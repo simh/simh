@@ -214,12 +214,6 @@
 #define ACC_IFAD 12 /* Instruction fetch after discontinuity */
 #define ACC_IF   13 /* Instruction fetch */
 
-/* Memory access levels */
-#define L_KERNEL 0
-#define L_EXEC   1
-#define L_SUPER  2
-#define L_USER   3
-
 /* Pluck out Virtual Address fields */
 #define SID(va)           (((va) >> 30) & 3)
 #define SSL(va)           (((va) >> 17) & 0x1fff)
@@ -370,12 +364,6 @@ t_stat mmu_decode_vaddr(uint32 vaddr, uint8 r_acc,
 
 #define SHOULD_UPDATE_PD_M_BIT(pd)              \
     (r_acc == ACC_W && !((pd) & PD_M_MASK))
-
-/* Special functions for reading operands and examining memory
-   safely */
-t_stat read_operand(uint32 va, uint8 *val);
-t_stat examine(uint32 va, uint8 *val);
-t_stat deposit(uint32 va, uint8 val);
 
 /* Dispatch to the MMU when enabled, or to physical RW when
    disabled */

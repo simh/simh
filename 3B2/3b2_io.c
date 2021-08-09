@@ -33,15 +33,34 @@
 
 CIO_STATE  cio[CIO_SLOTS] = {{0}};
 
-struct iolink iotable[] = {
+#if defined(REV3)
+iolink iotable[] = {
+    { MMUBASE,    MMUBASE+MMUSIZE,       &mmu_read,    &mmu_write    },
+    { IFBASE,     IFBASE+IFSIZE,         &if_read,     &if_write     },
+    { IFCSRBASE,  IFCSRBASE+IFCSRSIZE,   &if_csr_read, &if_csr_write },
+    { FLTLBASE,   FLTLSIZE,              &flt_read,    &flt_write    },
+    { FLTHBASE,   FLTHSIZE,              &flt_read,    &flt_write    },
+    { NVRBASE,    NVRBASE+NVRSIZE,       &nvram_read,  &nvram_write  },
+    { TIMERBASE,  TIMERBASE+TIMERSIZE,   &timer_read,  &timer_write  },
+    { CSRBASE,    CSRBASE+CSRSIZE,       &csr_read,    &csr_write    },
+    { IUBASE,     IUBASE+IUSIZE,         &iu_read,     &iu_write     },
+    { DMAIUABASE, DMAIUABASE+DMAIUASIZE, &dmac_read,   &dmac_write   },
+    { DMAIUBBASE, DMAIUBBASE+DMAIUBSIZE, &dmac_read,   &dmac_write   },
+    { DMACBASE,   DMACBASE+DMACSIZE,     &dmac_read,   &dmac_write   },
+    { DMAIFBASE,  DMAIFBASE+DMAIFSIZE,   &dmac_read,   &dmac_write   },
+    { TODBASE,    TODBASE+TODSIZE,       &tod_read,    &tod_write    },
+    { 0, 0, NULL, NULL}
+};
+#else
+iolink iotable[] = {
     { MMUBASE,    MMUBASE+MMUSIZE,       &mmu_read,   &mmu_write   },
     { IFBASE,     IFBASE+IFSIZE,         &if_read,    &if_write    },
     { IDBASE,     IDBASE+IDSIZE,         &id_read,    &id_write    },
+    { DMAIDBASE,  DMAIDBASE+DMAIDSIZE,   &dmac_read,  &dmac_write  },
+    { NVRBASE,    NVRBASE+NVRSIZE,       &nvram_read, &nvram_write },
     { TIMERBASE,  TIMERBASE+TIMERSIZE,   &timer_read, &timer_write },
-    { NVRAMBASE,  NVRAMBASE+NVRAMSIZE,   &nvram_read, &nvram_write },
     { CSRBASE,    CSRBASE+CSRSIZE,       &csr_read,   &csr_write   },
     { IUBASE,     IUBASE+IUSIZE,         &iu_read,    &iu_write    },
-    { DMAIDBASE,  DMAIDBASE+DMAIDSIZE,   &dmac_read,  &dmac_write  },
     { DMAIUABASE, DMAIUABASE+DMAIUASIZE, &dmac_read,  &dmac_write  },
     { DMAIUBBASE, DMAIUBBASE+DMAIUBSIZE, &dmac_read,  &dmac_write  },
     { DMACBASE,   DMACBASE+DMACSIZE,     &dmac_read,  &dmac_write  },
@@ -49,6 +68,7 @@ struct iolink iotable[] = {
     { TODBASE,    TODBASE+TODSIZE,       &tod_read,   &tod_write   },
     { 0, 0, NULL, NULL}
 };
+#endif
 
 void cio_clear(uint8 cid)
 {
@@ -358,10 +378,70 @@ t_bool cio_rqueue_avail(uint8 cid, uint32 qnum, uint32 esize)
 
 uint32 io_read(uint32 pa, size_t size)
 {
-    struct iolink *p;
+    iolink *p;
     uint8 cid, reg, data;
 
-    /* Special devices */
+#if defined (REV3)
+    /*
+     * NOTE: Not Yet Implemented, but: If 0x4BF00 is accessed and does
+     * not result in an error, the system assumes there are two MMUs
+     * installed. I think 0x4b000 is where a second MMU would live in
+     * IO space if there were multiple MMUs.
+     */
+    if ((pa == MADDR_SLOT_0) ||
+        (pa == MADDR_SLOT_1) ||
+        (pa == MADDR_SLOT_2) ||
+        (pa == MADDR_SLOT_3)) {
+        switch(MEM_SIZE) {
+        case MSIZ_4M:
+            /* Configure with one 4MB boards */
+            if (pa < MADDR_SLOT_1) {
+                return MEMID_4M;
+            }
+            break;
+        case MSIZ_8M:
+            /* Configure with two 4MB boards */
+            if (pa < MADDR_SLOT_2) {
+                return MEMID_4M;
+            }
+            break;
+        case MSIZ_16M:
+            /* Configure with four 4MB boards */
+            return MEMID_4M;
+        case MSIZ_32M:
+            /* Configure with two 16MB boards */
+            if (pa < MADDR_SLOT_2) {
+                return MEMID_16M;
+            }
+            break;
+        case MSIZ_64M:
+            /* Configure with four 16MB boards */
+            return MEMID_16M;
+        default:
+            return 0;
+        }
+
+        return 0;
+    }
+
+    if (pa >= VCACHE_BOTTOM && pa < VCACHE_TOP) {
+        CSRBIT(CSRTIMO, TRUE);
+        cpu_abort(NORMAL_EXCEPTION, EXTERNAL_MEMORY_FAULT);
+        return 0;
+    }
+
+    if (pa >= BUB_BOTTOM && pa < BUB_TOP) {
+        CSRBIT(CSRTIMO, TRUE);
+
+        /* TODO: I don't remember why we do this! */
+        if ((pa & 0xfff) == 3) {
+            cpu_abort(NORMAL_EXCEPTION, EXTERNAL_MEMORY_FAULT);
+        }
+
+        /* TODO: Implement BUB */
+        return 1;
+    }
+#else
     if (pa == MEMSIZE_REG) {
 
         /* The following values map to memory sizes:
@@ -383,6 +463,7 @@ uint32 io_read(uint32 pa, size_t size)
             return 0;
         }
     }
+#endif
 
     /* CIO board area */
     if (pa >= CIO_BOTTOM && pa < CIO_TOP) {
@@ -522,7 +603,7 @@ uint32 io_read(uint32 pa, size_t size)
 
 void io_write(uint32 pa, uint32 val, size_t size)
 {
-    struct iolink *p;
+    iolink *p;
     uint8 cid, reg;
 
     /* Feature Card Area */

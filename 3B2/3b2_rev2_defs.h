@@ -33,14 +33,20 @@
 
 #include "sim_defs.h"
 
-#define MAXMEMSIZE      (1 << 22) /* 4 MB */
+#define NUM_REGISTERS   16
+
+#define DEFMEMSIZE      MSIZ_4M
+#define MAXMEMSIZE      MSIZ_4M
+
+#define HWORD_OP_COUNT  11
+#define CPU_VERSION     0x1A  /* Version encoded in WE32100 */
 
 #define TODBASE         0x41000
 #define TODSIZE         0x40
 #define TIMERBASE       0x42000
 #define TIMERSIZE       0x20
-#define NVRAMBASE       0x43000
-#define NVRAMSIZE       0x1000
+#define NVRBASE         0x43000
+#define NVRSIZE         0x1000
 #define CSRBASE         0x44000
 #define CSRSIZE         0x100
 #define IFBASE          0x4d000
@@ -75,7 +81,12 @@
 #define CSRDMA          0x0002 /* DMA Interrupt          */
 #define CSRIOF          0x0001 /* I/O Board Fail         */
 
+/* Memory */
 #define MEMSIZE_REG     0x4C003
+#define MEMID_512K      0
+#define MEMID_1M        2
+#define MEMID_2M        1
+#define MEMID_4M        3
 
 /* DMA Controller */
 #define DMACBASE        0x48000
@@ -107,5 +118,7 @@
 #define DMA_IUB         0x47
 #define DMA_C           0x48
 #define DMA_IF          0x4E
+
+extern uint16 csr_data;
 
 #endif /* _3B2_REV2_DEFS_H_  */

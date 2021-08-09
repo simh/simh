@@ -1,6 +1,6 @@
-/* 3b2_rev2_sys.c: AT&T 3B2 Rev 2 (Model 400) system definition
+/* 3b2_mem.h: AT&T 3B2 3B2 memory access routines
 
-   Copyright (c) 2017, Seth J. Morabito
+   Copyright (c) 2021, Seth J. Morabito
 
    Permission is hereby granted, free of charge, to any person
    obtaining a copy of this software and associated documentation
@@ -28,43 +28,35 @@
    from the author.
 */
 
-#include "3b2_defs.h"
+#ifndef _3B2_MEM_H_
+#define _3B2_MEM_H_
 
-char sim_name[] = "AT&T 3B2/400";
+#include "sim_defs.h"
 
-DEVICE *sim_devices[] = {
-    &cpu_dev,
-    &mmu_dev,
-    &mau_dev,
-    &timer_dev,
-    &tod_dev,
-    &nvram_dev,
-    &csr_dev,
-    &tti_dev,
-    &tto_dev,
-    &contty_dev,
-    &iu_timer_dev,
-    &dmac_dev,
-    &if_dev,
-    &id_dev,
-    &ports_dev,
-    &ctc_dev,
-    &ni_dev,
-    NULL
-};
+uint32 pread_w(uint32 pa);
+void   pwrite_w(uint32 pa, uint32 val);
+uint8  pread_b(uint32 pa);
+void   pwrite_b(uint32 pa, uint8 val);
+uint16 pread_h(uint32 pa);
+void   pwrite_h(uint32 pa, uint16 val);
 
-void full_reset()
-{
-    cpu_reset(&cpu_dev);
-    mau_reset(&mau_dev);
-    tti_reset(&tti_dev);
-    contty_reset(&contty_dev);
-    iu_timer_reset(&iu_timer_dev);
-    timer_reset(&timer_dev);
-    if_reset(&if_dev);
-    id_reset(&id_dev);
-    csr_reset(&csr_dev);
-    ports_reset(&ports_dev);
-    ctc_reset(&ctc_dev);
-    ni_reset(&ni_dev);
-}
+uint8  read_b(uint32 va, uint8 r_acc);
+uint16 read_h(uint32 va, uint8 r_acc);
+uint32 read_w(uint32 va, uint8 r_acc);
+void   write_b(uint32 va, uint8 val);
+void   write_h(uint32 va, uint16 val);
+void   write_w(uint32 va, uint32 val);
+
+t_stat read_operand(uint32 va, uint8 *val);
+t_stat examine(uint32 va, uint8 *val);
+t_stat deposit(uint32 va, uint8 val);
+
+t_bool addr_is_rom(uint32 pa);
+t_bool addr_is_mem(uint32 pa);
+t_bool addr_is_io(uint32 pa);
+
+t_stat mmu_decode_va(uint32 va, uint8 r_acc, t_bool fc, uint32 *pa);
+void   mmu_enable();
+void   mmu_disable();
+
+#endif /* _3B2_MEM_H_ */

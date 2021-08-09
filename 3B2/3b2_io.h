@@ -190,12 +190,12 @@ typedef struct {
     uint32 address;
 } cio_entry;
 
-struct iolink {
+typedef struct {
     uint32      low;
     uint32      high;
     uint32      (*read)(uint32 pa, size_t size);
     void        (*write)(uint32 pa, uint32 val, size_t size);
-};
+} iolink;
 
 /* Example pump structure
  * ----------------------

@@ -44,6 +44,9 @@ typedef struct {
     uint8 read_addr_ptr;
     int8  step_dir;
     t_bool drq;
+#if defined(REV3)    
+    uint8 csr;
+#endif
 } IF_STATE;
 
 /* Status Bits */
@@ -114,6 +117,10 @@ t_stat if_attach(UNIT *uptr, CONST char *cptr);
 t_stat if_detach(UNIT *uptr);
 uint32 if_read(uint32 pa, size_t size);
 void if_write(uint32 pa, uint32 val, size_t size);
+#if defined(REV3)
+uint32 if_csr_read(uint32 pa, size_t size);
+void if_csr_write(uint32 pa, uint32 val, size_t size);
+#endif
 void if_handle_command();
 void if_after_dma();
 CONST char *if_description(DEVICE *dptr);

@@ -242,10 +242,10 @@ REG mau_reg[] = {
 };
 
 MTAB mau_mod[] = {
-    { UNIT_EXHALT, UNIT_EXHALT, "Halt on Exception", "EXHALT",
-      NULL, NULL, NULL, "Enables Halt on floating point exceptions" },
-    { UNIT_EXHALT, 0, "No halt on Exception", "NOEXHALT",
-      NULL, NULL, NULL, "Disables Halt on floating point exceptions" },
+    { UNIT_EXBRK, UNIT_EXBRK, "Break on exceptions", "EXBRK",
+      NULL, NULL, NULL, "Enables break on floating point exceptions" },
+    { UNIT_EXBRK, 0, "No break on exceptions", "NOEXBRK",
+      NULL, NULL, NULL, "Disables break on floating point exceptions" },
     { 0 }
 };
 
@@ -416,7 +416,7 @@ static SIM_INLINE void abort_on_fault()
          * in the CPU's PSW).
          */
         if ((mau_state.asr & MAU_ASR_IO) && (R[NUM_PSW] & PSW_OE_MASK)) {
-            if (mau_unit.flags & UNIT_EXHALT) {
+            if (mau_unit.flags & UNIT_EXBRK) {
                 stop_reason = STOP_EX;
             }
             sim_debug(TRACE_DBG, &mau_dev,
@@ -427,7 +427,7 @@ static SIM_INLINE void abort_on_fault()
 
         /* Otherwise, check for other exceptions. */
         if (mau_exception_present()) {
-            if (mau_unit.flags & UNIT_EXHALT) {
+            if (mau_unit.flags & UNIT_EXBRK) {
                 stop_reason = STOP_EX;
             }
             sim_debug(TRACE_DBG, &mau_dev,

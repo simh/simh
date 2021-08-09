@@ -2032,14 +2032,25 @@ KL10 = ${KL10D}/kx10_cpu.c ${KL10D}/kx10_sys.c ${KL10D}/kx10_df.c \
 KL10_OPT = -DKL=1 -DUSE_INT64 -I $(KL10D) -DUSE_SIM_CARD ${NETWORK_OPT} 
 
 ATT3B2D = ${SIMHD}/3B2
-ATT3B2M400 = ${ATT3B2D}/3b2_cpu.c ${ATT3B2D}/3b2_rev2_sys.c \
-	${ATT3B2D}/3b2_rev2_stddev.c ${ATT3B2D}/3b2_rev2_mmu.c \
-	${ATT3B2D}/3b2_rev2_mau.c ${ATT3B2D}/3b2_iu.c \
-	${ATT3B2D}/3b2_if.c ${ATT3B2D}/3b2_id.c \
+ATT3B2M400 = ${ATT3B2D}/3b2_cpu.c ${ATT3B2D}/3b2_sys.c \
+	${ATT3B2D}/3b2_rev2_sys.c ${ATT3B2D}/3b2_rev2_mmu.c \
+	${ATT3B2D}/3b2_rev2_mau.c ${ATT3B2D}/3b2_rev2_csr.c \
+	${ATT3B2D}/3b2_stddev.c ${ATT3B2D}/3b2_mem.c \
+	${ATT3B2D}/3b2_iu.c ${ATT3B2D}/3b2_if.c \
+	${ATT3B2D}/3b2_id.c ${ATT3B2D}/3b2_dmac.c \
+	${ATT3B2D}/3b2_io.c ${ATT3B2D}/3b2_ports.c \
+	${ATT3B2D}/3b2_ctc.c ${ATT3B2D}/3b2_ni.c
+ATT3B2M400_OPT = -DUSE_INT64 -DUSE_ADDR64 -DREV2 -I ${ATT3B2D} ${NETWORK_OPT}
+
+ATT3B2M600 = ${ATT3B2D}/3b2_cpu.c ${ATT3B2D}/3b2_sys.c \
+	${ATT3B2D}/3b2_rev3_sys.c ${ATT3B2D}/3b2_rev3_mmu.c \
+	${ATT3B2D}/3b2_rev2_mau.c ${ATT3B2D}/3b2_rev3_csr.c \
+	${ATT3B2D}/3b2_stddev.c ${ATT3B2D}/3b2_mem.c \
+	${ATT3B2D}/3b2_iu.c ${ATT3B2D}/3b2_if.c \
 	${ATT3B2D}/3b2_dmac.c ${ATT3B2D}/3b2_io.c \
-	${ATT3B2D}/3b2_ports.c ${ATT3B2D}/3b2_ctc.c \
+	${ATT3B2D}/3b2_ports.c ${ATT3B2D}/3b2_scsi.c \
 	${ATT3B2D}/3b2_ni.c
-ATT3B2_OPT = -DUSE_INT64 -DUSE_ADDR64 -I ${ATT3B2D} ${NETWORK_OPT}
+ATT3B2M600_OPT = -DUSE_INT64 -DUSE_ADDR64 -DREV3 -I ${ATT3B2D} ${NETWORK_OPT}
 
 SIGMAD = ${SIMHD}/sigma
 SIGMA = ${SIGMAD}/sigma_cpu.c ${SIGMAD}/sigma_sys.c ${SIGMAD}/sigma_cis.c \
@@ -2106,7 +2117,7 @@ ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 
 all : ${ALL}
 
-EXPERIMENTAL = cdc1700 
+EXPERIMENTAL = cdc1700 3b2-600
 
 experimental : ${EXPERIMENTAL}
 
@@ -2740,9 +2751,18 @@ endif
  
 ${BIN}3b2${EXE} : ${ATT3B2M400} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
-	${CC} ${ATT3B2M400} ${SIM} ${ATT3B2_OPT} ${CC_OUTSPEC} ${LDFLAGS}
+	${CC} ${ATT3B2M400} ${SIM} ${ATT3B2M400_OPT} ${CC_OUTSPEC} ${LDFLAGS}
 ifneq (,$(call find_test,${ATT3B2D},3b2))
 	$@ $(call find_test,${ATT3B2D},3b2) ${TEST_ARG}
+endif
+
+3b2-600 : ${BIN}3b2-600${EXE}
+
+${BIN}3b2-600${EXE} : ${ATT3B2M600} ${SIM} ${BUILD_ROMS}
+	${MKDIRBIN}
+	${CC} ${ATT3B2M600} ${SCSI} ${SIM} ${ATT3B2M600_OPT} ${CC_OUTSPEC} ${LDFLAGS}
+ifneq (,$(call find_test,${ATT3B2D},3b2-600))
+	$@ $(call find_test,${ATT3B2D},3b2-600) ${TEST_ARG}
 endif
 
 i7090 : ${BIN}i7090${EXE}

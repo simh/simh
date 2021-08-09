@@ -77,10 +77,13 @@ void nvram_write(uint32 pa, uint32 val, size_t size);
 t_stat timer_reset(DEVICE *dptr);
 uint32 timer_read(uint32 pa, size_t size);
 void timer_write(uint32 pa, uint32 val, size_t size);
+void timer_tick();
 t_stat timer0_svc(UNIT *uptr);
 t_stat timer1_svc(UNIT *uptr);
 t_stat timer2_svc(UNIT *uptr);
 t_stat timer_set_shutdown(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+void timer_disable(uint8 ctrnum);
+void timer_enable(uint8 ctrnum);
 
 /* CSR */
 t_stat csr_svc(UNIT *uptr);
@@ -119,5 +122,12 @@ const char *tod_description(DEVICE *dptr);
 t_stat tod_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 uint32 tod_read(uint32 pa, size_t size);
 void tod_write(uint32, uint32 val, size_t size);
+
+#if defined(REV3)
+/* Fault Register */
+
+uint32 flt_read(uint32 pa, size_t size);
+void flt_write(uint32 pa, uint32 val, size_t size);
+#endif
 
 #endif /* _3B2_REV2_SYSDEV_H_ */

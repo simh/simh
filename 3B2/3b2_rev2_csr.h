@@ -1,6 +1,6 @@
-/* 3b2_rev2_sys.c: AT&T 3B2 Rev 2 (Model 400) system definition
+/* 3b2_rev2_csr.h: AT&T 3B2 Rev 2 Control and Status Register
 
-   Copyright (c) 2017, Seth J. Morabito
+   Copyright (c) 2021, Seth J. Morabito
 
    Permission is hereby granted, free of charge, to any person
    obtaining a copy of this software and associated documentation
@@ -28,43 +28,17 @@
    from the author.
 */
 
-#include "3b2_defs.h"
+#ifndef _3B2_REV2_CSR_H_
+#define _3B2_REV2_CSR_H_
 
-char sim_name[] = "AT&T 3B2/400";
+#include "sim_defs.h"
 
-DEVICE *sim_devices[] = {
-    &cpu_dev,
-    &mmu_dev,
-    &mau_dev,
-    &timer_dev,
-    &tod_dev,
-    &nvram_dev,
-    &csr_dev,
-    &tti_dev,
-    &tto_dev,
-    &contty_dev,
-    &iu_timer_dev,
-    &dmac_dev,
-    &if_dev,
-    &id_dev,
-    &ports_dev,
-    &ctc_dev,
-    &ni_dev,
-    NULL
-};
+/* CSR */
+t_stat csr_svc(UNIT *uptr);
+t_stat csr_ex(t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
+t_stat csr_dep(t_value val, t_addr exta, UNIT *uptr, int32 sw);
+t_stat csr_reset(DEVICE *dptr);
+uint32 csr_read(uint32 pa, size_t size);
+void csr_write(uint32 pa, uint32 val, size_t size);
 
-void full_reset()
-{
-    cpu_reset(&cpu_dev);
-    mau_reset(&mau_dev);
-    tti_reset(&tti_dev);
-    contty_reset(&contty_dev);
-    iu_timer_reset(&iu_timer_dev);
-    timer_reset(&timer_dev);
-    if_reset(&if_dev);
-    id_reset(&id_dev);
-    csr_reset(&csr_dev);
-    ports_reset(&ports_dev);
-    ctc_reset(&ctc_dev);
-    ni_reset(&ni_dev);
-}
+#endif /* 3B2_REV2_CSR_H_ */

@@ -1,6 +1,6 @@
-/* 3b2_rev2_sys.c: AT&T 3B2 Rev 2 (Model 400) system definition
+/* 3b2_rev3_sys.c: AT&T 3B2/600G system definition
 
-   Copyright (c) 2017, Seth J. Morabito
+   Copyright (c) 2020, Seth J. Morabito
 
    Permission is hereby granted, free of charge, to any person
    obtaining a copy of this software and associated documentation
@@ -29,26 +29,27 @@
 */
 
 #include "3b2_defs.h"
+#include "3b2_sys.h"
 
-char sim_name[] = "AT&T 3B2/400";
+char sim_name[] = "AT&T 3B2/600G";
 
 DEVICE *sim_devices[] = {
     &cpu_dev,
+    &csr_dev,
+    &flt_dev,
     &mmu_dev,
     &mau_dev,
     &timer_dev,
     &tod_dev,
     &nvram_dev,
-    &csr_dev,
     &tti_dev,
     &tto_dev,
     &contty_dev,
     &iu_timer_dev,
     &dmac_dev,
     &if_dev,
-    &id_dev,
+    &ha_dev,
     &ports_dev,
-    &ctc_dev,
     &ni_dev,
     NULL
 };
@@ -62,9 +63,8 @@ void full_reset()
     iu_timer_reset(&iu_timer_dev);
     timer_reset(&timer_dev);
     if_reset(&if_dev);
-    id_reset(&id_dev);
+    ha_reset(&ha_dev);
     csr_reset(&csr_dev);
     ports_reset(&ports_dev);
-    ctc_reset(&ctc_dev);
     ni_reset(&ni_dev);
 }

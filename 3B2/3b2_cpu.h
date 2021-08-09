@@ -67,7 +67,7 @@
 #define NEW_PCB_FAULT         4
 #define GATE_VECTOR_FAULT     6
 
-/* Processor Exceptions */
+/* Process Exceptions */
 #define GATE_PCB_FAULT        1
 
 /* Stack Exceptions */
@@ -91,8 +91,8 @@
 #define PRIVILEGED_REGISTER   15
 
 #define PSW_ET                0
-#define PSW_TM                2u
-#define PSW_ISC               3u
+#define PSW_TM                2
+#define PSW_ISC               3
 #define PSW_I                 7
 #define PSW_R                 8
 #define PSW_PM                9
@@ -127,6 +127,10 @@
 #define PSW_CFD_MASK          (1u << PSW_CFD)
 #define PSW_CUR_IPL           (((R[NUM_PSW] & PSW_IPL_MASK) >> PSW_IPL) & 0xf)
 
+/* A helper to set the PSW, preserving read-only fields */
+#define PSW_RO_MASK           0x17f   /* ET, TM, ISC, and R are read-only! */
+#define WRITE_PSW(V)          (R[NUM_PSW] = ((R[NUM_PSW] & PSW_RO_MASK) | ((V) & ~PSW_RO_MASK)))
+
 /* Exceptional conditions handled within the instruction loop */
 #define ABORT_EXC             1 /* CPU exception  */
 
@@ -152,12 +156,19 @@
 #define NUM_PC                15
 
 /* System board interrupt priority levels */
-#define CPU_PIR8_IPL          8
-#define CPU_PIR9_IPL          9
-#define CPU_ID_IF_IPL         11
-#define CPU_IU_DMA_IPL        13
-#define CPU_TMR_IPL           15
+#define CPU_IPL_8             8
+#define CPU_IPL_9             9
+#define CPU_IPL_11            11
+#define CPU_IPL_13            13
+#define CPU_IPL_15            15
 
+/* Processor permission levels */
+#define L_KERNEL              0
+#define L_EXEC                1
+#define L_SUPER               2
+#define L_USER                3
+
+/* Currently selected processor permission level */
 #define CPU_CM                (cpu_km ? L_KERNEL : ((R[NUM_PSW] >> PSW_CM) & 3))
 
 /* Data types operated on by instructions. NB: These integer values
@@ -171,9 +182,6 @@
 #define SB                    7 /* Signed Byte */
 
 #define NA                   -1
-
-/* Processor Version Number */
-#define WE32100_VER           0x1A
 
 /*
  *
@@ -224,13 +232,29 @@ typedef enum {
     SPOPRT  = 0x06,
     SPOPT2  = 0x07,
     RET     = 0x08,
+#if defined(REV3)
+    CASWI   = 0x09,
+    SETX    = 0x0A,
+    CLRX    = 0x0B,
+#endif
     MOVTRW  = 0x0C,
+#if defined(REV3)
+    TEDTH   = 0x0D,
+    PACKB   = 0x0E,
+    UNPACKB = 0x0F,
+#endif
     SAVE    = 0x10,
     SPOPWD  = 0x13,
     EXTOP   = 0x14,
     SPOPWT  = 0x17,
     RESTORE = 0x18,
+#if defined(REV3)
+    DTH     = 0x19,
+#endif
     SWAPWI  = 0x1C,
+#if defined(REV3)
+    TGEDTH  = 0x1D,
+#endif    
     SWAPHI  = 0x1E,
     SWAPBI  = 0x1F,
     POPW    = 0x20,
@@ -239,9 +263,15 @@ typedef enum {
     JMP     = 0x24,
     CFLUSH  = 0x27,
     TSTW    = 0x28,
+#if defined(REV3)
+    DTB     = 0x29,
+#endif
     TSTH    = 0x2A,
     TSTB    = 0x2B,
     CALL    = 0x2C,
+#if defined(REV3)
+    TGDTH   = 0x2D,
+#endif
     BPT     = 0x2E,
     WAIT    = 0x2F,
     EMB     = 0x30, /* Multi-byte */
@@ -254,6 +284,9 @@ typedef enum {
     BITH    = 0x3A,
     BITB    = 0x3B,
     CMPW    = 0x3C,
+#if defined(REV3)
+    TNEDTH  = 0x3D,
+#endif
     CMPH    = 0x3E,
     CMPB    = 0x3F,
     RGEQ    = 0x40,
@@ -266,6 +299,9 @@ typedef enum {
     BLH     = 0x4A,
     BLB     = 0x4B,
     RLEQ    = 0x4C,
+#if defined(REV3)
+    TEDTB   = 0x4D,
+#endif
     BLEH    = 0x4E,
     BLEB    = 0x4F,
     RGEQU   = 0x50,
@@ -278,6 +314,9 @@ typedef enum {
     BLUH    = 0x5A,
     BLUB    = 0x5B,
     RLEQU   = 0x5C,
+#if defined(REV3)
+    TGEDTB  = 0x5D,
+#endif
     BLEUH   = 0x5E,
     BLEUB   = 0x5F,
     RVC     = 0x60,
@@ -290,12 +329,14 @@ typedef enum {
     BVSH    = 0x6A,
     BVSB    = 0x6B,
     REQLU   = 0x6C,
+#if defined(REV3)
+    TGDTB   = 0x6D,
+#endif
     BEH_D   = 0x6E,
     BEB_D   = 0x6F,
     NOP     = 0x70,
     NOP3    = 0x72,
     NOP2    = 0x73,
-    BNEQ    = 0x74,
     RNEQ    = 0x74,
     BNEH    = 0x76,
     BNEB    = 0x77,
@@ -303,6 +344,9 @@ typedef enum {
     BRH     = 0x7A,
     BRB     = 0x7B,
     REQL    = 0x7C,
+#if defined(REV3)
+    TNEDTB  = 0x7D,
+#endif
     BEH     = 0x7E,
     BEB     = 0x7F,
     CLRW    = 0x80,
@@ -323,10 +367,17 @@ typedef enum {
     DECW    = 0x94,
     DECH    = 0x96,
     DECB    = 0x97,
+#if defined(REV3)
+    RETQINT = 0x98,
+    SUBPB2  = 0x9B,
+#endif
     ADDW2   = 0x9C,
     ADDH2   = 0x9E,
     ADDB2   = 0x9F,
     PUSHW   = 0xA0,
+#if defined(REV3)
+    ADDPB2  = 0xA3,
+#endif
     MODW2   = 0xA4,
     MODH2   = 0xA6,
     MODB2   = 0xA7,
@@ -363,10 +414,16 @@ typedef enum {
     LLSB3   = 0xD3,
     LRSW3   = 0xD4,
     ROTW    = 0xD8,
+#if defined(REV3)
+    SUBPB3  = 0xDB,
+#endif
     ADDW3   = 0xDC,
     ADDH3   = 0xDE,
     ADDB3   = 0xDF,
     PUSHAW  = 0xE0,
+#if defined(REV3)
+    ADDPB3  = 0xE3,
+#endif
     MODW3   = 0xE4,
     MODH3   = 0xE6,
     MODB3   = 0xE7,
@@ -446,8 +503,22 @@ typedef enum {
     OP_COPR  /* Coprocessor instruction */
 } op_mode;
 
-/* Describes a mnemonic */
-typedef struct _mnemonic {
+/* Describes a CPU opcode.
+ *
+ * e.g.:
+ *
+ *    {0x09, 3, OP_DESC, WD, "CASWI", 0, 1, -1, 2}
+ *
+ *  - Opcode 0x09.
+ *  - Followed by three operands.
+ *  - Operands use descriptor bytes.
+ *  - Default data type is word (32 bit).
+ *  - Operand 0 is source 1.
+ *  - Operand 1 is source 2.
+ *  - Operand 2 is destination.
+ *
+ */
+typedef struct {
     uint16  opcode;
     int8    op_count;    /* Number of operands */
     op_mode mode;        /* Dispatch mode      */
@@ -462,7 +533,7 @@ typedef struct _mnemonic {
 /*
  * Structure that describes each operand in a decoded instruction
  */
-typedef struct _operand {
+typedef struct {
     uint8   mode;        /* Embedded data addressing mode */
     uint8   reg;         /* Operand register (0-15) */
     int8    dtype;       /* Default type for the operand */
@@ -490,6 +561,18 @@ typedef struct {
     t_bool valid;
     operand operands[4];
 } instr;
+
+/*
+ * A mapping of CIO identifier word to CIO device name.
+ *
+ * Each CIO expansion card in a 3B2 system identifies itself with a
+ * well-knon 16-bit value, used by drivers to identify the type of
+ * card installed in each slot.
+ */
+typedef struct {
+    uint16 id;
+    const char name[8];
+} cio_device;
 
 /* Function prototypes */
 t_stat sys_boot(int32 flag, CONST char *ptr);

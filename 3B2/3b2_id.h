@@ -32,7 +32,6 @@
 #define __3B2_ID_H__
 
 #include "sim_defs.h"
-#include "sim_disk.h"
 
 #define ID0             0
 #define ID1             1

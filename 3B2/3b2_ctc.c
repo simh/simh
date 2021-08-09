@@ -56,9 +56,6 @@
 
 #define VTOC_BLOCK    0
 
-#define ATOW(arr,i)  ((uint32)arr[i+3] + ((uint32)arr[i+2] << 8) +      \
-                      ((uint32)arr[i+1] << 16) + ((uint32)arr[i] << 24))
-
 /* Static function declarations */
 static t_stat ctc_show_cqueue(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 static t_stat ctc_show_rqueue(FILE *st, UNIT *uptr, int32 val, CONST void *desc);

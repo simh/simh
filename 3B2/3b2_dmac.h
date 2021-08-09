@@ -1,6 +1,6 @@
-/* 3b2_dmac.h: AT&T 3B2 Model 400 AM9517A DMA Controller Header
+/* 3b2_dmac.h: AT&T 3B2 DMA Controller Header
 
-   Copyright (c) 2017, Seth J. Morabito
+   Copyright (c) 2021, Seth J. Morabito
 
    Permission is hereby granted, free of charge, to any person
    obtaining a copy of this software and associated documentation
@@ -40,7 +40,7 @@
 #define DMA_IF_READ      (IFBASE + IF_DATA_REG)
 
 typedef struct {
-    uint8  page;
+    uint16 page;
     uint16 addr;     /* Original addr       */
     uint16 wcount;   /* Original wcount     */
     uint16 addr_c;   /* Current addr        */

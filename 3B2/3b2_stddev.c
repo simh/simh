@@ -39,7 +39,7 @@
 */
 
 #include "3b2_defs.h"
-#include "3b2_rev2_stddev.h"
+#include "3b2_stddev.h"
 
 DEBTAB sys_deb_tab[] = {
     { "INIT",       INIT_MSG,       "Init"              },
@@ -57,171 +57,10 @@ uint32 *NVRAM = NULL;
 
 int32 tmxr_poll = 16667;
 
-/* CSR */
-
-uint16 csr_data;
-
-BITFIELD csr_bits[] = {
-    BIT(IOF),
-    BIT(DMA),
-    BIT(DISK),
-    BIT(UART),
-    BIT(PIR9),
-    BIT(PIR8),
-    BIT(CLK),
-    BIT(IFLT),
-    BIT(ITIM),
-    BIT(FLOP),
-    BIT(NA),
-    BIT(LED),
-    BIT(ALGN),
-    BIT(RRST),
-    BIT(PARE),
-    BIT(TIMO),
-    ENDBITS
-};
-
-UNIT csr_unit = {
-    UDATA(NULL, UNIT_FIX, CSRSIZE)
-};
-
-REG csr_reg[] = {
-    { HRDATADF(DATA, csr_data, 16, "CSR Data", csr_bits) },
-    { NULL }
-};
-
-DEVICE csr_dev = {
-    "CSR", &csr_unit, csr_reg, NULL,
-    1, 16, 8, 4, 16, 32,
-    &csr_ex, &csr_dep, &csr_reset,
-    NULL, NULL, NULL, NULL,
-    DEV_DEBUG, 0, sys_deb_tab
-};
-
-t_stat csr_ex(t_value *vptr, t_addr exta, UNIT *uptr, int32 sw)
-{
-    return SCPE_OK;
-}
-
-t_stat csr_dep(t_value val, t_addr exta, UNIT *uptr, int32 sw)
-{
-    return SCPE_OK;
-}
-
-t_stat csr_reset(DEVICE *dptr)
-{
-    csr_data = 0;
-    return SCPE_OK;
-}
-
-uint32 csr_read(uint32 pa, size_t size)
-{
-    uint32 reg = pa - CSRBASE;
-
-    sim_debug(READ_MSG, &csr_dev,
-              "[%08x] CSR=%04x\n",
-              R[NUM_PC], csr_data);
-
-    switch (reg) {
-    case 0x2:
-        if (size == 8) {
-            return (csr_data >> 8) & 0xff;
-        } else {
-            return csr_data;
-        }
-    case 0x3:
-        return csr_data & 0xff;
-    default:
-        return 0;
-    }
-}
-
-void csr_write(uint32 pa, uint32 val, size_t size)
-{
-    uint32 reg = pa - CSRBASE;
-
-    switch (reg) {
-    case 0x03:    /* Clear Bus Timeout Error */
-        csr_data &= ~CSRTIMO;
-        break;
-    case 0x07:    /* Clear Memory Parity Error */
-        csr_data &= ~CSRPARE;
-        break;
-    case 0x0b:    /* Set System Reset Request */
-        full_reset();
-        cpu_boot(0, &cpu_dev);
-        break;
-    case 0x0f:    /* Clear Memory Alignment Fault */
-        csr_data &= ~CSRALGN;
-        break;
-    case 0x13:    /* Set Failure LED */
-        csr_data |= CSRLED;
-        break;
-    case 0x17:    /* Clear Failure LED */
-        csr_data &= ~CSRLED;
-        break;
-    case 0x1b:    /* Set Floppy Motor On */
-        csr_data |= CSRFLOP;
-        break;
-    case 0x1f:    /* Clear Floppy Motor On */
-        csr_data &= ~CSRFLOP;
-        break;
-    case 0x23:    /* Set Inhibit Timers */
-        sim_debug(WRITE_MSG, &csr_dev,
-                  "[%08x] SET INHIBIT TIMERS\n", R[NUM_PC]);
-        csr_data |= CSRITIM;
-        break;
-    case 0x27:    /* Clear Inhibit Timers */
-        sim_debug(WRITE_MSG, &csr_dev,
-                  "[%08x] CLEAR INHIBIT TIMERS\n", R[NUM_PC]);
-
-        /* A side effect of clearing the timer inhibit bit is to cause
-         * a simulated "tick" of any active timers.  This is a hack to
-         * make diagnostics pass. This is not 100% accurate, but it
-         * makes SVR3 and DGMON tests happy.
-         */
-
-        if (TIMERS[0].gate && TIMERS[0].enabled) {
-            TIMERS[0].val = TIMERS[0].divider - 1;
-        }
-
-        if (TIMERS[1].gate && TIMERS[1].enabled) {
-            TIMERS[1].val = TIMERS[1].divider - 1;
-        }
-
-        if (TIMERS[2].gate && TIMERS[2].enabled) {
-            TIMERS[2].val = TIMERS[2].divider - 1;
-        }
-
-        csr_data &= ~CSRITIM;
-        break;
-    case 0x2b:    /* Set Inhibit Faults */
-        csr_data |= CSRIFLT;
-        break;
-    case 0x2f:    /* Clear Inhibit Faults */
-        csr_data &= ~CSRIFLT;
-        break;
-    case 0x33:    /* Set PIR9 */
-        csr_data |= CSRPIR9;
-        break;
-    case 0x37:    /* Clear PIR9 */
-        csr_data &= ~CSRPIR9;
-        break;
-    case 0x3b:    /* Set PIR8 */
-        csr_data |= CSRPIR8;
-        break;
-    case 0x3f:    /* Clear PIR8 */
-        csr_data &= ~CSRPIR8;
-        break;
-    default:
-        break;
-    }
-}
-
 /* NVRAM */
 
 UNIT nvram_unit = {
-    UDATA(NULL, UNIT_FIX+UNIT_BINK, NVRAMSIZE)
+    UDATA(NULL, UNIT_FIX+UNIT_BINK, NVRSIZE)
 };
 
 REG nvram_reg[] = {
@@ -246,7 +85,7 @@ t_stat nvram_ex(t_value *vptr, t_addr exta, UNIT *uptr, int32 sw)
         return SCPE_ARG;
     }
 
-    if (addr >= NVRAMSIZE) {
+    if (addr >= NVRSIZE) {
         return SCPE_NXM;
     }
 
@@ -263,7 +102,7 @@ t_stat nvram_dep(t_value val, t_addr exta, UNIT *uptr, int32 sw)
         return SCPE_ARG;
     }
 
-    if (addr >= NVRAMSIZE) {
+    if (addr >= NVRSIZE) {
         return SCPE_NXM;
     }
 
@@ -275,8 +114,8 @@ t_stat nvram_dep(t_value val, t_addr exta, UNIT *uptr, int32 sw)
 t_stat nvram_reset(DEVICE *dptr)
 {
     if (NVRAM == NULL) {
-        NVRAM = (uint32 *)calloc(NVRAMSIZE >> 2, sizeof(uint32));
-        memset(NVRAM, 0, sizeof(uint32) * NVRAMSIZE >> 2);
+        NVRAM = (uint32 *)calloc(NVRSIZE >> 2, sizeof(uint32));
+        memset(NVRAM, 0, sizeof(uint32) * NVRSIZE >> 2);
         nvram_unit.filebuf = NVRAM;
     }
 
@@ -345,7 +184,7 @@ t_stat nvram_detach(UNIT *uptr)
 
 uint32 nvram_read(uint32 pa, size_t size)
 {
-    uint32 offset = pa - NVRAMBASE;
+    uint32 offset = pa - NVRBASE;
     uint32 data = 0;
     uint32 sc = (~(offset & 3) << 3) & 0x1f;
 
@@ -370,7 +209,7 @@ uint32 nvram_read(uint32 pa, size_t size)
 
 void nvram_write(uint32 pa, uint32 val, size_t size)
 {
-    uint32 offset = pa - NVRAMBASE;
+    uint32 offset = pa - NVRBASE;
     uint32 index = offset >> 2;
     uint32 sc, mask;
 
@@ -464,6 +303,61 @@ t_stat timer_reset(DEVICE *dptr) {
     return SCPE_OK;
 }
 
+static void timer_activate(uint8 ctrnum)
+{
+    struct timer_ctr *ctr;
+
+    ctr = &TIMERS[ctrnum];
+
+    switch (ctrnum) {
+    case TIMER_SANITY:
+#ifdef REV3
+        if ((csr_data & CSRISTIM) == 0) {
+            sim_debug(EXECUTE_MSG, &timer_dev,
+                      "[%08x] SANITY TIMER: Activating after %d steps\n",
+                      R[NUM_PC], ctr->val);
+            sim_activate_abs(&timer_unit[ctrnum], ctr->val);
+            ctr->val--;
+        } else {
+            sim_debug(EXECUTE_MSG, &timer_dev,
+                      "[%08x] SANITY TIMER: Currently disabled, not starting\n",
+                      R[NUM_PC]);
+        }
+#endif
+        break;
+    case TIMER_INTERVAL:
+        if ((csr_data & CSRITIM) == 0) {
+            sim_debug(EXECUTE_MSG, &timer_dev,
+                      "[%08x] INTERVAL TIMER: Activating after %d ms\n",
+                      R[NUM_PC], ctr->val);
+            sim_activate_after_abs(&timer_unit[ctrnum], ctr->val);
+            ctr->val--;
+        } else {
+            sim_debug(EXECUTE_MSG, &timer_dev,
+                      "[%08x] INTERVAL TIMER: Currently disabled, not starting\n",
+                      R[NUM_PC]);
+        }
+        break;
+    case TIMER_BUS:
+#ifdef REV3
+        if ((csr_data & CSRITIMO) == 0) {
+            sim_debug(EXECUTE_MSG, &timer_dev,
+                      "[%08x] BUS TIMER: Activating after %d steps\n",
+                      R[NUM_PC], ctr->val);
+            sim_activate_abs(&timer_unit[ctrnum], (ctr->val - 2));
+            ctr->val -= 2;
+        } else {
+            sim_debug(EXECUTE_MSG, &timer_dev,
+                      "[%08x] BUS TIMER: Currently disabled, not starting\n",
+                      R[NUM_PC]);
+        }
+#endif
+        break;
+    default:
+        break;
+    }    
+}
+
 t_stat timer_set_shutdown(UNIT *uptr, int32 val, CONST char* cptr, void* desc)
 {
     struct timer_ctr *sanity = (struct timer_ctr *)timer_unit[0].tmr;
@@ -476,6 +370,18 @@ t_stat timer_set_shutdown(UNIT *uptr, int32 val, CONST char* cptr, void* desc)
     csr_data |= CSRTIMO;
 
     return SCPE_OK;
+}
+
+void timer_enable(uint8 ctrnum) {
+    timer_activate(ctrnum);
+}
+
+void timer_disable(uint8 ctrnum)
+{
+    sim_debug(EXECUTE_MSG, &timer_dev,
+              "[%08x] Disabling timer %d\n",
+              R[NUM_PC], ctrnum);
+    sim_cancel(&timer_unit[ctrnum]);
 }
 
 /*
@@ -684,6 +590,21 @@ void timer_write(uint32 pa, uint32 val, size_t size)
                   "[%08x] unexpected write to clear timer latch\n",
                   R[NUM_PC]);
         break;
+    }
+}
+
+void timer_tick()
+{
+    if (TIMERS[0].gate && TIMERS[0].enabled) {
+        TIMERS[0].val = TIMERS[0].divider - 1;
+    }
+    
+    if (TIMERS[1].gate && TIMERS[1].enabled) {
+        TIMERS[1].val = TIMERS[1].divider - 1;
+    }
+    
+    if (TIMERS[2].gate && TIMERS[2].enabled) {
+        TIMERS[2].val = TIMERS[2].divider - 1;
     }
 }
 
@@ -955,3 +876,54 @@ t_stat tod_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr
 
     return SCPE_OK;
 }
+
+#if defined(REV3)
+
+/*
+ * Fault Register
+ *
+ * The Fault Register is composed of two 32-bit registers at addresses
+ * 0x4C000 and 0x4D000. These latch state of the last address to cause
+ * a CPU fault.
+ *
+ *   Bits 00-25: Physical memory address bits 00-25
+ */
+
+uint32 flt_1 = 0;
+uint32 flt_2 = 0;
+
+UNIT flt_unit = {
+    UDATA(NULL, UNIT_FIX+UNIT_BINK, 8)
+};
+
+REG flt_reg[] = {
+    { NULL }
+};
+
+DEVICE flt_dev = {
+    "FLT", &flt_unit, flt_reg, NULL,
+    1, 16, 8, 4, 16, 32,
+    NULL, NULL, NULL,
+    NULL, NULL, NULL,
+    NULL, DEV_DEBUG, 0, sys_deb_tab, NULL, NULL,
+    NULL, NULL, NULL,
+    NULL
+};
+
+uint32 flt_read(uint32 pa, size_t size)
+{
+    sim_debug(READ_MSG, &flt_dev,
+              "[%08x] Read from FLT Register at %x\n",
+              R[NUM_PC], pa);
+    return 0;
+}
+
+void flt_write(uint32 pa, uint32 val, size_t size)
+{
+    sim_debug(WRITE_MSG, &flt_dev,
+              "[%08x] Write to FLT Register at %x (val=%x)\n",
+              R[NUM_PC], pa, val);
+    return;
+}
+
+#endif

@@ -33,23 +33,34 @@
 
 #include "sim_defs.h"
 #include "sim_tmxr.h"
+#include "sim_disk.h"
 #include <setjmp.h>
 
-#include "3b2_cpu.h"
+
+#if defined(REV3)
+#include "3b2_rev3_defs.h"
+#include "3b2_rev3_csr.h"
+#include "3b2_rev3_mmu.h"
+#include "3b2_rev2_mau.h"  /* Use Rev 2 MAU until Rev 3 is implemented */
+#include "3b2_scsi.h"
+#else
 #include "3b2_rev2_defs.h"
+#include "3b2_rev2_csr.h"
 #include "3b2_rev2_mau.h"
 #include "3b2_rev2_mmu.h"
-#include "3b2_rev2_stddev.h"
-#include "3b2_rev2_sys.h"
 #include "3b2_id.h"
+#include "3b2_ctc.h"
+#endif
 
+#include "3b2_sys.h"
+#include "3b2_cpu.h"
 #include "3b2_io.h"
+#include "3b2_stddev.h"
+#include "3b2_mem.h"
 #include "3b2_dmac.h"
 #include "3b2_if.h"
 #include "3b2_iu.h"
-
 #include "3b2_ports.h"
-#include "3b2_ctc.h"
 #include "3b2_ni.h"
 
 #ifndef FALSE
@@ -81,11 +92,38 @@ noret __libc_longjmp(jmp_buf buf, int val);
 #define UNUSED(x) ((void)((x)))
 #endif
 
-#define UNIT_V_EXHALT  (UNIT_V_UF + 0)
-#define UNIT_EXHALT    (1u << UNIT_V_EXHALT)
+#define ATOW(arr, i)                                                           \
+  ((uint32)(arr)[i + 3] + ((uint32)(arr)[i + 2] << 8) +                        \
+   ((uint32)(arr)[i + 1] << 16) + ((uint32)(arr)[i] << 24))
+
+#define ATOH(arr, i) ((uint32)(arr)[i + 1] + ((uint32)(arr)[i] << 8))
+
+#define CSRBIT(bit, sc)                                                        \
+  {                                                                            \
+    if (sc) {                                                                  \
+      csr_data |= (bit);                                                       \
+    } else {                                                                   \
+      csr_data &= ~(bit);                                                      \
+    }                                                                          \
+  }
+
+#define UNIT_V_EXBRK   (UNIT_V_UF + 0)
+#define UNIT_V_OPBRK   (UNIT_V_UF + 1)
+#define UNIT_EXBRK     (1u << UNIT_V_EXBRK)
+#define UNIT_OPBRK     (1u << UNIT_V_OPBRK)
+
 #define EX_V_FLAG      1 << 21
 
 #define PHYS_MEM_BASE  0x2000000
+
+#define MSIZ_512K      0x80000
+#define MSIZ_1M        0x100000
+#define MSIZ_2M        0x200000
+#define MSIZ_4M        0x400000
+#define MSIZ_8M        0x800000
+#define MSIZ_16M       0x1000000
+#define MSIZ_32M       0x2000000
+#define MSIZ_64M       0x4000000
 
 /* Simulator stop codes */
 #define STOP_RSRV      1
@@ -115,25 +153,29 @@ noret __libc_longjmp(jmp_buf buf, int val);
 #define CACHE_DBG      0x1000
 #define DECODE_DBG     0x2000
 
+#define TIMER_SANITY   0
+#define TIMER_INTERVAL 1
+#define TIMER_BUS      2
+
 /* Global symbols */
 
 extern volatile int32 stop_reason;
 
 extern CIO_STATE      cio[CIO_SLOTS];
 
+extern uint32         rom_size;
 extern instr         *cpu_instr;
+extern t_bool         cpu_nmi;
 extern uint32        *ROM;
 extern uint32        *RAM;
-extern uint32         R[16];
+extern uint32         R[NUM_REGISTERS];
 extern REG            cpu_reg[];
 extern UNIT           cpu_unit;
 extern uint8          fault;
 extern t_bool         cpu_km;
-extern uint32         R[16];
 extern char           sim_name[];
 extern REG           *sim_PC;
 extern int32          sim_emax;
-extern uint16         csr_data;
 extern int32          tmxr_poll;
 
 extern DEBTAB         sys_deb_tab[];
