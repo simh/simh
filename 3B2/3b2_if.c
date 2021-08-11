@@ -554,6 +554,12 @@ void if_write(uint32 pa, uint32 val, size_t size)
         if_state.cmd = (uint8) val;
         /* Writing to the command register always de-asserts the IRQ line */
         if_clear_irq();
+
+        if ((uptr->flags & UNIT_ATT) == 0) {
+            /* If not attached, do nothing */
+            break;
+        }
+
         if_handle_command();
         break;
     case IF_TRACK_REG:
