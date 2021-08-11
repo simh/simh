@@ -568,7 +568,7 @@ t_stat set_prompt (int32 flag, CONST char *cptr);
 t_stat set_runlimit (int32 flag, CONST char *cptr);
 t_stat sim_set_asynch (int32 flag, CONST char *cptr);
 static const char *_get_dbg_verb (uint32 dbits, DEVICE* dptr, UNIT *uptr);
-static t_stat sim_sanity_check_register_declarations (void);
+static t_stat sim_sanity_check_register_declarations (DEVICE **devices);
 static void fix_writelock_mtab (DEVICE *dptr);
 static t_stat _sim_debug_flush (void);
 
@@ -2850,7 +2850,7 @@ if (register_check) {
     /* This test is explicitly run after the above reset_all_p() so that any devices 
        which dynamically manipulate their register lists have already done that. */
     sim_printf (" Running internal register sanity checks on %s simulator.\n", sim_name);
-    if ((stat = sim_sanity_check_register_declarations ()) != SCPE_OK) {
+    if ((stat = sim_sanity_check_register_declarations (NULL)) != SCPE_OK) {
         sim_printf ("Simulator device register sanity check error\n");
         if (sim_ttisatty())
             read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
@@ -2872,7 +2872,7 @@ if ((stat = sim_brk_init ()) != SCPE_OK) {
     goto cleanup_and_exit;
     }
 /* always check for register definition problems */
-sim_sanity_check_register_declarations ();
+sim_sanity_check_register_declarations (NULL);
 
 signal (SIGINT, int_handler);
 if (!sim_quiet) {
@@ -15753,14 +15753,17 @@ free (f);
  * device state variables it is supposed to reference.
  */
 
-static t_stat sim_sanity_check_register_declarations (void)
+static t_stat sim_sanity_check_register_declarations (DEVICE **devices)
 {
 t_stat stat = SCPE_OK;
 int i;
 DEVICE *dptr;
 MFILE *f = MOpen ();
 
-for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
+if (devices == NULL)                        /* Test DEVICE not provided? */
+    devices = sim_devices;                  /*    then Default to simulator's DEVICEs */
+
+for (i = 0; (dptr = devices[i]) != NULL; i++) {
     REG *rptr;
 
     for (rptr = dptr->registers; (rptr != NULL) && (rptr->name != NULL); rptr++) {
@@ -15779,7 +15782,7 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
         if (rptr->flags & REG_UNIT) {
             DEVICE **d;
 
-            for (d = sim_devices; *d != NULL; d++) {
+            for (d = devices; *d != NULL; d++) {
                 if (((UNIT *)rptr->loc >= (*d)->units) &&
                     ((UNIT *)rptr->loc < (*d)->units + (*d)->numunits)) {
                     udptr = *d;
@@ -15863,6 +15866,54 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
     }
 MClose (f);
 return stat;
+}
+
+uint8 treg8;
+uint16 treg16;
+uint32 treg32;
+t_value tregval;
+
+static struct validation_test {
+    REG reg[5];
+    t_stat expected_result;
+    } validations[] = {
+        { { { ORDATAD (REG8,   treg8,   8*sizeof(treg8),   "8 bit register") },
+            { ORDATAD (REG16,  treg16,  8*sizeof(treg16),  "16 bit register") },
+            { ORDATAD (REG32,  treg32,  8*sizeof(treg32),  "32 bit register") },
+            { ORDATAD (REGVAL, tregval, 8*sizeof(tregval), "value register") },
+            {NULL} },
+         SCPE_OK},
+        { { { ORDATAD (REG8,   treg8,   8*sizeof(treg8),   "8 bit register") },
+            { ORDATAD (REG16,  treg16,  8*sizeof(treg16),  "16 bit register") },
+            { ORDATAD (REG32,  treg32,  8*sizeof(treg32),  "32 bit register") },
+            { ORDATAD (REGVAL, tregval, 8*sizeof(tregval), "value register") },
+            {NULL} },
+         SCPE_OK},
+        {NULL}
+    };
+
+static UNIT validate_units[3];
+
+static DEVICE validate_test = {
+    "TEST-REG", validate_units, NULL, NULL, 
+    3, 16, 22, 4, 16, 16};
+
+static t_stat test_register_validation (void)
+{
+struct validation_test *v;
+DEVICE *v_devs[] = {&validate_test, 
+                   NULL};
+
+if (sim_switches & SWMASK ('T'))
+    sim_messagef (SCPE_OK, "test_register_validation - starting\n");
+for (v = validations; v->reg[0].name != NULL; v++) {
+    validate_test.registers = v->reg;
+    if (SCPE_OK != sim_sanity_check_register_declarations (v_devs))
+        break;
+    }
+if (sim_switches & SWMASK ('T'))
+    sim_messagef (SCPE_OK, "test_register_validation - done\n");
+return SCPE_OK;
 }
 
 typedef const char *(*parse_function)(const char *input, char *output, char end_char);
@@ -15992,7 +16043,7 @@ sim_printf ("Unit %s fired at %.0f\n", sim_uname (uptr), sim_gtime ());
 return SCPE_OK;
 }
 
-static t_stat test_scp_event_sequencing ()
+static t_stat test_scp_event_sequencing (void)
 {
 DEVICE *dptr = &sim_scp_dev;
 uint32 i;
@@ -16104,7 +16155,7 @@ char gbuf[CBUFSIZE];
 GET_SWITCHES (cptr);                        /* get switches */
 saved_switches |= sim_switches;
 if (sim_time != 0.0)
-    return sim_messagef (SCPE_UNK, "Library tests can not be performed after instructions have been executed.\n");
+    return sim_messagef (SCPE_UNK, "Library tests can only be performed before any other commands are processed.\n");
 sim_switches = 0;
 detach_all (0, 0);                          /* Assure that all units are unattached */
 sim_switches = saved_switches;
@@ -16124,6 +16175,8 @@ if (sim_switches & SWMASK ('D')) {
     sim_switches = saved_switches;
     }
 if ((strcmp (gbuf, "ALL") == 0) || (strcmp (gbuf, "SCP") == 0)) {
+    if (test_register_validation () != SCPE_OK)
+        return sim_messagef (SCPE_IERR, "SCP register validation test failed\n");
     if (test_scp_parsing () != SCPE_OK)
         return sim_messagef (SCPE_IERR, "SCP parsing test failed\n");
     if (test_scp_event_sequencing () != SCPE_OK)
