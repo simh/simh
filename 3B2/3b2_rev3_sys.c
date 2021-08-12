@@ -29,7 +29,15 @@
 */
 
 #include "3b2_defs.h"
-#include "3b2_sys.h"
+
+#include "3b2_cpu.h"
+#include "3b2_if.h"
+#include "3b2_iu.h"
+#include "3b2_ni.h"
+#include "3b2_ports.h"
+#include "3b2_rev2_mau.h" /* TODO: Replace with Rev 3 MAU when implemented */
+#include "3b2_scsi.h"
+#include "3b2_stddev.h"
 
 char sim_name[] = "AT&T 3B2/600G";
 

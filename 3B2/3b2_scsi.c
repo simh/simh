@@ -1,4 +1,4 @@
-/* 3b2_scsi.h: AT&T 3B2 SCSI (CM195W) feature card
+/* 3b2_scsi.c: AT&T 3B2 SCSI (CM195W) feature card
 
    Copyright (c) 2020, Seth J. Morabito
 
@@ -28,11 +28,14 @@
    from the author.
 */
 
+#include "3b2_scsi.h"
+
 #include "sim_scsi.h"
 #include "sim_tape.h"
 
-#include "3b2_defs.h"
-#include "3b2_scsi.h"
+#include "3b2_cpu.h"
+#include "3b2_io.h"
+#include "3b2_mem.h"
 
 #define PUMP_CRC 0x201b3617
 

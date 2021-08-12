@@ -31,7 +31,7 @@
 #ifndef _3B2_400_CSR_H_
 #define _3B2_400_CSR_H_
 
-#include "sim_defs.h"
+#include "3b2_defs.h"
 
 t_stat csr_svc(UNIT *uptr);
 t_stat csr_ex(t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
@@ -39,5 +39,7 @@ t_stat csr_dep(t_value val, t_addr exta, UNIT *uptr, int32 sw);
 t_stat csr_reset(DEVICE *dptr);
 uint32 csr_read(uint32 pa, size_t size);
 void csr_write(uint32 pa, uint32 val, size_t size);
+
+extern uint32 csr_data;
 
 #endif

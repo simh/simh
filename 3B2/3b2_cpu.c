@@ -42,15 +42,27 @@
  * - "WE 32200 Microprocessor Information Manual" (AT&T, 1988)
  *
  */
-#include <sim_defs.h>
 
-#include "3b2_defs.h"
 #include "3b2_cpu.h"
+
 #if defined(REV3)
+#include "3b2_rev2_mau.h"  /* TODO: Replace with Rev 3 MAU when implemented */
+#include "3b2_rev3_csr.h"
+#include "3b2_rev3_mmu.h"
 #include "rom_rev3_bin.h"
 #else
+#include "3b2_rev2_csr.h"
+#include "3b2_rev2_mau.h"
+#include "3b2_rev2_mmu.h"
+#include "3b2_id.h"
 #include "rom_rev2_bin.h"
 #endif
+
+#include "3b2_dmac.h"
+#include "3b2_io.h"
+#include "3b2_iu.h"
+#include "3b2_mem.h"
+#include "3b2_stddev.h"
 
 #define MAX_SUB_RETURN_SKIP 9
 

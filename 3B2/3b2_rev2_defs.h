@@ -31,8 +31,6 @@
 #ifndef _3B2_REV2_DEFS_H_
 #define _3B2_REV2_DEFS_H_
 
-#include "sim_defs.h"
-
 #define NUM_REGISTERS   16
 
 #define DEFMEMSIZE      MSIZ_4M
@@ -118,7 +116,5 @@
 #define DMA_IUB         0x47
 #define DMA_C           0x48
 #define DMA_IF          0x4E
-
-extern uint16 csr_data;
 
 #endif /* _3B2_REV2_DEFS_H_  */

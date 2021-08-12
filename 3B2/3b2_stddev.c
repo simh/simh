@@ -38,8 +38,15 @@
    - tod         MM58174A Real-Time-Clock
 */
 
-#include "3b2_defs.h"
 #include "3b2_stddev.h"
+
+#if defined(REV3)
+#include "3b2_rev3_csr.h"
+#else
+#include "3b2_rev2_csr.h"
+#endif
+
+#include "3b2_cpu.h"
 
 DEBTAB sys_deb_tab[] = {
     { "INIT",       INIT_MSG,       "Init"              },

@@ -28,8 +28,6 @@
    from the author.
 */
 
-
-
 /* Reference Documentation
  * =======================
  *
@@ -111,8 +109,7 @@
 #ifndef _3B2_IO_H_
 #define _3B2_IO_H_
 
-#include "sim_defs.h"
-#include "sim_tmxr.h"
+#include "3b2_defs.h"
 
 #define CRC_POLYNOMIAL  0xEDB88320
 
@@ -247,5 +244,7 @@ void io_write(uint32 pa, uint32 val, size_t size);
 
 void dump_entry(uint32 dbits, DEVICE *dev, CONST char *type,
                 uint32 esize, cio_entry *entry, uint8 *app_data);
+
+extern CIO_STATE cio[CIO_SLOTS];
 
 #endif

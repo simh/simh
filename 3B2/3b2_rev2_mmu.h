@@ -32,7 +32,6 @@
 #define _3B2_REV2_MMU_H_
 
 #include "sim_defs.h"
-#include "3b2_rev2_defs.h"
 
 /************************************************************************
  *
@@ -381,5 +380,7 @@ t_bool addr_is_io(uint32 pa);
 t_stat mmu_decode_va(uint32 va, uint8 r_acc, t_bool fc, uint32 *pa);
 void   mmu_enable();
 void   mmu_disable();
+
+extern MMU_STATE mmu_state;
 
 #endif /* _3B2_REV2_MMU_H_ */

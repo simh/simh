@@ -93,10 +93,11 @@
  *
  */
 
-#include "3b2_defs.h"
 #include "3b2_ni.h"
 
-#include <math.h>
+#include "3b2_io.h"
+#include "3b2_mem.h"
+#include "3b2_stddev.h"
 
 /* State container for the card */
 NI_STATE  ni;

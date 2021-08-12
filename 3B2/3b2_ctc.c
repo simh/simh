@@ -28,8 +28,12 @@
    from the author.
 */
 
-#include "3b2_defs.h"
 #include "3b2_ctc.h"
+
+#include "sim_disk.h"
+
+#include "3b2_mem.h"
+#include "3b2_io.h"
 
 #define CTQRESIZE     20
 #define CTQCESIZE     16

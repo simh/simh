@@ -28,10 +28,25 @@
    from the author.
 */
 
-#include "3b2_defs.h"
 #include "3b2_io.h"
 
-CIO_STATE  cio[CIO_SLOTS] = {{0}};
+#if defined(REV3)
+#include "3b2_rev3_csr.h"
+#include "3b2_rev3_mmu.h"
+#else
+#include "3b2_id.h"
+#include "3b2_rev2_csr.h"
+#include "3b2_rev2_mmu.h"
+#endif
+
+#include "3b2_cpu.h"
+#include "3b2_dmac.h"
+#include "3b2_if.h"
+#include "3b2_iu.h"
+#include "3b2_mem.h"
+#include "3b2_stddev.h"
+
+CIO_STATE cio[CIO_SLOTS] = {{0}};
 
 #if defined(REV3)
 iolink iotable[] = {

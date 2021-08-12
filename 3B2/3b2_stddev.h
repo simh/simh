@@ -31,7 +31,7 @@
 #ifndef _3B2_REV2_SYSDEV_H_
 #define _3B2_REV2_SYSDEV_H_
 
-#include "sim_defs.h"
+#include "3b2_defs.h"
 
 /* Timer definitions */
 #define TMR_CLK           0   /* The clock responsible for IPL 15 interrupts */
@@ -129,5 +129,7 @@ void tod_write(uint32, uint32 val, size_t size);
 uint32 flt_read(uint32 pa, size_t size);
 void flt_write(uint32 pa, uint32 val, size_t size);
 #endif
+
+extern int32 tmxr_poll;
 
 #endif /* _3B2_REV2_SYSDEV_H_ */

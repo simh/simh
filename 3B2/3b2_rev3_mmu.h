@@ -31,7 +31,7 @@
 #ifndef _3B2_1000_MMU_H_
 #define _3B2_1000_MMU_H_
 
-#include "sim_defs.h"
+#include "3b2_defs.h"
 
 #define MMU_SRS         4        /* Section RAM array size (words) */
 #define MMU_SDCS        8        /* SD Cache H/L array size */

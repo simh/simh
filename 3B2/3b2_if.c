@@ -28,8 +28,18 @@
    from the author.
 */
 
-#include "3b2_defs.h"
 #include "3b2_if.h"
+
+#include "sim_disk.h"
+
+
+#if defined(REV3)
+#include "3b2_rev3_csr.h"
+#else
+#include "3b2_rev2_csr.h"
+#endif
+
+#include "3b2_cpu.h"
 
 /* Static function declarations */
 static SIM_INLINE void if_set_irq();

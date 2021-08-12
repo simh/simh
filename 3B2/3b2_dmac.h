@@ -31,7 +31,7 @@
 #ifndef _3B2_DMAC_H_
 #define _3B2_DMAC_H_
 
-#include "sim_defs.h"
+#include "3b2_defs.h"
 
 #define DMA_MODE_VERIFY  0
 #define DMA_MODE_WRITE   1     /* Write to memory from device */
@@ -78,5 +78,7 @@ void dmac_write(uint32 pa, uint32 val, size_t size);
 void dmac_service_drqs();
 void dmac_generic_dma(uint8 channel, uint32 service_address);
 uint32 dma_address(uint8 channel, uint32 offset, t_bool r);
+
+extern DMA_STATE dma_state;
 
 #endif

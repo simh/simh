@@ -31,8 +31,6 @@
 #ifndef _3B2_REV3_DEFS_H_
 #define _3B2_REV3_DEFS_H_
 
-#include "sim_defs.h"
-
 #define NUM_REGISTERS   32
 
 #define DEFMEMSIZE      MSIZ_4M
@@ -130,9 +128,5 @@
 #define CSRSTIMO        (1u << 29) /* Sanity Timer Timeout         */
 #define CSRABRT         (1u << 30) /* Abort Switch Activated       */
 #define CSRRRST         (1u << 31) /* System Reset Request         */
-
-extern DEVICE flt_dev;
-extern DEVICE ha_dev;
-extern uint32 csr_data;
 
 #endif

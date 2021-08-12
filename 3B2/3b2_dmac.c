@@ -28,8 +28,16 @@
    from the author.
 */
 
-#include "3b2_defs.h"
 #include "3b2_dmac.h"
+
+#if defined(REV2)
+#include "3b2_id.h"
+#endif
+
+#include "3b2_cpu.h"
+#include "3b2_if.h"
+#include "3b2_iu.h"
+#include "3b2_mem.h"
 
 DMA_STATE dma_state;
 

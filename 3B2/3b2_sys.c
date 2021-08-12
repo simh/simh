@@ -28,7 +28,10 @@
    from the author.
 */
 
-#include "3b2_defs.h"
+#include "3b2_sys.h"
+
+#include "3b2_cpu.h"
+#include "3b2_mem.h"
 
 REG *sim_PC = &cpu_reg[NUM_PC];
 

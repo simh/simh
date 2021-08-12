@@ -31,7 +31,7 @@
 #ifndef __3B2_IF_H__
 #define __3B2_IF_H__
 
-#include "sim_defs.h"
+#include "3b2_defs.h"
 
 typedef struct {
     uint8 data;
@@ -125,5 +125,8 @@ void if_handle_command();
 void if_after_dma();
 CONST char *if_description(DEVICE *dptr);
 t_stat if_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+
+extern IF_STATE if_state;
+extern t_bool if_irq;
 
 #endif

@@ -42,8 +42,11 @@
  *   HD135      11   1224    15   18    512     Maxtor XT1190
  */
 
-#include "3b2_defs.h"
 #include "3b2_id.h"
+
+#include "sim_disk.h"
+
+#include "3b2_cpu.h"
 
 #define ID_SEEK_WAIT        50
 #define ID_SEEK_BASE        700

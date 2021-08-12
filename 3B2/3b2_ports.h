@@ -45,7 +45,7 @@
 #ifndef _3B2_PORTS_H_
 #define _3B2_PORTS_H_
 
-#include "sim_defs.h"
+#include "3b2_defs.h"
 
 #define PORTS_ID        0x0003
 #define PORTS_IPL       10

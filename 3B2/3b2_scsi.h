@@ -31,7 +31,7 @@
 #ifndef _3B2_SCSI_H_
 #define _3B2_SCSI_H_
 
-#include "sim_defs.h"
+#include "3b2_defs.h"
 
 /* CIO Opcodes */
 #define HA_BOOT        0x0a

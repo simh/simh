@@ -28,8 +28,11 @@
    from the author.
 */
 
-#include "3b2_defs.h"
 #include "3b2_rev2_csr.h"
+
+#include "3b2_cpu.h"
+#include "3b2_sys.h"
+#include "3b2_stddev.h"
 
 uint16 csr_data;
 

@@ -31,37 +31,15 @@
 #ifndef _3B2_DEFS_H_
 #define _3B2_DEFS_H_
 
-#include "sim_defs.h"
-#include "sim_tmxr.h"
-#include "sim_disk.h"
 #include <setjmp.h>
 
+#include "sim_defs.h"
 
 #if defined(REV3)
 #include "3b2_rev3_defs.h"
-#include "3b2_rev3_csr.h"
-#include "3b2_rev3_mmu.h"
-#include "3b2_rev2_mau.h"  /* Use Rev 2 MAU until Rev 3 is implemented */
-#include "3b2_scsi.h"
 #else
 #include "3b2_rev2_defs.h"
-#include "3b2_rev2_csr.h"
-#include "3b2_rev2_mau.h"
-#include "3b2_rev2_mmu.h"
-#include "3b2_id.h"
-#include "3b2_ctc.h"
 #endif
-
-#include "3b2_sys.h"
-#include "3b2_cpu.h"
-#include "3b2_io.h"
-#include "3b2_stddev.h"
-#include "3b2_mem.h"
-#include "3b2_dmac.h"
-#include "3b2_if.h"
-#include "3b2_iu.h"
-#include "3b2_ports.h"
-#include "3b2_ni.h"
 
 #ifndef FALSE
 #define FALSE 0
@@ -159,54 +137,27 @@ noret __libc_longjmp(jmp_buf buf, int val);
 
 /* Global symbols */
 
-extern volatile int32 stop_reason;
-
-extern CIO_STATE      cio[CIO_SLOTS];
-
-extern uint32         rom_size;
-extern instr         *cpu_instr;
-extern t_bool         cpu_nmi;
-extern uint32        *ROM;
-extern uint32        *RAM;
-extern uint32         R[NUM_REGISTERS];
-extern REG            cpu_reg[];
-extern UNIT           cpu_unit;
-extern uint8          fault;
-extern t_bool         cpu_km;
-extern char           sim_name[];
-extern REG           *sim_PC;
-extern int32          sim_emax;
-extern int32          tmxr_poll;
-
-extern DEBTAB         sys_deb_tab[];
-extern DEVICE         contty_dev;
-extern DEVICE         cpu_dev;
-extern DEVICE         csr_dev;
-extern DEVICE         ctc_dev;
-extern DEVICE         dmac_dev;
-extern DEVICE         id_dev;
-extern DEVICE         if_dev;
-extern DEVICE         iu_timer_dev;
-extern DEVICE         mau_dev;
-extern DEVICE         mmu_dev;
-extern DEVICE         ni_dev;
-extern DEVICE         nvram_dev;
-extern DEVICE         ports_dev;
-extern DEVICE         timer_dev;
-extern DEVICE         tod_dev;
-extern DEVICE         tti_dev;
-extern DEVICE         tto_dev;
-
-extern IU_PORT        iu_console;
-extern IU_PORT        iu_contty;
-extern IF_STATE       if_state;
-extern MMU_STATE      mmu_state;
-extern DMA_STATE      dma_state;
-
-extern t_bool         id_drq;
-extern t_bool         if_irq;
-extern t_bool         cio_skip_seqbit;
-extern t_bool         iu_increment_a;
-extern t_bool         iu_increment_b;
+extern DEBTAB sys_deb_tab[];
+extern DEVICE contty_dev;
+extern DEVICE cpu_dev;
+extern DEVICE csr_dev;
+extern DEVICE ctc_dev;
+extern DEVICE dmac_dev;
+extern DEVICE id_dev;
+extern DEVICE if_dev;
+extern DEVICE iu_timer_dev;
+extern DEVICE mau_dev;
+extern DEVICE mmu_dev;
+extern DEVICE ni_dev;
+extern DEVICE nvram_dev;
+extern DEVICE ports_dev;
+extern DEVICE timer_dev;
+extern DEVICE tod_dev;
+extern DEVICE tti_dev;
+extern DEVICE tto_dev;
+#if defined(REV3)
+extern DEVICE flt_dev;
+extern DEVICE ha_dev;
+#endif
 
 #endif

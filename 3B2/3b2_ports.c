@@ -42,8 +42,14 @@
  *
  */
 
-#include "3b2_defs.h"
 #include "3b2_ports.h"
+
+#include "sim_tmxr.h"
+
+#include "3b2_cpu.h"
+#include "3b2_io.h"
+#include "3b2_mem.h"
+#include "3b2_stddev.h"
 
 /* Static function declarations */
 static t_stat ports_show_queue_common(FILE *st, UNIT *uptr, int32 val,
@@ -375,7 +381,7 @@ static void ports_cmd(uint8 cid, cio_entry *rentry, uint8 *rapp_data)
             tmxr_set_config_line(&ports_ldsc[ln], line_config);
         }
 
-        centry.byte_count = sizeof(PPC_OPTIONS);
+        centry.byte_count = 20;
         centry.opcode = PPC_OPTIONS;
         centry.subdevice = rentry->subdevice;
         centry.address = rentry->address;

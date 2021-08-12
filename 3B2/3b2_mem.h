@@ -31,7 +31,7 @@
 #ifndef _3B2_MEM_H_
 #define _3B2_MEM_H_
 
-#include "sim_defs.h"
+#include "3b2_defs.h"
 
 uint32 pread_w(uint32 pa);
 void   pwrite_w(uint32 pa, uint32 val);

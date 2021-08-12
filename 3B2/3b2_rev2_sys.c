@@ -30,6 +30,16 @@
 
 #include "3b2_defs.h"
 
+#include "3b2_cpu.h"
+#include "3b2_ctc.h"
+#include "3b2_id.h"
+#include "3b2_if.h"
+#include "3b2_iu.h"
+#include "3b2_ni.h"
+#include "3b2_ports.h"
+#include "3b2_rev2_mau.h"
+#include "3b2_stddev.h"
+
 char sim_name[] = "AT&T 3B2/400";
 
 DEVICE *sim_devices[] = {

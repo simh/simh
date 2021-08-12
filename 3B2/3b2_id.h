@@ -31,7 +31,7 @@
 #ifndef __3B2_ID_H__
 #define __3B2_ID_H__
 
-#include "sim_defs.h"
+#include "3b2_defs.h"
 
 #define ID0             0
 #define ID1             1
@@ -173,5 +173,7 @@ t_stat id_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 void id_handle_data(uint8 val);
 void id_handle_command(uint8 val);
 void id_after_dma();
+
+extern t_bool id_drq;
 
 #endif

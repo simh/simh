@@ -31,7 +31,7 @@
 #ifndef _3B2_CPU_H_
 #define _3B2_CPU_H_
 
-#include "sim_defs.h"
+#include "3b2_defs.h"
 
 /* Execution Modes */
 #define EX_LVL_KERN           0
@@ -648,5 +648,17 @@ void cpu_clear_irq(uint8 ipl, uint16 csr_flags);
 #define OP_R_B(d,a,p) {                        \
         (d) = (uint8) (a)[(p)++];              \
     }
+
+extern volatile int32 stop_reason;
+extern uint32 rom_size;
+extern instr *cpu_instr;
+extern t_bool cpu_nmi;
+extern uint32 *ROM;
+extern uint32 *RAM;
+extern uint32 R[NUM_REGISTERS];
+extern REG cpu_reg[];
+extern UNIT cpu_unit;
+extern uint8 fault;
+extern t_bool cpu_km;
 
 #endif

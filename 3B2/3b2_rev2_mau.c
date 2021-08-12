@@ -81,10 +81,19 @@
    ---------------------------------------------------------------------
 */
 
+#include "3b2_rev2_mau.h"
+
 #include <math.h>
 
-#include "3b2_defs.h"
-#include "3b2_rev2_mau.h"
+/* TODO: Simplify after 3b2_rev3_mau is implemented */
+#if defined(REV3)
+#include "3b2_rev3_mmu.h"
+#else
+#include "3b2_rev2_mmu.h"
+#endif
+
+#include "3b2_cpu.h"
+#include "3b2_mem.h"
 
 #define   MAU_ID   0        /* Coprocessor ID of MAU */
 
