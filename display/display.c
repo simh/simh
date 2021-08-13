@@ -556,7 +556,7 @@ display_delay(int t, int slowdown)
         return;
 
     elapsed = os_elapsed();     /* read and reset elapsed timer */
-    if (elapsed == ~0L) {       /* first time thru? */
+    if (elapsed == (unsigned long)(~0L)) {/* first time thru? */
         slowdown = 0;           /* no adjustments */
         elapsed = sim_time;
         }
@@ -946,7 +946,7 @@ phosphor_init(struct phosphor *phosphors, int nphosphors, int color)
 static struct display *
 find_type(enum display_type type)
 {
-    int i;
+    size_t i;
     struct display *dp;
 
     for (i = 0, dp = displays; i < ELEMENTS(displays); i++, dp++)
