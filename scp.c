@@ -4614,7 +4614,7 @@ char gbuf[CBUFSIZE];
 char *ip = instr, *op, *oend, *istart, *tmpbuf;
 const char *ap;
 char rbuf[CBUFSIZE];
-int i;
+uint32 i;
 size_t outstr_off = 0;
 
 sim_exp_argv = do_arg;
@@ -4677,7 +4677,7 @@ for (; *ip && (op < oend); ) {
                 }
             if ((*ip >= '0') && (*ip <= ('9'))) {       /* %n = sub */
                 ap = do_arg[*ip - '0'];
-                for (i=0; i<*ip - '0'; ++i)           /* make sure we're not past the list end */
+                for (i=0; i < (uint32)(*ip - '0'); ++i) /* make sure we're not past the list end */
                     if (do_arg[i] == NULL) {
                         ap = NULL;
                         break;
@@ -9664,7 +9664,7 @@ void put_rval_pcchk (REG *rptr, uint32 idx, t_value val, t_bool pc_chk)
 size_t sz;
 t_value mask;
 uint32 *ptr;
-t_value prev_val;
+t_value prev_val = 0;
 
 if ((!(sim_switches & SWMASK ('Z'))) && 
     (rptr->flags & REG_DEPOSIT) && sim_vm_reg_update)
@@ -11125,7 +11125,7 @@ for (logop = cmpop = -1; (c = *cptr++); ) {             /* loop thru clauses */
         return NULL;
         }
     }                                                   /* end for */
-if (schptr->count != (1 - reason)) {
+if (schptr->count != (uint32)(1 - reason)) {
     schptr->count = 1 - reason;
     free (schptr->mask);
     schptr->mask = (t_value *)calloc (sim_emax, sizeof(*schptr->mask));
@@ -12221,7 +12221,7 @@ bp = sim_brk_fnd (loc);                                 /* loc present? */
 if (!bp)                                                /* no, allocate */
     bp = sim_brk_new (loc, sw);
 else {
-    while (bp && (bp->typ != sw))
+    while (bp && (bp->typ != (uint32)sw))
         bp = bp->next;
     if (!bp)
         bp = sim_brk_new (loc, sw);
@@ -14106,7 +14106,7 @@ static volatile struct {
     size_t block;
     size_t line;
     } help_where = { "", NULL, 0, 0 };
-jmp_buf (help_env);
+jmp_buf help_env;
 #define FAIL(why,text,here) { help_where.error = #text; help_where.prox = here; longjmp (help_env, (why)); }
 
 /* Add to topic text.
@@ -15889,7 +15889,7 @@ static struct validation_test {
             { ORDATAD (REGVAL, tregval, 8*sizeof(tregval), "value register") },
             {NULL} },
          SCPE_OK},
-        {NULL}
+        { { {NULL} } }
     };
 
 static UNIT validate_units[3];
@@ -16047,7 +16047,7 @@ static t_stat test_scp_event_sequencing (void)
 {
 DEVICE *dptr = &sim_scp_dev;
 uint32 i;
-int active;
+uint32 active;
 t_stat r = SCPE_OK;
 int32 start_deb_switches = sim_set_deb_switches (0);
 
@@ -16071,7 +16071,7 @@ for (i = 0; i < dptr->numunits; i++) {
 for (i = 0; i < dptr->numunits; i++) {
     int32 t = sim_activate_time (&dptr->units[i]);
 
-    if (t != i + 1)
+    if (t != (int32)(i + 1))
         return sim_messagef (SCPE_IERR, "sim_activate_time() unexpected result for unit %d: %d\n", i, t);
     }
 sim_printf ("sim_interval = %d, sim_gtime = %.0f\n", sim_interval, sim_gtime ());
@@ -16081,7 +16081,7 @@ sim_printf ("sim_interval = %d, sim_gtime = %.0f\n", sim_interval, sim_gtime ())
 for (i = 0; i < dptr->numunits; i++) {
     int32 t = sim_activate_time (&dptr->units[i]);
 
-    if (t != i + 1)
+    if (t != (int32)(i + 1))
         return sim_messagef (SCPE_IERR, "sim_activate_time() unexpected result for unit %d: %d\n", i, t);
     }
 r = sim_process_event ();

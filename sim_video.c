@@ -118,7 +118,7 @@ static const char *key_names[] =
      "KP_INSERT", "KP_DELETE", "KP_5", "KP_ENTER", "KP_MULTIPLY", "KP_DIVIDE"
      };
 
-const char *vid_key_name (int32 key)
+const char *vid_key_name (uint32 key)
 {
 static char tmp_key_name[40];
 
@@ -942,7 +942,7 @@ if (sim_deb) {
             int bit = 7 - ((j + i*width) & 0x7);
             static char mode[] = "TWIB";
 
-            sim_debug (SIM_VID_DBG_CURSOR, vptr->vid_dev, "%c", mode[(((data[byte]>>bit)&1)<<1)|(mask[byte]>>bit)&1]);
+            sim_debug (SIM_VID_DBG_CURSOR, vptr->vid_dev, "%c", mode[(((data[byte]>>bit)&1)<<1)|((mask[byte]>>bit)&1)]);
             }
         sim_debug (SIM_VID_DBG_CURSOR, vptr->vid_dev, "\n");
         }
@@ -2794,7 +2794,7 @@ void vid_set_cursor_position_window (VID_DISPLAY *vptr, int32 x, int32 y)
 return;
 }
 
-const char *vid_key_name (int32 key)
+const char *vid_key_name (uint32 key)
 {
 return "";
 }

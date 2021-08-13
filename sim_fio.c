@@ -724,7 +724,7 @@ else {
     struct stat statb;
 
     if ((fstat ((*shmem)->shm_fd, &statb)) ||
-        (statb.st_size != (*shmem)->shm_size)) {
+        ((size_t)statb.st_size != (*shmem)->shm_size)) {
         sim_shmem_close (*shmem);
         *shmem = NULL;
         return sim_messagef (SCPE_OPENERR, "Shared Memory segment '%s' is %d bytes instead of %d\n", name, (int)(statb.st_size), (int)size);

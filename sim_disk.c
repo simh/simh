@@ -2145,7 +2145,7 @@ sim_debug_unit (ctx->dbit, uptr, "get_disk_footer(%s)\n", sim_uname (uptr));
 switch (DK_GET_FMT (uptr)) {                            /* case on format */
     case DKUF_F_STD:                                    /* SIMH format */
         container_size = sim_fsize_ex (uptr->fileref);
-        if ((container_size != (t_offset)-1) && (container_size > sizeof (*f)) &&
+        if ((container_size != (t_offset)-1) && (container_size > (t_offset)sizeof (*f)) &&
             (sim_fseeko (uptr->fileref, container_size - sizeof (*f), SEEK_SET) == 0) &&
             (sizeof (*f) == sim_fread (f, 1, sizeof (*f), uptr->fileref)))
             break;
@@ -2154,7 +2154,7 @@ switch (DK_GET_FMT (uptr)) {                            /* case on format */
         break;
     case DKUF_F_RAW:                                    /* RAW format */
         container_size = sim_os_disk_size_raw (uptr->fileref);
-        if ((container_size != (t_offset)-1) && (container_size > sizeof (*f)) &&
+        if ((container_size != (t_offset)-1) && (container_size > (t_offset)sizeof (*f)) &&
             (sim_os_disk_read (uptr, container_size - sizeof (*f), (uint8 *)f, &bytesread, sizeof (*f)) == SCPE_OK) &&
             (bytesread == sizeof (*f)))
             break;
@@ -3944,12 +3944,12 @@ while (bytestoread) {
     if (bytesread < 0) {
         return SCPE_IOERR;
         }
-    if (bytesread < bytestoread) {      /* read zeros at/past EOF */
+    if ((size_t)bytesread < bytestoread) {/* read zeros at/past EOF */
         memset (buf + bytesread, 0, bytestoread - bytesread);
         bytesread = bytestoread;
         }
     sectorbytes = (bytesread / ctx->sector_size) * ctx->sector_size;
-    if (bytesread > sectorbytes)
+    if ((size_t)bytesread > sectorbytes)
         sectorbytes += ctx->sector_size;
     if (sectsread)
         *sectsread += sectorbytes / ctx->sector_size;
@@ -6034,7 +6034,7 @@ if (info->flag) {        /* zap type */
         return;
         }
     container_size = sim_fsize_ex (container);
-    if ((container_size != (t_offset)-1) && (container_size > sizeof (*f)) &&
+    if ((container_size != (t_offset)-1) && (container_size > (t_offset)sizeof (*f)) &&
         (sim_fseeko (container, container_size - sizeof (*f), SEEK_SET) == 0) &&
         (sizeof (*f) == sim_fread (f, 1, sizeof (*f), container))) {
         if ((memcmp (f->Signature, "simh", 4) == 0) && 

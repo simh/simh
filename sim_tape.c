@@ -4463,7 +4463,7 @@ static void ansi_fill_text_buffer (FILE *f, char *buf, size_t buf_size, size_t r
         if (!fixed_text) {
             if (rec_size >= record_skip_ending)
                 rec_size -= record_skip_ending;
-            if ((rec_size + 4) > (int)(buf_size - offset)) { /* room for record? */
+            if ((rec_size + 4) > (buf_size - offset)) { /* room for record? */
                 (void)fseek (f, start, SEEK_SET);
                 break;
                 }

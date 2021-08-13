@@ -5706,11 +5706,11 @@ return SCPE_OK;
 
 static t_stat sim_tmxr_test_lnorder (TMXR *tmxr)
 {
-int i;
+uint32 i;
 int32 *saved_lnorder = tmxr->lnorder;
 int32 saved_lines = tmxr->lines;
 
-tmxr->lnorder = calloc (tmxr->lines, sizeof (*tmxr->lnorder));
+tmxr->lnorder = (int32 *)calloc (tmxr->lines, sizeof (*tmxr->lnorder));
 if (tmxr->lines >= 8) {
     tmxr->lines = 8;
     for (i = 0; i < (sizeof (lnorders)/sizeof (lnorders[0])); ++i)
