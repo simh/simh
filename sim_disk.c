@@ -2597,9 +2597,9 @@ else {                                                  /* normal */
             uptr->flags = uptr->flags | UNIT_RO;        /* set rd only */
             sim_messagef (SCPE_OK, "%s: Unit is read only\n", sim_uname (uptr));
             }
-        else {                                          /* doesn't exist */
+        else {                                          /* other error? */
             if ((sim_switches & SWMASK ('E')) ||        /* must exist? */
-                (errno != ENOENT))                      /* or other error? */
+                (errno != ENOENT))                      /* or must not re-create? */
                 return sim_messagef (_err_return (uptr, SCPE_OPENERR), "%s: Cannot open '%s' - %s\n",
                                      sim_uname (uptr), cptr, strerror (errno));
             if (create_function)
