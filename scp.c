@@ -14561,6 +14561,8 @@ for (i = 0; i < topic->kids; i++) {
             cptr++;
             }
         }
+    if (!strcmp (cbuf, token))      /* Exact Match */
+        return i+1;
     if (!strncmp (cbuf, token, strlen (token))) {
         if (match)
             return HLP_MATCH_AMBIGUOUS;
@@ -14745,10 +14747,16 @@ while (TRUE) {
 
   reprompt:
     if (!cptr || !*cptr) {
+        if (topic->kids == 0)
+            topic = topic->parent;
         pstring = helpPrompt (topic, prompt[topic->kids != 0], FALSE);
 
         cptr = read_line_p (pstring, cbuf, sizeof (cbuf), stdin);
         free (pstring);
+        if ((cptr != NULL) &&                   /* Got something? */
+            ((0 == strcmp (cptr, "\x04")) ||    /* was it a bare ^D? */
+             (0 == strcmp (cptr, "\x1A"))))     /* was it a bare ^Z? */
+            cptr = NULL;                        /* These are EOF synonyms */
         }
 
     if (!cptr) {                            /* EOF, exit help */
