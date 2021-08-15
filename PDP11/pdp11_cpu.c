@@ -623,6 +623,8 @@ MTAB cpu_mod[] = {
     { MTAB_XTD|MTAB_VDV, OPT_FPP, NULL, "NOFPP", &cpu_clr_opt, NULL, NULL, "disable FPP instructions" },
     { MTAB_XTD|MTAB_VDV, OPT_CIS, NULL, "CIS", &cpu_set_opt, NULL, NULL, "enable CIS instructions" },
     { MTAB_XTD|MTAB_VDV, OPT_CIS, NULL, "NOCIS", &cpu_clr_opt, NULL, NULL, "disable CIS instructions" },
+    { MTAB_XTD|MTAB_VDV, OPT_MMU, NULL, "MMU", &cpu_set_opt, NULL, NULL, "enable MMU functionality" },
+    { MTAB_XTD|MTAB_VDV, OPT_MMU, NULL, "NOMMU", &cpu_clr_opt, NULL, NULL, "disable MMU functionality" },
     { MTAB_XTD|MTAB_VDV, OPT_BVT, NULL, "BEVENT", &cpu_set_opt, NULL, NULL, "Enable BEVENT line (11/03, 11/23 only)" },
     { MTAB_XTD|MTAB_VDV, OPT_BVT, NULL, "NOBEVENT", &cpu_clr_opt, NULL, NULL, "Disable BEVENT line (11/03, 11/23 only)" },
     { UNIT_MSIZE, 8192, NULL, "8K", &cpu_set_size, NULL, NULL, "Set memory size to 8Kb"},
