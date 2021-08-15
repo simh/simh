@@ -433,8 +433,8 @@ MTAB cpu_mod[] = {
     { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE{=VMS|ULTRIX|ULTRIX-1.X|ULTRIXOLD|NETBSD|NETBSDOLD|OPENBSD|OPENBSDOLD|QUASIJARUS|32V|ELN|MDM|INFOSERVER}{:n}", &cpu_set_idle, &cpu_show_idle, NULL, "Display idle detection mode" },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL, NULL,  "Disables idle detection" },
     MEM_MODIFIERS,   /* Model specific memory modifiers from vaxXXX_defs.h */
-    { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP|MTAB_NC, 0, "HISTORY", "HISTORY",
-      &cpu_set_hist, &cpu_show_hist, NULL, "Displays instruction history" },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP|MTAB_NC, 0, "HISTORY", "HISTORY=n",
+      &cpu_set_hist, &cpu_show_hist, NULL, "Enable/Display instruction history" },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "VIRTUAL", NULL,
       NULL, &cpu_show_virt, NULL, "show translation for address arg in KESU mode" },
     CPU_MODEL_MODIFIERS  /* Model specific cpu modifiers from vaxXXX_defs.h */
