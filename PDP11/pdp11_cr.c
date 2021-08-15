@@ -1832,6 +1832,8 @@ if (string) {
     if (crtypes & 4)
         strlcat (devtype, "CD20/", sizeof (devtype));
     strlcpy (string, devtype, string_aize);
+    if (string[strlen (string) - 1] == '/')
+        string[strlen (string) - 1] = '\0';
 }
 if (bits)
     *bits = crtypes;
