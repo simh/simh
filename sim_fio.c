@@ -50,7 +50,8 @@
    sim_fsize_ex      -       get file size as a t_offset
    sim_fsize_name_ex -       get file size as a t_offset of named file
    sim_buf_copy_swapped -    copy data swapping elements along the way
-   sim_buf_swap_data -       swap data elements inplace in buffer
+   sim_buf_swap_data -       swap data elements inplace in buffer if needed
+   sim_byte_swap_data -      swap data elements inplace in buffer
    sim_shmem_open            create or attach to a shared memory region
    sim_shmem_close           close a shared memory region
 
@@ -109,7 +110,15 @@ sim_taddr_64 = sim_toffset_64 && (sizeof(t_addr) > sizeof(int32));
 return sim_end;
 }
 
+/* Copy little endian data to local buffer swapping if needed */
 void sim_buf_swap_data (void *bptr, size_t size, size_t count)
+{
+if (sim_end || (count == 0) || (size == sizeof (char)))
+    return;
+sim_byte_swap_data (bptr, size, count);
+}
+
+void sim_byte_swap_data (void *bptr, size_t size, size_t count)
 {
 uint32 j;
 int32 k;
