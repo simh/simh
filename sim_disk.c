@@ -867,6 +867,24 @@ switch (DK_GET_FMT (uptr)) {                            /* case on format */
     }
 }
 
+t_stat sim_disk_erase (UNIT *uptr)
+{
+struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
+uint8 *buf;
+t_lba lba;
+
+if (uptr->flags & UNIT_ATT)
+    return SCPE_UNATT;
+
+buf = (uint8 *)calloc (1, ctx->storage_sector_size);
+if (buf == NULL)
+    return SCPE_MEM;
+for (lba = 0; lba < ctx->container_size / ctx->sector_size; lba++)
+    sim_disk_wrsect (uptr, lba, buf, NULL, 1);          /* write sector */
+free (buf);
+return SCPE_OK;
+}
+
 /*
    This routine is called when the simulator stops and any time
    the asynch mode is changed (enabled or disabled)
