@@ -1546,9 +1546,12 @@ static t_stat detach_all_sockets ()
 
 static t_stat detach_socket (uint32 socket_number)
 {
+    MODULE_DEF *modptr = *(module_list + selected_type);
+    SOCKET_DEF *socketptr = *modptr->sockets + socket_number;
+
     /* Clear socket information */
-    socket_config[socket_number].base_address = 0;
-    socket_config[socket_number].rom_size = 0;
+    socket_config[socket_number].base_address = socketptr->base_address;
+    socket_config[socket_number].rom_size = socketptr->size;
     socket_config[socket_number].rom_init = NULL;
     *socket_config[socket_number].rom_name = 0;
 
@@ -1595,6 +1598,8 @@ static t_stat m9312_auto_config_bootroms ()
 {
     int32 dev_index;
     DEVICE *dptr;
+    UNIT* uptr;
+    uint32 unit_number;
     rom_for_device *mptr;
     int socket_number;
     t_stat result;
@@ -1615,17 +1620,29 @@ static t_stat m9312_auto_config_bootroms ()
         /* Is the device enabled? */
         if (!dev_disabled (dptr)) {
 
-            /* Search device_rom map for a suitable boot ROM for the device */
-            for (mptr = &device_rom_map[0]; mptr->device_name != NULL; mptr++) {
-                if (strcasecmp (dptr->name, mptr->device_name) == 0) {
-                    if ((result = m9312_attach (mptr->rom_name, socket_number)) != SCPE_OK)
-                        return result;
-                    socket_number++;
+            /* Is any unit of this device attached? */
+            for (uptr = dptr->units, unit_number = 0; unit_number < dptr->numunits; unit_number++) {
+                if ((uptr + unit_number)->flags & UNIT_ATT) {
+
+                    /* Search device_rom map for a suitable boot ROM for the device */
+                    for (mptr = &device_rom_map[0]; mptr->device_name != NULL; mptr++) {
+                        if (strcasecmp (dptr->name, mptr->device_name) == 0) {
+                            if ((result = m9312_attach (mptr->rom_name, socket_number)) != SCPE_OK)
+                                return result;
+                            socket_number++;
+                            break;
+                        }
+                    }
                     break;
                 }
             }
         }
     }
+
+    /* Is any ROM attached? */
+    if (socket_number == 1)
+        sim_printf ("warning - no boot ROMs attached for lack of attached devices\n");
+
     return SCPE_OK;
 }
 
