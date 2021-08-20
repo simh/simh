@@ -23,6 +23,7 @@
 
 #include "sim_defs.h"
 #include "pdp11_defs.h"
+#include "pdp11_cpumod.h"
 #include "pdp11_m9312.h"
 #include "pdp11_vt40boot.h"
 
@@ -89,6 +90,7 @@ static t_stat vt40_help_attach(FILE*, DEVICE*, UNIT*, int32, const char*);
 extern uint32 cpu_type;
 extern uint32 cpu_opt;
 extern uint32 cpu_model;
+extern CPUTAB cpu_tab[];
 extern int32 HITMISS;
 
 /*
@@ -350,7 +352,9 @@ t_stat rom_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
             
             /* Check if the module is allowed on this cpu and bus type */
             if (!module_type_is_valid (module_number))
-                return sim_messagef (SCPE_ARG, "Module is not compatible with current cpu and/or bus type\n");
+                return sim_messagef (SCPE_ARG, 
+                    "Module %s is not compatible with current cpu (%s) and/or bus type (%s)\n",
+                    cptr, cpu_tab[cpu_model].name, UNIBUS ? "Unibus" : "Q-bus");
 
             /* Save current cpu type for reference in rom_reset() */
             cpu_type_on_selection = cpu_type;
