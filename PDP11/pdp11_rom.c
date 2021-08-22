@@ -132,7 +132,6 @@ MODULE_DEF blank =
     (SOCKET_DEF(*)[]) &blank_sockets,       /* Pointer to SOCKET_DEF structs */
     NULL,                                   /* Auto configuration function */
     blank_attach,                           /* Attach function */
-    NULL,                                   /* Auto-attach function */
     create_filename_blank,                  /* Create unit file name */
     blank_rom_rd,                           /* ROM read function */
     blank_set_start_address,                /* ROM set start address */
@@ -151,7 +150,6 @@ MODULE_DEF m9312 =
     (SOCKET_DEF (*)[]) & m9312_sockets,     /* Pointer to SOCKET_DEF structs */
     &m9312_auto_config,                     /* Auto configuration function */
     embedded_attach,                        /* Attach function */
-    NULL,                                   /* Auto-attach function */
     create_filename_embedded,               /* Create unit file name */
     m9312_rd,                               /* ROM read function */
     m9312_set_start_address,                /* ROM set start address */
@@ -168,9 +166,8 @@ MODULE_DEF vt40 =
     UNIBUS_MODEL,                           /* Required CPU options */
     VT40_NUM_SOCKETS,                       /* Number of sockets */
     (SOCKET_DEF (*)[]) & vt40_sockets,      /* Pointer to SOCKET_DEF structs */
-    NULL,                                   /* Auto configuration function */
+    & vt40_auto_attach,                     /* Auto configuration function */
     embedded_attach,                        /* Attach function */
-    &vt40_auto_attach,                      /* Auto-attach function */
     create_filename_embedded,               /* Create unit file name */
     blank_rom_rd,                           /* ROM read function */
     blank_set_start_address,                /* ROM set start address */
@@ -380,8 +377,10 @@ t_stat rom_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
                 rom_device_flags &= ~ROM_CONFIG_AUTO;
 
                 /* Auto-attach ROM(s) if available */
+#if 0
                 if (module_list[selected_type]->auto_attach != NULL)
                     (*module_list[selected_type]->auto_attach)();
+#endif
             }
             return SCPE_OK;
         }

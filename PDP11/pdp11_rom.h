@@ -87,7 +87,6 @@ typedef struct
     SOCKET_DEF (*sockets)[];                                            /* Sockets for this module */
     t_stat (*auto_config)();                                            /* Auto-configuration function for the module type */
     t_stat (*attach)(const char *);                                     /* Attach function for the module type */
-    t_stat (*auto_attach)();                                            /* Auto attach on module type selection */
     void (*create_filename)(char *);                                    /* Function to create unit file name */
     t_stat (*read)(int32*, int32, int32);                               /* ROM read function */
     t_stat (*set_start_address)(UNIT*, int32, CONST char*, void*);      /* Set start address function */
