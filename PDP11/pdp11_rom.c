@@ -65,7 +65,7 @@ static t_stat validate_attach_embedded_rom (ATTACH_CMD *, uint32);
 static t_stat exec_attach_blank_rom (ATTACH_CMD *);
 static t_stat exec_attach_embedded_rom (ATTACH_CMD *);
 static t_stat attach_rom_to_socket (char *, t_addr, void *, int16, void (*)(), int);
-static t_stat vt40_auto_attach ();
+static t_stat vt40_auto_config ();
 static void create_filename_blank (char *);
 static void create_filename_embedded (char*);
 static void strclean(char *, CONST char *);
@@ -166,7 +166,7 @@ MODULE_DEF vt40 =
     UNIBUS_MODEL,                           /* Required CPU options */
     VT40_NUM_SOCKETS,                       /* Number of sockets */
     (SOCKET_DEF (*)[]) & vt40_sockets,      /* Pointer to SOCKET_DEF structs */
-    & vt40_auto_attach,                     /* Auto configuration function */
+    &vt40_auto_config,                      /* Auto configuration function */
     embedded_attach,                        /* Attach function */
     create_filename_embedded,               /* Create unit file name */
     blank_rom_rd,                           /* ROM read function */
@@ -376,11 +376,9 @@ t_stat rom_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
                 /* (Re)set the configuration mode to manual */
                 rom_device_flags &= ~ROM_CONFIG_AUTO;
 
-                /* Auto-attach ROM(s) if available */
-#if 0
-                if (module_list[selected_type]->auto_attach != NULL)
-                    (*module_list[selected_type]->auto_attach)();
-#endif
+                /* Auto-configure the module if available */
+                if (module_list[selected_type]->auto_config != NULL)
+                    (*module_list[selected_type]->auto_config)();
             }
             return SCPE_OK;
         }
@@ -483,14 +481,9 @@ static t_stat rom_set_configmode (UNIT *uptr, int32 val, CONST char *cptr, void 
         if (MATCH_CMD (cptr, "AUTO") == 0) {
 
             /* Check if auto config is available for the selected module */
-            if (module_list[selected_type]->auto_config != NULL) {
-
-                /* Set auto config mode */
-                rom_device_flags |= ROM_CONFIG_AUTO;
-
-                /* Perform auto-config */
+            if (module_list[selected_type]->auto_config != NULL)
                 (*module_list[selected_type]->auto_config)();
-            } else
+            else
                 return sim_messagef (SCPE_ARG, "Auto configuration is not available for the %s module\n",
                 module_list[selected_type]->name);
         } else
@@ -1418,7 +1411,7 @@ static t_stat attach_rom_to_socket (char* name, t_addr address,
 
 /* Auto-attach ROM for VT40 */
 
-static t_stat vt40_auto_attach ()
+static t_stat vt40_auto_config ()
 {
     SOCKET_DEF *socketptr;
     ROM_DEF *romptr;
@@ -1437,6 +1430,10 @@ static t_stat vt40_auto_attach ()
     /* Compute the VT40 start adress and make it a 16-bit physical address */
     rom_start_address = socket_config[socket_number].base_address + romptr->boot_no_diags;
     rom_start_address &= VAMASK;
+
+    /* Set auto config mode */
+    rom_device_flags |= ROM_CONFIG_AUTO;
+
     return SCPE_OK;
 }
 
@@ -1570,6 +1567,8 @@ static t_stat detach_socket (uint32 socket_number)
 static t_stat m9312_auto_config ()
 {
     t_stat result;
+
+    rom_device_flags |= ROM_CONFIG_AUTO;
 
     if ((result = m9312_auto_config_console_roms()) != SCPE_OK)
         return result;
