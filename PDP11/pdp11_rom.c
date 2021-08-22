@@ -82,6 +82,7 @@ static t_stat m9312_auto_config ();
 static t_stat m9312_auto_config_console_roms ();
 static t_stat m9312_auto_config_bootroms ();
 static t_stat m9312_attach (const char *rom_name, int unit_number);
+static void m9312_set_default_start_address ();
 static t_stat blank_help_attach(FILE*, DEVICE*, UNIT*, int32, const char*);
 static t_stat m9312_help_attach(FILE*, DEVICE*, UNIT*, int32, const char*);
 static t_stat vt40_help_attach(FILE*, DEVICE*, UNIT*, int32, const char*);
@@ -1643,6 +1644,9 @@ static t_stat m9312_auto_config_bootroms ()
     if (socket_number == 1)
         sim_printf ("warning - no boot ROMs attached for lack of attached devices\n");
 
+    /* Set the default start address for the new configuration of ROMs */
+    m9312_set_default_start_address ();
+
     return SCPE_OK;
 }
 
@@ -1661,6 +1665,33 @@ static t_stat m9312_attach (const char *rom_name, int socket_number)
     } else
         /* ROM not found */
         return SCPE_IERR;
+}
+
+/*
+ * The default start address is the NO-DIAG entry point of the ROM
+ * attached to the boot ROM in socket 1 (if any).
+ */
+static void m9312_set_default_start_address ()
+{
+    ROM_DEF* romptr;
+    int offset;
+
+    /* Clear start address in case no valid start address can be determined */
+    rom_start_address = 0;
+
+    /* Check a ROM is available in socket 1 */
+    if (socket_config[1].rom_image != NULL) {
+
+        /* Get pointer to ROM in socket 1 */
+        romptr = find_rom (socket_config[1].rom_name, (ROM_DEF (*)[]) &boot_roms);
+
+        /* Get NO_DIAG offset for this ROM */
+        offset = romptr->boot_no_diags;
+
+        /* Calculate the start address from the ROM NO_DIAG offset*/
+        if (offset != NO_START_ADDRESS)
+            rom_start_address = (socket_config[1].base_address + offset) & VAMASK;
+    }
 }
 
 /* Define help texts */
