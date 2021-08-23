@@ -1369,8 +1369,8 @@ static t_stat attach_rom_to_socket (char* name, t_addr address,
         return sim_messagef (SCPE_IERR, "reset_dib() failed\n");
     }
 
-    /* Save the specified ROM image name in the register */
-    strncpy (socket_config[socket_number].rom_name, name, CBUFSIZE);
+    /* Save the specified ROM image name in the configuration */
+    strlcpy (socket_config[socket_number].rom_name, name, CBUFSIZE);
     
     /* Execute ROM init function if available and save pointer for re-use */
     if (rom_init != NULL) {
