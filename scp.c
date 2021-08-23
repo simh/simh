@@ -4415,11 +4415,15 @@ if (fixup_needed) {
     memcpy (tgbuf, gbuf, (fixup_needed - gbuf));
     gbuf = tgbuf;
     }
-for (i = 0; i < sim_external_env_count; i++) {
-    if (0 == strcmp (gbuf, sim_external_env[i].name))
-        return sim_external_env[i].value;
-    }
 ap = _sim_gen_env_uplowcase (gbuf, rbuf, rbuf_size);/* Look for environment variable */
+if (!ap) {                              /* no environment variable found? */
+    for (i = 0; i < sim_external_env_count; i++) {
+        if (0 == strcmp (gbuf, sim_external_env[i].name)) {
+            ap = sim_external_env[i].value;
+            break;
+            }
+        }
+    }
 if (!ap) {                              /* no environment variable found? */
     time_t now = (time_t)cmd_time.tv_sec;
     struct tm *tmnow = localtime(&now);
@@ -6203,7 +6207,7 @@ const char *_sim_uname (UNIT *uptr)
 return _sim_uname_prefix (uptr, "");
 }
 
-const char *_sim_dname_space ()
+const char *_sim_dname_space (void)
 {
 return _sim_dname_prefix (NULL, "");
 }
@@ -15418,6 +15422,11 @@ Operator *op = NULL, *last_op;
 Stack *stack2 = new_Stack();        /* operator stack */
 char gbuf[CBUFSIZE];
 
+if (stack2 == NULL) {
+    *stat = SCPE_MEM;
+    return cptr;
+    }
+*stat = SCPE_OK;
 while (sim_isspace(*cptr))              /* skip leading whitespace */
     ++cptr;
 if (parens_required && (*cptr != '(')) {
