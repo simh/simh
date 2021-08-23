@@ -4918,9 +4918,11 @@ while (!feof (f) && !error) {
                                ansi->fixed_text);
 
     else {                                              /* Binary file */
-        size_t runt;
+        size_t runt = 0;
+
         data_read = fread (block, 1, tape->block_size, f);
-        runt = data_read % max_record_size; /* data_read (=0) % 0 == 0 */
+        if (max_record_size > 0)                /* always will be true but XCode thinks otherwise */
+            runt = data_read % max_record_size; /* data_read (=0) % anypositivenumber == 0 */
         /* Pad short records with zeros */
         if (runt > 0) {
             size_t nPad = max_record_size - runt;
