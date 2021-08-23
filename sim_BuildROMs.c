@@ -351,13 +351,14 @@ fprintf (iFile, "   This file is a generated file and should NOT be edited or ch
 if (Comments)
     fprintf (iFile, "\n   %s\r\n\r\n", Comments);
 fprintf (iFile, "*/\r\n");
-fprintf (iFile, "#if !defined BOOT_CODE_SIZE\r\n");
+fprintf (iFile, "#undef BOOT_CODE_SIZE\r\n");
 fprintf (iFile, "#define BOOT_CODE_SIZE 0x%X\r\n", (int)statb.st_size);
+fprintf (iFile, "#undef BOOT_CODE_FILENAME\r\n");
 fprintf (iFile, "#define BOOT_CODE_FILENAME \"%s\"\r\n", load_filename);
+fprintf (iFile, "#undef BOOT_CODE_ARRAY\r\n");
 fprintf (iFile, "#define BOOT_CODE_ARRAY %s\r\n", rom_array_name);
-fprintf (iFile, "#endif\r\n");
 for (rom = 1; rom <= MAX_CONCURRENT_ROMS; rom++) {
-    fprintf (iFile, "%s !defined BOOT_CODE_SIZE_%d\r\n", (rom == 1) ? "#if" : "#elif", rom);
+    fprintf (iFile, "%s !defined(BOOT_CODE_SIZE_%d)\r\n", (rom == 1) ? "#if" : "#elif", rom);
     fprintf (iFile, "#define BOOT_CODE_SIZE_%d 0x%X\r\n", rom, (int)statb.st_size);
     fprintf (iFile, "#define BOOT_CODE_FILENAME_%d \"%s\"\r\n", rom, load_filename);
     fprintf (iFile, "#define BOOT_CODE_ARRAY_%d %s\r\n", rom, rom_array_name);

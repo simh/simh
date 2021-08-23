@@ -1,29 +1,30 @@
 #ifndef ROM_vax_ka655x_bin_H
 #define ROM_vax_ka655x_bin_H 0
 /*
-   VAX/vax_ka655x_bin.h         produced at Mon Aug 23 12:14:02 2021
+   VAX/vax_ka655x_bin.h         produced at Mon Aug 23 13:30:20 2021
    from VAX/ka655x.bin which was last modified at Mon Jul 26 08:03:31 2021
    file size: 131072 (0x20000) - checksum: 0xFF7673B6
    This file is a generated file and should NOT be edited or changed by hand.
 */
-#if !defined BOOT_CODE_SIZE
+#undef BOOT_CODE_SIZE
 #define BOOT_CODE_SIZE 0x20000
+#undef BOOT_CODE_FILENAME
 #define BOOT_CODE_FILENAME "ka655x.bin"
+#undef BOOT_CODE_ARRAY
 #define BOOT_CODE_ARRAY vax_ka655x_bin
-#endif
-#if !defined BOOT_CODE_SIZE_1
+#if !defined(BOOT_CODE_SIZE_1)
 #define BOOT_CODE_SIZE_1 0x20000
 #define BOOT_CODE_FILENAME_1 "ka655x.bin"
 #define BOOT_CODE_ARRAY_1 vax_ka655x_bin
-#elif !defined BOOT_CODE_SIZE_2
+#elif !defined(BOOT_CODE_SIZE_2)
 #define BOOT_CODE_SIZE_2 0x20000
 #define BOOT_CODE_FILENAME_2 "ka655x.bin"
 #define BOOT_CODE_ARRAY_2 vax_ka655x_bin
-#elif !defined BOOT_CODE_SIZE_3
+#elif !defined(BOOT_CODE_SIZE_3)
 #define BOOT_CODE_SIZE_3 0x20000
 #define BOOT_CODE_FILENAME_3 "ka655x.bin"
 #define BOOT_CODE_ARRAY_3 vax_ka655x_bin
-#elif !defined BOOT_CODE_SIZE_4
+#elif !defined(BOOT_CODE_SIZE_4)
 #define BOOT_CODE_SIZE_4 0x20000
 #define BOOT_CODE_FILENAME_4 "ka655x.bin"
 #define BOOT_CODE_ARRAY_4 vax_ka655x_bin
