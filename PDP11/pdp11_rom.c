@@ -34,8 +34,7 @@ t_stat rom_reset (DEVICE *dptr);
 t_stat rom_boot (int32 u, DEVICE *dptr);
 t_stat rom_set_type (UNIT *, int32, CONST char *, void *);
 t_stat rom_show_type (FILE *, UNIT *, int32, CONST void *);
-static t_stat rom_set_configmode(UNIT*, int32, CONST char*, void*);
-t_stat rom_show_configmode (FILE *, UNIT *, int32, CONST void *);
+static t_stat rom_auto_configure(UNIT*, int32, CONST char*, void*);
 t_stat rom_set_start_address (UNIT *, int32, CONST char *, void *);
 t_stat rom_show_start_address (FILE *, UNIT *, int32, CONST void *);
 t_stat rom_set_write_enable (UNIT*, int32, CONST char*, void*);
@@ -208,7 +207,6 @@ DIB rom_dib[ROM_MAX_SOCKETS];
 
 /* Static definitions */
 static uint32 cpu_type_on_selection;                        /* cpu_type for which module type was selected */
-static uint32 rom_device_flags = 0;                         /* ROM_DEF device specific flags */
 static char unit_filename[M9312_NUM_SOCKETS * CBUFSIZE];    /* Composed file name for UNIT */
 
 /*
@@ -232,10 +230,12 @@ REG rom_reg[] = {
 /*
  * Define the ROM device modifiers.
  * 
- * The WRITE_ENABLE modifier is settable only modifier. To prevent the value
- * of this parameter is shown twice in the SHOW ROM output, there is no
- * SHOW ROM WRITE_ENABLE command and it's value is shown by the units
- * read-only flag.
+ * The AUTO_CONFIGURE and WRITE_ENABLE modifiers are settable only
+ * modifiers. The AUTO_CONFIGURE command is not a real modifier but
+ * a one-shot command to configure the ROMs.
+ * The WRITE_ENABLE modifier is settable only to prevent that the value
+ * of this parameter is shown twice in the SHOW ROM output, its value
+ * is shown by the units read-only flag in the SHOW ROM output.
  * 
  * The SOCKETS modifier is a view-only modifer and prints the relevant
  * information for all sockets in a pretty format.
@@ -243,8 +243,8 @@ REG rom_reg[] = {
 MTAB rom_mod[] = {
     { MTAB_XTD | MTAB_VDV | MTAB_VALR, 0, "TYPE", "TYPE",
         &rom_set_type, &rom_show_type, NULL, "ROM type (BLANK, M9312 or VT40)" },
-    { MTAB_XTD | MTAB_VDV | MTAB_VALR, 0, "CONFIGURATION", "CONFIGURATION",
-        &rom_set_configmode, &rom_show_configmode, NULL, "Auto configuration (AUTO or MANUAL)" },
+    { MTAB_XTD | MTAB_VDV,             0, NULL, "AUTO_CONFIGURE",
+        &rom_auto_configure, NULL, NULL, "Auto configure ROMs" },
     { MTAB_XTD | MTAB_VDV | MTAB_VALR, 0, "START_ADDRESS", "START_ADDRESS",
         &rom_set_start_address, &rom_show_start_address, NULL, "ROM bootstrap start address" },
     { MTAB_XTD | MTAB_VDV | MTAB_VALR, 0, NULL, "WRITE_ENABLE",
@@ -373,9 +373,6 @@ t_stat rom_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
                 /* Set socket base and end address if available */
                 set_socket_addresses ();
 
-                /* (Re)set the configuration mode to manual */
-                rom_device_flags &= ~ROM_CONFIG_AUTO;
-
                 /* Auto-configure the module if available */
                 if (module_list[selected_type]->auto_config != NULL)
                     (*module_list[selected_type]->auto_config)();
@@ -471,31 +468,20 @@ static t_bool dev_disabled (DEVICE *dptr)
 }
 
 
-/* Set configuration mode MANUAL or AUTO */
+/* Perform an auto-configuration */
 
-static t_stat rom_set_configmode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+static t_stat rom_auto_configure (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-    if (MATCH_CMD (cptr, "MANUAL") == 0)
-        rom_device_flags &= ~ROM_CONFIG_AUTO;
+    if (cptr != NULL)
+        return sim_messagef (SCPE_ARG, "The SET ROM AUTO_CONFIGURE command takes no parameter\n");
+
+    /* Check if auto config is available for the selected module */
+    if (module_list[selected_type]->auto_config != NULL)
+        (*module_list[selected_type]->auto_config)();
     else
-        if (MATCH_CMD (cptr, "AUTO") == 0) {
+        return sim_messagef (SCPE_ARG, "Auto configuration is not available for the %s module\n",
+        module_list[selected_type]->name);
 
-            /* Check if auto config is available for the selected module */
-            if (module_list[selected_type]->auto_config != NULL)
-                (*module_list[selected_type]->auto_config)();
-            else
-                return sim_messagef (SCPE_ARG, "Auto configuration is not available for the %s module\n",
-                module_list[selected_type]->name);
-        } else
-            return sim_messagef (SCPE_ARG, "Specify AUTO or MANUAL configuration mode\n\n");
-
-        return SCPE_OK;
-}
-
-t_stat rom_show_configmode (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
-{
-    fprintf (f, "configuration mode %s",
-        (rom_device_flags & ROM_CONFIG_AUTO) ? "AUTO" : "MANUAL");
     return SCPE_OK;
 }
 
@@ -1317,9 +1303,6 @@ static t_stat exec_attach_embedded_rom (ATTACH_CMD *param_values)
         return r;
     }
 
-    /* (Re)set the configuration mode to manual */
-    rom_device_flags &= ~ROM_CONFIG_AUTO;
-
     return SCPE_OK;
 }
 
@@ -1431,9 +1414,6 @@ static t_stat vt40_auto_config ()
     rom_start_address = socket_config[socket_number].base_address + romptr->boot_no_diags;
     rom_start_address &= VAMASK;
 
-    /* Set auto config mode */
-    rom_device_flags |= ROM_CONFIG_AUTO;
-
     return SCPE_OK;
 }
 
@@ -1507,9 +1487,6 @@ t_stat rom_detach (UNIT *uptr)
     /* Set socket base and end address if available */
     set_socket_addresses ();
 
-    /* (Re)set the configuration mode to manual */
-    rom_device_flags &= ~ROM_CONFIG_AUTO;
-
     return SCPE_OK;
 }
 
@@ -1567,8 +1544,6 @@ static t_stat detach_socket (uint32 socket_number)
 static t_stat m9312_auto_config ()
 {
     t_stat result;
-
-    rom_device_flags |= ROM_CONFIG_AUTO;
 
     if ((result = m9312_auto_config_console_roms()) != SCPE_OK)
         return result;
