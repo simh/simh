@@ -85,15 +85,9 @@
 
 #include <math.h>
 
-/* TODO: Simplify after 3b2_rev3_mau is implemented */
-#if defined(REV3)
-#include "3b2_rev3_mmu.h"
-#else
-#include "3b2_rev2_mmu.h"
-#endif
-
 #include "3b2_cpu.h"
 #include "3b2_mem.h"
+#include "3b2_mmu.h"
 
 #define   MAU_ID   0        /* Coprocessor ID of MAU */
 
@@ -282,7 +276,11 @@ DEVICE mau_dev = {
     NULL,                           /* attach routine */
     NULL,                           /* detach routine */
     NULL,                           /* context */
-    DEV_DISABLE|DEV_DIS|DEV_DEBUG,  /* flags */
+#ifdef REV3
+    DEV_DEBUG,                      /* Rev 3 flags: Always required */
+#else
+    DEV_DISABLE|DEV_DIS|DEV_DEBUG,  /* Rev 2 flags */
+#endif
     0,                              /* debug control flags */
     mau_debug,                      /* debug flag names */
     NULL,                           /* memory size change */

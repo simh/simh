@@ -70,7 +70,7 @@ static struct scsi_dev_t ha_tab[] = {
     HA_TAPE(ST120)
 };
 
-#define SCSI_U_FLAGS  (UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_DIS+ \
+#define SCSI_U_FLAGS  (UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+ \
                        UNIT_ROABLE+(SD327_DTYPE << UNIT_V_DTYPE))
 
 UNIT ha_unit[] = {
@@ -335,7 +335,7 @@ t_stat ha_svc(UNIT *uptr)
         sim_debug(HA_TRACE, &ha_dev,
                   "[%08x] [ha_svc] IRQ for board %d (VEC=%d).\n",
                   R[NUM_PC], ha_state.cid, cio[ha_state.cid].ivec);
-        cio[ha_state.cid].intr = TRUE;
+        CIO_SET_INT(ha_state.cid);
     }
 
     return SCPE_OK;

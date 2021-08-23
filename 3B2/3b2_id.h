@@ -158,7 +158,6 @@
 
 /* Function prototypes */
 
-t_bool id_int();
 t_stat id_ctlr_svc(UNIT *uptr);
 t_stat id_unit_svc(UNIT *uptr);
 t_stat id_reset(DEVICE *dptr);

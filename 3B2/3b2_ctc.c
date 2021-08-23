@@ -32,8 +32,8 @@
 
 #include "sim_disk.h"
 
-#include "3b2_mem.h"
 #include "3b2_io.h"
+#include "3b2_mem.h"
 
 #define CTQRESIZE     20
 #define CTQCESIZE     16
@@ -761,7 +761,7 @@ t_stat ctc_svc(UNIT *uptr)
         sim_debug(TRACE_DBG, &ctc_dev,
                   "[cio_svc] IRQ for board %d (VEC=%d)\n",
                   int_cid, cio[int_cid].ivec);
-        cio[int_cid].intr = TRUE;
+        CIO_SET_INT(int_cid);
     }
 
     /* Check to see if the completion queue has more work in it. We

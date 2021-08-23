@@ -604,8 +604,6 @@ instr *cpu_next_instruction(void);
 uint8 decode_instruction(instr *instr);
 void cpu_on_interrupt(uint16 vec);
 void cpu_abort(uint8 et, uint8 isc);
-void cpu_set_irq(uint8 ipl, uint8 id, uint16 csr_flags);
-void cpu_clear_irq(uint8 ipl, uint16 csr_flags);
 
 /* Helper macros */
 
@@ -649,7 +647,11 @@ void cpu_clear_irq(uint8 ipl, uint16 csr_flags);
         (d) = (uint8) (a)[(p)++];              \
     }
 
+#define CPU_SET_INT(flags) (sbd_int_req |= flags)
+#define CPU_CLR_INT(flags) (sbd_int_req &= ~(flags))
+
 extern volatile int32 stop_reason;
+extern uint16 sbd_int_req;
 extern uint32 rom_size;
 extern instr *cpu_instr;
 extern t_bool cpu_nmi;

@@ -30,23 +30,23 @@
 
 #include "3b2_io.h"
 
-#if defined(REV3)
-#include "3b2_rev3_csr.h"
-#include "3b2_rev3_mmu.h"
-#else
-#include "3b2_id.h"
-#include "3b2_rev2_csr.h"
-#include "3b2_rev2_mmu.h"
-#endif
-
 #include "3b2_cpu.h"
+#include "3b2_csr.h"
 #include "3b2_dmac.h"
 #include "3b2_if.h"
 #include "3b2_iu.h"
 #include "3b2_mem.h"
+#include "3b2_mmu.h"
 #include "3b2_stddev.h"
+#include "3b2_timer.h"
+
+#if defined(REV2)
+#include "3b2_id.h"
+#endif
 
 CIO_STATE cio[CIO_SLOTS] = {{0}};
+
+uint16 cio_int_req = 0; /* Bitset of card slots requesting interrupts */
 
 #if defined(REV3)
 iolink iotable[] = {
@@ -99,10 +99,10 @@ void cio_clear(uint8 cid)
     cio[cid].ivec = 0;
     cio[cid].no_rque = 0;
     cio[cid].ipl = 0;
-    cio[cid].intr = FALSE;
     cio[cid].sysgen_s = 0;
     cio[cid].seqbit = 0;
     cio[cid].op = 0;
+    CIO_CLR_INT(cid);
 }
 
 /*
@@ -490,7 +490,7 @@ uint32 io_read(uint32 pa, size_t size)
             sim_debug(IO_DBG, &cpu_dev,
                       "[READ] [%08x] No card at cid=%d reg=%d\n",
                       R[NUM_PC], cid, reg);
-            csr_data |= CSRTIMO;
+            CSRBIT(CSRTIMO, TRUE);
             cpu_abort(NORMAL_EXCEPTION, EXTERNAL_MEMORY_FAULT);
             return 0;
         }
@@ -594,7 +594,7 @@ uint32 io_read(uint32 pa, size_t size)
             sim_debug(CIO_DBG, &cpu_dev,
                       "[READ] [%08x] No card at cid=%d reg=%d\n",
                       R[NUM_PC], cid, reg);
-            csr_data |= CSRTIMO;
+            CSRBIT(CSRTIMO, TRUE);
             cpu_abort(NORMAL_EXCEPTION, EXTERNAL_MEMORY_FAULT);
             return 0;
         }
@@ -611,7 +611,7 @@ uint32 io_read(uint32 pa, size_t size)
     sim_debug(IO_DBG, &cpu_dev,
               "[%08x] [io_read] ADDR=%08x: No device found.\n",
               R[NUM_PC], pa);
-    csr_data |= CSRTIMO;
+    CSRBIT(CSRTIMO, TRUE);
     cpu_abort(NORMAL_EXCEPTION, EXTERNAL_MEMORY_FAULT);
     return 0;
 }
@@ -620,6 +620,24 @@ void io_write(uint32 pa, uint32 val, size_t size)
 {
     iolink *p;
     uint8 cid, reg;
+
+#if defined(REV3)
+    if (pa >= VCACHE_BOTTOM && pa < VCACHE_TOP) {
+        CSRBIT(CSRTIMO, TRUE);
+        cpu_abort(NORMAL_EXCEPTION, EXTERNAL_MEMORY_FAULT);
+        return;
+    }
+
+    if (pa >= BUB_BOTTOM && pa < BUB_TOP) {
+        CSRBIT(CSRTIMO, TRUE);
+        /* TODO: I don't remember why we do this! */
+        if ((pa & 0xfff) == 3) {
+            cpu_abort(NORMAL_EXCEPTION, EXTERNAL_MEMORY_FAULT);
+        }
+        /* TODO: Implement BUB */
+        return;
+    }
+#endif    
 
     /* Feature Card Area */
     if (pa >= CIO_BOTTOM && pa < CIO_TOP) {
@@ -631,7 +649,7 @@ void io_write(uint32 pa, uint32 val, size_t size)
             sim_debug(CIO_DBG, &cpu_dev,
                       "[WRITE] [%08x] No card at cid=%d reg=%d\n",
                       R[NUM_PC], cid, reg);
-            csr_data |= CSRTIMO;
+            CSRBIT(CSRTIMO, TRUE);
             cpu_abort(NORMAL_EXCEPTION, EXTERNAL_MEMORY_FAULT);
             return;
         }
@@ -726,7 +744,7 @@ void io_write(uint32 pa, uint32 val, size_t size)
             sim_debug(CIO_DBG, &cpu_dev,
                       "[WRITE] [%08x] No card at cid=%d reg=%d\n",
                       R[NUM_PC], cid, reg);
-            csr_data |= CSRTIMO;
+            CSRBIT(CSRTIMO, TRUE);
             cpu_abort(NORMAL_EXCEPTION, EXTERNAL_MEMORY_FAULT);
             return;
         }
@@ -744,7 +762,7 @@ void io_write(uint32 pa, uint32 val, size_t size)
     sim_debug(IO_DBG, &cpu_dev,
               "[%08x] [io_write] ADDR=%08x: No device found.\n",
               R[NUM_PC], pa);
-    csr_data |= CSRTIMO;
+    CSRBIT(CSRTIMO, TRUE);
     cpu_abort(NORMAL_EXCEPTION, EXTERNAL_MEMORY_FAULT);
 }
 

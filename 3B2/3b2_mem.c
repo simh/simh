@@ -30,16 +30,10 @@
 
 #include "3b2_mem.h"
 
-#if defined(REV3)
-#include "3b2_rev3_csr.h"
-#include "3b2_rev3_mmu.h"
-#else
-#include "3b2_rev2_csr.h"
-#include "3b2_rev2_mmu.h"
-#endif
-
 #include "3b2_cpu.h"
+#include "3b2_csr.h"
 #include "3b2_io.h"
+#include "3b2_mmu.h"
 
 t_bool addr_is_rom(uint32 pa)
 {

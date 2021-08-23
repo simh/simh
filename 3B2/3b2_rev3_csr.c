@@ -28,11 +28,10 @@
    from the author.
 */
 
-#include "3b2_rev3_csr.h"
-
 #include "3b2_cpu.h"
+#include "3b2_csr.h"
 #include "3b2_if.h"
-#include "3b2_stddev.h"
+#include "3b2_timer.h"
 
 uint32 csr_data;
 
@@ -131,6 +130,14 @@ uint32 csr_read(uint32 pa, size_t size)
     }
 }
 
+#define SET_INT(flag, val) {                     \
+        if (val) {                               \
+            CPU_SET_INT(flag);                   \
+        } else {                                 \
+            CPU_CLR_INT(flag);                   \
+        }                                        \
+    }
+
 void csr_write(uint32 pa, uint32 val, size_t size)
 {
     uint32 reg = pa - CSRBASE;
@@ -139,24 +146,31 @@ void csr_write(uint32 pa, uint32 val, size_t size)
 
     case 0x00:
         CSRBIT(CSRCLK, val);
+        SET_INT(INT_CLOCK, val);
         break;
     case 0x04:
         CSRBIT(CSRPWRDN, val);
+        SET_INT(INT_PWRDWN, val);
         break;
     case 0x08:
         CSRBIT(CSROPINT15, val);
+        SET_INT(INT_BUS_OP, val);
         break;
     case 0x0c:
         CSRBIT(CSRUART, val);
+        SET_INT(INT_UART, val);
         break;
     case 0x10:
         CSRBIT(CSRDMA, val);
+        SET_INT(INT_UART_DMA, val);
         break;
     case 0x14:
         CSRBIT(CSRPIR9, val);
+        SET_INT(INT_PIR9, val);
         break;
     case 0x18:
         CSRBIT(CSRPIR8, val);
+        SET_INT(INT_PIR8, val);
         break;
     case 0x1c:
         CSRBIT(CSRITIM, val);
@@ -234,15 +248,31 @@ void csr_write(uint32 pa, uint32 val, size_t size)
         break;
     case 0x5c:
         CSRBIT(CSRSBERR, val);
+        if (val) {
+            if (!(csr_data & CSRISBERR)) {
+                SET_INT(INT_SBERR, TRUE);
+            }
+        } else {
+            SET_INT(INT_SBERR, FALSE);
+        }
         break;
     case 0x60:
         CSRBIT(CSRMBERR, val);
+        SET_INT(INT_MBERR, val);
         break;
     case 0x64:
         CSRBIT(CSRUBUBF, val);
+        SET_INT(INT_BUS_RXF, val);
         break;
     case 0x68:
         CSRBIT(CSRTIMO, val);
+        if (val) {
+            if (!(csr_data & CSRITIMO)) {
+                SET_INT(INT_BUS_TMO, TRUE);
+            }
+        } else {
+            SET_INT(INT_BUS_TMO, FALSE);
+        }
         break;
     case 0x6c:
         CSRBIT(CSRFRF, val);

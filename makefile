@@ -2035,21 +2035,22 @@ ATT3B2D = ${SIMHD}/3B2
 ATT3B2M400 = ${ATT3B2D}/3b2_cpu.c ${ATT3B2D}/3b2_sys.c \
 	${ATT3B2D}/3b2_rev2_sys.c ${ATT3B2D}/3b2_rev2_mmu.c \
 	${ATT3B2D}/3b2_rev2_mau.c ${ATT3B2D}/3b2_rev2_csr.c \
-	${ATT3B2D}/3b2_stddev.c ${ATT3B2D}/3b2_mem.c \
-	${ATT3B2D}/3b2_iu.c ${ATT3B2D}/3b2_if.c \
-	${ATT3B2D}/3b2_id.c ${ATT3B2D}/3b2_dmac.c \
-	${ATT3B2D}/3b2_io.c ${ATT3B2D}/3b2_ports.c \
-	${ATT3B2D}/3b2_ctc.c ${ATT3B2D}/3b2_ni.c
+	${ATT3B2D}/3b2_rev2_timer.c ${ATT3B2D}/3b2_stddev.c \
+	${ATT3B2D}/3b2_mem.c ${ATT3B2D}/3b2_iu.c \
+	${ATT3B2D}/3b2_if.c ${ATT3B2D}/3b2_id.c \
+	${ATT3B2D}/3b2_dmac.c ${ATT3B2D}/3b2_io.c \
+	${ATT3B2D}/3b2_ports.c ${ATT3B2D}/3b2_ctc.c \
+	${ATT3B2D}/3b2_ni.c
 ATT3B2M400_OPT = -DUSE_INT64 -DUSE_ADDR64 -DREV2 -I ${ATT3B2D} ${NETWORK_OPT}
 
 ATT3B2M600 = ${ATT3B2D}/3b2_cpu.c ${ATT3B2D}/3b2_sys.c \
 	${ATT3B2D}/3b2_rev3_sys.c ${ATT3B2D}/3b2_rev3_mmu.c \
 	${ATT3B2D}/3b2_rev2_mau.c ${ATT3B2D}/3b2_rev3_csr.c \
-	${ATT3B2D}/3b2_stddev.c ${ATT3B2D}/3b2_mem.c \
-	${ATT3B2D}/3b2_iu.c ${ATT3B2D}/3b2_if.c \
-	${ATT3B2D}/3b2_dmac.c ${ATT3B2D}/3b2_io.c \
-	${ATT3B2D}/3b2_ports.c ${ATT3B2D}/3b2_scsi.c \
-	${ATT3B2D}/3b2_ni.c
+	${ATT3B2D}/3b2_rev3_timer.c ${ATT3B2D}/3b2_stddev.c \
+	${ATT3B2D}/3b2_mem.c ${ATT3B2D}/3b2_iu.c \
+	${ATT3B2D}/3b2_if.c ${ATT3B2D}/3b2_dmac.c \
+	${ATT3B2D}/3b2_io.c ${ATT3B2D}/3b2_ports.c \
+	${ATT3B2D}/3b2_scsi.c ${ATT3B2D}/3b2_ni.c
 ATT3B2M600_OPT = -DUSE_INT64 -DUSE_ADDR64 -DREV3 -I ${ATT3B2D} ${NETWORK_OPT}
 
 SIGMAD = ${SIMHD}/sigma

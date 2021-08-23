@@ -1,4 +1,4 @@
-/* 3b2_rev2_stddev.h: AT&T 3B2 Rev 2 (Model 400) System Devices Header
+/* 3b2_stddev.h: AT&T 3B2 miscellaneous system board devices.
 
    Copyright (c) 2017, Seth J. Morabito
 
@@ -28,39 +28,10 @@
    from the author.
 */
 
-#ifndef _3B2_REV2_SYSDEV_H_
-#define _3B2_REV2_SYSDEV_H_
+#ifndef _3B2_STDDEV_H_
+#define _3B2_STDDEV_H_
 
 #include "3b2_defs.h"
-
-/* Timer definitions */
-#define TMR_CLK           0   /* The clock responsible for IPL 15 interrupts */
-#define TPS_CLK           100 /* 100 ticks per second */
-
-#define TIMER_STP_US      1
-#define tmrnum            u3
-#define tmr               up7
-
-#define TIMER_REG_DIVA    0x03
-#define TIMER_REG_DIVB    0x07
-#define TIMER_REG_DIVC    0x0b
-#define TIMER_REG_CTRL    0x0f
-#define TIMER_CLR_LATCH   0x13
-
-#define CLK_RW            0x30
-#define CLK_LSB           0x10
-#define CLK_MSB           0x20
-#define CLK_LMB           0x30
-
-struct timer_ctr {
-    uint16 divider;
-    uint16 val;
-    uint8  mode;
-    t_bool lmb;
-    t_bool enabled;
-    t_bool gate;
-    double stime;     /* Most recent start time of counter */
-};
 
 /* NVRAM */
 t_stat nvram_ex(t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
@@ -73,28 +44,7 @@ const char *nvram_description(DEVICE *dptr);
 t_stat nvram_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 void nvram_write(uint32 pa, uint32 val, size_t size);
 
-/* 8253 Timer */
-t_stat timer_reset(DEVICE *dptr);
-uint32 timer_read(uint32 pa, size_t size);
-void timer_write(uint32 pa, uint32 val, size_t size);
-void timer_tick();
-t_stat timer0_svc(UNIT *uptr);
-t_stat timer1_svc(UNIT *uptr);
-t_stat timer2_svc(UNIT *uptr);
-t_stat timer_set_shutdown(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
-void timer_disable(uint8 ctrnum);
-void timer_enable(uint8 ctrnum);
-
-/* CSR */
-t_stat csr_svc(UNIT *uptr);
-t_stat csr_ex(t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
-t_stat csr_dep(t_value val, t_addr exta, UNIT *uptr, int32 sw);
-t_stat csr_reset(DEVICE *dptr);
-uint32 csr_read(uint32 pa, size_t size);
-void csr_write(uint32 pa, uint32 val, size_t size);
-
 /* TOD */
-
 typedef struct tod_data {
     int32 delta;       /* Delta between simulated time and real time (sec.) */
     uint8 tsec;        /* 1/10 seconds */
@@ -125,11 +75,8 @@ void tod_write(uint32, uint32 val, size_t size);
 
 #if defined(REV3)
 /* Fault Register */
-
 uint32 flt_read(uint32 pa, size_t size);
 void flt_write(uint32 pa, uint32 val, size_t size);
 #endif
 
-extern int32 tmxr_poll;
-
-#endif /* _3B2_REV2_SYSDEV_H_ */
+#endif /* _3B2_STDDEV_H_ */

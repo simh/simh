@@ -127,6 +127,5 @@ CONST char *if_description(DEVICE *dptr);
 t_stat if_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 
 extern IF_STATE if_state;
-extern t_bool if_irq;
 
 #endif

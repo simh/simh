@@ -32,7 +32,7 @@
 
 #include "3b2_cpu.h"
 #include "3b2_sys.h"
-#include "3b2_stddev.h"
+#include "3b2_timer.h"
 
 uint16 csr_data;
 
@@ -166,15 +166,19 @@ void csr_write(uint32 pa, uint32 val, size_t size)
         break;
     case 0x33:    /* Set PIR9 */
         csr_data |= CSRPIR9;
+        CPU_SET_INT(INT_PIR9);
         break;
     case 0x37:    /* Clear PIR9 */
         csr_data &= ~CSRPIR9;
+        CPU_CLR_INT(INT_PIR9);
         break;
     case 0x3b:    /* Set PIR8 */
         csr_data |= CSRPIR8;
+        CPU_SET_INT(INT_PIR8);
         break;
     case 0x3f:    /* Clear PIR8 */
         csr_data &= ~CSRPIR8;
+        CPU_CLR_INT(INT_PIR8);
         break;
     default:
         break;

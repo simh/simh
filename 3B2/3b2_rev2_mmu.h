@@ -187,9 +187,6 @@
 /* Shift and mask the flag bits for the current CPU mode */
 #define MMU_PERM(f)  ((f >> ((3 - CPU_CM) * 2)) & 3)
 
-#define ROM_SIZE       0x10000
-#define BOOT_CODE_SIZE 0x8000
-
 /* Codes set in the MMU Fault register */
 #define MMU_F_SDTLEN             0x03
 #define MMU_F_PW                 0x04

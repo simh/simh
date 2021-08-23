@@ -252,6 +252,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\3B2\3b2_rev2_timer.c"
+				>
+			</File>
+			<File
 				RelativePath="..\3B2\3b2_stddev.c"
 				>
 			</File>
@@ -557,6 +561,10 @@
 			</File>
 			<File
 				RelativePath="..\3B2\3b2_rev2_csr.h"
+				>
+			</File>
+			<File
+				RelativePath="..\3B2\3b2_rev2_timer.h"
 				>
 			</File>
 			<File

@@ -28,10 +28,10 @@
    from the author.
 */
 
-#include "3b2_rev2_mmu.h"
 
-#include "3b2_sys.h"
 #include "3b2_cpu.h"
+#include "3b2_mmu.h"
+#include "3b2_sys.h"
 
 UNIT mmu_unit = { UDATA(NULL, 0, 0) };
 
