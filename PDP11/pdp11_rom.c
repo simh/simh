@@ -340,6 +340,10 @@ t_stat rom_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
     uint16 module_number;
 
+    /* Disallow SET commands on a disabled ROM device */
+    if (rom_dev.flags & DEV_DIS)
+        return sim_messagef (SCPE_ARG, "Non-existent device\n");
+
     /* Is a module type specified? */
     if (cptr == NULL)
         return sim_messagef (SCPE_ARG, "No module specified\n");
@@ -403,6 +407,10 @@ static int module_type_is_valid (uint16 module_number)
 
 t_stat rom_show_type (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 {
+    /* Disallow SHOW commands on a disabled ROM device */
+    if (rom_dev.flags & DEV_DIS)
+        return sim_messagef (SCPE_ARG, "ROM\tdisabled\n");
+
     fprintf (f, "module type %s", module_list[selected_type]->name);
     return SCPE_OK;
 }
@@ -442,6 +450,10 @@ t_stat rom_show_sockets (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 {
     uint32 socket_number;
 
+    /* Disallow SHOW commands on a disabled ROM device */
+    if (rom_dev.flags & DEV_DIS)
+        return sim_messagef (SCPE_ARG, "ROM\tdisabled\n");
+
     for (socket_number = 0;
         socket_number < module_list[selected_type]->num_sockets; socket_number++) {
         fprintf (f, "socket %d: ", socket_number);
@@ -472,6 +484,10 @@ static t_bool dev_disabled (DEVICE *dptr)
 
 static t_stat rom_auto_configure (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
+    /* Disallow SET commands on a disabled ROM device */
+    if (rom_dev.flags & DEV_DIS)
+        return sim_messagef (SCPE_ARG, "Non-existent device\n");
+
     if (cptr != NULL)
         return sim_messagef (SCPE_ARG, "The SET ROM AUTO_CONFIGURE command takes no parameter\n");
 
@@ -490,6 +506,10 @@ static t_stat rom_auto_configure (UNIT *uptr, int32 val, CONST char *cptr, void 
 
 t_stat rom_set_start_address(UNIT* uptr, int32 value, CONST char* cptr, void* desc)
 {
+    /* Disallow SET commands on a disabled ROM device */
+    if (rom_dev.flags & DEV_DIS)
+        return sim_messagef (SCPE_ARG, "Non-existent device\n");
+
     /* Forward the command to the module-specific function */
     return module_list[selected_type]->set_start_address (uptr, value, cptr, desc);
 }
@@ -650,6 +670,10 @@ t_stat get_symbolic_start_address (const char* cptr, int32* start_address)
 
 t_stat rom_show_start_address (FILE* f, UNIT* uptr, int32 val, CONST void* desc)
 {
+    /* Disallow SHOW commands on a disabled ROM device */
+    if (rom_dev.flags & DEV_DIS)
+        return sim_messagef (SCPE_ARG, "ROM\tdisabled\n");
+
     /* Forward the command to the module-specific function */
     return module_list[selected_type]->show_start_address (f);
 }
@@ -720,6 +744,10 @@ t_stat m9312_show_start_address (FILE *f)
 
 t_stat rom_set_write_enable (UNIT* uptr, int32 value, CONST char* cptr, void* desc)
 {
+    /* Disallow SET commands on a disabled ROM device */
+    if (rom_dev.flags & DEV_DIS)
+        return sim_messagef (SCPE_ARG, "Non-existent device\n");
+
     if (MATCH_CMD (cptr, "ENABLED") == 0)
         uptr->flags &= ~UNIT_RO;
     else if (MATCH_CMD (cptr, "DISABLED") == 0)
@@ -774,6 +802,12 @@ static t_bool address_available (int32 address)
 /*
  * ROM read routine. This routine forwards the read request
  * to the ROM-specific read function.
+ * 
+ * There is no need to check the device is enabled as we cannot
+ * get into a state in which ROMs are attached on a disabled
+ * ROM device. ROM's have to be detached before the device can
+ * be disabled and ATTACH and auto-configure commands are
+ * disallowed on a disabled device.
  */
 t_stat rom_rd (int32* data, int32 PA, int32 access)
 {
