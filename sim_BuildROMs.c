@@ -81,6 +81,8 @@ struct ROM_File_Descriptor {
 #include <time.h>
 #include <sys/stat.h>
 
+#define MAX_CONCURRENT_ROMS 4
+
 #if defined(_WIN32)
 #include <sys/utime.h>
 #define utimbuf _utimbuf 
@@ -98,7 +100,7 @@ int sim_read_ROM_include(const char *include_filename,
                          int *defines_found)
 {
 FILE *iFile;
-char line[256];
+char line[256], cmpbuf[256];
 size_t i;
 size_t bytes_written = 0;
 size_t allocated_size = 0;
@@ -121,11 +123,15 @@ while (fgets (line, sizeof(line)-1, iFile)) {
 
     switch (line[0]) {
         case '#':
-            if (0 == strncmp ("#define BOOT_CODE_SIZE ", line, 23))
+            snprintf (cmpbuf, sizeof (cmpbuf), "_%d ", MAX_CONCURRENT_ROMS);
+            if ((0 == strncmp ("#define BOOT_CODE_SIZE", line, 22)) &&
+                (0 == strncmp (cmpbuf, &line[22], strlen (cmpbuf))))
                 define_size_found = 1;
-            if (0 == strncmp ("#define BOOT_CODE_FILENAME ", line, 27))
+            if ((0 == strncmp ("#define BOOT_CODE_FILENAME", line, 26)) &&
+                (0 == strncmp (cmpbuf, &line[26], strlen (cmpbuf))))
                 define_filename_found = 1;
-            if (0 == strncmp ("#define BOOT_CODE_ARRAY ", line, 24))
+            if ((0 == strncmp ("#define BOOT_CODE_ARRAY", line, 23)) &&
+                (0 == strncmp (cmpbuf, &line[23], strlen (cmpbuf))))
                 define_array_found = 1;
             break;
         case ' ':
@@ -236,6 +242,7 @@ time_t now;
 int bytes_written = 0;
 int include_bytes;
 int c;
+int rom;
 struct stat statb;
 const char *load_filename;
 unsigned char *ROMData = NULL;
@@ -337,16 +344,25 @@ time (&now);
 fprintf (iFile, "#ifndef ROM_%s_H\r\n", rom_array_name);
 fprintf (iFile, "#define ROM_%s_H 0\r\n", rom_array_name);
 fprintf (iFile, "/*\r\n");
-fprintf (iFile, "   %s         produced at %s", include_filename, ctime(&now));
-fprintf (iFile, "   from %s which was last modified at %s", rom_filename, ctime(&statb.st_mtime));
+fprintf (iFile, "   %s         produced at %24.24s\r\n", include_filename, ctime(&now));
+fprintf (iFile, "   from %s which was last modified at %24.24s\r\n", rom_filename, ctime(&statb.st_mtime));
 fprintf (iFile, "   file size: %d (0x%X) - checksum: 0x%08X\r\n", (int)statb.st_size, (int)statb.st_size, checksum);
 fprintf (iFile, "   This file is a generated file and should NOT be edited or changed by hand.\r\n");
 if (Comments)
     fprintf (iFile, "\n   %s\r\n\r\n", Comments);
 fprintf (iFile, "*/\r\n");
+fprintf (iFile, "#if !defined BOOT_CODE_SIZE\r\n");
 fprintf (iFile, "#define BOOT_CODE_SIZE 0x%X\r\n", (int)statb.st_size);
 fprintf (iFile, "#define BOOT_CODE_FILENAME \"%s\"\r\n", load_filename);
 fprintf (iFile, "#define BOOT_CODE_ARRAY %s\r\n", rom_array_name);
+fprintf (iFile, "#endif\r\n");
+for (rom = 1; rom <= MAX_CONCURRENT_ROMS; rom++) {
+    fprintf (iFile, "%s !defined BOOT_CODE_SIZE_%d\r\n", (rom == 1) ? "#if" : "#elif", rom);
+    fprintf (iFile, "#define BOOT_CODE_SIZE_%d 0x%X\r\n", rom, (int)statb.st_size);
+    fprintf (iFile, "#define BOOT_CODE_FILENAME_%d \"%s\"\r\n", rom, load_filename);
+    fprintf (iFile, "#define BOOT_CODE_ARRAY_%d %s\r\n", rom, rom_array_name);
+    }
+fprintf (iFile, "#endif\r\n");
 fprintf (iFile, "unsigned char %s[] = {", rom_array_name);
 for (bytes_written=0;bytes_written<statb.st_size; ++bytes_written) {
     c = ROMData[bytes_written];
