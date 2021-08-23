@@ -5233,7 +5233,8 @@ if (set == NULL) {                                      /* if the allocation fai
 
 tbuf = (char *) calloc (strlen(cptr)+2, sizeof(*cptr));
 if (tbuf == NULL) {                                     /* if the allocation failed */
-    free (tbuf);                                        /*   then free the successful list allocation */
+    free (set);                                         /*   then free the line set tracking array */
+    free (list);                                        /*        and successful list allocation */
     return SCPE_MEM;                                    /*      and report a "Memory exhausted" error */
     }
 
