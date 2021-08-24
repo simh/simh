@@ -240,6 +240,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\3B2\3b2_rev3_timer.c"
+				>
+			</File>
+			<File
 				RelativePath="..\3B2\3b2_scsi.c"
 				>
 			</File>
@@ -536,11 +540,11 @@
 				>
 			</File>
 			<File
-				RelativePath="..\3B2\3b2_rev2_csr.h"
+				RelativePath="..\3B2\3b2_rev3_csr.h"
 				>
 			</File>
 			<File
-				RelativePath="..\3B2\3b2_rev2_defs.h"
+				RelativePath="..\3B2\3b2_rev3_defs.h"
 				>
 			</File>
 			<File
@@ -548,11 +552,15 @@
 				>
 			</File>
 			<File
-				RelativePath="..\3B2\3b2_rev2_mmu.h"
+				RelativePath="..\3B2\3b2_rev3_mmu.h"
 				>
 			</File>
 			<File
-				RelativePath="..\3B2\3b2_rev2_sys.h"
+				RelativePath="..\3B2\3b2_rev3_sys.h"
+				>
+			</File>
+			<File
+				RelativePath="..\3B2\3b2_rev3_timer.h"
 				>
 			</File>
 			<File

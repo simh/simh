@@ -79,6 +79,18 @@
 #define CSRDMA          0x0002 /* DMA Interrupt          */
 #define CSRIOF          0x0001 /* I/O Board Fail         */
 
+/* Interrupt Sources */
+#define INT_SERR        0x01   /* IPL 15 */
+#define INT_CLOCK       0x02   /* IPL 15 */
+#define INT_DMA         0x04   /* IPL 13 */
+#define INT_UART        0x04   /* IPL 13 */
+#define INT_DISK        0x10   /* IPL 11 */
+#define INT_FLOPPY      0x20   /* IPL 11 */
+#define INT_PIR9        0x40   /* IPL 9  */
+#define INT_PIR8        0x80   /* IPL 8  */
+
+#define INT_MAP_LEN     0x100
+
 /* Memory */
 #define MEMSIZE_REG     0x4C003
 #define MEMID_512K      0

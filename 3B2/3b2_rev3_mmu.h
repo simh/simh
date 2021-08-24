@@ -167,14 +167,14 @@
 #define SDC_IDX(va)       ((uint8)((va) >> 17) & 7)
 
 /* Convert from sd to sd cache entry */
-#define SD_TO_SDCH(hi,lo)     ((hi) & SD_ADDR_MASK           |  \
-                               ((lo) & SD_C_MASK) >> 1       |  \
-                               ((lo) & SD_CACHE_MASK) >> 1   |  \
+#define SD_TO_SDCH(hi,lo)     (((hi) & SD_ADDR_MASK)         | \
+                               ((lo) & SD_C_MASK) >> 1       | \
+                               ((lo) & SD_CACHE_MASK) >> 1   | \
                                (SDC_G_MASK))
-#define SD_TO_SDCL(lo,va)     (((lo) & SD_ACC_MASK)          |  \
-                               ((lo) & SD_MAX_OFF_MASK) >> 3 |  \
-                               ((lo) & SD_R_MASK) << 18      |  \
-                               ((lo) & SD_M_MASK) << 21      |  \
+#define SD_TO_SDCL(lo,va)     (((lo) & SD_ACC_MASK)          | \
+                               ((lo) & SD_MAX_OFF_MASK) >> 3 | \
+                               ((lo) & SD_R_MASK) << 18      | \
+                               ((lo) & SD_M_MASK) << 21      | \
                                ((va) & SD_VADDR_MASK) >> 20)
 
 /* Convert from sd cache entry to sd */
@@ -188,18 +188,18 @@
                                SD_V_MASK | SD_P_MASK)
 
 /* Convert from pd cache entry to pd */
-#define PDCE_TO_PD(pdcl)      (((pdcl & PDC_PADDR_MASK) << 11) | \
-                               ((pdcl & PDC_W_MASK) >> 17)     | \
-                               ((pdcl & PDC_M_MASK) >> 21)     | \
-                               ((pdcl & PDC_R_MASK) >> 18)     | \
+#define PDCE_TO_PD(pdcl)      ((((pdcl) & PDC_PADDR_MASK) << 11) | \
+                               (((pdcl) & PDC_W_MASK) >> 17)     | \
+                               (((pdcl) & PDC_M_MASK) >> 21)     | \
+                               (((pdcl) & PDC_R_MASK) >> 18)     | \
                                PD_P_MASK)
 
 /* Convert from pd to pd cache entry (low word) */
-#define PD_TO_PDCL(pd, sd_lo) (((pd & PD_PADDR_MASK) >> 11) | \
-                               ((pd & PD_W_MASK)     << 17) | \
-                               ((pd & PD_M_MASK)     << 21) | \
-                               ((pd & PD_R_MASK)     << 18) | \
-                               (sd_lo & SD_ACC_MASK))
+#define PD_TO_PDCL(pd, sd_lo) ((((pd) & PD_PADDR_MASK) >> 11) | \
+                               (((pd) & PD_W_MASK)     << 17) | \
+                               (((pd) & PD_M_MASK)     << 21) | \
+                               (((pd) & PD_R_MASK)     << 18) | \
+                               ((sd_lo) & SD_ACC_MASK))
 
 /* Convert from va to pd cache entry (high word / tag) */
 #define VA_TO_PDCH(va, sd_lo) ((1 << 30)                        | \

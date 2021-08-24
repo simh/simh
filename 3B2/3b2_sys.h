@@ -28,8 +28,8 @@
    from the author.
 */
 
-#ifndef _3B2_REV2_SYS_H_
-#define _3B2_REV2_SYS_H_
+#ifndef _3B2_SYS_H_
+#define _3B2_SYS_H_
 
 #include "3b2_defs.h"
 
@@ -43,4 +43,4 @@ extern char sim_name[];
 extern REG *sim_PC;
 extern int32 sim_emax;
 
-#endif /* _3B2_REV2_SYS_H_ */
+#endif /* _3B2_SYS_H_ */

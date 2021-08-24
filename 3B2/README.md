@@ -1,7 +1,13 @@
 AT&T 3B2 Simulator
 ==================
 
-This module contains a simulator for the AT&T 3B2 Model 400 microcomputer.
+This module contains the source for two simulators:
+
+1. A simulator for the AT&T 3B2 Model 400 computer (Rev. 2)
+2. A simulator for the AT&T 3B2 Model 600 computer (Rev. 3)
+
+The 3B2/400 simulator is complete, usable, and robust. The 3B2/600 simulator
+is not yet usable, however. It is under active development.
 
 Full documentation for the 3B2 simulator is available here:
 
@@ -23,6 +29,7 @@ devices are given in parentheses:
   - uPD7261A Integrated MFM Fixed Disk Controller (IDISK)
   - Non-Volatile Memory (NVRAM)
   - MM58174A Time Of Day Clock (TOD)
+  - CM195A Ethernet Network Interface (NI)
   - CM195B 4-port Serial MUX (PORTS)
   - CM195H Cartridge Tape Controller (CTC)
 

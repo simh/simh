@@ -46,34 +46,39 @@
 #include "3b2_cpu.h"
 
 #if defined(REV3)
-#include "3b2_rev2_mau.h"  /* TODO: Replace with Rev 3 MAU when implemented */
-#include "3b2_rev3_csr.h"
-#include "3b2_rev3_mmu.h"
 #include "rom_rev3_bin.h"
+#include "3b2_if.h"
+#define ROM_ARRAY  BOOT_CODE_ARRAY
+#define ROM_SIZE   BOOT_CODE_SIZE
 #else
-#include "3b2_rev2_csr.h"
-#include "3b2_rev2_mau.h"
-#include "3b2_rev2_mmu.h"
-#include "3b2_id.h"
 #include "rom_rev2_bin.h"
-#endif
+#include "rom_rev2_demon_bin.h"
+#include "3b2_id.h"
+#define ROM_ARRAY  BOOT_CODE_ARRAY_1
+#define ROM_SIZE   BOOT_CODE_SIZE_1
+#define DEMON_ROM_ARRAY  BOOT_CODE_ARRAY_2
+#define DEMON_ROM_SIZE   BOOT_CODE_SIZE_2
+#endif /* defined(REV3) */
 
+#include "3b2_csr.h"
 #include "3b2_dmac.h"
 #include "3b2_io.h"
 #include "3b2_iu.h"
+#include "3b2_mau.h"
 #include "3b2_mem.h"
+#include "3b2_mmu.h"
 #include "3b2_stddev.h"
+#include "3b2_timer.h"
 
 #define MAX_SUB_RETURN_SKIP 9
 
-uint32 rom_size = BOOT_CODE_SIZE;
+uint32 rom_size = 0;
 
 /* Static function declarations */
 static uint32 cpu_effective_address(operand * op);
 static uint32 cpu_read_op(operand * op);
 static void cpu_write_op(operand * op, t_uint64 val);
 static void cpu_set_nz_flags(t_uint64 data, operand * op);
-static void cpu_calc_ints();
 static SIM_INLINE void cpu_on_normal_exception(uint8 isc);
 static SIM_INLINE void cpu_on_stack_exception(uint8 isc);
 static SIM_INLINE void cpu_on_process_exception(uint8 isc);
@@ -136,16 +141,19 @@ volatile uint32 abort_reason;
 uint32 R[NUM_REGISTERS];
 
 /* Other global CPU state */
-uint8  cpu_int_ipl    = 0;         /* Interrupt IPL level */
-uint8  cpu_int_vec    = 0;         /* Interrupt vector */
-t_bool cpu_nmi        = FALSE;     /* If set, there has been an NMI */
 
-int32  pc_incr        = 0;         /* Length (in bytes) of instruction
-                                      currently being executed */
-t_bool cpu_ex_halt    = FALSE;     /* Flag to halt on exceptions /
-                                      traps */
-t_bool cpu_km         = FALSE;     /* If true, kernel mode has been forced
-                                      for memory access */
+/* Interrupt request bitfield */
+/* Note: Only the lowest 8 bits are used by Rev 2, and only the lowest
+   12 bits are used by Rev 3 */
+uint16 sbd_int_req = 0;       /* Currently set interrupt sources */
+uint8 int_map[INT_MAP_LEN];   /* Map of  interrupt sources  to highest
+                                 priority IPL */
+t_bool cpu_nmi = FALSE;       /* If set, there has been an NMI */
+int32 pc_incr = 0;            /* Length (in bytes) of instruction
+                                 currently being executed */
+t_bool cpu_ex_halt = FALSE;   /* Flag to halt on exceptions / traps */
+t_bool cpu_km = FALSE;        /* If true, kernel mode has been forced
+                                 for memory access */
 CTAB sys_cmd[] = {
     { "BOOT", &sys_boot, RU_BOOT,
       "bo{ot}                   boot simulator\n", NULL, &run_cmd_message },
@@ -180,6 +188,37 @@ BITFIELD psw_bits[] = {
     BITNCF(6),           /* Unused */
 #endif
     ENDBITS
+};
+
+BITFIELD sbd_int_req_bits[] = {
+#if defined(REV3)
+    BIT(CLOK),  /* UNIX Interval Timer */
+    BIT(PWRD),  /* Power Down Request */
+    BIT(BUSO),  /* UBUS or BUB Operational Interrupt */
+    BIT(SBER),  /* Single Bit Memory Error */
+    BIT(MBER),  /* Multiple Bit Memory Error */
+    BIT(BRXF),  /* UBUS, BUB, EIO Bus Received Fail */
+    BIT(BTMO),  /* UBUS Timer Timeout */
+    BIT(UDMA),  /* UART DMA Complete */
+    BIT(UART),  /* UART Interrupt */
+    BIT(FDMA),  /* Floppy DMA Complete */
+    BIT(FLOP),  /* Floppy Interrupt */
+    BIT(PIR9),  /* PIR 9 */
+    BIT(PIR8),  /* PIR 8 */
+    BITNCF(3),  /* Unused */
+    ENDBITS
+#else
+    BIT(SERR),  /* System Error */
+    BIT(CLOK),  /* UNIX Interval Timer */
+    BIT(DMAC),  /* DMA Complete */
+    BIT(UART),  /* UART */
+    BIT(DISK),  /* Integrated Disk Drive (Winchester) */
+    BIT(FLOP),  /* Integrated Floppy Drive */
+    BIT(PIR9),  /* PIR 9 */
+    BIT(PIR8),  /* PIR 8 */
+    BITNCF(8),  /* Unused */
+    ENDBITS
+#endif
 };
 
 /* Registers. */
@@ -218,8 +257,7 @@ REG cpu_reg[] = {
     { HRDATAD  (R30,  R[30],       32, "Privileged register 30")},
     { HRDATAD  (R31,  R[31],       32, "Privileged register 31")},
 #endif
-    { HRDATAD  (IPL,  cpu_int_ipl, 8, "Current CPU IPL bits")},
-    { HRDATAD  (VEC,  cpu_int_vec, 8, "Current CPU interrupt vector")},
+    { HRDATADF (SBD_INT, sbd_int_req, 16, "Interrupt Requests", sbd_int_req_bits) },
     { NULL }
 };
 
@@ -317,9 +355,9 @@ MTAB cpu_mod[] = {
       &cpu_set_size, NULL, NULL, "Set Memory to 1M bytes" },
     { UNIT_MSIZE, (1u << 21), NULL, "2M",
       &cpu_set_size, NULL, NULL, "Set Memory to 2M bytes" },
-#endif
     { UNIT_MSIZE, (1u << 22), NULL, "4M",
       &cpu_set_size, NULL, NULL, "Set Memory to 4M bytes" },
+#endif
 #if defined(REV3)
     { UNIT_MSIZE, (1u << 23), NULL, "8M",
       &cpu_set_size, NULL, NULL, "Set Memory to 8M bytes" },
@@ -756,24 +794,34 @@ t_stat cpu_show_cio(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
     return SCPE_OK;
 }
 
-void cpu_load_rom()
+t_stat cpu_load_rom(uint8 *arrayp, uint32 len)
 {
     uint32 i, index, sc, mask, val;
 
+    /* Update global state */
+    rom_size = len;
+
+    if (ROM != NULL) {
+        free(ROM);
+    }
+    ROM = (uint32 *) calloc((size_t)(len >> 2), sizeof(uint32));
     if (ROM == NULL) {
-        return;
+        return SCPE_MEM;
     }
 
-    for (i = 0; i < rom_size; i++) {
-        val = BOOT_CODE_ARRAY[i];
+    for (i = 0; i < len; i++) {
+        val = arrayp[i];
         sc = (~(i & 3) << 3) & 0x1f;
         mask = 0xffu << sc;
         index = i >> 2;
 
         ROM[index] = (ROM[index] & ~mask) | (val << sc);
     }
+
+    return SCPE_OK;
 }
 
+#if defined(REV3)
 t_stat sys_boot(int32 flag, CONST char *ptr)
 {
     char gbuf[CBUFSIZE];
@@ -789,6 +837,39 @@ t_stat sys_boot(int32 flag, CONST char *ptr)
 
     return run_cmd(flag, "CPU");
 }
+#else
+t_stat sys_boot(int32 flag, CONST char *ptr)
+{
+    char gbuf[CBUFSIZE] = { 0 };
+    int gnum = 0;
+    uint8 *srcp = ROM_ARRAY;
+    uint32 len = ROM_SIZE;
+    t_stat r;
+
+    if ((ptr = get_sim_sw(ptr)) == NULL) {
+        return SCPE_INVSW;
+    }
+
+    do {
+        ptr = get_glyph(ptr, gbuf, 0);
+
+        if (gbuf[0] && (strcmp(gbuf, "CPU") && strcmp(gbuf, "DEMON"))) {
+            return SCPE_ARG;
+        }
+
+        if (strcmp(gbuf, "DEMON") == 0) {
+            srcp = DEMON_ROM_ARRAY;
+            len = DEMON_ROM_SIZE;
+        }
+    } while (gbuf[0]);
+
+    if ((r = cpu_load_rom(srcp, len)) != SCPE_OK) {
+        return r;
+    }
+
+    return run_cmd(flag, "CPU");
+}
+#endif /* Rev 2 boot */
 
 t_stat cpu_boot(int32 unit_num, DEVICE *dptr)
 {
@@ -872,9 +953,58 @@ t_stat cpu_dep(t_value val, t_addr addr, UNIT *uptr, int32 sw)
     }
 }
 
+/*
+ * Pre-populate the interrupt->IPL map "int_map"
+ */
+static void build_int_map()
+{
+    int i;
+    uint8 ipl;
+
+    for (i = 0; i < INT_MAP_LEN; i++) {
+#if defined(REV3)
+        if (i & (INT_PWRDWN|INT_BUS_OP|INT_SBERR|
+                       INT_MBERR|INT_BUS_RXF|INT_BUS_TMO|
+                       INT_CLOCK)) {
+            ipl = CPU_IPL_15;
+        } else if (i & (INT_UART|INT_UART_DMA)) {
+            ipl = CPU_IPL_13;
+        } else if (i & (INT_FLOPPY|INT_FLOPPY_DMA)) {
+            ipl = CPU_IPL_11;
+        } else if (i & INT_PIR9) {
+            ipl = CPU_IPL_9;
+        } else if (i & INT_PIR8) {
+            ipl = CPU_IPL_8;
+        } else {
+            ipl = 0;
+        }
+#else
+        if (i & (INT_CLOCK|INT_SERR)) {
+            ipl = CPU_IPL_15;
+        } else if (i & (INT_UART|INT_DMA)) {
+            ipl = CPU_IPL_13;
+        } else if (i & (INT_DISK|INT_FLOPPY)) {
+            ipl = CPU_IPL_11;
+        } else if (i & INT_PIR9) {
+            ipl = CPU_IPL_9;
+        } else if (i & INT_PIR8) {
+            ipl = CPU_IPL_8;
+        } else {
+            ipl = 0;
+        }
+#endif
+
+        int_map[i] = ipl;
+    }
+
+    sim_debug(EXECUTE_MSG, &cpu_dev,
+              "Built interrupt->IPL map of length %d\n", INT_MAP_LEN);
+}
+
 t_stat cpu_reset(DEVICE *dptr)
 {
     int i;
+    t_stat r;
 
     /* Link in our special "boot" command so we can boot with both
      * "BO{OT}" and "BO{OT} CPU" */
@@ -883,24 +1013,23 @@ t_stat cpu_reset(DEVICE *dptr)
     /* Set up the pre-calibration routine */
     sim_clock_precalibrate_commands = att3b2_clock_precalibrate_commands;
 
+    /* Populate the interrupt->IPL map */
+    build_int_map();
+
     if (!sim_is_running) {
         /* Clear registers */
         for (i = 0; i < NUM_REGISTERS; i++) {
             R[i] = 0;
         }
 
-        /* Allocate ROM */
-        if (ROM != NULL) {
-            free(ROM);
-        }
-        ROM = (uint32 *) calloc((size_t)(rom_size >> 2), sizeof(uint32));
+        /* Allocate ROM if needed */
         if (ROM == NULL) {
-            return SCPE_MEM;
+            if ((r = cpu_load_rom(ROM_ARRAY, ROM_SIZE)) != SCPE_OK) {
+                return r;
+            }
         }
 
-        cpu_load_rom();
-
-        /* Allocate RAM */
+        /* Always re-allocate RAM */
         if (RAM != NULL) {
             free(RAM);
         }
@@ -1822,8 +1951,8 @@ void cpu_on_interrupt(uint16 vec)
     uint32 new_pcbp, new_pcbp_ptr;
 
     sim_debug(IRQ_MSG, &cpu_dev,
-              "[%08x] [cpu_on_interrupt] vec=%02x (%d)  csr_data = %x\n",
-              R[NUM_PC], vec, vec, csr_data);
+              "[%08x] [cpu_on_interrupt] vec=%02x (%d)  sbd_int_req = %x, csr_data = %x\n",
+              R[NUM_PC], vec, vec, sbd_int_req, csr_data);
 
     /*
      * "If a nonmaskable interrupt request is received, an auto-vector
@@ -1885,6 +2014,9 @@ t_stat sim_instr(void)
 
     /* Generic index */
     uint32   i;
+
+    /* Interrupt request IPL */
+    uint8    ipl;
 
     /* Used by oprocessor instructions */
     uint32   coprocessor_word;
@@ -1999,26 +2131,33 @@ t_stat sim_instr(void)
             increment_modep_b();
         }
 
-        /* Set the correct IRQ state */
-        cpu_calc_ints();
-
-        if (cpu_nmi || (PSW_CUR_IPL < cpu_int_ipl)) {
-            cpu_on_interrupt(cpu_int_vec);
-            for (i = 0; i < CIO_SLOTS; i++) {
-                if (cio[i].intr &&
-                    cio[i].ipl == cpu_int_ipl &&
-                    cio[i].ivec == cpu_int_vec) {
-                    sim_debug(CIO_DBG, &cpu_dev,
-                              "[%08x] [IRQ] Handling CIO interrupt for card %d ivec=%02x\n",
-                              R[NUM_PC], i, cpu_int_vec);
-
-                    cio[i].intr = FALSE;
-                }
-            }
-            cpu_int_ipl = 0;
-            cpu_int_vec = 0;
+        /* Interrupt Handling
+         *
+         *  - NMI is always serviced first.
+         *  - SBD interrupts are handled next in priority.
+         *  - IO Bus boards are handled last.
+         */
+        if (cpu_nmi) {
             cpu_nmi = FALSE;
             cpu_in_wait = FALSE;
+            cpu_on_interrupt(0);
+        } else if (sbd_int_req) {
+            ipl = int_map[sbd_int_req];
+            if (PSW_CUR_IPL < ipl) {
+                /* For the system board, interrupt vector is always
+                   equal to IPL */
+                cpu_in_wait = FALSE;
+                cpu_on_interrupt(ipl);
+            }
+        } else if (cio_int_req) {
+            for (i = 0; i < CIO_SLOTS; i++) {
+                if ((cio_int_req & (1 << i)) && (PSW_CUR_IPL < cio[i].ipl)) {
+                    cpu_in_wait = FALSE;
+                    CIO_CLR_INT(i);
+                    cpu_on_interrupt(cio[i].ivec);
+                    break;
+                }
+            }
         }
 
         if (cpu_in_wait) {
@@ -3691,45 +3830,6 @@ static void cpu_write_op(operand * op, t_uint64 val)
         stop_reason = STOP_ERR;
         break;
     }
-}
-
-/*
- * Calculate the current state of interrupts.
- * TODO: This could use a refactor. It's getting code-smelly.
- */
-static void cpu_calc_ints()
-{
-    uint32 i;
-
-    /* First scan for a CIO interrupt */
-    for (i = 0; i < CIO_SLOTS; i++) {
-        if (cio[i].intr) {
-            cpu_int_ipl = cio[i].ipl;
-            cpu_int_vec = cio[i].ivec;
-            return;
-        }
-    }
-
-    /* If none was found, look for system board interrupts */
-
-#if defined(REV3)
-    // TODO: Rev 3 interrupt support
-    cpu_int_ipl = cpu_int_vec = 0;
-#else
-    if (csr_data & CSRPIR8) {
-        cpu_int_ipl = cpu_int_vec = CPU_IPL_8;
-    } else if (csr_data & CSRPIR9) {
-        cpu_int_ipl = cpu_int_vec = CPU_IPL_9;
-    } else if (id_int() || (csr_data & CSRDISK)) {
-        cpu_int_ipl = cpu_int_vec = CPU_IPL_11;
-    } else if ((csr_data & CSRUART) || (csr_data & CSRDMA)) {
-        cpu_int_ipl = cpu_int_vec = CPU_IPL_13;
-    } else if ((csr_data & CSRCLK) || (csr_data & CSRTIMO)) {
-        cpu_int_ipl = cpu_int_vec = CPU_IPL_15;
-    } else {
-        cpu_int_ipl = cpu_int_vec = 0;
-    }
-#endif
 }
 
 /*

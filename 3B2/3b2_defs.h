@@ -85,6 +85,8 @@ noret __libc_longjmp(jmp_buf buf, int val);
     }                                                                          \
   }
 
+#define PCHAR(c) (((char) (c) >= 0x20 && (char) (c) < 0x7f) ? (char) (c) : '.')
+
 #define UNIT_V_EXBRK   (UNIT_V_UF + 0)
 #define UNIT_V_OPBRK   (UNIT_V_UF + 1)
 #define UNIT_EXBRK     (1u << UNIT_V_EXBRK)
@@ -134,6 +136,11 @@ noret __libc_longjmp(jmp_buf buf, int val);
 #define TIMER_SANITY   0
 #define TIMER_INTERVAL 1
 #define TIMER_BUS      2
+
+/* Timer */
+#define TMR_CLK        0     /* The clock responsible for IPL 15 interrupts */
+#define TPS_CLK        100   /* 100 ticks per second */
+
 
 /* Global symbols */
 
