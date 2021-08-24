@@ -298,7 +298,6 @@ int32 isenable = 0, dsenable = 0;                       /* i, d space flags */
 int32 stop_trap = 1;                                    /* stop on trap */
 int32 stop_vecabort = 1;                                /* stop on vec abort */
 int32 stop_spabort = 1;                                 /* stop on SP abort */
-int32 wait_enable = 0;                                  /* wait state enable */
 int32 autcon_enb = 1;                                   /* autoconfig enable */
 uint32 cpu_model = INIMODEL;                            /* CPU model */
 uint32 cpu_type = 1u << INIMODEL;                       /* model as bit mask */
@@ -574,7 +573,6 @@ REG cpu_reg[] = {
     { BRDATAD (IREQ, int_req, 8, 32, IPL_HLVL, "interrupt pending flags, IPL 0 to 7"), REG_RO },
     { ORDATAD (TRAPS, trap_req, TRAP_V_MAX, "trap pending flags") },
     { FLDATAD (WAIT, wait_state, 0,         "wait state enable flag") },
-    { FLDATA (WAIT_ENABLE, wait_enable, 0), REG_HIDDEN },
     { ORDATAD (STOP_TRAPS, stop_trap, TRAP_V_MAX, "stop on trap flags") },
     { FLDATAD (STOP_VECA, stop_vecabort, 0, "stop on read abort in trap or interrupt") },
     { FLDATAD (STOP_SPA, stop_spabort, 0,   "stop on stack abort in trap or interrupt") },
