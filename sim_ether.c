@@ -2394,8 +2394,7 @@ else { /* !tap: */
             char command[1024];
 
             /* try to force an otherwise unused interface to be turned on */
-            memset(command, 0, sizeof(command));
-            snprintf(command, sizeof(command)-1, "ifconfig %s up", savname);
+            snprintf(command, sizeof(command), (sim_get_tool_path ("ifconfig")[0] != '\0') ? "ifconfig %s up" : "ip link set dev %s up", savname);
             if (system(command)) {};
             errbuf[0] = '\0';
             *handle = (void*) pcap_open_live(savname, bufsz, ETH_PROMISC, PCAP_READ_TIMEOUT, errbuf);
