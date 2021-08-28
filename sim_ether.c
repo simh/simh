@@ -1753,6 +1753,11 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, const char *devname)
     char command[1024];
     FILE *f;
     int i;
+    char tool[CBUFSIZE];
+    const char *turnon[] = {
+        "ip link set dev %.*s up",
+        "ifconfig %.*s up", 
+        NULL};
     const char *patterns[] = {
         "ip link show %.*s | grep [0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]",
         "ip link show %.*s | egrep [0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]",
@@ -1762,40 +1767,47 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, const char *devname)
 
     memset(command, 0, sizeof(command));
     /* try to force an otherwise unused interface to be turned on */
-    snprintf(command, sizeof(command)-1, "ip link set dev %.*s up", (int)(sizeof(command) - 21), devname);
-    if (system(command)) {};
-    snprintf(command, sizeof(command)-1, "ifconfig %.*s up", (int)(sizeof(command) - 14), devname);
-    if (system(command)) {};
+    for (i=0; turnon[i]; ++i) {
+      snprintf(command, sizeof(command), turnon[i], (int)(sizeof(command) - (2 + strlen(patterns[i]))), devname);
+      get_glyph_nc (command, tool, 0);
+      if (sim_get_tool_path (tool)[0]) {
+        if (NULL != (f = popen(command, "r")))
+          pclose(f);
+        }
+      }
     for (i=0; patterns[i] && (0 == dev->have_host_nic_phy_addr); ++i) {
-      snprintf(command, sizeof(command)-1, patterns[i], (int)(sizeof(command) - (2 + strlen(patterns[i]))), devname);
-      if (NULL != (f = popen(command, "r"))) {
-        while (0 == dev->have_host_nic_phy_addr) {
-          if (fgets(command, sizeof(command)-1, f)) {
-            char *p1, *p2;
+      snprintf(command, sizeof(command), patterns[i], (int)(sizeof(command) - (2 + strlen(patterns[i]))), devname);
+      get_glyph_nc (command, tool, 0);
+      if (sim_get_tool_path (tool)[0]) {
+        if (NULL != (f = popen(command, "r"))) {
+          while (0 == dev->have_host_nic_phy_addr) {
+            if (fgets(command, sizeof(command)-1, f)) {
+              char *p1, *p2;
 
-            p1 = strchr(command, ':');
-            while (p1) {
-              p2 = strchr(p1+1, ':');
-              if (p2 <= p1+3) {
-                unsigned int mac_bytes[6];
-                if (6 == sscanf(p1-2, "%02x:%02x:%02x:%02x:%02x:%02x", &mac_bytes[0], &mac_bytes[1], &mac_bytes[2], &mac_bytes[3], &mac_bytes[4], &mac_bytes[5])) {
-                  dev->host_nic_phy_hw_addr[0] = mac_bytes[0];
-                  dev->host_nic_phy_hw_addr[1] = mac_bytes[1];
-                  dev->host_nic_phy_hw_addr[2] = mac_bytes[2];
-                  dev->host_nic_phy_hw_addr[3] = mac_bytes[3];
-                  dev->host_nic_phy_hw_addr[4] = mac_bytes[4];
-                  dev->host_nic_phy_hw_addr[5] = mac_bytes[5];
-                  dev->have_host_nic_phy_addr = 1;
+              p1 = strchr(command, ':');
+              while (p1) {
+                p2 = strchr(p1+1, ':');
+                if (p2 <= p1+3) {
+                  unsigned int mac_bytes[6];
+                  if (6 == sscanf(p1-2, "%02x:%02x:%02x:%02x:%02x:%02x", &mac_bytes[0], &mac_bytes[1], &mac_bytes[2], &mac_bytes[3], &mac_bytes[4], &mac_bytes[5])) {
+                    dev->host_nic_phy_hw_addr[0] = mac_bytes[0];
+                    dev->host_nic_phy_hw_addr[1] = mac_bytes[1];
+                    dev->host_nic_phy_hw_addr[2] = mac_bytes[2];
+                    dev->host_nic_phy_hw_addr[3] = mac_bytes[3];
+                    dev->host_nic_phy_hw_addr[4] = mac_bytes[4];
+                    dev->host_nic_phy_hw_addr[5] = mac_bytes[5];
+                    dev->have_host_nic_phy_addr = 1;
+                    }
+                  break;
                   }
-                break;
+                p1 = p2;
                 }
-              p1 = p2;
               }
+            else
+              break;
             }
-          else
-            break;
+          pclose(f);
           }
-        pclose(f);
         }
       }
     }
