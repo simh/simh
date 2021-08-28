@@ -6361,12 +6361,10 @@ void fprint_capac (FILE *st, DEVICE *dptr, UNIT *uptr)
 fprintf (st, "%s", sprint_capac (dptr, uptr));
 }
 
-static const char *_get_tool_version (const char *tool)
+const char *sim_get_tool_path (const char *tool)
 {
 char findcmd[PATH_MAX+1];
-char toolpath[PATH_MAX+1];
-char versioncmd[PATH_MAX+1];
-static char toolversion[PATH_MAX+1];
+static char toolpath[PATH_MAX+1];
 FILE *f;
 
 #if defined(_WIN32)
@@ -6376,27 +6374,37 @@ FILE *f;
 #else
 #define FIND_CMD "which"
 #endif
-toolversion[0] = '\0';
+memset (toolpath, 0, sizeof(toolpath));
 snprintf (findcmd, sizeof (findcmd), "%s %s", FIND_CMD, tool);
 if ((f = popen (findcmd, "r"))) {
-    memset (toolpath, 0, sizeof(toolpath));
     do {
         if (NULL == fgets (toolpath, sizeof(toolpath)-1, f))
             break;
         sim_trim_endspc (toolpath);
         } while (toolpath[0] == '\0');
     pclose (f);
-    if (toolpath[0]) {
-        snprintf (versioncmd, sizeof (versioncmd), "%s --version", tool);
-        if ((f = popen (versioncmd, "r"))) {
-            memset (toolversion, 0, sizeof(toolversion));
-            do {
-                if (NULL == fgets (toolversion, sizeof(toolversion)-1, f))
-                    break;
-                sim_trim_endspc (toolversion);
-                } while (toolversion[0] == '\0');
-            pclose (f);
-            }
+    }
+return toolpath;
+}
+
+static const char *_get_tool_version (const char *tool)
+{
+const char *toolpath;
+char versioncmd[PATH_MAX+1];
+static char toolversion[PATH_MAX+1];
+FILE *f;
+
+memset (toolversion, 0, sizeof(toolversion));
+toolpath = sim_get_tool_path (tool);
+if (toolpath[0]) {
+    snprintf (versioncmd, sizeof (versioncmd), "%s --version", tool);
+    if ((f = popen (versioncmd, "r"))) {
+        do {
+            if (NULL == fgets (toolversion, sizeof(toolversion)-1, f))
+                break;
+            sim_trim_endspc (toolversion);
+            } while (toolversion[0] == '\0');
+        pclose (f);
         }
     }
 return toolversion;
