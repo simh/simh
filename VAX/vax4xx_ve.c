@@ -1460,6 +1460,7 @@ if (!vid_active && !ve_active)  {
     ve_lines = (uint32 *) calloc (VE_XSIZE*VE_YSIZE, sizeof (uint32));
     if (ve_lines == NULL) {
         free (ve_buf);
+        ve_buf = NULL;
         vid_close ();
         return SCPE_MEM;
         }
