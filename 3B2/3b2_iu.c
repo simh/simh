@@ -28,8 +28,48 @@
    from the author.
 */
 
-#include "3b2_defs.h"
 #include "3b2_iu.h"
+
+#include "sim_tmxr.h"
+
+#include "3b2_cpu.h"
+#include "3b2_csr.h"
+#include "3b2_dmac.h"
+#include "3b2_mem.h"
+#include "3b2_stddev.h"
+#include "3b2_timer.h"
+
+#define SET_INT do {                            \
+        CPU_SET_INT(INT_UART);                  \
+        SET_CSR(CSRUART);                       \
+    } while (0)
+
+#define CLR_INT do {                            \
+        CPU_CLR_INT(INT_UART);                  \
+        CLR_CSR(CSRUART);                       \
+    } while (0)
+
+#if defined(REV3)
+#define SET_DMA_INT do {                        \
+        CPU_SET_INT(INT_UART_DMA);              \
+        SET_CSR(CSRDMA);                        \
+    } while (0)
+
+#define CLR_DMA_INT do {                        \
+        CPU_CLR_INT(INT_UART_DMA);              \
+        CLR_CSR(CSRDMA);                        \
+    } while (0)
+#else
+#define SET_DMA_INT do {                        \
+        CPU_SET_INT(INT_DMA);                   \
+        SET_CSR(CSRDMA);                        \
+    } while (0)
+
+#define CLR_DMA_INT do {                        \
+        CPU_CLR_INT(INT_DMA);                   \
+        CLR_CSR(CSRDMA);                        \
+    } while (0)
+#endif
 
 /* Static function declarations */
 static SIM_INLINE void iu_w_cmd(uint8 portno, uint8 val);
@@ -299,8 +339,8 @@ void iu_txrdy_a_irq() {
         (iu_console.stat & STS_TXR)) {
         sim_debug(EXECUTE_MSG, &tto_dev,
                   "[iu_txrdy_a_irq()] Firing IRQ after transmit of %02x (%c)\n",
-                  (uint8) iu_console.txbuf, (char) iu_console.txbuf);
-        csr_data |= CSRUART;
+                  (uint8) iu_console.txbuf, PCHAR(iu_console.txbuf));
+        SET_INT;
     }
 }
 
@@ -310,8 +350,8 @@ void iu_txrdy_b_irq() {
         (iu_contty.stat & STS_TXR)) {
         sim_debug(EXECUTE_MSG, &contty_dev,
                   "[iu_txrdy_b_irq()] Firing IRQ after transmit of %02x (%c)\n",
-                  (uint8) iu_contty.txbuf, (char) iu_contty.txbuf);
-        csr_data |= CSRUART;
+                  (uint8) iu_contty.txbuf, PCHAR(iu_contty.txbuf));
+        SET_INT;
     }
 }
 
@@ -385,7 +425,7 @@ t_stat iu_svc_tti(UNIT *uptr)
 {
     int32 temp;
 
-    sim_clock_coschedule(uptr, tmxr_poll);
+    tmxr_clock_coschedule(uptr, tmxr_poll);
 
     /* TODO:
 
@@ -412,7 +452,7 @@ t_stat iu_svc_tti(UNIT *uptr)
         iu_console.stat |= STS_RXR;
         iu_state.istat |= ISTS_RAI;
         if (iu_state.imr & IMR_RXRA) {
-            csr_data |= CSRUART;
+            SET_INT;
         }
     }
 
@@ -448,7 +488,7 @@ t_stat iu_svc_contty_rcv(UNIT *uptr)
         contty_ldsc[ln].rcve = 1;
         iu_state.inprt &= ~(IU_DCDB);
         iu_state.ipcr |= IU_DCDB;
-        csr_data |= CSRUART;
+        SET_INT;
     }
 
     /* Check for disconnect */
@@ -456,7 +496,7 @@ t_stat iu_svc_contty_rcv(UNIT *uptr)
         contty_ldsc[0].rcve = 0;
         iu_state.inprt |= IU_DCDB;
         iu_state.ipcr |= IU_DCDB;
-        csr_data |= CSRUART;
+        SET_INT;
     } else if (iu_contty.conf & RX_EN) {
         tmxr_poll_rx(&contty_desc);
 
@@ -473,7 +513,7 @@ t_stat iu_svc_contty_rcv(UNIT *uptr)
                 iu_contty.stat |= STS_RXR;
                 iu_state.istat |= ISTS_RBI;
                 if (iu_state.imr & IMR_RXRB) {
-                    csr_data |= CSRUART;
+                    SET_INT;
                 }
             }
         }
@@ -508,7 +548,7 @@ t_stat iu_svc_timer(UNIT *uptr)
     iu_state.istat |= ISTS_CRI;
 
     if (iu_state.imr & IMR_CTR) {
-        csr_data |= CSRUART;
+        SET_INT;
     }
 
     return SCPE_OK;
@@ -562,7 +602,7 @@ uint32 iu_read(uint32 pa, size_t size)
                 iu_console.stat &= ~(STS_RXR|STS_FFL);
                 iu_state.istat &= ~ISTS_RAI;
             } else if (iu_state.imr & IMR_RXRA) {
-                csr_data |= CSRUART;
+                SET_INT;
             }
         }
         break;
@@ -570,7 +610,7 @@ uint32 iu_read(uint32 pa, size_t size)
         data = iu_state.ipcr;
         /* Reading the port resets it */
         iu_state.ipcr = 0;
-        csr_data &= ~CSRUART;
+        CLR_INT;
         break;
     case ISR:
         data = iu_state.istat;
@@ -599,7 +639,7 @@ uint32 iu_read(uint32 pa, size_t size)
                 iu_contty.stat &= ~(STS_RXR|STS_FFL);
                 iu_state.istat &= ~ISTS_RBI;
             } else if (iu_state.imr & IMR_RXRB) {
-                csr_data |= CSRUART;
+                SET_INT;
             }
         }
         break;
@@ -614,12 +654,12 @@ uint32 iu_read(uint32 pa, size_t size)
     case STOP_CTR:
         data = 0;
         iu_state.istat &= ~ISTS_CRI;
-        csr_data &= ~CSRUART;
+        CLR_INT;
         sim_cancel(&iu_timer_unit);
         break;
     case 17: /* Clear DMAC interrupt */
         data = 0;
-        csr_data &= ~CSRDMA;
+        CLR_DMA_INT;
         break;
     default:
         break;
@@ -670,7 +710,10 @@ void iu_write(uint32 pa, uint32 val, size_t size)
         break;
     case IMR:
         iu_state.imr = bval;
-        csr_data &= ~CSRUART;
+        sim_debug(EXECUTE_MSG, &tto_dev,
+                  "[%08x] Write IMR = %x\n",
+                  R[NUM_PC], bval);
+        CLR_INT;
         /* Possibly cause an interrupt */
         iu_txrdy_a_irq();
         iu_txrdy_b_irq();
@@ -773,7 +816,7 @@ t_stat iu_tx(uint8 portno, uint8 val)
             p->stat |= STS_RXR;
             if (iu_state.imr & imr_mask) {
                 iu_state.istat |= ists;
-                csr_data |= CSRUART;
+                SET_INT;
             }
 
             return SCPE_OK;
@@ -789,12 +832,12 @@ t_stat iu_tx(uint8 portno, uint8 val)
                     /* Write the character to the SIMH console */
                     sim_debug(EXECUTE_MSG, &tto_dev,
                               "[iu_tx] CONSOLE transmit %02x (%c)\n",
-                              (uint8) c, (char) c);
+                              (uint8) c, PCHAR(c));
                     status = sim_putchar_s(c);
                 } else {
                     sim_debug(EXECUTE_MSG, &contty_dev,
                               "[iu_tx] CONTTY transmit %02x (%c)\n",
-                              (uint8) c, (char) c);
+                              (uint8) c, PCHAR(c));
                     status = tmxr_putc_ln(&contty_ldsc[0], c);
                 }
             }
@@ -944,12 +987,16 @@ void iu_dma_console(uint8 channel, uint32 service_address)
         }
     }
 
+    /* Cancel any pending interrupts, we're done. */
+    /* TODO: I THINK THIS BREAKS EVERYTHING!!!! */
+    /* sim_cancel(uptr); */
+
     /* Done with DMA */
     port->dma = DMA_NONE;
 
     dma_state.mask |= (1 << channel);
     dma_state.status |= (1 << channel);
-    csr_data |= CSRDMA;
+    SET_DMA_INT;
 }
 
 void iu_dma_contty(uint8 channel, uint32 service_address)
@@ -994,5 +1041,5 @@ void iu_dma_contty(uint8 channel, uint32 service_address)
 
     dma_state.mask |= (1 << channel);
     dma_state.status |= (1 << channel);
-    csr_data |= CSRDMA;
+    SET_DMA_INT;
 }

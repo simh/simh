@@ -70,13 +70,10 @@
 #define RX2_SIZE        (RX_NUMTR * RX_NUMSC * RX2_NUMBY)
 #define RX_NUMDR        2                               /* drives/controller */
 #define RX_M_NUMDR      01
-#define UNIT_V_WLK      (UNIT_V_UF + 0)                 /* write locked */
-#define UNIT_V_DEN      (UNIT_V_UF + 1)                 /* double density */
-#define UNIT_V_AUTO     (UNIT_V_UF + 2)                 /* autosize */
-#define UNIT_WLK        (1u << UNIT_V_WLK)
+#define UNIT_V_DEN      (UNIT_V_UF + 0)                 /* double density */
+#define UNIT_V_AUTO     (UNIT_V_UF + 1)                 /* autosize */
 #define UNIT_DEN        (1u << UNIT_V_DEN)
 #define UNIT_AUTO       (1u << UNIT_V_AUTO)
-#define UNIT_WPRT       (UNIT_WLK | UNIT_RO)            /* write protect */
 
 #define IDLE            0                               /* idle state */
 #define CMD8            1                               /* 8b cmd, ho next */
@@ -193,8 +190,10 @@ REG rx_reg[] = {
     };
 
 MTAB rx_mod[] = {
-    { UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
-    { UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable floppy drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock floppy drive" },
     { MTAB_XTD | MTAB_VDV, 1, NULL, "RX28", &rx_settype, NULL, NULL },
     { MTAB_XTD | MTAB_VDV, 0, NULL, "RX8E", &rx_settype, NULL, NULL },
     { MTAB_XTD | MTAB_VDV, 0, "TYPE", NULL, NULL, &rx_showtype, NULL },

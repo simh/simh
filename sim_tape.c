@@ -4463,7 +4463,7 @@ static void ansi_fill_text_buffer (FILE *f, char *buf, size_t buf_size, size_t r
         if (!fixed_text) {
             if (rec_size >= record_skip_ending)
                 rec_size -= record_skip_ending;
-            if ((rec_size + 4) > (int)(buf_size - offset)) { /* room for record? */
+            if ((rec_size + 4) > (buf_size - offset)) { /* room for record? */
                 (void)fseek (f, start, SEEK_SET);
                 break;
                 }
@@ -4918,9 +4918,11 @@ while (!feof (f) && !error) {
                                ansi->fixed_text);
 
     else {                                              /* Binary file */
-        size_t runt;
+        size_t runt = 0;
+
         data_read = fread (block, 1, tape->block_size, f);
-        runt = data_read % max_record_size; /* data_read (=0) % 0 == 0 */
+        if (max_record_size > 0)                /* always will be true but XCode thinks otherwise */
+            runt = data_read % max_record_size; /* data_read (=0) % anypositivenumber == 0 */
         /* Pad short records with zeros */
         if (runt > 0) {
             size_t nPad = max_record_size - runt;

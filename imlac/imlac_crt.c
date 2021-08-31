@@ -26,7 +26,6 @@
 
 #include "imlac_defs.h"
 #include "sim_video.h"
-#include "display/imlac.h"
 #include "display/display.h"
 
 /* Function declaration. */
@@ -66,7 +65,7 @@ static t_stat
 crt_svc(UNIT *uptr)
 {
 #ifdef USE_DISPLAY
-  imlac_cycle (100, 0);
+  display_age (100, 0);
   sim_activate_after (uptr, 100);
   if (crt_quit) {
     crt_quit = FALSE;
@@ -90,7 +89,7 @@ crt_reset (DEVICE *dptr)
     sim_cancel (&crt_unit);
   } else {
     display_reset ();
-    imlac_init (dptr, 1);
+    display_init (DIS_IMLAC, 1, dptr);
     sim_activate_abs (&crt_unit, 0);
     vid_register_quit_callback (&crt_quit_callback);
   }
@@ -105,7 +104,7 @@ crt_point (uint16 x, uint16 y)
 #ifdef USE_DISPLAY
   if (crt_dev.flags & DEV_DIS)
     return;
-  imlac_point ((x & 03777) >> 1, (y & 03777) >> 1);
+  display_point ((x & 03777) >> 1, (y & 03777) >> 1, DISPLAY_INT_MAX, 0);
 #endif
 }
 
@@ -116,8 +115,9 @@ crt_line (uint16 x1, uint16 y1, uint16 x2, uint16 y2)
 #ifdef USE_DISPLAY
   if (crt_dev.flags & DEV_DIS)
     return;
-  imlac_line ((x1 & 03777) >> 1, (y1 & 03777) >> 1,
-              (x2 & 03777) >> 1, (y2 & 03777) >> 1);
+  display_line ((x1 & 03777) >> 1, (y1 & 03777) >> 1,
+                (x2 & 03777) >> 1, (y2 & 03777) >> 1,
+                DISPLAY_INT_MAX);
 #endif
 }
 

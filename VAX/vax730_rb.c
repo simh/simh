@@ -70,13 +70,10 @@
 
 /* Flags in the unit flags word */
 
-#define UNIT_V_WLK      (UNIT_V_UF + 0)                 /* hwre write lock */
-#define UNIT_V_RB80     (UNIT_V_UF + 1)                 /* RB02 vs RB80 */
-#define UNIT_V_DUMMY    (UNIT_V_UF + 2)                 /* dummy flag */
+#define UNIT_V_RB80     (UNIT_V_UF + 0)                 /* RB02 vs RB80 */
+#define UNIT_V_DUMMY    (UNIT_V_UF + 1)                 /* dummy flag */
 #define UNIT_DUMMY      (1 << UNIT_V_DUMMY)
-#define UNIT_WLK        (1u << UNIT_V_WLK)
 #define UNIT_RB80       (1u << UNIT_V_RB80)
-#define UNIT_WPRT       (UNIT_WLK | UNIT_RO)            /* write protected */
 
 /* Parameters in the unit descriptor */
 
@@ -257,10 +254,10 @@ DEBTAB rb_debug[] = {
 };
 
 MTAB rb_mod[] = {
-    { UNIT_WLK,        0, "write enabled", "WRITEENABLED", 
-        NULL, NULL, NULL, "Write enable disk drive" },
-    { UNIT_WLK, UNIT_WLK, "write locked",  "LOCKED", 
-        NULL, NULL, NULL, "Write lock disk drive"  },
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable disk drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock disk drive" },
     { UNIT_DUMMY,      0, NULL,            "BADBLOCK", 
         &rb_set_bad, NULL, NULL, "write bad block table on last track" },
     { (UNIT_RB80+UNIT_ATT),             UNIT_ATT, "RB02", NULL, NULL },

@@ -1035,6 +1035,7 @@ if (!vid_active)  {
     vc_lines = (uint32 *) calloc (VC_XSIZE*VC_YSIZE, sizeof (uint32));
     if (vc_lines == NULL) {
         free (vc_buf);
+        vc_buf = NULL;
         vid_close ();
         return SCPE_MEM;
         }
@@ -1043,6 +1044,7 @@ if (!vid_active)  {
         free (vc_lines);
         vc_lines = NULL;
         free (vc_buf);
+        vc_buf = NULL;
         vid_close ();
         return SCPE_MEM;
         }

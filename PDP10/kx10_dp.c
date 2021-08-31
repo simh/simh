@@ -260,8 +260,10 @@ DIB dp_dib[] = {
 
 
 MTAB                dp_mod[] = {
-    {UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL},
-    {UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL},
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock drive" },
     {MTAB_XTD|MTAB_VDV, 0, NULL, "NOHEADERS",
             &dp_set_hdr, &dp_show_hdr, NULL, "Disable header writing"},
     {MTAB_XTD|MTAB_VDV, DEV_WHDR, "write header", "HEADERS",

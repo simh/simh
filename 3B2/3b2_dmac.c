@@ -1,6 +1,6 @@
-/* 3b2_dmac.c: AT&T 3B2 Model 400 AM9517A DMA Controller Implementation
+/* 3b2_dmac.c: AT&T 3B2 DMA Controller Implementation
 
-   Copyright (c) 2017, Seth J. Morabito
+   Copyright (c) 2021, Seth J. Morabito
 
    Permission is hereby granted, free of charge, to any person
    obtaining a copy of this software and associated documentation
@@ -28,8 +28,16 @@
    from the author.
 */
 
-#include "3b2_defs.h"
 #include "3b2_dmac.h"
+
+#if defined(REV2)
+#include "3b2_id.h"
+#endif
+
+#include "3b2_cpu.h"
+#include "3b2_if.h"
+#include "3b2_iu.h"
+#include "3b2_mem.h"
 
 DMA_STATE dma_state;
 
@@ -54,7 +62,9 @@ DEVICE dmac_dev = {
 };
 
 dmac_dma_handler device_dma_handlers[] = {
+#if defined(REV2)
     {DMA_ID_CHAN,  IDBASE+ID_DATA_REG,  &id_drq,         dmac_generic_dma, id_after_dma},
+#endif
     {DMA_IF_CHAN,  IFBASE+IF_DATA_REG,  &if_state.drq,   dmac_generic_dma, if_after_dma},
     {DMA_IUA_CHAN, IUBASE+IUA_DATA_REG, &iu_console.drq, iu_dma_console,   NULL},
     {DMA_IUB_CHAN, IUBASE+IUB_DATA_REG, &iu_contty.drq,  iu_dma_contty,    NULL},
@@ -62,10 +72,16 @@ dmac_dma_handler device_dma_handlers[] = {
 };
 
 uint32 dma_address(uint8 channel, uint32 offset, t_bool r) {
-    uint32 addr;
-    addr = (PHYS_MEM_BASE + dma_state.channels[channel].addr + offset);
-    /* The top bit of the page address is a R/W bit, so we mask it here */
-    addr |= (uint32) (((uint32)dma_state.channels[channel].page & 0x7f) << 16);
+    uint32 addr, page;
+    addr = (PHYS_MEM_BASE + (uint32)(dma_state.channels[channel].addr) + offset);
+#if defined (REV3)
+    page = (uint32)dma_state.channels[channel].page;
+#else
+    /* In Rev 2, the top bit of the page address is a R/W bit, so
+       we mask it here */
+    page = (uint32)dma_state.channels[channel].page & 0x7f;
+#endif
+    addr |= page << 16;
     return addr;
 }
 
@@ -91,7 +107,7 @@ uint32 dmac_read(uint32 pa, size_t size)
 {
     uint8 reg, base, data;
 
-    base =(uint8) (pa >> 12);
+    base = (uint8) (pa >> 12);
     reg = pa & 0xff;
 
     switch (base) {
@@ -201,6 +217,9 @@ void dmac_program(uint8 reg, uint8 val)
         case 6:
         case 7:
             chan_num = 3;
+            break;
+        default:
+            chan_num = 0;
             break;
         }
 
@@ -315,32 +334,35 @@ void dmac_page_update(uint8 base, uint8 reg, uint8 val)
         return;
     }
 
-    /* The actual register is a 32-bit, byte-addressed register, so
-       that address 4x000 is the highest byte, 4x003 is the lowest
-       byte. */
-
+#if defined(REV2)
+    /* In Rev2 systems, the actual register is a 32-bit,
+       byte-addressed register, so that address 4x000 is the highest
+       byte, 4x003 is the lowest byte. */
     shift = -(reg - 3) * 8;
+#endif
 
     switch (base) {
+#if defined (REV2)
     case DMA_ID:
         sim_debug(WRITE_MSG, &dmac_dev, "Set page channel 0 = %x\n", val);
         dma_state.channels[DMA_ID_CHAN].page &= ~(0xff << shift);
-        dma_state.channels[DMA_ID_CHAN].page |= (val << shift);
+        dma_state.channels[DMA_ID_CHAN].page |= ((uint16)val << shift);
         break;
+#endif
     case DMA_IF:
         sim_debug(WRITE_MSG, &dmac_dev, "Set page channel 1 = %x\n", val);
         dma_state.channels[DMA_IF_CHAN].page &= ~(0xff << shift);
-        dma_state.channels[DMA_IF_CHAN].page |= (val << shift);
+        dma_state.channels[DMA_IF_CHAN].page |= ((uint16)val << shift);
         break;
     case DMA_IUA:
         sim_debug(WRITE_MSG, &dmac_dev, "Set page channel 2 = %x\n", val);
         dma_state.channels[DMA_IUA_CHAN].page &= ~(0xff << shift);
-        dma_state.channels[DMA_IUA_CHAN].page |= (val << shift);
+        dma_state.channels[DMA_IUA_CHAN].page |= ((uint16)val << shift);
         break;
     case DMA_IUB:
         sim_debug(WRITE_MSG, &dmac_dev, "Set page channel 3 = %x\n", val);
         dma_state.channels[DMA_IUB_CHAN].page &= ~(0xff << shift);
-        dma_state.channels[DMA_IUB_CHAN].page |= (val << shift);
+        dma_state.channels[DMA_IUB_CHAN].page |= ((uint16)val << shift);
         break;
     }
 }
@@ -353,14 +375,15 @@ void dmac_write(uint32 pa, uint32 val, size_t size)
     reg = pa & 0xff;
 
     switch (base) {
-    case DMA_C:     /* 0x48xxx */
+    case DMA_C:
         dmac_program(reg, (uint8) val);
         break;
-
-    case DMA_ID:    /* 0x45xxx */
-    case DMA_IUA:   /* 0x46xxx */
-    case DMA_IUB:   /* 0x47xxx */
-    case DMA_IF:    /* 0x4Exxx */
+#if defined (REV2)
+    case DMA_ID:
+#endif
+    case DMA_IUA:
+    case DMA_IUB:
+    case DMA_IF:
         dmac_page_update(base, reg, (uint8) val);
         break;
     }
@@ -386,10 +409,13 @@ void dmac_generic_dma(uint8 channel, uint32 service_address)
         break;
     case DMA_MODE_WRITE:
         sim_debug(EXECUTE_MSG, &dmac_dev,
-                  "[%08x] [dmac_generic_dma channel=%d] write: %d bytes from %08x\n",
+                  "[%08x] [dmac_generic_dma channel=%d] write: %d bytes to %08x from %08x (page=%04x addr=%08x)\n",
                   R[NUM_PC], channel,
                   chan->wcount + 1,
-                  dma_address(channel, 0, TRUE));
+                  dma_address(channel, 0, TRUE),
+                  service_address,
+                  dma_state.channels[channel].page,
+                  dma_state.channels[channel].addr);
         for (; i >= 0; i--) {
             chan->wcount_c--;
             addr = dma_address(channel, chan->ptr, TRUE);
@@ -401,10 +427,11 @@ void dmac_generic_dma(uint8 channel, uint32 service_address)
         break;
     case DMA_MODE_READ:
         sim_debug(EXECUTE_MSG, &dmac_dev,
-                  "[%08x] [dmac_generic_dma channel=%d] read: %d bytes to %08x\n",
+                  "[%08x] [dmac_generic_dma channel=%d] read: %d bytes from %08x to %08x\n",
                   R[NUM_PC], channel,
                   chan->wcount + 1,
-                  dma_address(channel, 0, TRUE));
+                  dma_address(channel, 0, TRUE),
+                  service_address);
         for (; i >= 0; i--) {
             chan->wcount_c = i;
             addr = dma_address(channel, chan->ptr++, TRUE);
@@ -425,7 +452,7 @@ void dmac_generic_dma(uint8 channel, uint32 service_address)
  */
 void dmac_service_drqs()
 {
-    dmac_dma_handler *h;
+    volatile dmac_dma_handler *h;
 
     for (h = &device_dma_handlers[0]; h->drq != NULL; h++) {
         /* Only trigger if the channel has a DRQ set and its channel's

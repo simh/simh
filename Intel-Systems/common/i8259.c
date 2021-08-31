@@ -35,11 +35,13 @@
 
 #include "system_defs.h"                /* system header in system dir */
 
-#if defined (I8259_NUM) && (I8259_NUM > 0)
+#define i8259_NAME    "Intel i8259 PIC Chip"
 
 /* function prototypes */
 
-t_stat i8259_cfg(uint8 base, uint8 devnum);
+t_stat i8259_cfg(uint16 base, uint16 devnum, uint8 dummy);
+t_stat i8259_clr(void);
+t_stat i8259_show_param (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 uint8 i8259a(t_bool io, uint8 data, uint8 devnum);
 uint8 i8259b(t_bool io, uint8 data, uint8 devnum);
 void i8259_dump(uint8 devnum);
@@ -47,27 +49,37 @@ t_stat i8259_reset (DEVICE *dptr);
 
 /* external globals */
 
+static const char* i8259_desc(DEVICE *dptr) {
+    return i8259_NAME;
+}
+int     i8259_num = 0;
+uint8 icw_num0 = 1, icw_num1 = 1;
+
 /* external function prototypes */
 
-extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
+extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint16, uint16, uint8);
+extern uint8 unreg_dev(uint16);
 
 /* globals */
 
-/* these bytes represent the input and output to/from a port instance */
+/* these bytes represent the input and output to/from a device instance */
 
 uint8 i8259_IR[4];                      //interrupt inputs (bits 0-7)
 uint8 i8259_CAS[4];                     //interrupt cascade I/O (bits 0-2) 
 uint8 i8259_INT[4];                     //interrupt output (bit 0)
 
-uint8 i8259_base[I8259_NUM];
-uint8 i8259_icw1[I8259_NUM];
-uint8 i8259_icw2[I8259_NUM];
-uint8 i8259_icw3[I8259_NUM];
-uint8 i8259_icw4[I8259_NUM];
-uint8 i8259_ocw1[I8259_NUM];
-uint8 i8259_ocw2[I8259_NUM];
-uint8 i8259_ocw3[I8259_NUM];
-uint8 icw_num0 = 1, icw_num1 = 1;
+uint8 i8259_base[4];
+uint8 i8259_icw1[4];
+uint8 i8259_icw2[4];
+uint8 i8259_icw3[4];
+uint8 i8259_icw4[4];
+uint8 i8259_ocw1[4];
+uint8 i8259_ocw2[4];
+uint8 i8259_ocw3[4];
+
+int     i8259_baseport[] = { -1, -1, -1, -1 }; //base port
+uint8   i8259_intnum[4] = { 0, 0, 0, 0 }; //interrupt number
+uint8   i8259_verb[4] = { 0, 0, 0, 0 }; //verbose flag
 
 /* i8259 Standard I/O Data Structures */
 /* up to 4 i8259 devices */
@@ -105,13 +117,19 @@ DEBTAB i8259_debug[] = {
     { NULL }
 };
 
+MTAB i8259_mod[] = {
+    { MTAB_XTD | MTAB_VDV, 0, "PARAM", NULL, NULL, i8259_show_param, NULL, 
+        "show configured parametes for i8259" },
+    { 0 }
+};
+
 /* address width is set to 16 bits to use devices in 8086/8088 implementations */
 
 DEVICE i8259_dev = {
     "I8259",            //name
     i8259_unit,         //units
     i8259_reg,          //registers
-    NULL,               //modifiers
+    i8259_mod,          //modifiers
     I8259_NUM,          //numunits
     16,                 //aradix
     16,                 //awidth
@@ -125,11 +143,15 @@ DEVICE i8259_dev = {
     NULL,               //attach
     NULL,               //detach
     NULL,               //ctxt
-    0,                  //flags
+    DEV_DEBUG+DEV_DISABLE+DEV_DIS, //flags 
     0,                  //dctrl
     i8259_debug,        //debflags
     NULL,               //msize
-    NULL                //lname
+    NULL,               //lname
+    NULL,               //help routine
+    NULL,               //attach help routine
+    NULL,               //help context
+    &i8259_desc         //device description
 };
 
 /*  I/O instruction handlers, called from the CPU module when an
@@ -138,12 +160,50 @@ DEVICE i8259_dev = {
 
 // i8259 configuration
 
-t_stat i8259_cfg(uint8 base, uint8 devnum)
+t_stat i8259_cfg(uint16 base, uint16 devnum, uint8 dummy)
 {
-    sim_printf("    i8259[%d]: at base port 0%02XH\n",
-        devnum, base & 0xFF);
-    reg_dev(i8259a, base, devnum); 
-    reg_dev(i8259b, base + 1, devnum); 
+    i8259_baseport[devnum] = base & 0xff;
+    sim_printf("    i8259%d: installed at base port 0%02XH\n",
+        devnum, i8259_baseport[devnum]);
+    reg_dev(i8259a, i8259_baseport[devnum], devnum, 0); 
+    reg_dev(i8259b, i8259_baseport[devnum] + 1, devnum, 0); 
+    i8259_num++;
+    return SCPE_OK;
+}
+
+t_stat i8259_clr(void)
+{
+    int i;
+    
+    for (i=0; i<i8259_num; i++) {
+        unreg_dev(i8259_baseport[i]); 
+        unreg_dev(i8259_baseport[i] + 1); 
+        i8259_baseport[i] = -1;
+        i8259_intnum[i] = 0;
+        i8259_verb[i] = 0;
+    }
+    i8259_num = 0; 
+    return SCPE_OK;
+}
+
+// show configuration parameters
+
+t_stat i8259_show_param (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+    int i;
+    
+    if (uptr == NULL)
+        return SCPE_ARG;
+    fprintf(st, "Device %s\n", ((i8259_dev.flags & DEV_DIS) == 0) ? "Enabled" : "Disabled");
+    for (i=0; i<i8259_num; i++) {
+        fprintf(st, "Unit %d at Base port ", i);
+        fprintf(st, "0%02X ", i8259_baseport[i]);
+        fprintf(st, "Interrupt # is ");
+        fprintf(st, "%d ", i8259_intnum[i]);
+        fprintf(st, "Mode ");
+        fprintf(st, "%s", i8259_verb[i] ? "Verbose" : "Quiet");
+        if (i<i8259_num && i8259_num != 1) fprintf(st, "\n");
+    }
     return SCPE_OK;
 }
 
@@ -153,7 +213,7 @@ t_stat i8259_reset (DEVICE *dptr)
 {
     uint8 devnum;
     
-    for (devnum=0; devnum<I8259_NUM; devnum++) {
+    for (devnum=0; devnum<i8259_num+1; devnum++) {
         i8259_unit[devnum].u3 = 0x00; /* IRR */
         i8259_unit[devnum].u4 = 0x00; /* ISR */
         i8259_unit[devnum].u5 = 0x00; /* IMR */
@@ -245,7 +305,5 @@ void i8259_dump(uint8 devnum)
     sim_printf(" OCW2=%02X", i8259_ocw2[devnum]);
     sim_printf(" OCW3=%02X\n", i8259_ocw3[devnum]);
 }
-
-#endif /* I8259_NUM > 0 */
 
 /* end of i8259.c */

@@ -196,10 +196,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\display\imlac.c"
-				>
-			</File>
-			<File
 				RelativePath="..\imlac\imlac_bel.c"
 				>
 			</File>
@@ -309,10 +305,6 @@
 			>
 			<File
 				RelativePath="..\display\display.h"
-				>
-			</File>
-			<File
-				RelativePath="..\display\imlac.h"
 				>
 			</File>
 			<File

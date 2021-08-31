@@ -5146,117 +5146,160 @@ return SCPE_OK;
 
 /* Set the line connection order.
 
-   Example command for eight-line multiplexer:
+   This validation routine is called to set the connection order for the
+   multiplexer whose TMXR pointer is passed in the "desc" parameter.  It parses
+   the line order list, specified by the "cptr" parameter, of commands such as:
 
-      SET <dev> LINEORDER=1;5;2-4;7
+      SET <dev> LINEORDER=4-7
+      SET <dev> LINEORDER=1;5;2-4;7;ALL
+      SET <dev> LINEORDER=ALL
 
-   Resulting connection order: 1,5,2,3,4,7,0,6.
+   Assuming an 8-channel multiplexer, the first form sets the connection order
+   to line numbers 4, 5, 6, and 7.  The remaining lines will not be connected; a
+   connection attempt will be refused with "All connections busy."  The second
+   form sets the connection order to line 1, 5, 2, 3, 4, 7, 0, and 6.  The
+   trailing "ALL" parameter causes any unspecified lines to be added to the
+   connection order in ascending value.  The third form sets the order to lines
+   0-7, which is the default order in the absence of a line connection order
+   array.
 
-   Parameters:
-    - uptr = (not used)
-    - val  = (not used)
-    - cptr = pointer to first character of range specification
-    - desc = pointer to multiplexer's TMXR structure
+   The range of accepted line numbers, including those implied by "ALL", can be
+   restricted by specifying a non-zero "val" parameter, with the upper 16 bits
+   specifying the maximum line number, and the lower 16 bits specifying the
+   minimum line number.  If a minimum is specified but a maximum is not (i.e.,
+   is zero), the maximum is the last line number defined by the multiplexer
+   descriptor.
 
-   On entry, cptr points to the value portion of the command string, which may
-   be either a semicolon-separated list of line ranges or the keyword ALL.
+   The "uptr" parameter is not used.
+
+   On entry, "cptr" points to the value portion of the command string, which may
+   be either a semicolon-separated list of line ranges or the keyword "ALL".  If
+   "ALL" is specified, it must be the last (or only) item in the list.
 
    If a line connection order array is not defined in the multiplexer
-   descriptor, the command is rejected.  If the specified range encompasses all
-   of the lines, the first value of the connection order array is set to -1 to
+   descriptor, or a line range string is not present, or the optional minimum
+   and maximum restrictions in the "val" parameter are not valid, the command is
+   rejected.  If the specified range encompasses all of the lines defined by the
+   multiplexer, the first value of the connection order array is set to -1 to
    indicate sequential connection order.  Otherwise, the line values in the
-   array are set to the order specified by the command string.  All values are
-   populated, first with those explicitly specified in the command string, and
-   then in ascending sequence with those not specified.
+   array are set to the order specified by the command string.  If fewer values
+   are supplied than there are lines supported by the device, and the final
+   parameter is not ALL, the remaining lines will be inaccessible and are
+   indicated by a -1 value after the last specified value.
 
    If an error occurs, the original line order is not disturbed.
 */
 
-t_stat tmxr_set_lnorder (UNIT *uptr, int32 val, CONST char *carg, void *desc)
+t_stat tmxr_set_lnorder (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-TMXR *mp = (TMXR *) desc;
-char *tbuf;
-char *tptr;
-CONST char *cptr;
-t_addr low, high, max = (t_addr) mp->lines - 1;
-int32 *list;
+TMXR   *mp = (TMXR *) desc;
+char   *tbuf = NULL;
+char   *tptr;
+t_addr low, high, min, max;
+int32  *list;
 t_bool *set;
-uint32 line, idx = 0;
+uint32 line, idx;
+t_addr lncount = (t_addr) (mp->lines - 1);
 t_stat result = SCPE_OK;
 
-if (mp->lnorder == NULL)                                /* line connection order undefined? */
-    return SCPE_NXPAR;                                  /* "Non-existent parameter" error */
+if (mp->lnorder == NULL)                                /* if the connection order array is not defined */
+    return SCPE_NXPAR;                                  /*   then report a "Non-existent parameter" error */
 
-else if ((carg == NULL) || (*carg == '\0'))             /* line range not supplied? */
-    return SCPE_MISVAL;                                 /* "Missing value" error */
+else if ((cptr == NULL) || (*cptr == '\0'))             /* otherwise if a line range was not supplied */
+    return SCPE_MISVAL;                                 /*   then report a "Missing value" error */
 
-list = (int32 *) calloc (mp->lines, sizeof (int32));    /* allocate new line order array */
+else {                                                  /* otherwise */
+    min = (t_addr) (val & 0xFFFF);                      /*   split the restriction into */
+    max = (t_addr) ((val >> 16) & 0xFFFF);              /*     minimum and maximum line numbers */
 
-if (list == NULL)                                       /* allocation failed? */
-    return SCPE_MEM;                                    /* report it */
+    if (max == 0)                                       /* if the maximum line number isn't specified */
+        max = lncount;                                  /*   then use the defined maximum */
 
-set = (t_bool *) calloc (mp->lines, sizeof (t_bool));   /* allocate line set tracking array */
-
-if (set == NULL) {                                      /* allocation failed? */
-    free (list);                                        /* free successful list allocation */
-    return SCPE_MEM;                                    /* report it */
+    if (min > lncount || max > lncount || min > max)    /* if the restriction isn't valid */
+        return SCPE_IERR;                               /*   then report an "Internal error" */
     }
 
-tbuf = (char *) calloc (strlen(carg)+2, sizeof(*carg));
-strcpy (tbuf, carg);
+list = (int32 *) calloc (mp->lines, sizeof (int32));    /* allocate the new line order array */
+
+if (list == NULL)                                       /* if the allocation failed */
+    return SCPE_MEM;                                    /*   then report a "Memory exhausted" error */
+
+set = (t_bool *) calloc (mp->lines, sizeof (t_bool));   /* allocate the line set tracking array */
+
+if (set == NULL) {                                      /* if the allocation failed */
+    free (list);                                        /*   then free the successful list allocation */
+    return SCPE_MEM;                                    /*      and report a "Memory exhausted" error */
+    }
+
+tbuf = (char *) calloc (strlen(cptr)+2, sizeof(*cptr));
+if (tbuf == NULL) {                                     /* if the allocation failed */
+    free (set);                                         /*   then free the line set tracking array */
+    free (list);                                        /*        and successful list allocation */
+    return SCPE_MEM;                                    /*      and report a "Memory exhausted" error */
+    }
+
+strcpy (tbuf, cptr);
 tptr = tbuf + strlen (tbuf);                            /* append a semicolon */
 *tptr++ = ';';                                          /*   to the command string */
 *tptr = '\0';                                           /*   to make parsing easier for get_range */
 cptr = tbuf;
 
-while (*cptr) {                                         /* parse command string */
-    cptr = get_range (NULL, cptr, &low, &high, 10, max, ';');/* get a line range */
+idx = 0;                                                /* initialize the index of ordered values */
 
-    if (cptr == NULL) {                                 /* parsing error? */
-        result = SCPE_ARG;                              /* "Invalid argument" error */
-        break;
+while (*cptr != '\0') {                                     /* while characters remain in the command string */
+    if (strncasecmp (cptr, "ALL;", 4) == 0) {               /*   if the parameter is "ALL" */
+        if ((val != 0) || ((idx > 0) && (idx <= max)))      /*     then if some lines are restrictied or unspecified */
+            for (line = (uint32)min; line <= (uint32)max; line++)/*  then fill them in sequentially */
+                if (set [line] == FALSE)                    /*         setting each unspecified line */
+                    list [idx++] = line;                    /*           into the line order */
+
+        cptr = cptr + 4;                                /* advance past "ALL" and the trailing semicolon */
+
+        if (*cptr != '\0')                              /* if "ALL" is not the last parameter */
+            result = sim_messagef (SCPE_2MARG,          /*   then report extraneous items */
+                            "Too many args: %s\n", cptr);
+
+        break;                                          /* "ALL" terminates the order list */
         }
 
-    else if ((low > max) || (high > max)) {             /* line out of range? */
-        result = SCPE_SUB;                              /* "Subscript out of range" error */
-        break;
+    cptr = get_range (NULL, cptr, &low, &high, 10, max, ';');   /* get a line range */
+
+    if (cptr == NULL) {                                 /* if a parsing error occurred */
+        result = SCPE_ARG;                              /*   then report an invalid argument */
+        break;                                          /*     and terminate the parse */
         }
 
-    else if ((low == 0) && (high == max)) {             /* entire line range specified? */
-        list [0] = -1;                                  /* set sequential order flag */
-        idx = (uint32) max + 1;                         /* indicate no fill-in needed */
-        break;
+    else if ((low < min) || 
+             (low > max) || 
+             (high > max)) {                            /* otherwise if the line number is invalid */
+        result = SCPE_SUB;                              /*   then report the subscript is out of range */
+        break;                                          /*     and terminate the parse */
         }
 
-    else
-        for (line = (uint32) low; line <= (uint32) high; line++) /* see if previously specified */
-            if (set [line] == FALSE) {                  /* not already specified? */
-                set [line] = TRUE;                      /* now it is */
-                list [idx] = line;                      /* add line to connection order */
-                idx = idx + 1;                          /* bump "specified" count */
+    else                                                /* otherwise it's a valid range */
+        for (line = (uint32)low; line <= (uint32)high; line++)/* so add the line(s) to the order */
+            if (set [line] == FALSE) {                  /* if the line number has not been specified */
+                set [line] = TRUE;                      /*   then now it is */
+                list [idx++] = line;                    /*     and add it to the connection order */
                 }
     }
 
-if (result == SCPE_OK) {                                /* assignment successful? */
-    if (idx <= max)                                     /* any lines not specified? */
-        for (line = 0; line <= max; line++)             /* fill them in sequentially */
-            if (set [line] == FALSE) {                  /* specified? */
-                list [idx] = line;                      /* no, so add it */
-                idx = idx + 1;
-                }
+if (result == SCPE_OK) {                                /* if the assignment succeeded */
+    if (idx <= max)                                     /*   then if any lines were not specified */
+        list [idx] = -1;                                /*     then terminate the order list after the last one */
 
-    memcpy (mp->lnorder, list, mp->lines * sizeof (int32)); /* copy working array to connection array */
+    memcpy (mp->lnorder, list,                          /* copy the working array to the connection array */
+            mp->lines * sizeof (int32));
     }
 
-free (list);                                            /* free list allocation */
-free (set);                                             /* free set allocation */
-free (tbuf);                                            /* free arg copy with ; */
+free (list);                                            /* free the list allocation */
+free (set);                                             /*   and the set allocation */
+free (tbuf);                                            /*   and the arg copy with ; */
 
-return result;
+return result;                                          /* return the status */
 }
 
-
-/* Show line connection order.
+/* Show the line connection order.
 
    Parameters:
     - st   = stream on which output is to be written
@@ -5268,7 +5311,8 @@ return result;
    command is rejected.  If the first value of the connection order array is set
    to -1, then the connection order is sequential.  Otherwise, the line values
    in the array are printed as a semicolon-separated list.  Ranges are printed
-   where possible to shorten the output.
+   where possible to shorten the output.  A -1 value within the array indicates
+   the end of the order list.
 */
 
 t_stat tmxr_show_lnorder (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
@@ -5287,7 +5331,7 @@ if (*iptr < 0)                                          /* sequential order indi
 else {
     low = last = *iptr++;                               /* set first line value */
 
-    for (j = 1; j <= mp->lines; j++) {                  /* print remaining lines in order list */
+    for (j = 1; last != -1; j++) {                      /* print the remaining lines in the order list */
         if (j < mp->lines)                              /* more lines to process? */
             i = *iptr++;                                /* get next line in list */
         else                                            /* final iteration */
@@ -5622,6 +5666,64 @@ if ((dptr) && (dbits & dptr->dctrl)) {
 
 /* Testing of sim_sock and tmxr */
 
+static struct lnorder_test {
+    const char *orderspec;
+    int32 valspec;
+    t_stat expected_stat;
+    int32 expected_orderlist[8];
+    } lnorders[] = {
+        {NULL,            0,         SCPE_MISVAL},
+        {"",              0,         SCPE_MISVAL},
+        {"4-7",  0x3FFF3FFF,         SCPE_IERR},
+        {"6-8",           0,         SCPE_SUB},
+        {"9-11",          0,         SCPE_SUB},
+        {"4-7",           0,         SCPE_OK,
+               {  4,  5,  6,  7, -1}},
+        {"1;5;2-4;7;ALL", 0,         SCPE_OK,
+               {  1,  5,  2,  3,  4,  7,  0,  6}},
+        {"ALL",           0,         SCPE_OK,
+               {  -1}},
+    };
+
+static t_stat _lnorder_test (TMXR *tmxr, 
+                             struct lnorder_test *t)
+{
+t_stat r;
+char msg[80] = "";
+int i;
+
+r = tmxr_set_lnorder (NULL, t->valspec, t->orderspec, tmxr);
+if (r != t->expected_stat) {
+    snprintf (msg, sizeof (msg), "Unexpected lnorder result status for \"%s\" Expected: %s", t->orderspec, sim_error_text (t->expected_stat));
+    return sim_messagef (SCPE_ARG, "%s, Got: %s\n", msg, sim_error_text (r));
+    }
+if (r == SCPE_OK) {
+    for (i = 0; i<8; i++)
+        if (t->expected_orderlist[i] != tmxr->lnorder[i])
+            return sim_messagef (SCPE_ARG, "Unexpected order entry for line %d: %d vs %d\n", i, tmxr->lnorder[i], t->expected_orderlist[i]);
+    }
+return SCPE_OK;
+}
+
+static t_stat sim_tmxr_test_lnorder (TMXR *tmxr)
+{
+uint32 i;
+int32 *saved_lnorder = tmxr->lnorder;
+int32 saved_lines = tmxr->lines;
+
+tmxr->lnorder = (int32 *)calloc (tmxr->lines, sizeof (*tmxr->lnorder));
+if (tmxr->lines >= 8) {
+    tmxr->lines = 8;
+    for (i = 0; i < (sizeof (lnorders)/sizeof (lnorders[0])); ++i)
+        _lnorder_test (tmxr, &lnorders[i]);
+    }
+free (tmxr->lnorder);
+tmxr->lnorder = saved_lnorder;
+tmxr->lines = saved_lines;
+return SCPE_OK;
+}
+
+
 #include <setjmp.h>
 
 t_stat tmxr_sock_test (DEVICE *dptr)
@@ -5676,6 +5778,7 @@ if (tmxr->lines > 1) {
     sim_close_sock (sock_line);
     sock_line = INVALID_SOCKET;
     SIM_TEST(detach_cmd (0, dptr->name));
+    SIM_TEST(sim_tmxr_test_lnorder (tmxr));
     }
 return stat;
 }

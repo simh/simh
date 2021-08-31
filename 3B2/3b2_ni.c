@@ -93,10 +93,11 @@
  *
  */
 
-#include "3b2_defs.h"
 #include "3b2_ni.h"
 
-#include <math.h>
+#include "3b2_io.h"
+#include "3b2_mem.h"
+#include "3b2_timer.h"
 
 /* State container for the card */
 NI_STATE  ni;
@@ -285,12 +286,12 @@ static void ni_disable()
     sim_debug(DBG_TRACE, &ni_dev,
               "[ni_disable] Disabling the interface.\n");
     ni.enabled = FALSE;
-    cio[ni.cid].intr = FALSE;
     sim_cancel(ni_unit);
     sim_cancel(rcv_unit);
     sim_cancel(rq_unit);
     sim_cancel(cio_unit);
     sim_cancel(sanity_unit);
+    CIO_CLR_INT(ni.cid);
 }
 
 static void ni_cmd(uint8 cid, cio_entry *rentry, uint8 *rapp_data, t_bool is_exp)
@@ -869,7 +870,7 @@ t_stat ni_sanity_svc(UNIT *uptr)
     cio_cqueue(ni.cid, CIO_STAT, NIQESIZE, &cqe, app_data);
 
     if (cio[ni.cid].ivec > 0) {
-        cio[ni.cid].intr = TRUE;
+        CIO_SET_INT(ni.cid);
     }
 
     sim_activate_after(sanity_unit, NI_SANITY_INTERVAL_US);
@@ -884,7 +885,7 @@ t_stat ni_cio_svc(UNIT *uptr)
     if (cio[ni.cid].ivec > 0) {
         sim_debug(DBG_TRACE, &ni_dev,
                   "[ni_cio_svc] Handling a CIO service (Setting Interrupt) for board %d\n", ni.cid);
-        cio[ni.cid].intr = TRUE;
+        CIO_SET_INT(ni.cid);
     }
 
     return SCPE_OK;
@@ -951,7 +952,7 @@ void ni_process_packet()
 
     /* Trigger an interrupt */
     if (cio[ni.cid].ivec > 0) {
-        cio[ni.cid].intr = TRUE;
+        CIO_SET_INT(ni.cid);
     }
 }
 

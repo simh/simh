@@ -126,7 +126,7 @@
 
         Byte 5 - Buffer Low Address
 
-        Byte 6 - Buffer High Address
+        Byte 7 - Buffer High Address
 
         Byte 8 - Block Number
 
@@ -159,8 +159,6 @@
 */
 
 #include "system_defs.h"                /* system header in system dir */
-
-#if defined (SBC201_NUM) && (SBC201_NUM > 0)
 
 #define UNIT_V_WPMODE   (UNIT_V_UF)     /* Write protect */
 #define UNIT_WPMODE     (1 << UNIT_V_WPMODE)
@@ -214,13 +212,15 @@ extern uint16    PCX;
 
 /* external function prototypes */
 
-extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
-extern uint8 unreg_dev(uint8);
+extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint16, uint16, uint8);
+extern uint8 unreg_dev(uint16 port);
 extern uint8 get_mbyte(uint16 addr);
 extern void put_mbyte(uint16 addr, uint8 val);
 
 /* function prototypes */
 
+t_stat isbc201_cfg(uint16 baseport, uint16 devnum, uint8 intnum);
+t_stat isbc201_clr(void);
 t_stat isbc201_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat isbc201_set_port (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat isbc201_set_int (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
@@ -239,16 +239,16 @@ void isbc201_diskio(void);      //do actual disk i/o
 /* globals */
 
 int isbc201_onetime = 1;
-
 static const char* isbc201_desc(DEVICE *dptr) {
     return isbc201_NAME;
 }
+
 typedef    struct    {                  //FDD definition
     uint8   sec;
     uint8   cyl;
     }    FDDDEF;
 
-typedef    struct    {                  //FDC definition
+typedef    struct    {                  //FDC board definition
     uint8   baseport;                   //FDC base port
     uint8   intnum;                     //interrupt number
     uint8   verb;                       //verbose flag
@@ -258,17 +258,17 @@ typedef    struct    {                  //FDC definition
     uint8   rtype;                      //FDC result type
     uint8   rbyte0;                     //FDC result byte for type 00
     uint8   rbyte1;                     //FDC result byte for type 10
-    uint8   intff;                      //fdc interrupt FF
+    uint8   intff;                      //FDC interrupt FF
     FDDDEF  fdd[FDD_NUM];               //indexed by the FDD number
     }    FDCDEF;
 
-FDCDEF    fdc201;                       //indexed by the isbc-202 instance number  
+FDCDEF    fdc201;                       //indexed by the isbc-201 instance number  
 
 /* isbc201 Standard I/O Data Structures */
 
 UNIT isbc201_unit[] = {                 //2 FDDs
-    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE+UNIT_BUFABLE+UNIT_MUSTBUF+UNIT_FIX, MDSSD) }, 
-    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE+UNIT_BUFABLE+UNIT_MUSTBUF+UNIT_FIX, MDSSD) } 
+    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+UNIT_RO+UNIT_BUFABLE+UNIT_MUSTBUF+UNIT_FIX, MDSSD) }, 
+    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+UNIT_RO+UNIT_BUFABLE+UNIT_MUSTBUF+UNIT_FIX, MDSSD) } 
 };
 
 REG isbc201_reg[] = {
@@ -336,6 +336,50 @@ DEVICE isbc201_dev = {
     &isbc201_desc       //device description
 };
 
+// iSBC 201 configuration
+
+t_stat isbc201_cfg(uint16 baseport, uint16 devnum, uint8 intnum)
+{
+    int i;
+    UNIT *uptr;
+    
+    // one-time initialization for all FDDs for this FDC instance
+    for (i = 0; i < FDD_NUM; i++) { 
+        uptr = isbc201_dev.units + i;
+        uptr->u6 = i;               //fdd unit number
+        uptr->flags &= ~UNIT_ATT;
+    }
+    fdc201.baseport = baseport & 0xff;  //set port
+    fdc201.intnum = intnum;             //set interrupt
+    fdc201.verb = 0;                    //clear verb
+    reg_dev(isbc201r0, fdc201.baseport, 0, 0); //read status
+    reg_dev(isbc201r1, fdc201.baseport + 1, 0, 0); //read rslt type/write IOPB addr-l
+    reg_dev(isbc201r2, fdc201.baseport + 2, 0, 0); //write IOPB addr-h and start 
+    reg_dev(isbc201r3, fdc201.baseport + 3, 0, 0); //read rstl byte 
+    reg_dev(isbc201r7, fdc201.baseport + 7, 0, 0); //write reset fdc201
+    isbc201_reset_dev();                //software reset
+//    if (fdc201.verb)
+        sim_printf("    sbc201: Enabled base port at 0%02XH, Interrupt #=%02X, %s\n",
+        fdc201.baseport, fdc201.intnum, fdc201.verb ? "Verbose" : "Quiet" );
+    return SCPE_OK;
+}
+
+// iSBC 201 deconfiguration
+
+t_stat isbc201_clr(void)
+{
+    fdc201.intnum = -1;                 //set default interrupt
+    fdc201.verb = 0;                    //set verb = 0
+    unreg_dev(fdc201.baseport);         //read status
+    unreg_dev(fdc201.baseport + 1);     //read rslt type/write IOPB addr-l
+    unreg_dev(fdc201.baseport + 2);     //write IOPB addr-h and start 
+    unreg_dev(fdc201.baseport + 3);     //read rstl byte 
+    unreg_dev(fdc201.baseport + 7);     //write reset fdc201
+//    if (fdc201.verb)
+        sim_printf("    sbc201: Disabled\n");
+    return SCPE_OK;
+}
+
 /* fdc201 set mode = Write protect */
 
 t_stat isbc201_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
@@ -343,7 +387,8 @@ t_stat isbc201_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
     if (uptr == NULL)
         return SCPE_ARG;
     if (uptr->flags & UNIT_ATT)
-        return sim_messagef (SCPE_ALATT, "%s is already attached to %s\n", sim_uname(uptr), uptr->filename);
+        return sim_messagef (SCPE_ALATT, "%s is already attached to %s\n", 
+            sim_uname(uptr), uptr->filename);
     if (val & UNIT_WPMODE) {            /* write protect */
         uptr->flags |= val;
         if (fdc201.verb)
@@ -356,7 +401,7 @@ t_stat isbc201_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
     return SCPE_OK;
 }
 
-// set base address parameter
+// set base port address parameter
 
 t_stat isbc201_set_port(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
@@ -366,8 +411,13 @@ t_stat isbc201_set_port(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
         return SCPE_ARG;
     result = sscanf(cptr, "%02x", &size);
     fdc201.baseport = size;
-    if (fdc201.verb)
-        sim_printf("SBC201: Base port=%04X\n", fdc201.baseport);
+//    if (fdc201.verb)
+        sim_printf("SBC201: Installed at base port=%04X\n", fdc201.baseport);
+    reg_dev(isbc201r0, fdc201.baseport, 0, 0); //read status
+    reg_dev(isbc201r1, fdc201.baseport + 1, 0, 0); //read rslt type/write IOPB addr-l
+    reg_dev(isbc201r2, fdc201.baseport + 2, 0, 0); //write IOPB addr-h and start 
+    reg_dev(isbc201r3, fdc201.baseport + 3, 0, 0); //read rstl byte 
+    reg_dev(isbc201r7, fdc201.baseport + 7, 0, 0); //write reset fdc201
     return SCPE_OK;
 }
 
@@ -381,7 +431,7 @@ t_stat isbc201_set_int(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
         return SCPE_ARG;
     result = sscanf(cptr, "%02x", &size);
     fdc201.intnum = size;
-    if (fdc201.verb)
+//    if (fdc201.verb)
         sim_printf("SBC201: Interrupt number=%04X\n", fdc201.intnum);
     return SCPE_OK;
 }
@@ -398,7 +448,6 @@ t_stat isbc201_set_verb(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
     }
     if (strncasecmp(cptr, "ON", 3) == 0) {
         fdc201.verb = 1;
-        sim_printf("   SBC201: fdc201.verb=%d\n", fdc201.verb);
         return SCPE_OK;
     }
     return SCPE_ARG;
@@ -422,41 +471,9 @@ t_stat isbc201_show_param (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 
 t_stat isbc201_reset(DEVICE *dptr)
 {
-    int i;
-    UNIT *uptr;
-    
     if (dptr == NULL)
         return SCPE_ARG;
-    if (isbc201_onetime) {
-        fdc201.baseport = SBC201_BASE;  //set default base
-        fdc201.intnum = SBC201_INT;     //set default interrupt
-        fdc201.verb = 0;                //set verb = 0
-        isbc201_onetime = 0;
-        // one-time initialization for all FDDs for this FDC instance
-        for (i = 0; i < FDD_NUM; i++) { 
-            uptr = isbc201_dev.units + i;
-            uptr->u6 = i;               //fdd unit number
-        }
-    }
-    if ((dptr->flags & DEV_DIS) == 0) { // enabled
-        reg_dev(isbc201r0, fdc201.baseport, 0);         //read status
-        reg_dev(isbc201r1, fdc201.baseport + 1, 0);     //read rslt type/write IOPB addr-l
-        reg_dev(isbc201r2, fdc201.baseport + 2, 0);     //write IOPB addr-h and start 
-        reg_dev(isbc201r3, fdc201.baseport + 3, 0);     //read rstl byte 
-        reg_dev(isbc201r7, fdc201.baseport + 7, 0);     //write reset fdc201
-        isbc201_reset_dev(); //software reset
-//        if (fdc201.verb)
-            sim_printf("    sbc201: Enabled base port at 0%02XH  Interrupt #=%02X  %s\n",
-            fdc201.baseport, fdc201.intnum, fdc201.verb ? "Verbose" : "Quiet" );
-    } else {
-        unreg_dev(fdc201.baseport);         //read status
-        unreg_dev(fdc201.baseport + 1);     //read rslt type/write IOPB addr-l
-        unreg_dev(fdc201.baseport + 2);     //write IOPB addr-h and start 
-        unreg_dev(fdc201.baseport + 3);     //read rstl byte 
-        unreg_dev(fdc201.baseport + 7);     //write reset fdc201
-//        if (fdc201.verb)
-            sim_printf("    sbc201: Disabled\n");
-    }
+    isbc201_reset_dev();
     return SCPE_OK;
 }
 
@@ -467,13 +484,13 @@ void isbc201_reset_dev(void)
     int32 i;
     UNIT *uptr;
 
-    fdc201.stat = 0;            //clear status
+    fdc201.stat = 0;                    //clear status
     for (i = 0; i < FDD_NUM; i++) {     /* handle all units */
         uptr = isbc201_dev.units + i;
-        fdc201.stat |= FDCPRE; //set the FDC status
+        fdc201.stat |= FDCPRE;          //set the FDC status
         fdc201.rtype = ROK;
         fdc201.rbyte0 = 0;              //set no error
-        if (uptr->flags & UNIT_ATT) { /* if attached */
+        if (uptr->flags & UNIT_ATT) {   /* if attached */
             switch(i){
                 case 0:
                     fdc201.stat |= RDY0; //set FDD 0 ready
@@ -496,18 +513,18 @@ t_stat isbc201_attach (UNIT *uptr, CONST char *cptr)
     t_stat r;
     uint8 fddnum;
 
+    fddnum = uptr->u6;
     if ((r = attach_unit (uptr, cptr)) != SCPE_OK) { 
         sim_printf("   SBC201_attach: Attach error %d\n", r);
         return r;
     }
-    fddnum = uptr->u6;
     switch(fddnum){
         case 0:
-            fdc201.stat |= RDY0; //set FDD 0 ready
+            fdc201.stat |= RDY0;        //set FDD 0 ready
             fdc201.rbyte1 |= RB1RD0;
             break;
         case 1:
-            fdc201.stat |= RDY1; //set FDD 1 ready
+            fdc201.stat |= RDY1;        //set FDD 1 ready
             fdc201.rbyte1 |= RB1RD1;
             break;
     }
@@ -524,7 +541,7 @@ t_stat isbc201_attach (UNIT *uptr, CONST char *cptr)
 
 uint8 isbc201r0(t_bool io, uint8 data, uint8 devnum)
 {
-    if (io == 0) {                  /* read status*/
+    if (io == 0) {                      /* read status*/
         return fdc201.stat;
         }
     return 0;
@@ -532,11 +549,12 @@ uint8 isbc201r0(t_bool io, uint8 data, uint8 devnum)
 
 uint8 isbc201r1(t_bool io, uint8 data, uint8 devnum)
 {
-    if (io == 0) {                  /* read data port */
-        fdc201.intff = 0;           //clear interrupt FF
+    if (io == 0) {                      /* read data port */
+        fdc201.intff = 0;               //clear interrupt FF
         fdc201.stat &= ~FDCINT;
+        fdc201.rtype = ROK;
         return fdc201.rtype;
-    } else {                        /* write data port */
+    } else {                            /* write data port */
         fdc201.iopb = data;
         }
     return 0;
@@ -544,20 +562,20 @@ uint8 isbc201r1(t_bool io, uint8 data, uint8 devnum)
 
 uint8 isbc201r2(t_bool io, uint8 data, uint8 devnum)
 {
-    if (io == 0) {                  /* read data port */
+    if (io == 0) {                      /* read data port */
         ;
-    } else {                        /* write data port */
+    } else {                            /* write data port */
         fdc201.iopb |= (data << 8);
         isbc201_diskio();
         if (fdc201.intff)
             fdc201.stat |= FDCINT;
-        }
+    }
     return 0;
 }
 
 uint8 isbc201r3(t_bool io, uint8 data, uint8 devnum)
 {
-    if (io == 0) {                  /* read data port */
+    if (io == 0) {                      /* read data port */
         if (fdc201.rtype == ROK) {
             return fdc201.rbyte0;
         } else {
@@ -567,17 +585,17 @@ uint8 isbc201r3(t_bool io, uint8 data, uint8 devnum)
                 return fdc201.rbyte0;
             }
         }
-    } else {                        /* write data port */
-        ; //stop diskette operation
+    } else {                            /* write data port */
+        ; //stop diskette operation after current linked IOPB finishes
     }
     return 0;
 }
 
 uint8 isbc201r7(t_bool io, uint8 data, uint8 devnum)
 {
-    if (io == 0) {                  /* read data port */
+    if (io == 0) {                      /* read data port */
         ;
-    } else {                        /* write data port */
+    } else {                            /* write data port */
         isbc201_reset_dev();
     }
     return 0;
@@ -596,26 +614,29 @@ void isbc201_diskio(void)
     uint8 *fbuf;
 
     //parse the IOPB
-    cw = get_mbyte(fdc201.iopb);
-    di = get_mbyte(fdc201.iopb + 1);
-    nr = get_mbyte(fdc201.iopb + 2);
-    ta = get_mbyte(fdc201.iopb + 3);
-    sa = get_mbyte(fdc201.iopb + 4) & 0x1f;
-    ba = get_mbyte(fdc201.iopb + 5);
-    ba |= (get_mbyte(fdc201.iopb + 6) << 8);
-    bn = get_mbyte(fdc201.iopb + 7);
+    cw = get_mbyte(fdc201.iopb);        //Channel Word
+    di = get_mbyte(fdc201.iopb + 1);    //Diskette Instruction
+    nr = get_mbyte(fdc201.iopb + 2);    //Number of Records
+    ta = get_mbyte(fdc201.iopb + 3);    //Track Address
+    sa = get_mbyte(fdc201.iopb + 4) & 0x1f; //Sector Address - without bank/fddnum
+    ba = get_mbyte(fdc201.iopb + 5);    
+    ba |= (get_mbyte(fdc201.iopb + 6) << 8); //Buffer Address
+    bn = get_mbyte(fdc201.iopb + 7);    //Block Number
     ni = get_mbyte(fdc201.iopb + 8);
-    ni |= (get_mbyte(fdc201.iopb + 9) << 8);
-    fddnum = (di & 0x10) >> 4;
-    uptr = isbc201_dev.units + fddnum;
-    fbuf = (uint8 *) (isbc201_dev.units + fddnum)->filebuf;
+    ni |= (get_mbyte(fdc201.iopb + 9) << 8); //Next IOPB Address
+    fddnum = (di & 0x10) >> 4;          //Floppy Disk Number
+    uptr = isbc201_dev.units + fddnum;  //Unit Pointer
+    fbuf = (uint8 *) uptr->filebuf;     //File Buffer
+    if (fdc201.verb)
+        sim_printf("\n   SBC201: FDD %d - nr=%02XH ta=%02XH sa=%02XH IOPB=%04XH PCX=%04XH",
+            fddnum, nr, ta, sa, fdc201.iopb, PCX);
     //check for not ready
     switch(fddnum) {
         case 0:
             if ((fdc201.stat & RDY0) == 0) {
                 fdc201.rtype = ROK;
                 fdc201.rbyte0 = RB0NR;
-                fdc201.intff = 1; //set interrupt FF
+                fdc201.intff = 1;       //set interrupt FF
                 sim_printf("\n   SBC201: FDD %d - Ready error", fddnum);
                 return;
             }
@@ -624,7 +645,7 @@ void isbc201_diskio(void)
             if ((fdc201.stat & RDY1) == 0) {
                 fdc201.rtype = ROK;
                 fdc201.rbyte0 = RB0NR;
-                fdc201.intff = 1; //set interrupt FF
+                fdc201.intff = 1;       //set interrupt FF
                 sim_printf("\n   SBC201: FDD %d - Ready error", fddnum);
                 return;
             }
@@ -632,7 +653,7 @@ void isbc201_diskio(void)
     }
     //check for address error
     if (
-        ((di & 0x07) != DHOME) && (
+        ((di & 0x07) != DHOME) && (     //this is not in manual
         (sa > MAXSECSD) ||
         ((sa + nr) > (MAXSECSD + 1)) ||
         (sa == 0) ||
@@ -640,60 +661,61 @@ void isbc201_diskio(void)
         )) {
         fdc201.rtype = ROK;
         fdc201.rbyte0 = RB0ADR;
-        fdc201.intff = 1;      //set interrupt FF
-        sim_printf("\n   SBC201: FDD %d - Address error at %04X", fddnum, PCX);
+        fdc201.intff = 1;               //set interrupt FF
+        sim_printf("\n   SBC201: FDD %d - Address error nr=%02XH ta=%02XH sa=%02XH IOPB=%04XH PCX=%04XH",
+            fddnum, nr, ta, sa, fdc201.iopb, PCX);
         return;
     }
     switch (di & 0x07) {
         case DNOP:
             fdc201.rtype = ROK;
-            fdc201.rbyte0 = 0;
-            fdc201.intff = 1;   //set interrupt FF
+            fdc201.rbyte0 = 0;          //set no error
+            fdc201.intff = 1;           //set interrupt FF
             break;
         case DSEEK:
             fdc201.fdd[fddnum].sec = sa;
             fdc201.fdd[fddnum].cyl = ta;
             fdc201.rtype = ROK;
-            fdc201.rbyte0 = 0;
-            fdc201.intff = 1;   //set interrupt FF
+            fdc201.rbyte0 = 0;          //set no error
+            fdc201.intff = 1;           //set interrupt FF
             break;
         case DHOME:
             fdc201.fdd[fddnum].sec = sa;
             fdc201.fdd[fddnum].cyl = 0;
             fdc201.rtype = ROK;
-            fdc201.rbyte0 = 0;
-            fdc201.intff = 1;   //set interrupt FF
+            fdc201.rbyte0 = 0;          //set no error
+            fdc201.intff = 1;           //set interrupt FF
             break;
         case DVCRC:
             fdc201.rtype = ROK;
             fdc201.rbyte0 = 0;
-            fdc201.intff = 1;   //set interrupt FF
+            fdc201.intff = 1;           //set interrupt FF
             break;
         case DFMT:
             //check for WP
             if(uptr->flags & UNIT_WPMODE) {
                 fdc201.rtype = ROK;
                 fdc201.rbyte0 = RB0WP;
-                fdc201.intff = 1; //set interrupt FF
-                sim_printf("\n   SBC201: FDD %d - Write protect error 1", fddnum);
+                fdc201.intff = 1;       //set interrupt FF
+                sim_printf("\n   SBC201: FDD %d - Write protect error DFMT", fddnum);
                 return;
             }
-            fmtb = get_mbyte(ba); //get the format byte
+            fmtb = get_mbyte(ba);       //get the format byte
             //calculate offset into disk image
             dskoff = ((ta * MAXSECSD) + (sa - 1)) * SECSIZ;
             for(i=0; i<=((uint32)(MAXSECSD) * SECSIZ); i++) {
                 *(fbuf + (dskoff + i)) = fmtb;
             }
             fdc201.rtype = ROK;
-            fdc201.rbyte0 = 0;
-            fdc201.intff = 1;   //set interrupt FF
+            fdc201.rbyte0 = 0;          //set no error
+            fdc201.intff = 1;           //set interrupt FF
             break;
         case DREAD:
             nrptr = 0;
             while(nrptr < nr) {
                 //calculate offset into disk image
                 dskoff = ((ta * MAXSECSD) + (sa - 1)) * SECSIZ;
-                //copy sector from image to RAM
+                //copy sector from disk image to RAM
                 for (i=0; i<SECSIZ; i++) { 
                     data = *(fbuf + (dskoff + i));
                     put_mbyte(ba + i, data);
@@ -703,23 +725,24 @@ void isbc201_diskio(void)
                 nrptr++;
             }
             fdc201.rtype = ROK;
-            fdc201.rbyte0 = 0;
-            fdc201.intff = 1;   //set interrupt FF
+            fdc201.rbyte0 = 0;          //set no error
+            fdc201.intff = 1;           //set interrupt FF
             break;
         case DWRITE:
             //check for WP
             if(uptr->flags & UNIT_WPMODE) {
                 fdc201.rtype = ROK;
                 fdc201.rbyte0 = RB0WP;
-                fdc201.intff = 1; //set interrupt FF
-                sim_printf("\n   SBC201: FDD %d - Write protect error 2", fddnum);
+                fdc201.intff = 1;       //set interrupt FF
+                sim_printf("\n   SBC201: FDD %d - Write protect error DWRITE", fddnum);
                 return;
             }
             nrptr = 0;
             while(nrptr < nr) {
                 //calculate offset into disk image
                 dskoff = ((ta * MAXSECSD) + (sa - 1)) * SECSIZ;
-                for (i=0; i<SECSIZ; i++) { //copy sector from image to RAM
+                //copy sector from RAM to disk image
+                for (i=0; i<SECSIZ; i++) { 
                     data = get_mbyte(ba + i);
                     *(fbuf + (dskoff + i)) = data;
                 }
@@ -728,15 +751,14 @@ void isbc201_diskio(void)
                 nrptr++;
             }
             fdc201.rtype = ROK;
-            fdc201.rbyte0 = 0;
-            fdc201.intff = 1;   //set interrupt FF
+            fdc201.rbyte0 = 0;          //set no error
+            fdc201.intff = 1;           //set interrupt FF
             break;
         default:
-            sim_printf("\n   SBC201: FDD %d - isbc201_diskio bad di=%02X", fddnum, di & 0x07);
+            sim_printf("\n   SBC201: FDD %d - isbc201_diskio bad di=%02X",
+                fddnum, di & 0x07);
             break;
     }
 }
-
-#endif /* SBC201_NUM > 0 */
 
 /* end of isbc201.c */

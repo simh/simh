@@ -88,6 +88,7 @@ typedef void (*DIR_ENTRY_CALLBACK)(const char *directory,
 t_stat sim_dir_scan (const char *cptr, DIR_ENTRY_CALLBACK entry, void *context);
 
 void sim_buf_swap_data (void *bptr, size_t size, size_t count);
+void sim_byte_swap_data (void *bptr, size_t size, size_t count);
 void sim_buf_copy_swapped (void *dptr, const void *bptr, size_t size, size_t count);
 const char *sim_get_os_error_text (int error);
 typedef struct SHMEM SHMEM;

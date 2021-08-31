@@ -38,10 +38,6 @@
 
 #include "sds_defs.h"
 
-#define UNIT_V_WLK      (UNIT_V_UF + 0)                 /* write locked */
-#define UNIT_WLK        (1 << UNIT_V_WLK)
-#define UNIT_WPRT       (UNIT_WLK | UNIT_RO)            /* write protect */
-
 #define DSK_PKTWD       16                              /* words/packet */
 #define DSK_NUMPKT      4                               /* packets/sector */
 #define DSK_NUMWD       (DSK_PKTWD*DSK_NUMPKT)          /* words/sector */
@@ -121,8 +117,10 @@ REG dsk_reg[] = {
     };
 
 MTAB dsk_mod[] = {
-    { UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
-    { UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock drive" },
     { MTAB_XTD|MTAB_VDV, 0, "CHANNEL", "CHANNEL",
       &set_chan, &show_chan, NULL },
     { 0 }

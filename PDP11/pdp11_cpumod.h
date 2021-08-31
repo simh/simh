@@ -48,7 +48,7 @@
 #define PSW_1120        0000377
 
 #define SOP_1123        (BUS_Q|OPT_EIS|OPT_FPP|OPT_MMU|OPT_BVT)
-#define OPT_1123        (OPT_FPP|OPT_CIS|OPT_BVT)
+#define OPT_1123        (OPT_FPP|OPT_CIS|OPT_BVT|OPT_MMU)
 #define PSW_F           0170777
 #define PAR_F           0177777
 #define PDR_F           0077516
@@ -69,7 +69,7 @@
 #define MM0_1134        0160557
 
 #define SOP_1140        (BUS_U|OPT_EIS|OPT_MMU)
-#define OPT_1140        (OPT_FIS)
+#define OPT_1140        (OPT_FIS|OPT_MMU)
 #define PSW_1140        0170377
 #define PAR_1140        0007777
 #define PDR_1140        0077516
@@ -84,7 +84,7 @@
 #define MM3_1144        0000077
 
 #define SOP_1145        (BUS_U|OPT_EIS|OPT_FPP|OPT_MMU|OPT_RH11)
-#define OPT_1145        (OPT_FPP)
+#define OPT_1145        (OPT_FPP|OPT_MMU)
 #define PSW_1145        0174377
 #define PAR_1145        0007777
 #define PDR_1145        0077717

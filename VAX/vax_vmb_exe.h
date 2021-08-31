@@ -1,14 +1,33 @@
 #ifndef ROM_vax_vmb_exe_H
 #define ROM_vax_vmb_exe_H 0
 /*
-   VAX/vax_vmb_exe.h         produced at Sun Mar 24 16:38:01 2013
-   from VAX/vmb.exe which was last modified at Sun Mar 24 12:24:51 2013
+   VAX/vax_vmb_exe.h         produced at Mon Aug 23 12:14:08 2021
+   from VAX/vmb.exe which was last modified at Mon Jul 26 08:03:31 2021
    file size: 44544 (0xAE00) - checksum: 0xFFC014BB
    This file is a generated file and should NOT be edited or changed by hand.
 */
+#if !defined BOOT_CODE_SIZE
 #define BOOT_CODE_SIZE 0xAE00
 #define BOOT_CODE_FILENAME "vmb.exe"
 #define BOOT_CODE_ARRAY vax_vmb_exe
+#endif
+#if !defined BOOT_CODE_SIZE_1
+#define BOOT_CODE_SIZE_1 0xAE00
+#define BOOT_CODE_FILENAME_1 "vmb.exe"
+#define BOOT_CODE_ARRAY_1 vax_vmb_exe
+#elif !defined BOOT_CODE_SIZE_2
+#define BOOT_CODE_SIZE_2 0xAE00
+#define BOOT_CODE_FILENAME_2 "vmb.exe"
+#define BOOT_CODE_ARRAY_2 vax_vmb_exe
+#elif !defined BOOT_CODE_SIZE_3
+#define BOOT_CODE_SIZE_3 0xAE00
+#define BOOT_CODE_FILENAME_3 "vmb.exe"
+#define BOOT_CODE_ARRAY_3 vax_vmb_exe
+#elif !defined BOOT_CODE_SIZE_4
+#define BOOT_CODE_SIZE_4 0xAE00
+#define BOOT_CODE_FILENAME_4 "vmb.exe"
+#define BOOT_CODE_ARRAY_4 vax_vmb_exe
+#endif
 unsigned char vax_vmb_exe[] = {
 0xD4,0xEF,0x34,0x61,0x00,0x00,0x17,0xEF,0xB8,0x5D,0x00,0x00,0xC1,0xAB,0x38,0xAB,
 0x34,0x57,0xC0,0x8F,0x00,0x02,0x00,0x00,0x57,0xCA,0x8F,0xFF,0x01,0x00,0x00,0x57,

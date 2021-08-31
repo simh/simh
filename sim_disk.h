@@ -41,8 +41,7 @@ typedef uint32          t_lba;                          /* disk logical block ad
 
 /* Unit flags */
 
-#define DKUF_V_WLK      (UNIT_V_UF + 0)                 /* write locked */
-#define DKUF_V_FMT      (UNIT_V_UF + 1)                 /* disk file format */
+#define DKUF_V_FMT      (UNIT_V_UF + 0)                 /* disk file format */
 #define DKUF_W_FMT      2                               /* 2b of formats */
 #define DKUF_M_FMT      ((1u << DKUF_W_FMT) - 1)
 #define DKUF_F_AUTO      0                              /* Auto detect format format */
@@ -50,7 +49,7 @@ typedef uint32          t_lba;                          /* disk logical block ad
 #define DKUF_F_RAW       2                              /* Raw Physical Disk Access */
 #define DKUF_F_VHD       3                              /* VHD format */
 #define DKUF_V_UF       (DKUF_V_FMT + DKUF_W_FMT)
-#define DKUF_WLK        (1u << DKUF_V_WLK)
+#define DKUF_WLK        UNIT_WLK
 #define DKUF_FMT        (DKUF_M_FMT << DKUF_V_FMT)
 #define DKUF_WRP        (DKUF_WLK | UNIT_RO)
 
@@ -70,15 +69,16 @@ typedef void (*DISK_PCALLBACK)(UNIT *unit, t_stat status);
 
 t_stat sim_disk_attach (UNIT *uptr, 
                         const char *cptr, 
-                        size_t sector_size, size_t xfer_element_size, 
-                        t_bool dontchangecapac, 
-                        uint32 debugbit, 
-                        const char *drivetype, 
-                        uint32 pdp11_tracksize, 
-                        int completion_delay);
+                        size_t memory_sector_size,  /* memory footprint of sector data */
+                        size_t xfer_element_size, 
+                        t_bool dontchangecapac,     /* if false just change uptr->capac as needed */
+                        uint32 debugbit,            /* debug bit */
+                        const char *drivetype,      /* drive type */
+                        uint32 pdp11_tracksize,     /* BAD144 track */
+                        int completion_delay);      /* Minimum Delay for asynch I/O completion */
 t_stat sim_disk_attach_ex (UNIT *uptr, 
                            const char *cptr, 
-                           size_t sector_size, 
+                           size_t memory_sector_size,   /* memory footprint of sector data */
                            size_t xfer_element_size, 
                            t_bool dontchangecapac,      /* if false just change uptr->capac as needed */
                            uint32 dbit,                 /* debug bit */
@@ -94,6 +94,7 @@ t_stat sim_disk_rdsect_a (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectsread
 t_stat sim_disk_wrsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectswritten, t_seccnt sects);
 t_stat sim_disk_wrsect_a (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectswritten, t_seccnt sects, DISK_PCALLBACK callback);
 t_stat sim_disk_unload (UNIT *uptr);
+t_stat sim_disk_erase (UNIT *uptr);
 t_stat sim_disk_set_fmt (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat sim_disk_show_fmt (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat sim_disk_set_capac (UNIT *uptr, int32 val, CONST char *cptr, void *desc);

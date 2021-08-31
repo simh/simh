@@ -41,7 +41,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories="../3B2/;./;../;../slirp;../slirp_glue;../slirp_glue/qemu;../slirp_glue/qemu/win32/include;../../windows-build/include;;../../windows-build/include/SDL2"
-				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;SIM_BUILD_TOOL=simh-Visual-Studio-Project;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID;HAVE_PCRE_H;PCRE_STATIC;USE_INT64;USE_ADDR64;USE_SHARED;PTW32_STATIC_LIB;SIM_ASYNCH_IO;USE_READER_THREAD;HAVE_SLIRP_NETWORK;USE_SIMH_SLIRP_DEBUG"
+				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;SIM_BUILD_TOOL=simh-Visual-Studio-Project;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID;HAVE_PCRE_H;PCRE_STATIC;USE_INT64;USE_ADDR64;USE_SHARED;PTW32_STATIC_LIB;SIM_ASYNCH_IO;USE_READER_THREAD;HAVE_SLIRP_NETWORK;USE_SIMH_SLIRP_DEBUG;REV2"
 				KeepComments="false"
 				BasicRuntimeChecks="0"
 				RuntimeLibrary="1"
@@ -125,7 +125,7 @@
 				OmitFramePointers="true"
 				WholeProgramOptimization="true"
 				AdditionalIncludeDirectories="../3B2/;./;../;../slirp;../slirp_glue;../slirp_glue/qemu;../slirp_glue/qemu/win32/include;../../windows-build/include;;../../windows-build/include/SDL2"
-				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;SIM_BUILD_TOOL=simh-Visual-Studio-Project;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID;HAVE_PCRE_H;PCRE_STATIC;USE_INT64;USE_ADDR64;USE_SHARED;PTW32_STATIC_LIB;SIM_ASYNCH_IO;USE_READER_THREAD;HAVE_SLIRP_NETWORK;USE_SIMH_SLIRP_DEBUG"
+				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;SIM_BUILD_TOOL=simh-Visual-Studio-Project;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID;HAVE_PCRE_H;PCRE_STATIC;USE_INT64;USE_ADDR64;USE_SHARED;PTW32_STATIC_LIB;SIM_ASYNCH_IO;USE_READER_THREAD;HAVE_SLIRP_NETWORK;USE_SIMH_SLIRP_DEBUG;REV2"
 				StringPooling="true"
 				RuntimeLibrary="0"
 				EnableFunctionLevelLinking="true"
@@ -192,7 +192,7 @@
 			Filter="cpp;c;cxx;def;odl;idl;hpj;bat;asm"
 			>
 			<File
-				RelativePath="..\3B2\3b2_400_cpu.c"
+				RelativePath="..\3B2\3b2_cpu.c"
 				>
 			</File>
 			<File
@@ -220,11 +220,19 @@
 				>
 			</File>
 			<File
-				RelativePath="..\3B2\3b2_400_mau.c"
+				RelativePath="..\3B2\3b2_sys.c"
 				>
 			</File>
 			<File
-				RelativePath="..\3B2\3b2_400_mmu.c"
+				RelativePath="..\3B2\3b2_rev2_mau.c"
+				>
+			</File>
+			<File
+				RelativePath="..\3B2\3b2_rev2_mmu.c"
+				>
+			</File>
+			<File
+				RelativePath="..\3B2\3b2_mem.c"
 				>
 			</File>
 			<File
@@ -236,11 +244,19 @@
 				>
 			</File>
 			<File
-				RelativePath="..\3B2\3b2_400_sys.c"
+				RelativePath="..\3B2\3b2_rev2_sys.c"
 				>
 			</File>
 			<File
-				RelativePath="..\3B2\3b2_400_stddev.c"
+				RelativePath="..\3B2\3b2_rev2_csr.c"
+				>
+			</File>
+			<File
+				RelativePath="..\3B2\3b2_rev2_timer.c"
+				>
+			</File>
+			<File
+				RelativePath="..\3B2\3b2_stddev.c"
 				>
 			</File>
 			<File
@@ -480,7 +496,7 @@
 			Filter="h;hpp;hxx;hm;inl;inc"
 			>
 			<File
-				RelativePath="..\3B2\3b2_400_cpu.h"
+				RelativePath="..\3B2\3b2_cpu.h"
 				>
 			</File>
 			<File
@@ -492,7 +508,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\3B2\3b2_400_defs.h"
+				RelativePath="..\3B2\3b2_rev2_defs.h"
 				>
 			</File>
 			<File
@@ -516,11 +532,19 @@
 				>
 			</File>
 			<File
-				RelativePath="..\3B2\3b2_400_mau.h"
+				RelativePath="..\3B2\3b2_sys.h"
 				>
 			</File>
 			<File
-				RelativePath="..\3B2\3b2_400_mmu.h"
+				RelativePath="..\3B2\3b2_rev2_mau.h"
+				>
+			</File>
+			<File
+				RelativePath="..\3B2\3b2_rev2_mmu.h"
+				>
+			</File>
+			<File
+				RelativePath="..\3B2\3b2_mem.h"
 				>
 			</File>
 			<File
@@ -532,11 +556,19 @@
 				>
 			</File>
 			<File
-				RelativePath="..\3B2\3b2_400_sys.h"
+				RelativePath="..\3B2\3b2_rev2_sys.h"
 				>
 			</File>
 			<File
-				RelativePath="..\3B2\3b2_400_stddev.h"
+				RelativePath="..\3B2\3b2_rev2_csr.h"
+				>
+			</File>
+			<File
+				RelativePath="..\3B2\3b2_rev2_timer.h"
+				>
+			</File>
+			<File
+				RelativePath="..\3B2\3b2_stddev.h"
 				>
 			</File>
 			<File

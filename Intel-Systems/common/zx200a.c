@@ -139,8 +139,6 @@
 
 #include "system_defs.h"                /* system header in system dir */
 
-#if defined (ZX200A_NUM) && (ZX200A_NUM > 0)
-
 #define UNIT_V_WPMODE   (UNIT_V_UF)     /* Write protect */
 #define UNIT_WPMODE     (1 << UNIT_V_WPMODE)
 
@@ -200,8 +198,8 @@ extern uint16    PCX;
 
 /* external function prototypes */
 
-extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
-extern uint8 unreg_dev(uint8);
+extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint16, uint16, uint8);
+extern uint8 unreg_dev(uint16);
 extern uint8 get_mbyte(uint16 addr);
 extern void put_mbyte(uint16 addr, uint8 val);
 
@@ -228,10 +226,10 @@ void zx200a_diskio(void);
 /* globals */
 
 int zx200a_onetime = 1;
-
 static const char* zx200a_desc(DEVICE *dptr) {
     return zx200a_NAME;
 }
+
 typedef    struct    {                  //FDD definition
     uint8   sec;
     uint8   cyl;
@@ -258,12 +256,12 @@ FDCDEF    zx200a;
 /* ZX-200A Standard I/O Data Structures */
 
 UNIT zx200a_unit[] = {
-    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE+UNIT_BUFABLE+UNIT_MUSTBUF+UNIT_FIX, MDSDD) }, 
-    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE+UNIT_BUFABLE+UNIT_MUSTBUF+UNIT_FIX, MDSDD) }, 
-    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE+UNIT_BUFABLE+UNIT_MUSTBUF+UNIT_FIX, MDSDD) }, 
-    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE+UNIT_BUFABLE+UNIT_MUSTBUF+UNIT_FIX, MDSDD) }, 
-    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE+UNIT_BUFABLE+UNIT_MUSTBUF+UNIT_FIX, MDSSD) }, 
-    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE+UNIT_BUFABLE+UNIT_MUSTBUF+UNIT_FIX, MDSSD) }, 
+    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+UNIT_RO+UNIT_BUFABLE+UNIT_MUSTBUF+UNIT_FIX, MDSDD) }, 
+    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+UNIT_RO+UNIT_BUFABLE+UNIT_MUSTBUF+UNIT_FIX, MDSDD) }, 
+    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+UNIT_RO+UNIT_BUFABLE+UNIT_MUSTBUF+UNIT_FIX, MDSDD) }, 
+    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+UNIT_RO+UNIT_BUFABLE+UNIT_MUSTBUF+UNIT_FIX, MDSDD) }, 
+    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+UNIT_RO+UNIT_BUFABLE+UNIT_MUSTBUF+UNIT_FIX, MDSSD) }, 
+    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+UNIT_RO+UNIT_BUFABLE+UNIT_MUSTBUF+UNIT_FIX, MDSSD) }, 
     { NULL }
 };
 
@@ -323,7 +321,7 @@ DEVICE zx200a_dev = {
     &zx200a_attach,     //attach  
     NULL,               //detach
     NULL,               //ctxt
-    DEV_DISABLE+DEV_DIS, //flags 
+    DEV_DEBUG+DEV_DISABLE+DEV_DIS, //flags 
     0,                  //dctrl 
     zx200a_debug,       //debflags
     NULL,               //msize
@@ -345,18 +343,14 @@ t_stat zx200a_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
     if (val & UNIT_WPMODE) {            /* write protect */
         uptr->flags |= val;
         if (zx200a.verb)
-            sim_printf("    sbc202: WP\n");
+            sim_printf("    ZX200A: WP\n");
     } else {                            /* read write */
         uptr->flags &= ~val;
         if (zx200a.verb)
-            sim_printf("    sbc202: RW\n");
+            sim_printf("    ZX200A: RW\n");
     }
     return SCPE_OK;
 }
-
-/*  I/O instruction handlers, called from the CPU module when an
-    IN or OUT instruction is issued.
-*/
 
 /* Service routines to handle simulator functions */
 
@@ -371,7 +365,7 @@ t_stat zx200a_set_port(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
     result = sscanf(cptr, "%02x", &size);
     zx200a.baseport = size;
     if (zx200a.verb)
-        sim_printf("SBC202: Base port=%04X\n", zx200a.baseport);
+        sim_printf("ZX200A: Base port=%04X\n", zx200a.baseport);
     return SCPE_OK;
 }
 
@@ -386,7 +380,7 @@ t_stat zx200a_set_int(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
     result = sscanf(cptr, "%02x", &size);
     zx200a.intnum = size;
     if (zx200a.verb)
-        sim_printf("SBC202: Interrupt number=%04X\n", zx200a.intnum);
+        sim_printf("ZX200A: Interrupt number=%04X\n", zx200a.intnum);
     return SCPE_OK;
 }
 
@@ -402,7 +396,7 @@ t_stat zx200a_set_verb(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
     }
     if (strncasecmp(cptr, "ON", 3) == 0) {
         zx200a.verb = 1;
-        sim_printf("   SBC202: zx200a.verb=%d\n", zx200a.verb);
+        sim_printf("   ZX200A: zx200a.verb=%d\n", zx200a.verb);
         return SCPE_OK;
     }
     return SCPE_ARG;
@@ -422,6 +416,10 @@ t_stat zx200a_show_param (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
     return SCPE_OK;
 }
 
+/*  I/O instruction handlers, called from the CPU module when an
+    IN or OUT instruction is issued.
+*/
+
 /* Hardware reset routine */
 
 t_stat zx200a_reset(DEVICE *dptr)
@@ -432,8 +430,8 @@ t_stat zx200a_reset(DEVICE *dptr)
     if (dptr == NULL)
         return SCPE_ARG;
     if (zx200a_onetime) {
-        zx200a.baseport = SBC202_BASE;  //set default base
-        zx200a.intnum = SBC202_INT;     //set default interrupt
+        zx200a.baseport = ZX200A_BASE;  //set default base
+        zx200a.intnum = ZX200A_INT;     //set default interrupt
         zx200a.verb = 0;                //set verb = 0
         zx200a_onetime = 0;
         // one-time initialization for all FDDs for this FDC instance
@@ -443,18 +441,18 @@ t_stat zx200a_reset(DEVICE *dptr)
         }
     }
     if ((dptr->flags & DEV_DIS) == 0) { // enabled
-        reg_dev(zx200ar0DD, zx200a.baseport, 0); //read status
-        reg_dev(zx200ar0DD, zx200a.baseport + 1, 0); //read rslt type/write IOPB addr-l
-        reg_dev(zx200ar0DD, zx200a.baseport + 2, 0); //write IOPB addr-h and start 
-        reg_dev(zx200ar3, zx200a.baseport + 3, 0); //read rstl byte 
-        reg_dev(zx200ar7, zx200a.baseport + 7, 0); //write reset fdc201
-        reg_dev(zx200ar0SD, zx200a.baseport + 16, 0);  //read status
-        reg_dev(zx200ar1SD, zx200a.baseport + 17, 0); //read rslt type/write IOPB addr-l
-        reg_dev(zx200ar2SD, zx200a.baseport + 18, 0); //write IOPB addr-h and start 
-        reg_dev(zx200ar3, zx200a.baseport + 19, 0); //read rstl byte 
-        reg_dev(zx200ar7, zx200a.baseport + 23, 0); //write reset zx200a
+        reg_dev(zx200ar0DD, zx200a.baseport, 0, 0); //read status
+        reg_dev(zx200ar0DD, zx200a.baseport + 1, 0, 0); //read rslt type/write IOPB addr-l
+        reg_dev(zx200ar0DD, zx200a.baseport + 2, 0, 0); //write IOPB addr-h and start 
+        reg_dev(zx200ar3, zx200a.baseport + 3, 0, 0); //read rstl byte 
+        reg_dev(zx200ar7, zx200a.baseport + 7, 0, 0); //write reset fdc201
+        reg_dev(zx200ar0SD, zx200a.baseport + 16, 0, 0);  //read status
+        reg_dev(zx200ar1SD, zx200a.baseport + 17, 0, 0); //read rslt type/write IOPB addr-l
+        reg_dev(zx200ar2SD, zx200a.baseport + 18, 0, 0); //write IOPB addr-h and start 
+        reg_dev(zx200ar3, zx200a.baseport + 19, 0, 0); //read rstl byte 
+        reg_dev(zx200ar7, zx200a.baseport + 23, 0, 0); //write reset zx200a
         zx200a_reset_dev(); //software reset
-        if (zx200a.verb)
+//        if (zx200a.verb)
             sim_printf("    ZX200A: Enabled base port at 0%02XH  Interrupt #=%02X  %s\n",
             zx200a.baseport, zx200a.intnum, zx200a.verb ? "Verbose" : "Quiet" );
     } else {
@@ -468,7 +466,7 @@ t_stat zx200a_reset(DEVICE *dptr)
         unreg_dev(zx200a.baseport + 18);    //write IOPB addr-h and start 
         unreg_dev(zx200a.baseport + 19);    //read rstl byte 
         unreg_dev(zx200a.baseport + 23);    //write reset fdc201
-        if (zx200a.verb)
+//        if (zx200a.verb)
             sim_printf("    ZX200A: Disabled\n");
     }
     return SCPE_OK;
@@ -895,7 +893,5 @@ void zx200a_diskio(void)
             break;
     }
 }
-
-#endif /* ZX200A_NUM > 0 */
 
 /* end of zx-200a.c */

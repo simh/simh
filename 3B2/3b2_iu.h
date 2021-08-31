@@ -31,8 +31,7 @@
 #ifndef __3B2_IU_H__
 #define __3B2_IU_H__
 
-#include "sim_defs.h"
-#include "sim_tmxr.h"
+#include "3b2_defs.h"
 
 #define CMD_ERX         0x01              /* Enable receiver */
 #define CMD_DRX         0x02              /* Disable receiver */
@@ -206,5 +205,10 @@ void iu_dma_console(uint8 channel, uint32 service_address);
 void iu_dma_contty(uint8 channel, uint32 service_address);
 void increment_modep_a();
 void increment_modep_b();
+
+extern IU_PORT iu_console;
+extern IU_PORT iu_contty;
+extern t_bool iu_increment_a;
+extern t_bool iu_increment_b;
 
 #endif

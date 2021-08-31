@@ -298,7 +298,6 @@ int32 isenable = 0, dsenable = 0;                       /* i, d space flags */
 int32 stop_trap = 1;                                    /* stop on trap */
 int32 stop_vecabort = 1;                                /* stop on vec abort */
 int32 stop_spabort = 1;                                 /* stop on SP abort */
-int32 wait_enable = 0;                                  /* wait state enable */
 int32 autcon_enb = 1;                                   /* autoconfig enable */
 uint32 cpu_model = INIMODEL;                            /* CPU model */
 uint32 cpu_type = 1u << INIMODEL;                       /* model as bit mask */
@@ -326,10 +325,13 @@ extern CPUTAB cpu_tab[];
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
+t_stat cpu_boot (int32 unitno, DEVICE *dptr);
 t_bool cpu_is_pc_a_subroutine_call (t_addr **ret_addrs);
 t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat cpu_show_virt (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat cpu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *cpu_description (DEVICE *dptr);
 int32 GeteaB (int32 spec);
 int32 GeteaW (int32 spec);
 int32 relocR (int32 addr);
@@ -451,8 +453,8 @@ REG cpu_reg[] = {
     { FLDATAD (Z, PSW, PSW_V_Z,             "Condition Code: Zero") },
     { FLDATAD (V, PSW, PSW_V_V,             "Condition Code: Overflow") },
     { FLDATAD (C, PSW, PSW_V_C,             "Condition Code: Carry") },
-    { ORDATAD (PIRQ, PIRQ, 16,              "Programmed Interrupt Request") },
-    { ORDATAD (STKLIM, STKLIM, 16,          "Stack Limit") },
+    { ORDATAD (PIRQ, PIRQ, 16,              "programmed interrupt requests") },
+    { ORDATAD (STKLIM, STKLIM, 16,          "stack limit") },
     { ORDATAD (FAC0H, FR[0].h, 32,          "Floating Point: R0 High") },
     { ORDATAD (FAC0L, FR[0].l, 32,          "Floating Point: R0 Low") },
     { ORDATAD (FAC1H, FR[1].h, 32,          "Floating Point: R1 High") },
@@ -465,9 +467,9 @@ REG cpu_reg[] = {
     { ORDATAD (FAC4L, FR[4].l, 32,          "Floating Point: R4 Low") },
     { ORDATAD (FAC5H, FR[5].h, 32,          "Floating Point: R5 High") },
     { ORDATAD (FAC5L, FR[5].l, 32,          "Floating Point: R5 Low") },
-    { ORDATAD (FPS, FPS, 16,                "FP Status") },
-    { ORDATAD (FEA, FEA, 16,                "FP Exception Code") },
-    { ORDATAD (FEC, FEC, 4,                 "FP Exception Address") },
+    { ORDATAD (FPS, FPS, 16,                "floating point status") },
+    { ORDATAD (FEA, FEA, 16,                "floating exception address") },
+    { ORDATAD (FEC, FEC, 4,                 "floating exception code") },
     { ORDATAD (MMR0, MMR0, 16,              "MMR0 - Status") },
     { ORDATAD (MMR1, MMR1, 16,              "MMR1 - R+/-R") },
     { ORDATAD (MMR2, MMR2, 16,              "MMR2 - saved PC") },
@@ -568,17 +570,16 @@ REG cpu_reg[] = {
     { GRDATA (UDPDR6, APRFILE[076], 8, 16, 0) },
     { GRDATA (UDPAR7, APRFILE[077], 8, 16, 16) },
     { GRDATA (UDPDR7, APRFILE[077], 8, 16, 0) },
-    { BRDATAD (IREQ, int_req, 8, 32, IPL_HLVL, "Interrupt Requests"), REG_RO },
-    { ORDATAD (TRAPS, trap_req, TRAP_V_MAX, "Trap Requests") },
-    { FLDATAD (WAIT, wait_state, 0,         "Wait State") },
-    { FLDATA (WAIT_ENABLE, wait_enable, 0), REG_HIDDEN },
-    { ORDATAD (STOP_TRAPS, stop_trap, TRAP_V_MAX, "Stop on Trap") },
-    { FLDATAD (STOP_VECA, stop_vecabort, 0, "Stop on Vec Abort") },
-    { FLDATAD (STOP_SPA, stop_spabort, 0,   "Stop on SP Abort") },
+    { BRDATAD (IREQ, int_req, 8, 32, IPL_HLVL, "interrupt pending flags, IPL 0 to 7"), REG_RO },
+    { ORDATAD (TRAPS, trap_req, TRAP_V_MAX, "trap pending flags") },
+    { FLDATAD (WAIT, wait_state, 0,         "wait state enable flag") },
+    { ORDATAD (STOP_TRAPS, stop_trap, TRAP_V_MAX, "stop on trap flags") },
+    { FLDATAD (STOP_VECA, stop_vecabort, 0, "stop on read abort in trap or interrupt") },
+    { FLDATAD (STOP_SPA, stop_spabort, 0,   "stop on stack abort in trap or interrupt") },
     { FLDATA (AUTOCON, autcon_enb, 0), REG_HRO },
-    { BRDATA (PCQ, pcq, 8, 16, PCQ_SIZE), REG_RO+REG_CIRC },
+    { BRDATAD (PCQ, pcq, 8, 16, PCQ_SIZE, "PC prior to last jump, branch, or interrupt; Most recent PC change first"), REG_RO+REG_CIRC },
     { ORDATA (PCQP, pcq_p, 6), REG_HRO },
-    { ORDATA (WRU, sim_int_char, 8) },
+    { ORDATAD (WRU, sim_int_char, 8, "interrupt character") },
     { ORDATA (MODEL, cpu_model, 16), REG_HRO },
     { ORDATA (OPTIONS, cpu_opt, 32), REG_HRO },
     { NULL}
@@ -588,82 +589,82 @@ MTAB cpu_mod[] = {
     { MTAB_XTD|MTAB_VDV, 0, "TYPE", NULL,
       NULL, &cpu_show_model },
 #if !defined (UC15)
-    { MTAB_XTD|MTAB_VDV, MOD_1103, NULL, "11/03", &cpu_set_model },
-    { MTAB_XTD|MTAB_VDV, MOD_1104, NULL, "11/04", &cpu_set_model },
-    { MTAB_XTD|MTAB_VDV, MOD_1105, NULL, "11/05", &cpu_set_model },
-    { MTAB_XTD|MTAB_VDV, MOD_1120, NULL, "11/20", &cpu_set_model },
-    { MTAB_XTD|MTAB_VDV, MOD_1123, NULL, "11/23", &cpu_set_model },
-    { MTAB_XTD|MTAB_VDV, MOD_1123P, NULL, "11/23+", &cpu_set_model },
-    { MTAB_XTD|MTAB_VDV, MOD_1124, NULL, "11/24", &cpu_set_model },
-    { MTAB_XTD|MTAB_VDV, MOD_1134, NULL, "11/34", &cpu_set_model },
-    { MTAB_XTD|MTAB_VDV, MOD_1140, NULL, "11/40", &cpu_set_model },
-    { MTAB_XTD|MTAB_VDV, MOD_1144, NULL, "11/44", &cpu_set_model },
-    { MTAB_XTD|MTAB_VDV, MOD_1145, NULL, "11/45", &cpu_set_model },
-    { MTAB_XTD|MTAB_VDV, MOD_1153, NULL, "11/53", &cpu_set_model },
-    { MTAB_XTD|MTAB_VDV, MOD_1160, NULL, "11/60", &cpu_set_model },
-    { MTAB_XTD|MTAB_VDV, MOD_1170, NULL, "11/70", &cpu_set_model },
-    { MTAB_XTD|MTAB_VDV, MOD_1173, NULL, "11/73", &cpu_set_model },
-    { MTAB_XTD|MTAB_VDV, MOD_1173B, NULL, "11/73B", &cpu_set_model },
-    { MTAB_XTD|MTAB_VDV, MOD_1183, NULL, "11/83", &cpu_set_model },
-    { MTAB_XTD|MTAB_VDV, MOD_1184, NULL, "11/84", &cpu_set_model },
-    { MTAB_XTD|MTAB_VDV, MOD_1193, NULL, "11/93", &cpu_set_model },
-    { MTAB_XTD|MTAB_VDV, MOD_1194, NULL, "11/94", &cpu_set_model },
-    { MTAB_XTD|MTAB_VDV, MOD_1173, NULL, "Q22", &cpu_set_model },
-    { MTAB_XTD|MTAB_VDV, MOD_1184, NULL, "URH11", &cpu_set_model },
-    { MTAB_XTD|MTAB_VDV, MOD_1170, NULL, "URH70", &cpu_set_model },
-    { MTAB_XTD|MTAB_VDV, MOD_1145, NULL, "U18", &cpu_set_model },
-    { MTAB_XTD|MTAB_VDV, OPT_EIS, NULL, "EIS", &cpu_set_opt },
-    { MTAB_XTD|MTAB_VDV, OPT_EIS, NULL, "NOEIS", &cpu_clr_opt },
-    { MTAB_XTD|MTAB_VDV, OPT_FIS, NULL, "FIS", &cpu_set_opt },
-    { MTAB_XTD|MTAB_VDV, OPT_FIS, NULL, "NOFIS", &cpu_clr_opt },
-    { MTAB_XTD|MTAB_VDV, OPT_FPP, NULL, "FPP", &cpu_set_opt },
-    { MTAB_XTD|MTAB_VDV, OPT_FPP, NULL, "NOFPP", &cpu_clr_opt },
-    { MTAB_XTD|MTAB_VDV, OPT_CIS, NULL, "CIS", &cpu_set_opt },
-    { MTAB_XTD|MTAB_VDV, OPT_CIS, NULL, "NOCIS", &cpu_clr_opt },
-    { MTAB_XTD|MTAB_VDV, OPT_MMU, NULL, "MMU", &cpu_set_opt },
-    { MTAB_XTD|MTAB_VDV, OPT_MMU, NULL, "NOMMU", &cpu_clr_opt },
+    { MTAB_XTD|MTAB_VDV, MOD_1103, NULL, "11/03", &cpu_set_model, NULL, NULL, "Set CPU type to 11/03" },
+    { MTAB_XTD|MTAB_VDV, MOD_1104, NULL, "11/04", &cpu_set_model, NULL, NULL, "Set CPU type to 11/04" },
+    { MTAB_XTD|MTAB_VDV, MOD_1105, NULL, "11/05", &cpu_set_model, NULL, NULL, "Set CPU type to 11/05" },
+    { MTAB_XTD|MTAB_VDV, MOD_1120, NULL, "11/20", &cpu_set_model, NULL, NULL, "Set CPU type to 11/20" },
+    { MTAB_XTD|MTAB_VDV, MOD_1123, NULL, "11/23", &cpu_set_model, NULL, NULL, "Set CPU type to 11/23" },
+    { MTAB_XTD|MTAB_VDV, MOD_1123P, NULL, "11/23+", &cpu_set_model, NULL, NULL, "Set CPU type to 11/23+" },
+    { MTAB_XTD|MTAB_VDV, MOD_1124, NULL, "11/24", &cpu_set_model, NULL, NULL, "Set CPU type to 11/24" },
+    { MTAB_XTD|MTAB_VDV, MOD_1134, NULL, "11/34", &cpu_set_model, NULL, NULL, "Set CPU type to 11/34" },
+    { MTAB_XTD|MTAB_VDV, MOD_1140, NULL, "11/40", &cpu_set_model, NULL, NULL, "Set CPU type to 11/40" },
+    { MTAB_XTD|MTAB_VDV, MOD_1144, NULL, "11/44", &cpu_set_model, NULL, NULL, "Set CPU type to 11/44" },
+    { MTAB_XTD|MTAB_VDV, MOD_1145, NULL, "11/45", &cpu_set_model, NULL, NULL, "Set CPU type to 11/45" },
+    { MTAB_XTD|MTAB_VDV, MOD_1153, NULL, "11/53", &cpu_set_model, NULL, NULL, "Set CPU type to 11/53" },
+    { MTAB_XTD|MTAB_VDV, MOD_1160, NULL, "11/60", &cpu_set_model, NULL, NULL, "Set CPU type to 11/60" },
+    { MTAB_XTD|MTAB_VDV, MOD_1170, NULL, "11/70", &cpu_set_model, NULL, NULL, "Set CPU type to 11/70" },
+    { MTAB_XTD|MTAB_VDV, MOD_1173, NULL, "11/73", &cpu_set_model, NULL, NULL, "Set CPU type to 11/73" },
+    { MTAB_XTD|MTAB_VDV, MOD_1173B, NULL, "11/73B", &cpu_set_model, NULL, NULL, "Set CPU type to 11/73B" },
+    { MTAB_XTD|MTAB_VDV, MOD_1183, NULL, "11/83", &cpu_set_model, NULL, NULL, "Set CPU type to 11/83" },
+    { MTAB_XTD|MTAB_VDV, MOD_1184, NULL, "11/84", &cpu_set_model, NULL, NULL, "Set CPU type to 11/84" },
+    { MTAB_XTD|MTAB_VDV, MOD_1193, NULL, "11/93", &cpu_set_model, NULL, NULL, "Set CPU type to 11/93" },
+    { MTAB_XTD|MTAB_VDV, MOD_1194, NULL, "11/94", &cpu_set_model, NULL, NULL, "Set CPU type to 11/94" },
+    { MTAB_XTD|MTAB_VDV, MOD_1173, NULL, "Q22", &cpu_set_model, NULL, NULL, "deprecated: same as 11/73" },
+    { MTAB_XTD|MTAB_VDV, MOD_1184, NULL, "URH11", &cpu_set_model, NULL, NULL, "deprecated: same as 11/84" },
+    { MTAB_XTD|MTAB_VDV, MOD_1170, NULL, "URH70", &cpu_set_model, NULL, NULL, "deprecated: same as 11/70" },
+    { MTAB_XTD|MTAB_VDV, MOD_1145, NULL, "U18", &cpu_set_model, NULL, NULL, "deprecated: same as 11/45" },
+    { MTAB_XTD|MTAB_VDV, OPT_EIS, NULL, "EIS", &cpu_set_opt, NULL, NULL, "enable EIS instructions" },
+    { MTAB_XTD|MTAB_VDV, OPT_EIS, NULL, "NOEIS", &cpu_clr_opt, NULL, NULL, "disable EIS instructions" },
+    { MTAB_XTD|MTAB_VDV, OPT_FIS, NULL, "FIS", &cpu_set_opt, NULL, NULL, "enable FIS instructions" },
+    { MTAB_XTD|MTAB_VDV, OPT_FIS, NULL, "NOFIS", &cpu_clr_opt, NULL, NULL, "disable FIS instructions" },
+    { MTAB_XTD|MTAB_VDV, OPT_FPP, NULL, "FPP", &cpu_set_opt, NULL, NULL, "enable FPP instructions" },
+    { MTAB_XTD|MTAB_VDV, OPT_FPP, NULL, "NOFPP", &cpu_clr_opt, NULL, NULL, "disable FPP instructions" },
+    { MTAB_XTD|MTAB_VDV, OPT_CIS, NULL, "CIS", &cpu_set_opt, NULL, NULL, "enable CIS instructions" },
+    { MTAB_XTD|MTAB_VDV, OPT_CIS, NULL, "NOCIS", &cpu_clr_opt, NULL, NULL, "disable CIS instructions" },
+    { MTAB_XTD|MTAB_VDV, OPT_MMU, NULL, "MMU", &cpu_set_opt, NULL, NULL, "enable MMU functionality" },
+    { MTAB_XTD|MTAB_VDV, OPT_MMU, NULL, "NOMMU", &cpu_clr_opt, NULL, NULL, "disable MMU functionality" },
     { MTAB_XTD|MTAB_VDV, OPT_BVT, NULL, "BEVENT", &cpu_set_opt, NULL, NULL, "Enable BEVENT line (11/03, 11/23 only)" },
     { MTAB_XTD|MTAB_VDV, OPT_BVT, NULL, "NOBEVENT", &cpu_clr_opt, NULL, NULL, "Disable BEVENT line (11/03, 11/23 only)" },
-    { UNIT_MSIZE, 8192, NULL, "8K", &cpu_set_size},
-    { UNIT_MSIZE, 16384, NULL, "16K", &cpu_set_size},
-    { UNIT_MSIZE, 24576, NULL, "24K", &cpu_set_size},
-    { UNIT_MSIZE, 32768, NULL, "32K", &cpu_set_size},
-    { UNIT_MSIZE, 40960, NULL, "40K", &cpu_set_size},
-    { UNIT_MSIZE, 49152, NULL, "48K", &cpu_set_size},
-    { UNIT_MSIZE, 57344, NULL, "56K", &cpu_set_size},
-    { UNIT_MSIZE, 65536, NULL, "64K", &cpu_set_size},
-    { UNIT_MSIZE, 98304, NULL, "96K", &cpu_set_size},
-    { UNIT_MSIZE, 131072, NULL, "128K", &cpu_set_size},
-    { UNIT_MSIZE, 196608, NULL, "192K", &cpu_set_size},
-    { UNIT_MSIZE, 262144, NULL, "256K", &cpu_set_size},
-    { UNIT_MSIZE, 393216, NULL, "384K", &cpu_set_size},
-    { UNIT_MSIZE, 524288, NULL, "512K", &cpu_set_size},
-    { UNIT_MSIZE, 786432, NULL, "768K", &cpu_set_size},
-    { UNIT_MSIZE, 1048576, NULL, "1024K", &cpu_set_size},
-    { UNIT_MSIZE, 1572864, NULL, "1536K", &cpu_set_size},
-    { UNIT_MSIZE, 2097152, NULL, "2048K", &cpu_set_size},
-    { UNIT_MSIZE, 3145728, NULL, "3072K", &cpu_set_size},
-    { UNIT_MSIZE, 4186112, NULL, "4096K", &cpu_set_size},
-    { UNIT_MSIZE, 1048576, NULL, "1M", &cpu_set_size},
-    { UNIT_MSIZE, 2097152, NULL, "2M", &cpu_set_size},
-    { UNIT_MSIZE, 3145728, NULL, "3M", &cpu_set_size},
-    { UNIT_MSIZE, 4186112, NULL, "4M", &cpu_set_size},
+    { UNIT_MSIZE, 8192, NULL, "8K", &cpu_set_size, NULL, NULL, "Set memory size to 8Kb"},
+    { UNIT_MSIZE, 16384, NULL, "16K", &cpu_set_size, NULL, NULL, "Set memory size to 16Kb"},
+    { UNIT_MSIZE, 24576, NULL, "24K", &cpu_set_size, NULL, NULL, "Set memory size to 24Kb"},
+    { UNIT_MSIZE, 32768, NULL, "32K", &cpu_set_size, NULL, NULL, "Set memory size to 32Kb"},
+    { UNIT_MSIZE, 40960, NULL, "40K", &cpu_set_size, NULL, NULL, "Set memory size to 40Kb"},
+    { UNIT_MSIZE, 49152, NULL, "48K", &cpu_set_size, NULL, NULL, "Set memory size to 48Kb"},
+    { UNIT_MSIZE, 57344, NULL, "56K", &cpu_set_size, NULL, NULL, "Set memory size to 56Kb"},
+    { UNIT_MSIZE, 65536, NULL, "64K", &cpu_set_size, NULL, NULL, "Set memory size to 64Kb"},
+    { UNIT_MSIZE, 98304, NULL, "96K", &cpu_set_size, NULL, NULL, "Set memory size to 96Kb"},
+    { UNIT_MSIZE, 131072, NULL, "128K", &cpu_set_size, NULL, NULL, "Set memory size to 128Kb"},
+    { UNIT_MSIZE, 196608, NULL, "192K", &cpu_set_size, NULL, NULL, "Set memory size to 192Kb"},
+    { UNIT_MSIZE, 262144, NULL, "256K", &cpu_set_size, NULL, NULL, "Set memory size to 256Kb"},
+    { UNIT_MSIZE, 393216, NULL, "384K", &cpu_set_size, NULL, NULL, "Set memory size to 384Kb"},
+    { UNIT_MSIZE, 524288, NULL, "512K", &cpu_set_size, NULL, NULL, "Set memory size to 512Kb"},
+    { UNIT_MSIZE, 786432, NULL, "768K", &cpu_set_size, NULL, NULL, "Set memory size to 768Kb"},
+    { UNIT_MSIZE, 1048576, NULL, "1024K", &cpu_set_size, NULL, NULL, "Set memory size to 1Mb"},
+    { UNIT_MSIZE, 1572864, NULL, "1536K", &cpu_set_size, NULL, NULL, "Set memory size to 1536Kb"},
+    { UNIT_MSIZE, 2097152, NULL, "2048K", &cpu_set_size, NULL, NULL, "Set memory size to 2Mb"},
+    { UNIT_MSIZE, 3145728, NULL, "3072K", &cpu_set_size, NULL, NULL, "Set memory size to 3Mb"},
+    { UNIT_MSIZE, 4186112, NULL, "4096K", &cpu_set_size, NULL, NULL, "Set memory size to 4Mb"},
+    { UNIT_MSIZE, 1048576, NULL, "1M", &cpu_set_size, NULL, NULL, "Set memory size to 1Mb"},
+    { UNIT_MSIZE, 2097152, NULL, "2M", &cpu_set_size, NULL, NULL, "Set memory size to 2Mb"},
+    { UNIT_MSIZE, 3145728, NULL, "3M", &cpu_set_size, NULL, NULL, "Set memory size to 3Mb"},
+    { UNIT_MSIZE, 4186112, NULL, "4M", &cpu_set_size, NULL, NULL, "Set memory size to 4Mb"},
     { MTAB_XTD|MTAB_VDV, 1, "AUTOCONFIG", "AUTOCONFIG",
-      &set_autocon, &show_autocon },
+      &set_autocon, &show_autocon, NULL, "Enable/Display Auto Configuration" },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "NOAUTOCONFIG",
-      &set_autocon, NULL },
+      &set_autocon, NULL, NULL, "Disable Auto Configuration" },
 #else
-    { UNIT_MSIZE, 16384, NULL, "16K", &cpu_set_size},
-    { UNIT_MSIZE, 24576, NULL, "24K", &cpu_set_size},
+    { UNIT_MSIZE, 16384, NULL, "16K", &cpu_set_size, NULL, NULL, "Set memory size to 16Kb"},
+    { UNIT_MSIZE, 24576, NULL, "24K", &cpu_set_size, NULL, NULL, "Set memory size to 24Kb"},
 #endif
     { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "IOSPACE", NULL,
-      NULL, &show_iospace },
-    { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE", &sim_set_idle, &sim_show_idle },
-    { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL },
-    { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "HISTORY", "HISTORY",
-      &cpu_set_hist, &cpu_show_hist },
+      NULL, &show_iospace, NULL, "Show I/O space address assignments" },
+    { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE", &sim_set_idle, &sim_show_idle, NULL, "Enable/Display idle detection" },
+    { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL, NULL, "Disable idle detection" },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP|MTAB_NC, 0, "HISTORY", "HISTORY=n",
+      &cpu_set_hist, &cpu_show_hist, NULL, "Enable/Display instruction history" },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "VIRTUAL", NULL,
-      NULL, &cpu_show_virt },
+      NULL, &cpu_show_virt, NULL, "Display address translation" },
     { 0 }
     };
 
@@ -681,10 +682,10 @@ DEVICE cpu_dev = {
     "CPU", &cpu_unit, cpu_reg, cpu_mod,
     1, 8, 22, 2, 8, 16,
     &cpu_ex, &cpu_dep, &cpu_reset,
-    NULL, NULL, NULL,
+    &cpu_boot, NULL, NULL,
     NULL, DEV_DYNM, 0,
     NULL, &cpu_set_size, NULL,
-    NULL, NULL, NULL, NULL,
+    &cpu_help, NULL, NULL, &cpu_description,
     cpu_breakpoints
     };
 
@@ -3348,6 +3349,45 @@ static const char *pdp11_clock_precalibrate_commands[] = {
     "PC 100",
     NULL};
 
+/* Special boot command - linked into SCP by initial reset
+
+   Syntax: BOOT {CPU}
+
+*/
+
+t_stat pdp11_boot (int32 flag, CONST char *ptr)
+{
+char gbuf[CBUFSIZE];
+
+if ((ptr = get_sim_sw (ptr)) == NULL)               /* get switches */
+    return SCPE_INVSW;
+get_glyph (ptr, gbuf, 0);                           /* get glyph */
+if (gbuf[0] && strcmp (gbuf, "CPU"))
+    return run_cmd (flag, gbuf);                    /* use specified device/unit */
+return run_cmd (flag, "CPU");
+}
+
+
+/* Special boot command, overrides regular boot */
+
+CTAB pdp11_cmd[] = {
+    { "BOOT", &pdp11_boot, RU_BOOT,
+      "bo{ot} {unit}            boot simulator\n", NULL, &run_cmd_message },
+    { NULL }
+    };
+
+
+t_stat cpu_boot (int32 unitno, DEVICE *dptr)
+{
+DEVICE *rom = find_dev ("ROM");
+
+if ((rom == NULL) || 
+    ((rom->flags & DEV_DIS) != 0) ||
+    (SCPE_NOFNC == rom->boot (unitno, rom)))
+    return SCPE_2FARG;
+return SCPE_OK;
+}
+
 /* Reset routine */
 
 t_stat cpu_reset (DEVICE *dptr)
@@ -3384,6 +3424,7 @@ if (pcq_r)
 else
     return SCPE_IERR;
 set_r_display (0, MD_KER);
+sim_vm_cmd = pdp11_cmd;
 return build_dib_tab ();            /* build, chk dib_tab */
 }
 
@@ -3607,5 +3648,146 @@ if (cptr) {
         }
     }
 fprintf (of, "Invalid argument\n");
+return SCPE_OK;
+}
+
+const char *cpu_description (DEVICE *dptr)
+{
+return "PDP-11 CPU";
+}
+
+t_stat cpu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+{
+int i;
+
+fprintf (st, "The %s (%s) device help\n\n", dptr->description (dptr), dptr->name);
+fprintf (st, "The CPU options include CPU type, CPU instruction set options for the\n");
+fprintf (st, "specified type, and the size of main memory.\n\n");
+fprint_set_help (st, dptr);
+fprintf (st, "\n");
+fprintf (st, "The CPU types and their capabilities are shown in the following table:\n\n");
+fprintf (st, "    cpu         max           Unibus\n");
+fprintf (st, "    type   bus  mem     MMU?  map?   EIS?  FIS?  FPP?  CIS?  BEVENT?\n");
+fprintf (st, "    ================================================================\n");
+#define _OPT(OPT) ((cpu->std & OPT) ? ((cpu->opt & OPT) ? "opt" : "std") : ((cpu->opt & OPT) ? "opt" : "no"))
+for (i = 0; i < MOD_MAX; i++) {
+    CPUTAB *cpu = &cpu_tab[i];
+
+    fprintf (st, "    %-6s  %s   %-7s %-3s   %-3s    %-3s   %-3s   %-3s   %-3s   %-3s\n", 
+                     cpu->name, 
+                     (cpu->std & BUS_Q) ? "Q" : "U",
+                     (cpu->maxm == MEMSIZE64K) ? "64K" : ((cpu->maxm == MAXMEMSIZE) ? "4M" : ((cpu->maxm == UNIMEMSIZE) ? "256K" : "UNK")),
+                     _OPT(OPT_MMU), _OPT(OPT_UBM), _OPT(OPT_EIS), _OPT(OPT_FIS),
+                     _OPT(OPT_FPP), _OPT(OPT_CIS), _OPT(OPT_BVT));
+    }
+fprintf (st, "\n");
+fprintf (st, "If a capability is standard, it cannot be disabled; if a capability\n");
+fprintf (st, "is not included, it cannot be enabled.\n\n");
+fprint_show_help (st, dptr);
+fprintf (st, "\n");
+fprintf (st, "If memory size is being reduced, and the memory being truncated contains\n");
+fprintf (st, "non-zero data, the simulator asks for confirmation.  Data in the truncated\n");
+fprintf (st, "portion of memory is lost.  Initial memory size is 256KB.  If memory size\n");
+fprintf (st, "is increased to more than 256KB, or the bus structure is changed, the\n");
+fprintf (st, "simulator disables peripherals that can't run in the current bus structure.\n\n");
+fprintf (st, "These switches are recognized when examining or depositing in CPU memory:\n\n");
+fprintf (st, "      -v           interpret address as virtual\n");
+fprintf (st, "      -t           if mem mgt enabled, force data space\n");
+fprintf (st, "      -k           if mem mgt enabled, force kernel mode\n");
+fprintf (st, "      -s           if mem mgt enabled, force supervisor mode\n");
+fprintf (st, "      -u           if mem mgt enabled, force user mode\n");
+fprintf (st, "      -p           if mem mgt enabled, force previous mode\n\n");
+fprintf (st, "CPU registers include the architectural state of the PDP-11 processor as\n");
+fprintf (st, "well as the control registers for the interrupt system.\n\n");
+fprint_reg_help (st, dptr);
+fprintf (st, "\n");
+fprintf (st, "The CPU attempts to detect when the simulator is idle.  When idle, the\n");
+fprintf (st, "simulator does not use any resources on the host system.  Idle detection\n");
+fprintf (st, "is controlled by the SET IDLE and SET NOIDLE commands:\n\n");
+fprintf (st, "     SET CPU IDLE             enable idle detection\n");
+fprintf (st, "     SET CPU NOIDLE           disable idle detection\n\n");
+fprintf (st, "Idle detection is disabled by default.  The CPU is considered idle if a\n");
+fprintf (st, "WAIT instruction is executed.  This will work for RSTS/E and RSX-11M+, but\n");
+fprintf (st, "not for RT-11 or UNIX.\n\n");
+fprintf (st, "The CPU can maintain a history of the most recently executed instructions.\n");
+fprintf (st, "This is controlled by the SET CPU HISTORY and SHOW CPU HISTORY commands:\n\n");
+fprintf (st, "     SET CPU HISTORY          clear history buffer\n");
+fprintf (st, "     SET CPU HISTORY=0        disable history\n");
+fprintf (st, "     SET CPU HISTORY=n        enable history, length = n\n");
+fprintf (st, "     SHOW CPU HISTORY         print CPU history\n");
+fprintf (st, "     SHOW CPU HISTORY=n       print first n entries of CPU history\n\n");
+fprintf (st, "The maximum length for the history is 262144 entries.\n\n");
+
+fprintf (st, "Unibus and Qbus DMA Devices\n\n");
+fprintf (st, "DMA peripherals function differently, depending on whether the CPU type\n");
+fprintf (st, "supports the Unibus or the Qbus, and whether the Unibus supports 22b direct\n");
+fprintf (st, "memory access (11/70 with RH70 controllers):\n\n");
+fprintf (st, "       peripheral   11/70      all         Qbus\n");
+fprintf (st, "                    +RH70      other\n");
+fprintf (st, "                               Unibus\n");
+fprintf (st, "       ==========================================================\n");
+fprintf (st, "       CD           18b        18b         disabled\n");
+fprintf (st, "       RC           18b        18b         disabled\n");
+fprintf (st, "       RF           18b        18b         disabled\n");
+fprintf (st, "       RK           18b        18b         disabled if mem > 256K\n");
+fprintf (st, "       HK           18b        18b         disabled if mem > 256K\n");
+fprintf (st, "       RL           18b        18b         22b RLV12\n");
+fprintf (st, "       RP           22b        18b         22b third party\n");
+fprintf (st, "       RQ           18b        18b         22b RQDX3\n");
+fprintf (st, "       RY           18b        18b         disabled if mem > 256K\n");
+fprintf (st, "       TC           18b        18b         disabled\n");
+fprintf (st, "       TM           18b        18b         disabled if mem > 256K\n");
+fprintf (st, "       TS           18b        18b         22b TSV05\n");
+fprintf (st, "       TQ           18b        18b         22b TQK50\n");
+fprintf (st, "       TU           22b        18b         22b third party\n");
+fprintf (st, "       VH           18b        18b         22b DHQ11\n");
+fprintf (st, "       XQ           disabled   disabled    22b DELQA\n");
+fprintf (st, "       XU           18b        18b         disabled\n\n");
+fprintf (st, "Non-DMA peripherals work the same in all configurations.  Unibus-only\n");
+fprintf (st, "peripherals are disabled in a Qbus configuration, and Qbus-only peripherals\n");
+fprintf (st, "are disabled in a Unibus configuration.  In addition, Qbus DMA peripherals\n");
+fprintf (st, "with only 18b addressing capability are disabled in a Qbus configuration\n");
+fprintf (st, "with more than 256KB memory.\n\n");
+fprintf (st, "I/O Device Addressing\n\n");
+fprintf (st, "PDP-11 I/O space and vector space are not large enough to allow all\n");
+fprintf (st, "theoretically possible devices to be configured simultaneously at\n");
+fprintf (st, "fixed addresses.  Instead, many devices have floating addresses and\n");
+fprintf (st, "vectors; that is, the assigned device address and vector depend on the\n");
+fprintf (st, "presence of other devices in the configuration:\n\n");
+fprintf (st, "       DZ11           all instances have floating addresses\n");
+fprintf (st, "       DHU11/DHQ11    all instances have floating addresses\n");
+fprintf (st, "       RL11           first instance has fixed address, rest floating\n");
+fprintf (st, "       RX11/RX211     first instance has fixed address, rest floating\n");
+fprintf (st, "       DEUNA/DELUA    first instance has fixed address, rest floating\n");
+fprintf (st, "       MSCP disk      first instance has fixed address, rest floating\n");
+fprintf (st, "       TMSCP tape     first instance has fixed address, rest floating\n\n");
+fprintf (st, "In addition, some devices with fixed I/O space addresses have floating\n");
+fprintf (st, "vector addresses.  DCI/DCO and DLI/DLO have floating vector addresses.\n\n");
+fprintf (st, "To maintain addressing consistency as the configuration changes, the\n");
+fprintf (st, "simulator implements DEC's standard I/O address and vector autoconfiguration.\n");
+fprintf (st, "This allows the user to enable or disable devices without needing to\n");
+fprintf (st, "manage I/O addresses and vectors.  For example, if RY is enabled while\n");
+fprintf (st, "RX is present, RY is assigned an I/O address in the floating I/O space\n");
+fprintf (st, "range; but if RX is disabled and then RY is enabled, RY is assigned the\n");
+fprintf (st, "fixed \"first instance\" I/O address for floppy disks.\n\n");
+fprintf (st, "Autoconfiguration cannot solve address conflicts between devices with\n");
+fprintf (st, "overlapping fixed addresses.  For example, with default I/O page addressing,\n");
+fprintf (st, "the PDP-11 can support either a TM11 or a TS11, but not both, since they\n");
+fprintf (st, "use the same I/O addresses.\n\n");
+fprintf (st, "In addition to autoconfiguration, most devices support the SET <device>\n");
+fprintf (st, "ADDRESS command, which allows the I/O page address of the device to be\n");
+fprintf (st, "changed, and the SET <device> VECTOR command, which allows the vector of\n");
+fprintf (st, "the device to be changed.  Explicitly setting the I/O address of any device\n");
+fprintf (st, "DISABLES autoconfiguration for that device and for the entire system.  As\n");
+fprintf (st, "a consequence, the user may have to manually configure all other\n");
+fprintf (st, "autoconfigured devices, because the autoconfiguration algorithm no longer\n");
+fprintf (st, "recognizes the explicitly configured device.  A device can be reset to\n");
+fprintf (st, "autoconfigure with the SET <device> AUTOCONFIGURE command.\n");
+fprintf (st, "autoconfiguration can be restored for the entire system with the SET\n");
+fprintf (st, "CPU AUTOCONFIGURE command.\n\n");
+fprintf (st, "The current I/O map can be displayed with the SHOW CPU IOSPACE command.\n");
+fprintf (st, "Addresses that have set by autoconfiguration are marked with an asterisk (*).\n");
+fprintf (st, "All devices support the SHOW <device> ADDRESS and SHOW <device> VECTOR\n");
+fprintf (st, "commands, which display the device address and vector, respectively.\n\n");
 return SCPE_OK;
 }

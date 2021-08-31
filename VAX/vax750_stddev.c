@@ -147,10 +147,6 @@ static BITFIELD tmr_iccs_bits [] = {
 
 /* TU58 definitions */
 
-#define UNIT_V_WLK      (UNIT_V_UF)                     /* write locked */
-#define UNIT_WLK        (1u << UNIT_V_UF)
-#define UNIT_WPRT       (UNIT_WLK | UNIT_RO)            /* write protect */
-
 #define TD_NUMBLK       512                             /* blocks/tape */
 #define TD_NUMBY        512                             /* bytes/block */
 #define TD_SIZE         (TD_NUMBLK * TD_NUMBY)          /* bytes/tape */
@@ -382,8 +378,10 @@ REG td_reg[] = {
     };
 
 MTAB td_mod[] = {
-    { UNIT_WLK,         0, "write enabled",  "WRITEENABLED", NULL, NULL, NULL, "Write enable TU58 drive" },
-    { UNIT_WLK,  UNIT_WLK, "write locked",   "LOCKED", NULL, NULL, NULL, "Write lock TU58 drive"  },
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable TU58 drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock TU58 drive" },
     { 0 }
     };
 
@@ -790,6 +788,12 @@ t_stat clk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cpt
 fprintf (st, "Real-Time Clock (%s)\n\n", dptr->name);
 fprintf (st, "The real-time clock autocalibrates; the clock interval is adjusted up or down\n");
 fprintf (st, "so that the clock tracks actual elapsed time.\n\n");
+fprintf (st, "The TODR (Time Of Day Register) is a 32 bit register that counts up once every\n");
+fprintf (st, "10 milliseconds of wall clock time.  At the 10 millisecond rate, the 32 bit\n");
+fprintf (st, "value will overflow after approximately 16 months.  The operating system\n");
+fprintf (st, "running on the machine generally keeps track of when the system date/time has\n");
+fprintf (st, "been set and thus can use the system's known base time plus the current TODR\n");
+fprintf (st, "value to provide the correct current date/time.\n\n");
 fprintf (st, "There are two modes of TODR operation:\n\n");
 fprintf (st, "   Default VMS mode.  Without initializing the TODR it returns the current\n");
 fprintf (st, "                      time of year offset which VMS would set the clock to\n");

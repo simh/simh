@@ -163,12 +163,12 @@ if (lpt_csr & CSR_IE)
 if ((uptr->flags & UNIT_ATT) == 0)
     return IORETURN (lpt_stopioe, SCPE_UNATT);
 fputc (uptr->buf & 0177, uptr->fileref);
-uptr->pos = ftell (uptr->fileref);
 if (ferror (uptr->fileref)) {
     sim_perror ("LPT I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }
+uptr->pos = uptr->pos + 1;
 lpt_csr = lpt_csr & ~CSR_ERR;
 return SCPE_OK;
 }

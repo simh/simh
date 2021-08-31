@@ -51,11 +51,7 @@
 #ifndef _3B2_CTC_H_
 #define _3B2_CTC_H_
 
-#include "sim_defs.h"
-#include "3b2_io.h"
-
-#define UNIT_V_WLK    (DKUF_V_UF + 0)     /* Write-locked tape */
-#define UNIT_WLK      (1 << UNIT_V_WLK)
+#include "3b2_defs.h"
 
 #define CTC_ID        0x0005
 #define CTC_IPL       12

@@ -28,8 +28,6 @@
    from the author.
 */
 
-
-
 /* Reference Documentation
  * =======================
  *
@@ -111,8 +109,7 @@
 #ifndef _3B2_IO_H_
 #define _3B2_IO_H_
 
-#include "sim_defs.h"
-#include "sim_tmxr.h"
+#include "3b2_defs.h"
 
 #define CRC_POLYNOMIAL  0xEDB88320
 
@@ -163,6 +160,8 @@
 #define CIO_INT1        2
 #define CIO_SYSGEN      3
 
+#define CIO_SET_INT(slot)   (cio_int_req |= (1 << slot))
+#define CIO_CLR_INT(slot)   (cio_int_req &= ~(1 << slot))
 
 typedef struct {
     uint16 id;                           /* Card ID                          */
@@ -177,7 +176,6 @@ typedef struct {
     uint8  ivec;                         /* Interrupt Vector                 */
     uint8  no_rque;                      /* Number of request queues         */
     uint8  ipl;                          /* IPL that this card uses          */
-    t_bool intr;                         /* Card needs to interrupt          */
     uint8  sysgen_s;                     /* Sysgen state                     */
     uint8  seqbit;                       /* Squence Bit                      */
     uint8  op;                           /* Last received opcode             */
@@ -190,12 +188,12 @@ typedef struct {
     uint32 address;
 } cio_entry;
 
-struct iolink {
+typedef struct {
     uint32      low;
     uint32      high;
     uint32      (*read)(uint32 pa, size_t size);
     void        (*write)(uint32 pa, uint32 val, size_t size);
-};
+} iolink;
 
 /* Example pump structure
  * ----------------------
@@ -247,5 +245,8 @@ void io_write(uint32 pa, uint32 val, size_t size);
 
 void dump_entry(uint32 dbits, DEVICE *dev, CONST char *type,
                 uint32 esize, cio_entry *entry, uint8 *app_data);
+
+extern uint16 cio_int_req;
+extern CIO_STATE cio[CIO_SLOTS];
 
 #endif

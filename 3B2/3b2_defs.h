@@ -31,30 +31,15 @@
 #ifndef _3B2_DEFS_H_
 #define _3B2_DEFS_H_
 
-#include "sim_defs.h"
-#include "sim_tmxr.h"
 #include <setjmp.h>
 
+#include "sim_defs.h"
+
 #if defined(REV3)
-#include "3b2_1000_defs.h"
+#include "3b2_rev3_defs.h"
 #else
-#include "3b2_400_defs.h"
-#include "3b2_400_cpu.h"
-#include "3b2_400_mau.h"
-#include "3b2_400_mmu.h"
-#include "3b2_400_stddev.h"
-#include "3b2_400_sys.h"
-#include "3b2_id.h"
+#include "3b2_rev2_defs.h"
 #endif
-
-#include "3b2_io.h"
-#include "3b2_dmac.h"
-#include "3b2_if.h"
-#include "3b2_iu.h"
-
-#include "3b2_ports.h"
-#include "3b2_ctc.h"
-#include "3b2_ni.h"
 
 #ifndef FALSE
 #define FALSE 0
@@ -85,11 +70,40 @@ noret __libc_longjmp(jmp_buf buf, int val);
 #define UNUSED(x) ((void)((x)))
 #endif
 
-#define UNIT_V_EXHALT  (UNIT_V_UF + 0)
-#define UNIT_EXHALT    (1u << UNIT_V_EXHALT)
+#define ATOW(arr, i)                                                           \
+  ((uint32)(arr)[i + 3] + ((uint32)(arr)[i + 2] << 8) +                        \
+   ((uint32)(arr)[i + 1] << 16) + ((uint32)(arr)[i] << 24))
+
+#define ATOH(arr, i) ((uint32)(arr)[i + 1] + ((uint32)(arr)[i] << 8))
+
+#define CSRBIT(bit, sc)                                                        \
+  {                                                                            \
+    if (sc) {                                                                  \
+      csr_data |= (bit);                                                       \
+    } else {                                                                   \
+      csr_data &= ~(bit);                                                      \
+    }                                                                          \
+  }
+
+#define PCHAR(c) (((char) (c) >= 0x20 && (char) (c) < 0x7f) ? (char) (c) : '.')
+
+#define UNIT_V_EXBRK   (UNIT_V_UF + 0)
+#define UNIT_V_OPBRK   (UNIT_V_UF + 1)
+#define UNIT_EXBRK     (1u << UNIT_V_EXBRK)
+#define UNIT_OPBRK     (1u << UNIT_V_OPBRK)
+
 #define EX_V_FLAG      1 << 21
 
 #define PHYS_MEM_BASE  0x2000000
+
+#define MSIZ_512K      0x80000
+#define MSIZ_1M        0x100000
+#define MSIZ_2M        0x200000
+#define MSIZ_4M        0x400000
+#define MSIZ_8M        0x800000
+#define MSIZ_16M       0x1000000
+#define MSIZ_32M       0x2000000
+#define MSIZ_64M       0x4000000
 
 /* Simulator stop codes */
 #define STOP_RSRV      1
@@ -119,56 +133,38 @@ noret __libc_longjmp(jmp_buf buf, int val);
 #define CACHE_DBG      0x1000
 #define DECODE_DBG     0x2000
 
+#define TIMER_SANITY   0
+#define TIMER_INTERVAL 1
+#define TIMER_BUS      2
+
+/* Timer */
+#define TMR_CLK        0     /* The clock responsible for IPL 15 interrupts */
+#define TPS_CLK        100   /* 100 ticks per second */
+
+
 /* Global symbols */
 
-extern volatile int32 stop_reason;
-
-extern CIO_STATE      cio[CIO_SLOTS];
-
-extern instr         *cpu_instr;
-extern uint32        *ROM;
-extern uint32        *RAM;
-extern uint32         R[16];
-extern REG            cpu_reg[];
-extern UNIT           cpu_unit;
-extern uint8          fault;
-extern t_bool         cpu_km;
-extern uint32         R[16];
-extern char           sim_name[];
-extern REG           *sim_PC;
-extern int32          sim_emax;
-extern uint16         csr_data;
-extern int32          tmxr_poll;
-
-extern DEBTAB         sys_deb_tab[];
-extern DEVICE         contty_dev;
-extern DEVICE         cpu_dev;
-extern DEVICE         csr_dev;
-extern DEVICE         ctc_dev;
-extern DEVICE         dmac_dev;
-extern DEVICE         id_dev;
-extern DEVICE         if_dev;
-extern DEVICE         iu_timer_dev;
-extern DEVICE         mau_dev;
-extern DEVICE         mmu_dev;
-extern DEVICE         ni_dev;
-extern DEVICE         nvram_dev;
-extern DEVICE         ports_dev;
-extern DEVICE         timer_dev;
-extern DEVICE         tod_dev;
-extern DEVICE         tti_dev;
-extern DEVICE         tto_dev;
-
-extern IU_PORT        iu_console;
-extern IU_PORT        iu_contty;
-extern IF_STATE       if_state;
-extern MMU_STATE      mmu_state;
-extern DMA_STATE      dma_state;
-
-extern t_bool         id_drq;
-extern t_bool         if_irq;
-extern t_bool         cio_skip_seqbit;
-extern t_bool         iu_increment_a;
-extern t_bool         iu_increment_b;
+extern DEBTAB sys_deb_tab[];
+extern DEVICE contty_dev;
+extern DEVICE cpu_dev;
+extern DEVICE csr_dev;
+extern DEVICE ctc_dev;
+extern DEVICE dmac_dev;
+extern DEVICE id_dev;
+extern DEVICE if_dev;
+extern DEVICE iu_timer_dev;
+extern DEVICE mau_dev;
+extern DEVICE mmu_dev;
+extern DEVICE ni_dev;
+extern DEVICE nvram_dev;
+extern DEVICE ports_dev;
+extern DEVICE timer_dev;
+extern DEVICE tod_dev;
+extern DEVICE tti_dev;
+extern DEVICE tto_dev;
+#if defined(REV3)
+extern DEVICE flt_dev;
+extern DEVICE ha_dev;
+#endif
 
 #endif

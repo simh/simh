@@ -98,17 +98,14 @@ static struct drvtyp drv_tab[] = {
 
 /* Flags in the unit flags word */
 
-#define UNIT_V_WLK      DKUF_V_WLK                      /* write locked */
 #define UNIT_V_DTYPE    (DKUF_V_UF + 0)                 /* disk type */
 #define UNIT_V_AUTO     (UNIT_V_DTYPE + 1)              /* autosize */
 #define UNIT_V_DUMMY    (UNIT_V_AUTO + 1)               /* dummy flag */
-#define UNIT_WLK        (1 << UNIT_V_WLK)
 #define UNIT_DTYPE      (1 << UNIT_V_DTYPE)
 #define  UNIT_RK06      (0 << UNIT_V_DTYPE)
 #define  UNIT_RK07      (1 << UNIT_V_DTYPE)
 #define UNIT_AUTO       (1 << UNIT_V_AUTO)
 #define UNIT_DUMMY      (1 << UNIT_V_DUMMY)
-#define UNIT_WPRT       (UNIT_WLK | UNIT_RO)            /* write prot */
 #define GET_DTYPE(x)    (((x) >> UNIT_V_DTYPE) & 1)
 
 /* Parameters in the unit descriptor */
@@ -664,10 +661,10 @@ REG hk_reg[] = {
     };
 
 MTAB hk_mod[] = {
-    { UNIT_WLK,        0, "write enabled", "WRITEENABLED", 
-        NULL, NULL, NULL, "Write enable disk drive" },
-    { UNIT_WLK, UNIT_WLK, "write locked",  "LOCKED", 
-        NULL, NULL, NULL, "Write lock disk drive"  },
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable tape drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock tape drive" },
     { UNIT_DUMMY,      0, NULL,            "BADBLOCK", 
         &hk_set_bad, NULL, NULL, "write bad block table on last track" },
     { MTAB_XTD|MTAB_VUN, 0, NULL, "RK06",
@@ -1189,7 +1186,7 @@ switch (fnc) {                                          /* case on function */
         else if (uptr->FNC == FNC_READ) {               /* read? */
             err = sim_disk_rdsect (uptr, da/HK_NUMWD, (uint8 *)hkxb, &sectsread, ((wc + (HK_NUMWD - 1)) & ~(HK_NUMWD - 1))/HK_NUMWD);
             if ((err == SCPE_OK) &&
-                (sectsread != (((wc + (HK_NUMWD - 1)) & ~(HK_NUMWD - 1))/HK_NUMWD)))
+                (sectsread != (t_seccnt)((((wc + (HK_NUMWD - 1)) & ~(HK_NUMWD - 1))/HK_NUMWD))))
                 err = -1;
             sim_disk_data_trace (uptr, (uint8 *)hkxb, da/HK_NUMWD, sectsread*HK_NUMWD*sizeof(*hkxb), "sim_disk_rdsect", HKDEB_DAT & dptr->dctrl, HKDEB_OPS);
             if (hkcs2 & CS2_UAI) {                      /* no addr inc? */
@@ -1209,7 +1206,7 @@ switch (fnc) {                                          /* case on function */
         else {                                          /* wchk */                  
             err = sim_disk_rdsect (uptr, da/HK_NUMWD, (uint8 *)hkxb, &sectsread, ((wc + (HK_NUMWD - 1)) & ~(HK_NUMWD - 1))/HK_NUMWD);
             if ((err == SCPE_OK) &&
-                (sectsread != (((wc + (HK_NUMWD - 1)) & ~(HK_NUMWD - 1))/HK_NUMWD)))
+                (sectsread != (t_seccnt)((((wc + (HK_NUMWD - 1)) & ~(HK_NUMWD - 1))/HK_NUMWD))))
                 err = -1;
             sim_disk_data_trace (uptr, (uint8 *)hkxb, da/HK_NUMWD, sectsread*HK_NUMWD*sizeof(*hkxb), "sim_disk_rdsect", HKDEB_DAT & dptr->dctrl, HKDEB_OPS);
             awc = wc;
@@ -1650,7 +1647,7 @@ t_stat hk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr
 fprintf (st, "RK611/RK06,RK07 Cartridge Disk (HK)\n\n");
 fprintf (st, "RK611  options include the ability to set units write enabled or write locked,\n");
 fprintf (st, "to set the drive type to RK06, RK07, or autosize, and to write a DEC standard\n");
-fprintf (st, "044 compliant bad block table on the last track:\n\n");
+fprintf (st, "144 compliant bad block table on the last track:\n\n");
 fprint_set_help (st, dptr);
 fprint_show_help (st, dptr);
 fprintf (st, "\nThe type options can be used only when a unit is not attached to a file.\n");

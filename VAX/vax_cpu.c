@@ -267,8 +267,14 @@ int32 cpu_astop = 0;
 int32 mchk_va, mchk_ref;                                /* mem ref param */
 int32 ibufl, ibufh;                                     /* prefetch buf */
 int32 ibcnt, ppc;                                       /* prefetch ctl */
-uint32 cpu_idle_mask = VAX_IDLE_VMS;                    /* idle mask */
+uint32 cpu_idle_mask =                                  /* idle mask */
+#if defined (VAX_411) || defined (VAX_412)
+                       VAX_IDLE_INFOSERVER;
+uint32 cpu_idle_type = 2;                               /* default INFOSERVER */
+#else
+                       VAX_IDLE_VMS;
 uint32 cpu_idle_type = 1;                               /* default VMS */
+#endif
 int32 extra_bytes;                                      /* bytes referenced by current string instruction */
 jmp_buf save_env;
 REG *pcq_r = NULL;                                      /* PC queue reg ptr */
@@ -424,11 +430,11 @@ REG cpu_reg[] = {
 MTAB cpu_mod[] = {
     { UNIT_CONH, 0, "HALT to SIMH", "SIMHALT", NULL, NULL, NULL, "Set HALT to trap to simulator" },
     { UNIT_CONH, UNIT_CONH, "HALT to console", "CONHALT", NULL, NULL, NULL, "Set HALT to trap to console ROM" },
-    { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE{=VMS|ULTRIX|ULTRIX-1.X|ULTRIXOLD|NETBSD|NETBSDOLD|OPENBSD|OPENBSDOLD|QUASIJARUS|32V|ELN|MDM}{:n}", &cpu_set_idle, &cpu_show_idle, NULL, "Display idle detection mode" },
+    { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE{=VMS|ULTRIX|ULTRIX-1.X|ULTRIXOLD|NETBSD|NETBSDOLD|OPENBSD|OPENBSDOLD|QUASIJARUS|32V|ELN|MDM|INFOSERVER}{:n}", &cpu_set_idle, &cpu_show_idle, NULL, "Display idle detection mode" },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL, NULL,  "Disables idle detection" },
     MEM_MODIFIERS,   /* Model specific memory modifiers from vaxXXX_defs.h */
-    { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP|MTAB_NC, 0, "HISTORY", "HISTORY",
-      &cpu_set_hist, &cpu_show_hist, NULL, "Displays instruction history" },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP|MTAB_NC, 0, "HISTORY", "HISTORY=n",
+      &cpu_set_hist, &cpu_show_hist, NULL, "Enable/Display instruction history" },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "VIRTUAL", NULL,
       NULL, &cpu_show_virt, NULL, "show translation for address arg in KESU mode" },
     CPU_MODEL_MODIFIERS  /* Model specific cpu modifiers from vaxXXX_defs.h */
@@ -2239,7 +2245,8 @@ for ( ;; ) {
             if ((((PSL & PSL_IS) != 0) &&               /* on IS? */
                  (PSL_GETIPL (PSL) == 0x1F) &&          /* at IPL 31 */
                  (mapen == 0) &&                        /* Running from ROM */
-                 (fault_PC == 0x2004361B)) ||           /* Boot ROM Character Prompt */
+                 ((fault_PC == 0x2004361B) ||           /* at a */
+                  (fault_PC == 0x20046A36))) ||         /* Boot ROM Character Prompt */
                 ((cpu_idle_mask & VAX_IDLE_ELN) &&      /* VAXELN Idle? */
                  (PSL & PSL_IS) &&                      /* on IS? */
                  (brdisp == 0xFA) &&                    /* Branch to prior TSTL */
@@ -2254,8 +2261,14 @@ for ( ;; ) {
         break;
 
     case BVS:
-        if (cc & CC_V)                                  /* br if V = 1 */
+        if (cc & CC_V) {                                /* br if V = 1 */
             BRANCHB (brdisp);
+            if ((cpu_idle_mask & VAX_IDLE_INFOSERVER) &&/* INFOSERVER Idle? */
+                 (PSL & PSL_IS) &&                      /* on IS? */
+                 (brdisp == 0xF1) &&                    /* Branch to prior INCL */
+                 (PSL_GETIPL (PSL) == 0x3))             /* at IPL 3 */
+                cpu_idle();
+            }
         break;
 
     case BGEQU:
@@ -3719,6 +3732,7 @@ struct os_idle {
 
 static struct os_idle os_tab[] = {
     { "VMS",            VAX_IDLE_VMS },
+    { "INFOSERVER",     VAX_IDLE_INFOSERVER },
     { "ULTRIX",         VAX_IDLE_ULT },
     { "ULTRIXOLD",      VAX_IDLE_ULTOLD },
     { "ULTRIX-1.X",     VAX_IDLE_ULT1X },
@@ -3970,7 +3984,8 @@ fprintf (st, "simulator does not use any resources on the host system.  Idle det
 fprintf (st, "controlled by the SET IDLE and SET NOIDLE commands:\n\n");
 fprintf (st, "   sim> SET CPU IDLE{=VMS|ULTRIX|ULTRIXOLD|ULTRIX-1.X|\n");
 fprintf (st, "                      3BSD|4.0BSD|4.1BSD|4.2BSD|QUASIJARUS|\n");
-fprintf (st, "                      NETBSD|NETBSDOLD|OPENBSD|OPENBSDOLD|32V|ELN}{:n}\n");
+fprintf (st, "                      NETBSD|NETBSDOLD|OPENBSD|OPENBSDOLD|\n");
+fprintf (st, "                      32V|ELN|INFOSERVER}{:n}\n");
 fprintf (st, "                                        enable idle detection\n");
 fprintf (st, "   sim> SET CPU NOIDLE                  disable idle detection\n\n");
 fprintf (st, "Idle detection is disabled by default.  If idle detection is enabled with\n");

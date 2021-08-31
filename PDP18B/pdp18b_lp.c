@@ -623,12 +623,12 @@ c = uptr->buf & 0177;                                   /* get char */
 if ((c == 0) || (c == 0177))                            /* skip NULL, DEL */
     return SCPE_OK;
 fputc (c, uptr->fileref);                               /* print char */
-uptr->pos = ftell (uptr->fileref);                      /* update position */
 if (ferror (uptr->fileref)) {                           /* error? */
     sim_perror ("LPT I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }
+uptr->pos = uptr->pos + 1;                              /* update position */
 return SCPE_OK;
 }
 

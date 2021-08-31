@@ -34,13 +34,10 @@
 
 /* Flags in the unit flags word */
 
-#define UNIT_V_WLK      (UNIT_V_UF + 0)                 /* write locked */
-#define UNIT_V_DTYPE    (UNIT_V_UF + 1)                 /* disk type */
+#define UNIT_V_DTYPE    (UNIT_V_UF + 0)                 /* disk type */
 #define UNIT_M_DTYPE    1
-#define UNIT_WLK        (1 << UNIT_V_WLK)
 #define UNIT_DTYPE      (UNIT_M_DTYPE << UNIT_V_DTYPE)
 #define GET_DTYPE(x)    (((x) >> UNIT_V_DTYPE) & UNIT_M_DTYPE)
-#define UNIT_WPRT       (UNIT_WLK | UNIT_RO)            /* write protect */
 
 /* Parameters in the unit descriptor */
 
@@ -155,8 +152,10 @@ DIB rc_dib[] = {
     };
 
 MTAB                rc_mod[] = {
-    {UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL},
-    {UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL},
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock drive" },
     {UNIT_DTYPE, (RD10_DTYPE << UNIT_V_DTYPE), "RD10", "RD10", &rc_set_type },
     {UNIT_DTYPE, (RM10_DTYPE << UNIT_V_DTYPE), "RM10", "RM10", &rc_set_type },
     {0}

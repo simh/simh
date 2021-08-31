@@ -85,17 +85,14 @@
 
 /* Flags in the unit flags word */
 
-#define UNIT_V_WLK      DKUF_V_WLK                      /* write locked */
 #define UNIT_V_DTYPE    (DKUF_V_UF + 0)                 /* disk type */
 #define UNIT_M_DTYPE    7
 #define UNIT_V_AUTO     (DKUF_V_UF + 3)                 /* autosize */
 #define UNIT_V_DUMMY    (DKUF_V_UF + 4)                 /* dummy flag */
-#define UNIT_WLK        (1 << UNIT_V_WLK)
 #define UNIT_DTYPE      (UNIT_M_DTYPE << UNIT_V_DTYPE)
 #define UNIT_AUTO       (1 << UNIT_V_AUTO)
 #define UNIT_DUMMY      (1 << UNIT_V_DUMMY)
 #define GET_DTYPE(x)    (((x) >> UNIT_V_DTYPE) & UNIT_M_DTYPE)
-#define UNIT_WPRT       (UNIT_WLK | UNIT_RO)            /* write prot */
 
 /* Parameters in the unit descriptor */
 
@@ -475,6 +472,7 @@ BITFIELD *rp_reg_bits[] = {
    RM02/3       32              5               823             =67MB
    RP04/5       22              19              411             =88MB
    RM80         31              14              559             =124MB
+   RP05         22              19              411             =88MB
    RP06         22              19              815             =176MB
    RM05         32              19              823             =256MB
    RP07         50              32              630             =516MB
@@ -490,6 +488,7 @@ BITFIELD *rp_reg_bits[] = {
 #define RM03_SECT       32
 #define RM03_SURF       5
 #define RM03_CYL        823
+#define RM03_DEC144     1
 #define RM03_DEV        020024
 #define RM03_SIZE       (RM03_SECT * RM03_SURF * RM03_CYL * RP_NUMWD)
 
@@ -497,34 +496,47 @@ BITFIELD *rp_reg_bits[] = {
 #define RP04_SECT       22
 #define RP04_SURF       19
 #define RP04_CYL        411
+#define RP04_DEC144     0
 #define RP04_DEV        020020
 #define RP04_SIZE       (RP04_SECT * RP04_SURF * RP04_CYL * RP_NUMWD)
 
-#define RM80_DTYPE      2
+#define RP05_DTYPE      2
+#define RP05_SECT       22
+#define RP05_SURF       19
+#define RP05_CYL        411
+#define RP05_DEC144     0
+#define RP05_DEV        020021
+#define RP05_SIZE       (RP05_SECT * RP05_SURF * RP05_CYL * RP_NUMWD)
+
+#define RM80_DTYPE      3
 #define RM80_SECT       31
 #define RM80_SURF       14
 #define RM80_CYL        559
+#define RM80_DEC144     1
 #define RM80_DEV        020026
 #define RM80_SIZE       (RM80_SECT * RM80_SURF * RM80_CYL * RP_NUMWD)
 
-#define RP06_DTYPE      3
+#define RP06_DTYPE      4
 #define RP06_SECT       22
 #define RP06_SURF       19
 #define RP06_CYL        815
+#define RP06_DEC144     0
 #define RP06_DEV        020022
 #define RP06_SIZE       (RP06_SECT * RP06_SURF * RP06_CYL * RP_NUMWD)
 
-#define RM05_DTYPE      4
+#define RM05_DTYPE      5
 #define RM05_SECT       32
 #define RM05_SURF       19
 #define RM05_CYL        823
+#define RM05_DEC144     1
 #define RM05_DEV        020027
 #define RM05_SIZE       (RM05_SECT * RM05_SURF * RM05_CYL * RP_NUMWD)
 
-#define RP07_DTYPE      5
+#define RP07_DTYPE      6
 #define RP07_SECT       50
 #define RP07_SURF       32
 #define RP07_CYL        630
+#define RP07_DEC144     1
 #define RP07_DEV        020042
 #define RP07_SIZE       (RP07_SECT * RP07_SURF * RP07_CYL * RP_NUMWD)
 
@@ -534,17 +546,19 @@ struct drvtyp {
     int32       cyl;                                    /* cylinders */
     int32       size;                                   /* #blocks */
     int32       devtype;                                /* device type */
+    int32       dec144;                                 /* DEC Std 144 bad block */
     int32       ctrl;                                   /* ctrl type */
     const char  *name;                                  /* device type name */
     };
 
 static struct drvtyp drv_tab[] = {
-    { RM03_SECT, RM03_SURF, RM03_CYL, RM03_SIZE, RM03_DEV, RM_CTRL, "RM03" },
-    { RP04_SECT, RP04_SURF, RP04_CYL, RP04_SIZE, RP04_DEV, RP_CTRL, "RP04" },
-    { RM80_SECT, RM80_SURF, RM80_CYL, RM80_SIZE, RM80_DEV, RM_CTRL, "RM80" },
-    { RP06_SECT, RP06_SURF, RP06_CYL, RP06_SIZE, RP06_DEV, RP_CTRL, "RP06" },
-    { RM05_SECT, RM05_SURF, RM05_CYL, RM05_SIZE, RM05_DEV, RM_CTRL, "RM05" },
-    { RP07_SECT, RP07_SURF, RP07_CYL, RP07_SIZE, RP07_DEV, RM_CTRL, "RP07" },
+    { RM03_SECT, RM03_SURF, RM03_CYL, RM03_SIZE, RM03_DEV, RM03_DEC144, RM_CTRL, "RM03" },
+    { RP04_SECT, RP04_SURF, RP04_CYL, RP04_SIZE, RP04_DEV, RP04_DEC144, RP_CTRL, "RP04" },
+    { RP05_SECT, RP05_SURF, RP05_CYL, RP05_SIZE, RP05_DEV, RP05_DEC144, RP_CTRL, "RP05" },
+    { RM80_SECT, RM80_SURF, RM80_CYL, RM80_SIZE, RM80_DEV, RM80_DEC144, RM_CTRL, "RM80" },
+    { RP06_SECT, RP06_SURF, RP06_CYL, RP06_SIZE, RP06_DEV, RP06_DEC144, RP_CTRL, "RP06" },
+    { RM05_SECT, RM05_SURF, RM05_CYL, RM05_SIZE, RM05_DEV, RM05_DEC144, RM_CTRL, "RM05" },
+    { RP07_SECT, RP07_SURF, RP07_CYL, RP07_SIZE, RP07_DEV, RP07_DEC144, RM_CTRL, "RP07" },
     { 0 }
     };
 
@@ -643,16 +657,18 @@ REG rp_reg[] = {
 MTAB rp_mod[] = {
     { MTAB_XTD|MTAB_VDV, 0, "MASSBUS", NULL, 
         NULL, &mba_show_num, NULL, "Display Massbus number" },
-    { UNIT_WLK,        0, "write enabled", "WRITEENABLED", 
-        NULL, NULL, NULL, "Write enable disk drive" },
-    { UNIT_WLK, UNIT_WLK, "write locked",  "LOCKED", 
-        NULL, NULL, NULL, "Write lock disk drive"  },
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable disk drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock disk drive" },
     { UNIT_DUMMY,      0, NULL,            "BADBLOCK", 
         &rp_set_bad, NULL, NULL, "write bad block table on last track" },
     { MTAB_XTD|MTAB_VUN, RM03_DTYPE, NULL, "RM03",
       &rp_set_type, NULL, NULL, "Set RM03 Disk Type" },
     { MTAB_XTD|MTAB_VUN, RP04_DTYPE, NULL, "RP04",
       &rp_set_type, NULL, NULL, "Set RP04 Disk Type" },
+    { MTAB_XTD|MTAB_VUN, RP05_DTYPE, NULL, "RP05",
+      &rp_set_type, NULL, NULL, "Set RP05 Disk Type" },
     { MTAB_XTD|MTAB_VUN, RM80_DTYPE, NULL, "RM80",
       &rp_set_type, NULL, NULL, "Set RM80 Disk Type" },
     { MTAB_XTD|MTAB_VUN, RP06_DTYPE, NULL, "RP06",
@@ -1355,12 +1371,14 @@ t_stat rp_attach (UNIT *uptr, CONST char *cptr)
 int32 drv;
 t_stat r;
 DEVICE *dptr = find_dev_from_unit (uptr);
-static const char *drives[] = {"RM03", "RP04", "RM80", "RP06", "RM05", "RP07", NULL};
+static const char *drives[] = {"RM03", "RP04", "RP05", "RM80", "RP06", "RM05", "RP07", NULL};
 
 uptr->capac = drv_tab[GET_DTYPE (uptr->flags)].size;
 r = sim_disk_attach_ex (uptr, cptr, RP_NUMWD * sizeof (uint16), 
                         sizeof (uint16), TRUE, DBG_DSK, 
-                        drv_tab[GET_DTYPE (uptr->flags)].name, drv_tab[GET_DTYPE (uptr->flags)].sect, 0, (uptr->flags & UNIT_AUTO) ? drives : NULL);
+                        drv_tab[GET_DTYPE (uptr->flags)].name, 
+                        drv_tab[GET_DTYPE (uptr->flags)].dec144 ? drv_tab[GET_DTYPE (uptr->flags)].sect : 0, 
+                        0, (uptr->flags & UNIT_AUTO) ? drives : NULL);
 if (r != SCPE_OK)                                       /* error? */
     return r;
 drv = (int32) (uptr - dptr->units);                     /* get drv number */
@@ -1412,7 +1430,10 @@ return SCPE_OK;
 
 t_stat rp_set_bad (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-return pdp11_bad_block (uptr, drv_tab[GET_DTYPE (uptr->flags)].sect, RP_NUMWD);
+if (drv_tab[GET_DTYPE (uptr->flags)].dec144)
+    return pdp11_bad_block (uptr, drv_tab[GET_DTYPE (uptr->flags)].sect, RP_NUMWD);
+return sim_messagef (SCPE_ARG, "%s: %s disk drives did not have a DEC Standard 144 bad block table\n",
+                     sim_uname (uptr), drv_tab[GET_DTYPE (uptr->flags)].name);
 }
 
 /* Boot routine */
@@ -1481,7 +1502,7 @@ fprintf (st, "RP04/05/06/07, RM02/03/05/80 Disk Pack Drives (RP)\n\n");
 fprintf (st, "The RP controller implements the Massbus family of large disk drives.  RP\n");
 fprintf (st, "options include the ability to set units write enabled or write locked, to\n");
 fprintf (st, "set the drive type to one of six disk types or autosize, and to write a DEC\n");
-fprintf (st, "standard 044 compliant bad block table on the last track.\n\n");
+fprintf (st, "standard 144 compliant bad block table on the last track.\n\n");
 fprint_set_help (st, dptr);
 fprint_show_help (st, dptr);
 fprintf (st, "\nThe type options can be used only when a unit is not attached to a file.\n");

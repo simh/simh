@@ -609,12 +609,12 @@ if (opaddr == 0xf0) {                                   /* Is it command format?
             if (qbyte & 0x01) display[2][3] = '|' ;
             if (rbyte & 0x01) display[2][7] = '|' ;
                                                         /* Print display segment array */
-            sim_printf("\n");
+            sim_printf("\r\n");
             for (i = 0; i < 3; i++) {
                 for (j = 0; j < 9; j++) {
                     sim_printf ("%c", display[i][j]);
                 }
-                sim_printf ("\n");
+                sim_printf ("\r\n");
             }
             reason = STOP_HALT;
             break;

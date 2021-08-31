@@ -31,7 +31,7 @@
 #ifndef _3B2_NI_H_
 #define _3B2_NI_H_
 
-#include "sim_defs.h"
+#include "3b2_defs.h"
 #include "sim_ether.h"
 
 #define NI_ID                  0x0002

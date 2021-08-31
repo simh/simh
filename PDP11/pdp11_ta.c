@@ -182,10 +182,10 @@ REG ta_reg[] = {
     };
 
 MTAB ta_mod[] = {
-    { MTUF_WLK,        0, "write enabled", "WRITEENABLED", 
-        NULL, NULL, NULL, "Write enable tape drive" },
-    { MTUF_WLK, MTUF_WLK, "write locked",  "LOCKED", 
-        NULL, NULL, NULL, "Write lock tape drive"  },
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable tape drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock tape drive" },
     { MTAB_XTD|MTAB_VUN, 0, "CAPACITY", NULL,
       NULL, &sim_tape_show_capac, NULL, "Display tape capacity" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 020, "ADDRESS", "ADDRESS",

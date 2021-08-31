@@ -1,14 +1,34 @@
 #ifndef ROM_vax_ka620_bin_H
 #define ROM_vax_ka620_bin_H 0
 /*
-   VAX/vax_ka620_bin.h         produced at Fri Nov  9 06:17:59 2012
-   from VAX/ka620.bin which was last modified at Thu Nov  8 17:23:00 2012
+   VAX/vax_ka620_bin.h         produced at Mon Aug 23 13:30:20 2021
+   from VAX/ka620.bin which was last modified at Mon Jul 26 08:03:31 2021
    file size: 65536 (0x10000) - checksum: 0xFF7F930F
    This file is a generated file and should NOT be edited or changed by hand.
 */
+#undef BOOT_CODE_SIZE
 #define BOOT_CODE_SIZE 0x10000
+#undef BOOT_CODE_FILENAME
 #define BOOT_CODE_FILENAME "ka620.bin"
+#undef BOOT_CODE_ARRAY
 #define BOOT_CODE_ARRAY vax_ka620_bin
+#if !defined(BOOT_CODE_SIZE_1)
+#define BOOT_CODE_SIZE_1 0x10000
+#define BOOT_CODE_FILENAME_1 "ka620.bin"
+#define BOOT_CODE_ARRAY_1 vax_ka620_bin
+#elif !defined(BOOT_CODE_SIZE_2)
+#define BOOT_CODE_SIZE_2 0x10000
+#define BOOT_CODE_FILENAME_2 "ka620.bin"
+#define BOOT_CODE_ARRAY_2 vax_ka620_bin
+#elif !defined(BOOT_CODE_SIZE_3)
+#define BOOT_CODE_SIZE_3 0x10000
+#define BOOT_CODE_FILENAME_3 "ka620.bin"
+#define BOOT_CODE_ARRAY_3 vax_ka620_bin
+#elif !defined(BOOT_CODE_SIZE_4)
+#define BOOT_CODE_SIZE_4 0x10000
+#define BOOT_CODE_FILENAME_4 "ka620.bin"
+#define BOOT_CODE_ARRAY_4 vax_ka620_bin
+#endif
 unsigned char vax_ka620_bin[] = {
 0x11,0x4E,0x00,0x00,0x00,0x00,0x01,0x01,0x11,0x30,0x00,0x00,0x11,0x32,0x00,0x00,
 0x11,0x34,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,

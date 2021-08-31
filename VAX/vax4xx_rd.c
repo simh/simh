@@ -226,11 +226,8 @@
 #define RD54_MED        0x25644036
 #define RD54_FLGS       0
 
-#define UNIT_V_WLK      (DKUF_V_UF + 0)                 /* hwre write lock */
-#define UNIT_V_DTYPE    (DKUF_V_UF + 1)                 /* drive type */
+#define UNIT_V_DTYPE    (DKUF_V_UF + 0)                 /* drive type */
 #define UNIT_M_DTYPE    0xF
-#define UNIT_WLK        (1u << UNIT_V_WLK)
-#define UNIT_WPRT       (UNIT_WLK | UNIT_RO)            /* write protected */
 #define UNIT_DTYPE      (UNIT_M_DTYPE << UNIT_V_DTYPE)
 
 struct drvtyp {
@@ -354,10 +351,10 @@ DEBTAB rd_debug[] = {
     };
 
 MTAB rd_mod[] = {
-    { UNIT_WLK, 0, "write enabled", "WRITEENABLED", 
-      NULL, NULL, NULL, "Write enable disk drive" },
-    { UNIT_WLK, UNIT_WLK, "write locked",  "LOCKED", 
-      NULL, NULL, NULL, "Write lock disk drive" },
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock drive" },
     { MTAB_XTD|MTAB_VUN, RX33_DTYPE, NULL, "RX33",
       &rd_set_type, NULL, NULL, "Set RX33 Disk Type" },
     { MTAB_XTD|MTAB_VUN, RD31_DTYPE, NULL, "RD31",

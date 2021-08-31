@@ -642,6 +642,8 @@ struct UNIT {
 #define UNIT_DISABLE    0002000         /* disable-able */
 #define UNIT_DIS        0004000         /* disabled */
 #define UNIT_IDLE       0040000         /* idle eligible */
+#define UNIT_WLK        0100000         /* hardware write lock */
+#define UNIT_WPRT     (UNIT_WLK|UNIT_RO)/* write protect */
 
 /* Unused/meaningless flags */
 #define UNIT_TEXT       0000000         /* text mode - no effect */

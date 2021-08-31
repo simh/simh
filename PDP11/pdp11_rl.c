@@ -132,7 +132,6 @@ static struct drvtyp drv_tab[] = {
 
 /* Flags in the unit flags word */
 
-#define UNIT_V_WLK      DKUF_V_WLK                      /* hwre write lock */
 #define UNIT_V_RL02     (DKUF_V_UF + 0)                 /* RL01 vs RL02 */
 #define UNIT_V_AUTO     (UNIT_V_RL02 + 1)               /* autosize enable */
 #define UNIT_V_DUMMY    (UNIT_V_AUTO + 1)               /* dummy flag, for SET BADBLOCK */
@@ -141,10 +140,8 @@ static struct drvtyp drv_tab[] = {
 #define UNIT_BRUSH      (1u << UNIT_V_BRUSH)
 #define UNIT_OFFL       (1u << UNIT_V_OFFL)
 #define UNIT_DUMMY      (1u << UNIT_V_DUMMY)
-#define UNIT_WLK        (1u << UNIT_V_WLK)
 #define UNIT_RL02       (1u << UNIT_V_RL02)
 #define UNIT_AUTO       (1u << UNIT_V_AUTO)
-#define UNIT_WPRT       (UNIT_WLK | UNIT_RO)            /* write protected */
 #define GET_DTYPE(x)    (((x) >> UNIT_V_RL02) & 1)
 
 /* Parameters in the unit descriptor */
@@ -374,10 +371,10 @@ static const MTAB rl_mod[] = {
         &rl_set_load, NULL,            NULL, "Unload drive" },
     { MTAB_XTD|MTAB_VUN|MTAB_NMO,        0, "DSTATE", NULL, 
         NULL, &rl_show_dstate, NULL, "Display drive state" },
-    { UNIT_WLK,        0, "write enabled", "WRITEENABLED", 
-        NULL, NULL, NULL, "Write enable disk drive" },
-    { UNIT_WLK, UNIT_WLK, "write locked",  "LOCKED", 
-        NULL, NULL, NULL, "Write lock disk drive"  },
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable disk drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock disk drive" },
     { UNIT_DUMMY, 0, NULL, "BADBLOCK", 
         &rl_set_bad, NULL, NULL, "Write bad block table on last track" },
     { MTAB_XTD|MTAB_VUN, 0, NULL, "RL01",
@@ -1272,7 +1269,7 @@ t_stat rl_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr
 fprintf (st, "RL11/RL01/RL02 Cartridge Disk (RL)\n\n");
 fprintf (st, "RL11 options include the ability to set units write enabled or write locked,\n");
 fprintf (st, "to set the drive type to RL01, RL02, or autosize, and to write a DEC standard\n");
-fprintf (st, "044 compliant bad block table on the last track:\n\n");
+fprintf (st, "144 compliant bad block table on the last track:\n\n");
 fprint_set_help (st, dptr);
 fprint_show_help (st, dptr);
 fprintf (st, "\nThe type options can be used only when a unit is not attached to a file.\n");

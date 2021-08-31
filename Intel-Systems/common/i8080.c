@@ -157,6 +157,8 @@
 #define BYTE_R  0xFF
 #define WORD_R  0xFFFF
 
+#define i8080_NAME    "Intel i8080/85 Processor Chip"
+
 /* storage for the rest of the registers */
 uint32 PSW = 0;                         /* program status word */
 uint32 A = 0;                           /* accumulator */
@@ -177,6 +179,10 @@ uint16 port;                            //port used in any IN/OUT
 uint16 addr;                            //addr used for operand fetch
 uint32 IR;
 uint16 devnum = 0;
+
+static const char* i8080_desc(DEVICE *dptr) {
+    return i8080_NAME;
+}
 
 /* function prototypes */
 
@@ -212,9 +218,10 @@ extern int32 sim_int_char;
 extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 
 struct idev {
-    uint8 (*routine)(t_bool, uint8, uint8);
-    uint8 port;
-    uint8 devnum;
+    uint8 (*routine)(t_bool io, uint8 data, uint8 devnum); 
+    uint16 port;
+    uint16 devnum;
+    uint8 dummy;
 };
 
 /* This is the I/O configuration table.  There are 256 possible
@@ -298,7 +305,7 @@ DEVICE i8080_dev = {
     NULL,                               //help routine
     NULL,                               //attach help routine
     NULL,                               //help context
-    NULL                                //device description
+    &i8080_desc                         //device description
 };
 
 /* tables for the disassembler */
@@ -398,14 +405,14 @@ void set_cpuint(int32 int_num)
 int32 sim_instr(void)
 {
     extern int32 sim_interval;
-    uint32 OP, DAR, reason, adr, onetime = 0;
+    uint32 OP, DAR, reason, adr, i8080_onetime = 0;
 
     PC = saved_PC & WORD_R;             /* load local PC */
     reason = 0;
 
     uptr = i8080_dev.units;
 
-    if (onetime++ == 0) {
+    if (i8080_onetime++ == 0) {
         if (uptr->flags & UNIT_8085)
             sim_printf("    CPU = 8085\n");
         else
@@ -478,10 +485,12 @@ int32 sim_instr(void)
         
         IR = OP = fetch_byte(0);        /* instruction fetch */
 
-        if (GET_XACK(1) == 0) {         // no XACK for instruction fetch
-//            reason = STOP_XACK;
-//            sim_printf("Failed XACK for Instruction Fetch from %04X\n", PCX);
-//            continue;
+        if (uptr->flags & UNIT_XACK) {
+            if (GET_XACK(1) == 0) {         // no XACK for instruction fetch
+                reason = STOP_XACK;
+                sim_printf("\nFailed XACK for Instruction Fetch from %04X", PCX);
+                continue;
+             }
          }
 
         // first instruction decode
@@ -886,15 +895,15 @@ int32 sim_instr(void)
             break;
 
         case 0xDB:                  /* IN */
+            SET_XACK(1);            /* good I/O address */
             port = fetch_byte(1);
-            A = dev_table[port].routine(0, 0, dev_table[port].devnum);
-            SET_XACK(1);                /* good I/O address */
+            A = dev_table[port].routine(0, 0, dev_table[port].devnum & 0xff);
             break;
 
         case 0xD3:                  /* OUT */
+            SET_XACK(1);            /* good I/O address */
             port = fetch_byte(1);
-            dev_table[port].routine(1, A, dev_table[port].devnum);
-            SET_XACK(1);                /* good I/O address */
+            dev_table[port].routine(1, A, dev_table[port].devnum & 0xff);
             break;
 
         default:                    /* undefined opcode */ 
@@ -906,14 +915,16 @@ int32 sim_instr(void)
         }
 loop_end:
 
-        if (GET_XACK(1) == 0) {     // no XACK for operand fetch
-//            reason = STOP_XACK;
-//            if (OP == 0xD3 || OP == 0xDB) {
-//                    sim_printf("Failed XACK for Port %02X Fetch from %04X\n", port, PCX);
-//            } else {
-//                    sim_printf("Failed XACK for Operand %04X Fetch from %04X\n", addr, PCX);
-//            continue;
-//            }
+        if (uptr->flags & UNIT_XACK) {
+            if (GET_XACK(1) == 0) {     // no XACK for operand fetch
+//                reason = STOP_XACK;
+                if (OP == 0xD3 || OP == 0xDB) {
+                        sim_printf("\nFailed XACK for Port %02X Fetch from %04X", port, PCX);
+                } else {
+                        sim_printf("\nFailed XACK for Operand %04X Fetch from %04X", addr, PCX);
+                continue;
+                }
+            }
         }
     }
 

@@ -947,7 +947,6 @@ const char *const text =
 "\n";
 fprintf (st, "%s", text);
 fprint_show_help (st, dptr);
-fprintf (st, "\nEach RH adapter implements these registers:\n");
 fprint_reg_help (st, dptr);
 return SCPE_OK;
 }

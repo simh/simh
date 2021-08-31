@@ -84,18 +84,15 @@
 
 /* Flags in the unit flags word */
 
-#define UNIT_V_WLK      DKUF_V_WLK                      /* write locked */
 #define UNIT_V_DTYPE    (DKUF_V_UF + 0)                 /* disk type */
 #define UNIT_W_DTYPE    3                               /* 3b disk type */
 #define UNIT_M_DTYPE    7
 #define UNIT_V_AUTO     (UNIT_V_DTYPE + UNIT_W_DTYPE)   /* autosize */
 #define UNIT_V_UTS      (UNIT_V_AUTO + 1)               /* Up to speed */
 #define UNIT_UTS        (1u << UNIT_V_UTS)
-#define UNIT_WLK        (1 << UNIT_V_WLK)
 #define UNIT_DTYPE      (UNIT_M_DTYPE << UNIT_V_DTYPE)
 #define UNIT_AUTO       (1 << UNIT_V_AUTO)
 #define GET_DTYPE(x)    (((x) >> UNIT_V_DTYPE) & UNIT_M_DTYPE)
-#define UNIT_WPRT       (UNIT_WLK | UNIT_RO)            /* write protect */
 
 /* Parameters in the unit descriptor */
 
@@ -449,10 +446,10 @@ REG rp_reg[] = {
     };
 
 MTAB rp_mod[] = {
-    { UNIT_WLK, 0, "write enabled", "WRITEENABLED",
-      NULL, NULL, NULL, "Write enable disk drive" },
-    { UNIT_WLK, UNIT_WLK, "write locked", "LOCKED",
-      NULL, NULL, NULL, "Write lock disk drive" },
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable disk drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock disk drive" },
     { MTAB_XTD|MTAB_VUN, RM03_DTYPE, NULL, "RM03",
       &rp_set_type, NULL, NULL, "Set RM03 Disk Type" },
     { MTAB_XTD|MTAB_VUN, RP04_DTYPE, NULL, "RP04",

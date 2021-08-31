@@ -28,13 +28,14 @@
    from the author.
 */
 
-#include "3b2_defs.h"
 #include "3b2_if.h"
 
+#include "sim_disk.h"
+
+#include "3b2_cpu.h"
+#include "3b2_csr.h"
+
 /* Static function declarations */
-static SIM_INLINE void if_set_irq();
-static SIM_INLINE void if_clear_irq();
-static SIM_INLINE void if_cancel_pending_irq();
 static SIM_INLINE uint32 if_lba();
 
 /*
@@ -56,6 +57,20 @@ static SIM_INLINE uint32 if_lba();
 #define IF_VERIFY_DELAY     20000    /* us */
 #define IF_HLD_DELAY        60000    /* us */
 #define IF_HSW_DELAY        40000    /* us */
+
+#if defined(REV3)
+#define SET_INT CPU_SET_INT(INT_FLOPPY)
+#define CLR_INT CPU_CLR_INT(INT_FLOPPY)
+#else
+#define SET_INT do {             \
+        CPU_SET_INT(INT_FLOPPY); \
+        SET_CSR(CSRDISK);        \
+    } while(0)
+#define CLR_INT do {             \
+        CPU_CLR_INT(INT_FLOPPY); \
+        CLR_CSR(CSRDISK);        \
+    } while(0)
+#endif
 
 UNIT if_unit = {
     UDATA (&if_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BINK+UNIT_ROABLE,
@@ -79,30 +94,12 @@ DEVICE if_dev = {
 IF_STATE if_state;
 uint8    if_buf[IF_SEC_SIZE];
 uint32   if_sec_ptr = 0;
-t_bool   if_irq = FALSE;
 
 /* Function implementation */
-
-static SIM_INLINE void if_set_irq()
-{
-    if_irq = TRUE;
-    csr_data |= CSRDISK;
-}
-
-static SIM_INLINE void if_clear_irq()
-{
-    if_irq = FALSE;
-    csr_data &= ~CSRDISK;
-}
 
 static SIM_INLINE void if_activate(uint32 delay)
 {
     sim_activate_abs(&if_unit, delay);
-}
-
-static SIM_INLINE void if_cancel_pending_irq()
-{
-    sim_cancel(&if_unit);
 }
 
 t_stat if_svc(UNIT *uptr)
@@ -145,7 +142,7 @@ t_stat if_svc(UNIT *uptr)
 
     /* Request an interrupt */
     sim_debug(IRQ_MSG, &if_dev, "\tINTR\n");
-    if_set_irq();
+    SET_INT;
 
     return SCPE_OK;
 }
@@ -185,7 +182,7 @@ uint32 if_read(uint32 pa, size_t size) {
             data |= IF_NRDY;
         }
         /* Reading the status register always de-asserts the IRQ line */
-        if_clear_irq();
+        CLR_INT;
         sim_debug(READ_MSG, &if_dev, "\tSTATUS\t%02x\n", data);
         break;
     case IF_TRACK_REG:
@@ -289,20 +286,24 @@ void if_handle_command()
     case IF_WRITE_SEC:
     case IF_WRITE_SEC_M:
         if_state.cmd_type = 2;
+#if defined(REV2)
         if (((if_state.cmd & IF_U_FLAG) >> 1) != if_state.side) {
             head_switch_delay = IF_HSW_DELAY;
             if_state.side = (if_state.cmd & IF_U_FLAG) >> 1;
         }
+#endif
         break;
 
     case IF_READ_ADDR:
     case IF_READ_TRACK:
     case IF_WRITE_TRACK:
         if_state.cmd_type = 3;
+#if defined(REV2)
         if (((if_state.cmd & IF_U_FLAG) >> 1) != if_state.side) {
             head_switch_delay = IF_HSW_DELAY;
             if_state.side = (if_state.cmd & IF_U_FLAG) >> 1;
         }
+#endif
         break;
 
     case IF_FORCE_INT:
@@ -516,11 +517,13 @@ void if_handle_command()
         }
 
         if ((if_state.cmd & 0xf) == 0) {
-            if_cancel_pending_irq();
-            if_clear_irq(); /* TODO: Confirm this is right */
+            sim_cancel(&if_unit);
+#if defined(REV2)
+            CLR_INT; /* TODO: Confirm this is right */
+#endif
         } else if ((if_state.cmd & 0x8) == 0x8) {
             if_state.status |= IF_DRQ;
-            if_set_irq();
+            SET_INT;
         }
 
         break;
@@ -542,7 +545,13 @@ void if_write(uint32 pa, uint32 val, size_t size)
     case IF_CMD_REG:
         if_state.cmd = (uint8) val;
         /* Writing to the command register always de-asserts the IRQ line */
-        if_clear_irq();
+        CLR_INT;
+
+        if ((uptr->flags & UNIT_ATT) == 0) {
+            /* If not attached, do nothing */
+            break;
+        }
+
         if_handle_command();
         break;
     case IF_TRACK_REG:
@@ -582,6 +591,18 @@ void if_write(uint32 pa, uint32 val, size_t size)
         break;
     }
 }
+
+#if defined(REV3)
+uint32 if_csr_read(uint32 pa, size_t size)
+{
+    return (uint32)(if_state.csr);
+}
+
+void if_csr_write(uint32 pa, uint32 val, size_t size)
+{
+    if_state.csr = val & 0xff;
+}
+#endif
 
 CONST char *if_description(DEVICE *dptr)
 {

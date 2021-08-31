@@ -1,6 +1,6 @@
-/* 3b2_dmac.h: AT&T 3B2 Model 400 AM9517A DMA Controller Header
+/* 3b2_dmac.h: AT&T 3B2 DMA Controller Header
 
-   Copyright (c) 2017, Seth J. Morabito
+   Copyright (c) 2021, Seth J. Morabito
 
    Permission is hereby granted, free of charge, to any person
    obtaining a copy of this software and associated documentation
@@ -31,7 +31,7 @@
 #ifndef _3B2_DMAC_H_
 #define _3B2_DMAC_H_
 
-#include "sim_defs.h"
+#include "3b2_defs.h"
 
 #define DMA_MODE_VERIFY  0
 #define DMA_MODE_WRITE   1     /* Write to memory from device */
@@ -40,7 +40,7 @@
 #define DMA_IF_READ      (IFBASE + IF_DATA_REG)
 
 typedef struct {
-    uint8  page;
+    uint16 page;
     uint16 addr;     /* Original addr       */
     uint16 wcount;   /* Original wcount     */
     uint16 addr_c;   /* Current addr        */
@@ -78,5 +78,7 @@ void dmac_write(uint32 pa, uint32 val, size_t size);
 void dmac_service_drqs();
 void dmac_generic_dma(uint8 channel, uint32 service_address);
 uint32 dma_address(uint8 channel, uint32 offset, t_bool r);
+
+extern DMA_STATE dma_state;
 
 #endif

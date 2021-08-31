@@ -1,14 +1,34 @@
 #ifndef ROM_vax_ka410_xs_bin_H
 #define ROM_vax_ka410_xs_bin_H 0
 /*
-   VAX/vax_ka410_xs_bin.h         produced at Sun Apr  7 13:22:58 2019
-   from VAX/ka410_xs.bin which was last modified at Sun Apr  7 11:12:27 2019
+   VAX/vax_ka410_xs_bin.h         produced at Mon Aug 23 13:30:21 2021
+   from VAX/ka410_xs.bin which was last modified at Mon Jul 26 08:03:31 2021
    file size: 32768 (0x8000) - checksum: 0xFFD8BD83
    This file is a generated file and should NOT be edited or changed by hand.
 */
+#undef BOOT_CODE_SIZE
 #define BOOT_CODE_SIZE 0x8000
+#undef BOOT_CODE_FILENAME
 #define BOOT_CODE_FILENAME "ka410_xs.bin"
+#undef BOOT_CODE_ARRAY
 #define BOOT_CODE_ARRAY vax_ka410_xs_bin
+#if !defined(BOOT_CODE_SIZE_1)
+#define BOOT_CODE_SIZE_1 0x8000
+#define BOOT_CODE_FILENAME_1 "ka410_xs.bin"
+#define BOOT_CODE_ARRAY_1 vax_ka410_xs_bin
+#elif !defined(BOOT_CODE_SIZE_2)
+#define BOOT_CODE_SIZE_2 0x8000
+#define BOOT_CODE_FILENAME_2 "ka410_xs.bin"
+#define BOOT_CODE_ARRAY_2 vax_ka410_xs_bin
+#elif !defined(BOOT_CODE_SIZE_3)
+#define BOOT_CODE_SIZE_3 0x8000
+#define BOOT_CODE_FILENAME_3 "ka410_xs.bin"
+#define BOOT_CODE_ARRAY_3 vax_ka410_xs_bin
+#elif !defined(BOOT_CODE_SIZE_4)
+#define BOOT_CODE_SIZE_4 0x8000
+#define BOOT_CODE_FILENAME_4 "ka410_xs.bin"
+#define BOOT_CODE_ARRAY_4 vax_ka410_xs_bin
+#endif
 unsigned char vax_ka410_xs_bin[] = {
 0x01,0x00,0x01,0x00,0x55,0xAA,0x33,0x20,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,

@@ -156,14 +156,12 @@ extern int32 MMR2;
 #define RQ_M_PFN        0x1FFFFF                        /* map entry PFN */
 
 #define UNIT_V_ONL      (DKUF_V_UF + 0)                 /* online */
-#define UNIT_V_WLK      DKUF_V_WLK                      /* hwre write lock */
 #define UNIT_V_ATP      (UNIT_V_ONL + 1)                /* attn pending */
 #define UNIT_V_DTYPE    (UNIT_V_ATP + 1)                /* drive type */
 #define UNIT_W_DTYPE    5                               /* 5b drive type encode */
 #define UNIT_M_DTYPE    ((1u << UNIT_W_DTYPE) - 1)
 #define UNIT_V_NOAUTO   (UNIT_V_DTYPE + UNIT_W_DTYPE)   /* noautosize */
 #define UNIT_ONL        (1 << UNIT_V_ONL)
-#define UNIT_WLK        (1 << UNIT_V_WLK)
 #define UNIT_ATP        (1 << UNIT_V_ATP)
 #define UNIT_NOAUTO     (1 << UNIT_V_NOAUTO)
 #define UNIT_DTYPE      (UNIT_M_DTYPE << UNIT_V_DTYPE)
@@ -176,7 +174,6 @@ extern int32 MMR2;
 #define io_status       u5                              /* io status from callback */
 #define io_complete     u6                              /* io completion flag */
 #define rqxb            filebuf                         /* xfer buffer */
-#define UNIT_WPRT       (UNIT_WLK | UNIT_RO)            /* write prot */
 #define RQ_RMV(u)       ((drv_tab[GET_DTYPE (u->flags)].flgs & RQDF_RMV)? \
                         UF_RMV: 0)
 #define RQ_WPH(u)       (((drv_tab[GET_DTYPE (u->flags)].flgs & RQDF_RO) || \
@@ -1032,12 +1029,10 @@ REG rq_reg[] = {
     };
 
 MTAB rq_mod[] = {
-    { UNIT_WLK,                 0,  NULL, "WRITEENABLED", 
-        &rq_set_wlk, NULL, NULL, "Write enable disk drive" },
-    { UNIT_WLK,          UNIT_WLK,  NULL, "LOCKED", 
+    { MTAB_XTD|MTAB_VUN,        0,  "write enable", "WRITEENABLED", 
+        &rq_set_wlk, &rq_show_wlk, NULL, "Write enable disk drive" },
+    { MTAB_XTD|MTAB_VUN,        1,  NULL, "LOCKED", 
         &rq_set_wlk, NULL, NULL, "Write lock disk drive"  },
-    { MTAB_XTD|MTAB_VUN, 0, "WRITE", NULL,
-      NULL, &rq_show_wlk, NULL,  "Display drive writelock status" },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO, RQ_SH_RI, "RINGS", NULL,
       NULL, &rq_show_ctrl, NULL, "Display command and response rings" },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO, RQ_SH_FR, "FREEQ", NULL,
@@ -2818,9 +2813,9 @@ t_stat rq_set_wlk (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uint32 dtyp = GET_DTYPE (uptr->flags);                  /* get drive type */
 
-if (drv_tab[dtyp].flgs & RQDF_RO)                       /* not on read only */
-    return SCPE_NOFNC;
-return SCPE_OK;
+if ((drv_tab[dtyp].flgs & RQDF_RO) && (val == 0))       /* not on read only */
+    return sim_messagef (SCPE_NOFNC, "%s: Can't enable write on Read Only device\n", sim_uname (uptr));
+return set_writelock (uptr, val, cptr, desc);
 }
 
 /* Show write lock status */
@@ -2831,9 +2826,8 @@ uint32 dtyp = GET_DTYPE (uptr->flags);                  /* get drive type */
 
 if (drv_tab[dtyp].flgs & RQDF_RO)
     fprintf (st, "read only");
-else if (uptr->flags & UNIT_WPRT)
-    fprintf (st, "write locked");
-else fprintf (st, "write enabled");
+else
+    show_writelock (st, uptr, val, desc);
 return SCPE_OK;
 }
 

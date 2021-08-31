@@ -556,7 +556,7 @@ display_delay(int t, int slowdown)
         return;
 
     elapsed = os_elapsed();     /* read and reset elapsed timer */
-    if (elapsed == ~0L) {       /* first time thru? */
+    if (elapsed == (unsigned long)(~0L)) {/* first time thru? */
         slowdown = 0;           /* no adjustments */
         elapsed = sim_time;
         }
@@ -809,6 +809,72 @@ display_point(int x,        /* 0..xpixels (unscaled) */
     return lx*lx + ly*ly <= scaled_pen_radius_squared;
 } /* display_point */
 
+#define ABS(_X) ((_X) >= 0 ? (_X) : -(_X))
+#define SIGN(_X) ((_X) >= 0 ? 1 : -1)
+
+static void
+xline (int x, int y, int x2, int dx, int dy, int level)
+{
+    int ix = SIGN(dx);
+    int iy = SIGN(dy);
+    int ay;
+
+    dx = ABS(dx);
+    dy = ABS(dy);
+
+    ay = dy/2;
+    for (;;) {
+        display_point (x, y, level, 0);
+        if (x == x2)
+            break;
+        if (ay > 0) {
+            y += iy;
+            ay -= dx;
+        }
+        ay += dy;
+        x += ix;
+    }
+}
+  
+static void
+yline (int x, int y, int y2, int dx, int dy, int level)
+{
+    int ix = SIGN(dx);
+    int iy = SIGN(dy);
+    int ax;
+
+    dx = ABS(dx);
+    dy = ABS(dy);
+
+    ax = dx/2;
+    for (;;) {
+        display_point (x, y, level, 0);
+        if (y == y2)
+            break;
+        if (ax > 0) {
+            x += ix;
+            ax -= dy;
+        }
+        ax += dx;
+        y += iy;
+    }
+}
+
+void
+display_line(int x1,        /* 0..xpixels (unscaled) */
+          int y1,           /* 0..ypixels (unscaled) */
+          int x2,           /* 0..xpixels (unscaled) */
+          int y2,           /* 0..ypixels (unscaled) */
+          int level)        /* DISPLAY_INT_xxx */
+{
+    int dx = x2 - x1;
+    int dy = y2 - y1;
+    if (ABS (dx) > ABS(dy))
+        xline (x1, y1, x2, dx, dy, level);
+    else
+        yline (x1, y1, y2, dx, dy, level);
+} /* display_line */
+
 /*
  * calculate decay color table for a phosphor mixture
  * must be called AFTER refresh_rate initialized!
@@ -880,7 +946,7 @@ phosphor_init(struct phosphor *phosphors, int nphosphors, int color)
 static struct display *
 find_type(enum display_type type)
 {
-    int i;
+    size_t i;
     struct display *dp;
 
     for (i = 0, dp = displays; i < ELEMENTS(displays); i++, dp++)

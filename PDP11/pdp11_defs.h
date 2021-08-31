@@ -123,10 +123,10 @@
 #define MOD_1140        8
 #define MOD_1144        9
 #define MOD_1145        10
-#define MOD_1160        11
-#define MOD_1170        12
-#define MOD_1173        13
-#define MOD_1153        14
+#define MOD_1153        11
+#define MOD_1160        12
+#define MOD_1170        13
+#define MOD_1173        14
 #define MOD_1173B       15
 #define MOD_1183        16
 #define MOD_1184        17

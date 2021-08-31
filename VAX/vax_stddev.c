@@ -593,6 +593,12 @@ t_stat clk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cpt
 fprintf (st, "Real-Time Clock (%s)\n\n", dptr->name);
 fprintf (st, "The real-time clock autocalibrates; the clock interval is adjusted up or down\n");
 fprintf (st, "so that the clock tracks actual elapsed time.\n\n");
+fprintf (st, "The TODR (Time Of Day Register) is a 32 bit register that counts up once every\n");
+fprintf (st, "10 milliseconds of wall clock time.  At the 10 millisecond rate, the 32 bit\n");
+fprintf (st, "value will overflow after approximately 16 months.  The operating system\n");
+fprintf (st, "running on the machine generally keeps track of when the system date/time has\n");
+fprintf (st, "been set and thus can use the system's known base time plus the current TODR\n");
+fprintf (st, "value to provide the correct current date/time.\n\n");
 fprintf (st, "There are two modes of TODR operation:\n\n");
 fprintf (st, "   Default VMS mode.  Without initializing the TODR it returns the current\n");
 fprintf (st, "                      time of year offset which VMS would set the clock to\n");

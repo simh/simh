@@ -149,12 +149,12 @@ if ((uptr->flags & UNIT_ATT) == 0) {
     return IORETURN (lpt_stopioe, SCPE_UNATT);
     }
 fputc (uptr->buf, uptr->fileref);                       /* print char */
-uptr->pos = ftell (uptr->fileref);
 if (ferror (uptr->fileref)) {                           /* error? */
     sim_perror ("LPT I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }
+uptr->pos = uptr->pos + 1;
 return SCPE_OK;
 }
 

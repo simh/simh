@@ -31,7 +31,7 @@
 #ifndef __3B2_IF_H__
 #define __3B2_IF_H__
 
-#include "sim_defs.h"
+#include "3b2_defs.h"
 
 typedef struct {
     uint8 data;
@@ -44,6 +44,9 @@ typedef struct {
     uint8 read_addr_ptr;
     int8  step_dir;
     t_bool drq;
+#if defined(REV3)    
+    uint8 csr;
+#endif
 } IF_STATE;
 
 /* Status Bits */
@@ -114,9 +117,15 @@ t_stat if_attach(UNIT *uptr, CONST char *cptr);
 t_stat if_detach(UNIT *uptr);
 uint32 if_read(uint32 pa, size_t size);
 void if_write(uint32 pa, uint32 val, size_t size);
+#if defined(REV3)
+uint32 if_csr_read(uint32 pa, size_t size);
+void if_csr_write(uint32 pa, uint32 val, size_t size);
+#endif
 void if_handle_command();
 void if_after_dma();
 CONST char *if_description(DEVICE *dptr);
 t_stat if_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+
+extern IF_STATE if_state;
 
 #endif

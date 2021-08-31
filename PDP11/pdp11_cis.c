@@ -1453,7 +1453,7 @@ return ((nz - 1) * 8) + i;
 
 void CreateTable (DSTR *dsrc, DSTR mtable[10])
 {
-int32 (i);
+int32 i;
 
 mtable[1] = *dsrc;
 for (i = 2; i < 10; i++)

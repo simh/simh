@@ -64,15 +64,12 @@
 
 /* Flags in the unit flags word */
 
-#define UNIT_V_WLK      (UNIT_V_UF + 0)                 /* write lock */
-#define UNIT_V_RL02     (UNIT_V_UF + 1)                 /* RL01 vs RL02 */
-#define UNIT_V_AUTO     (UNIT_V_UF + 2)                 /* autosize enable */
-#define UNIT_V_DUMMY    (UNIT_V_UF + 3)                 /* dummy flag */
+#define UNIT_V_RL02     (UNIT_V_UF + 0)                 /* RL01 vs RL02 */
+#define UNIT_V_AUTO     (UNIT_V_UF + 1)                 /* autosize enable */
+#define UNIT_V_DUMMY    (UNIT_V_UF + 2)                 /* dummy flag */
 #define UNIT_DUMMY      (1u << UNIT_V_DUMMY)
-#define UNIT_WLK        (1u << UNIT_V_WLK)
 #define UNIT_RL02       (1u << UNIT_V_RL02)
 #define UNIT_AUTO       (1u << UNIT_V_AUTO)
-#define UNIT_WPRT       (UNIT_WLK | UNIT_RO)            /* write protect */
 
 /* Parameters in the unit descriptor */
 
@@ -231,8 +228,10 @@ REG rl_reg[] = {
     };
 
 MTAB rl_mod[] = {
-    { UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
-    { UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock drive" },
     { UNIT_DUMMY, 0, NULL, "BADBLOCK", &rl_set_bad },
     { (UNIT_RL02+UNIT_ATT), UNIT_ATT, "RL01", NULL, NULL },
     { (UNIT_RL02+UNIT_ATT), (UNIT_RL02+UNIT_ATT), "RL02", NULL, NULL },

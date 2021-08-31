@@ -42,8 +42,11 @@
  *   HD135      11   1224    15   18    512     Maxtor XT1190
  */
 
-#include "3b2_defs.h"
 #include "3b2_id.h"
+
+#include "sim_disk.h"
+
+#include "3b2_cpu.h"
 
 #define ID_SEEK_WAIT        50
 #define ID_SEEK_BASE        700
@@ -183,11 +186,31 @@ DEVICE id_dev = {
 
 /* Function implementation */
 
-t_bool id_int()
+#define UPDATE_INT {                                      \
+        if ((id_status & (ID_STAT_CEL|ID_STAT_CEH)) ||    \
+            ((id_status & ID_STAT_SRQ) && !id_srqm)) {    \
+            CPU_SET_INT(INT_DISK);                        \
+        } else {                                          \
+            CPU_CLR_INT(INT_DISK);                        \
+        }                                                 \
+    }
+
+static SIM_INLINE void id_set_status(uint8 flags)
 {
-    return (((id_status & ID_STAT_CEL) ||
-             (id_status & ID_STAT_CEH) ||
-             ((id_status & ID_STAT_SRQ) && !id_srqm)));
+    id_status |= flags;
+    UPDATE_INT;
+}
+
+static SIM_INLINE void id_clr_status(uint8 flags)
+{
+    id_status &= ~(flags);
+    UPDATE_INT;
+}
+
+static SIM_INLINE void id_set_srqm(t_bool state)
+{
+    id_srqm = state;
+    UPDATE_INT;
 }
 
 static SIM_INLINE void id_clear_fifo()
@@ -214,9 +237,9 @@ t_stat id_ctlr_svc(UNIT *uptr)
 
     cmd = uptr->u4;  /* The command that caused the activity */
 
-    id_srqm = FALSE;
-    id_status &= ~(ID_STAT_CB);
-    id_status |= ID_STAT_CEH;
+    id_set_srqm(FALSE);
+    id_clr_status(ID_STAT_CB);
+    id_set_status(ID_STAT_CEH);
     uptr->u4 = 0;
 
     switch (cmd) {
@@ -256,8 +279,8 @@ t_stat id_unit_svc(UNIT *uptr)
         return SCPE_OK;
     }
 
-    id_srqm = FALSE;
-    id_status &= ~(ID_STAT_CB);
+    id_set_srqm(FALSE);
+    id_clr_status(ID_STAT_CB);
     /* Note that we don't set CEH, in case this is a SEEK/RECAL ID_SEEK_1 */
 
     switch (cmd) {
@@ -274,7 +297,7 @@ t_stat id_unit_svc(UNIT *uptr)
         if (id_polling) {
             switch (id_seek_state[unit]) {
             case ID_SEEK_0:
-                id_status |= ID_STAT_CEH;
+                id_set_status(ID_STAT_CEH);
                 sim_debug(EXECUTE_MSG, &id_dev,
                           "[%08x]\tINTR\t\tCOMPLETING Recal/Seek SEEK_0 UNIT %d\n",
                           R[NUM_PC], unit);
@@ -286,7 +309,7 @@ t_stat id_unit_svc(UNIT *uptr)
                           "[%08x]\tINTR\t\tCOMPLETING Recal/Seek SEEK_1 UNIT %d\n",
                           R[NUM_PC], unit);
                 id_seek_state[unit] = ID_SEEK_NONE;
-                id_status |= ID_STAT_SRQ;
+                id_set_status(ID_STAT_SRQ);
                 uptr->u4 = 0; /* Only clear out the command on a SEEK_1, never a SEEK_0 */
                 if (uptr->flags & UNIT_ATT) {
                     id_int_status |= (ID_IST_SEN|unit);
@@ -304,7 +327,7 @@ t_stat id_unit_svc(UNIT *uptr)
             sim_debug(EXECUTE_MSG, &id_dev,
                       "[%08x]\tINTR\t\tCOMPLETING NON-POLLING Recal/Seek UNIT %d\n",
                       R[NUM_PC], unit);
-            id_status |= ID_STAT_CEH;
+            id_set_status(ID_STAT_CEH);
             uptr->u4 = 0;
             if (uptr->flags & UNIT_ATT) {
                 id_int_status |= (ID_IST_SEN|unit);
@@ -318,7 +341,7 @@ t_stat id_unit_svc(UNIT *uptr)
         sim_debug(EXECUTE_MSG, &id_dev,
                   "[%08x]\tINTR\t\tCOMPLETING Sense Unit Status UNIT %d\n",
                   R[NUM_PC], unit);
-        id_status |= ID_STAT_CEH;
+        id_set_status(ID_STAT_CEH);
         uptr->u4 = 0;
         if ((uptr->flags & UNIT_ATT) == 0) {
             /* If no HD is attached, SUS puts 0x00 into the data
@@ -336,7 +359,7 @@ t_stat id_unit_svc(UNIT *uptr)
         sim_debug(EXECUTE_MSG, &id_dev,
                   "[%08x]\tINTR\t\tCOMPLETING OTHER COMMAND 0x%x UNIT %d\n",
                   R[NUM_PC], cmd, unit);
-        id_status |= ID_STAT_CEH;
+        id_set_status(ID_STAT_CEH);
         uptr->u4 = 0;
         break;
     }
@@ -670,14 +693,14 @@ void id_handle_command(uint8 val)
             sim_debug(WRITE_MSG, &id_dev,
                       "[%08x] \tCOMMAND\t%02x\tAUX:CLCE\n",
                       R[NUM_PC], val);
-            id_status &= ~(ID_STAT_CEH|ID_STAT_CEL);
+            id_clr_status(ID_STAT_CEH|ID_STAT_CEL);
         }
 
         if (aux_cmd & ID_AUX_HSRQ) {
             sim_debug(WRITE_MSG, &id_dev,
                       "[%08x] \tCOMMAND\t%02x\tAUX:HSRQ\n",
                       R[NUM_PC], val);
-            id_srqm = TRUE;
+            id_set_srqm(TRUE);
         }
 
         if (aux_cmd & ID_AUX_CLB) {
@@ -696,6 +719,7 @@ void id_handle_command(uint8 val)
             sim_cancel(id_ctlr_unit);
             id_status = 0;
             id_srqm = FALSE;
+            UPDATE_INT;
         }
 
         /* Just return early */
@@ -712,7 +736,7 @@ void id_handle_command(uint8 val)
     }
 
     /* A full command always resets CEH and CEL */
-    id_status &= ~(ID_STAT_CEH|ID_STAT_CEL);
+    id_clr_status(ID_STAT_CEH|ID_STAT_CEL);
 
     /* Save the full command byte */
     id_cmd = val;
@@ -736,14 +760,14 @@ void id_handle_command(uint8 val)
         id_sel_unit->u4 = cmd;
     }
 
-    id_status |= ID_STAT_CB;
+    id_set_status(ID_STAT_CB);
 
     switch(cmd) {
     case ID_CMD_SIS:
         sim_debug(WRITE_MSG, &id_dev,
                   "[%08x]\tCOMMAND\t%02x\tSense Int. Status\n",
                   R[NUM_PC], val);
-        id_status &= ~ID_STAT_SRQ; /* SIS immediately de-asserts SRQ */
+        id_clr_status(ID_STAT_SRQ); /* SIS immediately de-asserts SRQ */
         id_activate(id_ctlr_unit, ID_SIS_WAIT);
         break;
     case ID_CMD_SPEC:
@@ -948,7 +972,7 @@ void id_handle_command(uint8 val)
 
 void id_after_dma()
 {
-    id_status &= ~ID_STAT_DRQ;
+    id_clr_status(ID_STAT_DRQ);
     id_drq = FALSE;
 }
 

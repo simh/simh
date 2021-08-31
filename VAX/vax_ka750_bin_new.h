@@ -1,17 +1,36 @@
 #ifndef ROM_vax_ka750_bin_new_H
 #define ROM_vax_ka750_bin_new_H 0
 /*
-   VAX/vax_ka750_bin_new.h         produced at Thu Aug 06 09:27:12 2015
-   from VAX/ka750_new.bin which was last modified at Tue Jul 28 12:12:03 2015
+   VAX/vax_ka750_bin_new.h         produced at Mon Aug 23 12:14:08 2021
+   from VAX/ka750_new.bin which was last modified at Mon Jul 26 08:03:31 2021
    file size: 1024 (0x400) - checksum: 0xFFFE7BE5
    This file is a generated file and should NOT be edited or changed by hand.
 
    From ROM set: E40A9, E41A9, E42A9, E43A9 (Boots: A=DD, B=DB, C=DU
 
 */
+#if !defined BOOT_CODE_SIZE
 #define BOOT_CODE_SIZE 0x400
 #define BOOT_CODE_FILENAME "ka750_new.bin"
 #define BOOT_CODE_ARRAY vax_ka750_bin_new
+#endif
+#if !defined BOOT_CODE_SIZE_1
+#define BOOT_CODE_SIZE_1 0x400
+#define BOOT_CODE_FILENAME_1 "ka750_new.bin"
+#define BOOT_CODE_ARRAY_1 vax_ka750_bin_new
+#elif !defined BOOT_CODE_SIZE_2
+#define BOOT_CODE_SIZE_2 0x400
+#define BOOT_CODE_FILENAME_2 "ka750_new.bin"
+#define BOOT_CODE_ARRAY_2 vax_ka750_bin_new
+#elif !defined BOOT_CODE_SIZE_3
+#define BOOT_CODE_SIZE_3 0x400
+#define BOOT_CODE_FILENAME_3 "ka750_new.bin"
+#define BOOT_CODE_ARRAY_3 vax_ka750_bin_new
+#elif !defined BOOT_CODE_SIZE_4
+#define BOOT_CODE_SIZE_4 0x400
+#define BOOT_CODE_FILENAME_4 "ka750_new.bin"
+#define BOOT_CODE_ARRAY_4 vax_ka750_bin_new
+#endif
 unsigned char vax_ka750_bin_new[] = {
 0x44,0x44,0xC3,0x8F,0x00,0x02,0x00,0x00,0x5E,0x57,0xBB,0x3F,0x30,0xF4,0x02,0xBA,
 0x3F,0xD4,0x54,0x9E,0xCE,0x00,0x01,0x5E,0xBB,0x8F,0x06,0x01,0x9F,0xCE,0x0C,0xFD,

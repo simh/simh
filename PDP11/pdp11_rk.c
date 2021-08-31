@@ -127,11 +127,9 @@ static struct drvtyp drv_tab[] = {
 
 /* Flags in the unit flags word */
 
-#define UNIT_V_HWLK     (DKUF_V_WLK + 0)                /* hwre write lock */
 #define UNIT_V_SWLK     (DKUF_V_UF + 0)                 /* swre write lock */
-#define UNIT_HWLK       (1u << UNIT_V_HWLK)
+#define UNIT_HWLK       UNIT_WPRT
 #define UNIT_SWLK       (1u << UNIT_V_SWLK)
-#define UNIT_WPRT       (UNIT_HWLK|UNIT_SWLK|UNIT_RO)   /* write prot */
 #define GET_DTYPE(x)    (0)
 
 /* Parameters in the unit descriptor */
@@ -425,10 +423,10 @@ REG rk_reg[] = {
     };
 
 MTAB rk_mod[] = {
-    { UNIT_HWLK,        0, "write enabled", "WRITEENABLED", 
-        NULL, NULL, NULL, "Write enable disk drive" },
-    { UNIT_HWLK, UNIT_HWLK, "write locked",  "LOCKED", 
-        NULL, NULL, NULL, "Write lock disk drive"  },
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable tape drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock tape drive" },
     { MTAB_XTD|MTAB_VUN, 0, "TYPE", NULL,
       NULL, &rk_show_type, NULL, "Display device type" },
     { MTAB_XTD|MTAB_VUN|MTAB_VALR, 0, "FORMAT", "FORMAT={AUTO|SIMH|VHD|RAW}",
@@ -480,7 +478,7 @@ switch ((PA >> 1) & 07) {                               /* decode PA<3:1> */
                 rkds = rkds | RKDS_RDY;
             if (!sim_is_active (uptr))                  /* idle? */
                 rkds = rkds | RKDS_RWS;
-            if (uptr->flags & UNIT_WPRT)                /* write locked? */
+            if (uptr->flags & (UNIT_HWLK|UNIT_SWLK))    /* write locked? */
                 rkds = rkds | RKDS_WLK;
             if (GET_SECT (rkda) == (rkds & RKDS_SC))
                 rkds = rkds | RKDS_ON_SC;
@@ -621,7 +619,7 @@ if ((rkcs & RKCS_FMT) &&                                /* format and */
     return;
     }
 if ((func == RKCS_WRITE) &&                             /* write and locked? */
-    (uptr->flags & UNIT_WPRT)) {
+    (uptr->flags & (UNIT_HWLK|UNIT_SWLK))) {
     rk_set_done (RKER_WLK);
     return;
     }

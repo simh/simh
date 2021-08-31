@@ -1,14 +1,34 @@
 #ifndef ROM_vax_is1000_bin_H
 #define ROM_vax_is1000_bin_H 0
 /*
-   VAX/vax_is1000_bin.h         produced at Wed Apr 17 01:08:39 2019
-   from VAX/is1000.bin which was last modified at Wed Apr 17 01:05:07 2019
+   VAX/vax_is1000_bin.h         produced at Mon Aug 23 13:30:21 2021
+   from VAX/is1000.bin which was last modified at Mon Jul 26 08:03:31 2021
    file size: 524288 (0x80000) - checksum: 0xFCBCD74A
    This file is a generated file and should NOT be edited or changed by hand.
 */
+#undef BOOT_CODE_SIZE
 #define BOOT_CODE_SIZE 0x80000
+#undef BOOT_CODE_FILENAME
 #define BOOT_CODE_FILENAME "is1000.bin"
+#undef BOOT_CODE_ARRAY
 #define BOOT_CODE_ARRAY vax_is1000_bin
+#if !defined(BOOT_CODE_SIZE_1)
+#define BOOT_CODE_SIZE_1 0x80000
+#define BOOT_CODE_FILENAME_1 "is1000.bin"
+#define BOOT_CODE_ARRAY_1 vax_is1000_bin
+#elif !defined(BOOT_CODE_SIZE_2)
+#define BOOT_CODE_SIZE_2 0x80000
+#define BOOT_CODE_FILENAME_2 "is1000.bin"
+#define BOOT_CODE_ARRAY_2 vax_is1000_bin
+#elif !defined(BOOT_CODE_SIZE_3)
+#define BOOT_CODE_SIZE_3 0x80000
+#define BOOT_CODE_FILENAME_3 "is1000.bin"
+#define BOOT_CODE_ARRAY_3 vax_is1000_bin
+#elif !defined(BOOT_CODE_SIZE_4)
+#define BOOT_CODE_SIZE_4 0x80000
+#define BOOT_CODE_FILENAME_4 "is1000.bin"
+#define BOOT_CODE_ARRAY_4 vax_is1000_bin
+#endif
 unsigned char vax_is1000_bin[] = {
 0x31,0xE1,0x12,0x00,0x01,0x06,0x01,0x08,0x01,0x01,0x01,0x01,0x00,0x01,0x02,0x03,
 0x55,0x55,0x55,0x55,0xAA,0xAA,0xAA,0xAA,0x33,0x33,0x33,0x33,0x04,0x04,0x04,0x04,

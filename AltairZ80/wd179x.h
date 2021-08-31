@@ -51,8 +51,10 @@ extern uint8 wd179x_get_nheads(void);
 #define WD179X_SECTOR 2
 #define WD179X_DATA   3
 
+/* Note: this struct must be kept in sync with WD179X_INFO */
 typedef struct {
     PNP_INFO pnp;       /* Plug-n-Play Information */
+    uint16 fdctype;     /* Default is 1793 */
     uint8 intrq;        /* WD179X Interrupt Request Output (EOJ) */
     uint8 hld;          /* WD179X Head Load Output */
     uint8 drq;          /* WD179X DMA Request Output */

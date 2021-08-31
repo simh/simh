@@ -1,14 +1,34 @@
 #ifndef ROM_lunar_lda_H
 #define ROM_lunar_lda_H 0
 /*
-   PDP11/pdp11_vt_lunar_rom.h         produced at Sun Jan 10 15:59:23 2016
-   from PDP11/lunar11/lunar.lda which was last modified at Thu Aug 20 07:46:30 2015
+   PDP11/pdp11_vt_lunar_rom.h         produced at Mon Aug 23 13:30:21 2021
+   from PDP11/lunar11/lunar.lda which was last modified at Mon Jul 26 08:03:31 2021
    file size: 13824 (0x3600) - checksum: 0xFFF15D00
    This file is a generated file and should NOT be edited or changed by hand.
 */
+#undef BOOT_CODE_SIZE
 #define BOOT_CODE_SIZE 0x3600
+#undef BOOT_CODE_FILENAME
 #define BOOT_CODE_FILENAME "lunar.lda"
+#undef BOOT_CODE_ARRAY
 #define BOOT_CODE_ARRAY lunar_lda
+#if !defined(BOOT_CODE_SIZE_1)
+#define BOOT_CODE_SIZE_1 0x3600
+#define BOOT_CODE_FILENAME_1 "lunar.lda"
+#define BOOT_CODE_ARRAY_1 lunar_lda
+#elif !defined(BOOT_CODE_SIZE_2)
+#define BOOT_CODE_SIZE_2 0x3600
+#define BOOT_CODE_FILENAME_2 "lunar.lda"
+#define BOOT_CODE_ARRAY_2 lunar_lda
+#elif !defined(BOOT_CODE_SIZE_3)
+#define BOOT_CODE_SIZE_3 0x3600
+#define BOOT_CODE_FILENAME_3 "lunar.lda"
+#define BOOT_CODE_ARRAY_3 lunar_lda
+#elif !defined(BOOT_CODE_SIZE_4)
+#define BOOT_CODE_SIZE_4 0x3600
+#define BOOT_CODE_FILENAME_4 "lunar.lda"
+#define BOOT_CODE_ARRAY_4 lunar_lda
+#endif
 unsigned char lunar_lda[] = {
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01,0x00,0x0A,0x00,0x00,0x00,0x5F,0x00,

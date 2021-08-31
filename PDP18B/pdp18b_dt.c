@@ -27,6 +27,7 @@
                 (PDP-9) TC02/TU55 DECtape
                 (PDP-15) TC15/TU56 DECtape
 
+   03-May-21    RMS     Fixed bug if read overwrites WC memory location
    15-Mar-17    RMS     Fixed dt_seterr to clear successor states
    09-Mar-17    RMS     Fixed dt_seterr to handle nx unit select (COVERITY)
    10-Mar-16    RMS     Added 3-cycle databreak set/show entries
@@ -119,10 +120,8 @@
 #include "pdp18b_defs.h"
 
 #define DT_NUMDR        8                               /* #drives */
-#define UNIT_V_WLK      (UNIT_V_UF + 0)                 /* write locked */
-#define UNIT_V_8FMT     (UNIT_V_UF + 1)                 /* 12b format */
-#define UNIT_V_11FMT    (UNIT_V_UF + 2)                 /* 16b format */
-#define UNIT_WLK        (1 << UNIT_V_WLK)
+#define UNIT_V_8FMT     (UNIT_V_UF + 0)                 /* 12b format */
+#define UNIT_V_11FMT    (UNIT_V_UF + 1)                 /* 16b format */
 #define UNIT_8FMT       (1 << UNIT_V_8FMT)
 #define UNIT_11FMT      (1 << UNIT_V_11FMT)
 #define STATE           u3                              /* unit state */
@@ -130,7 +129,6 @@
 #define WRITTEN         u5                              /* device buffer is dirty and needs flushing */
 #define DT_WC           030                             /* word count */
 #define DT_CA           031                             /* current addr */
-#define UNIT_WPRT       (UNIT_WLK | UNIT_RO)            /* write protect */
 
 /* System independent DECtape constants */
 
@@ -430,8 +428,10 @@ REG dt_reg[] = {
     };
 
 MTAB dt_mod[] = {
-    { UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
-    { UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL }, 
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock drive" },
     { UNIT_8FMT + UNIT_11FMT, 0, "18b", NULL, NULL },
     { UNIT_8FMT + UNIT_11FMT, UNIT_8FMT, "12b", NULL, NULL },
     { UNIT_8FMT + UNIT_11FMT, UNIT_11FMT, "16b", NULL, NULL },
@@ -564,8 +564,8 @@ else if ((pulse & 044) == 004) {                        /* MMLC */
     if ((uptr == NULL) ||                               /* invalid? */
         ((uptr->flags) & UNIT_DIS) ||                   /* disabled? */
          (fnc >= FNC_WMRK) ||                           /* write mark? */
-        ((fnc == FNC_WRIT) && (uptr->flags & UNIT_WLK)) ||
-        ((fnc == FNC_WALL) && (uptr->flags & UNIT_WLK)))
+        ((fnc == FNC_WRIT) && (uptr->flags & UNIT_WPRT)) ||
+        ((fnc == FNC_WALL) && (uptr->flags & UNIT_WPRT)))
         dt_seterr (uptr, DTB_SEL);                      /* select err */
     else dt_newsa (dtsa);
     }
@@ -962,10 +962,10 @@ switch (fnc) {                                          /* at speed, check fnc *
         sim_activate (uptr, DTU_LPERB (uptr) * dt_ltime);/* sched next block */
         M[DT_WC] = (M[DT_WC] + 1) & DMASK;              /* inc WC */
         ma = M[DT_CA] & AMASK;                          /* get mem addr */
-        if (MEM_ADDR_OK (ma))                           /* store block # */
-            M[ma] = blk;
         if (((dtsa & DTA_MODE) == 0) || (M[DT_WC] == 0))
                 dtsb = dtsb | DTB_DTF;                  /* set DTF */
+        if (MEM_ADDR_OK (ma))                           /* store block # */
+            M[ma] = blk;
         if (DEBUG_PRI (dt_dev, LOG_MS))
             fprintf (sim_deb, ">>DT%d: found block %d\n", unum, blk);
         break;
@@ -1002,6 +1002,8 @@ switch (fnc) {                                          /* at speed, check fnc *
         case 0:                                         /* normal read */
             M[DT_WC] = (M[DT_WC] + 1) & DMASK;          /* incr WC, CA */
             M[DT_CA] = (M[DT_CA] + 1) & DMASK;
+            if (M[DT_WC] == 0)                          /* wc ovf? */
+                dt_substate = DTO_WCO;
             ma = M[DT_CA] & AMASK;                      /* mem addr */
             ba = (blk * DTU_BSIZE (uptr)) + wrd;        /* buffer ptr */
             dtdb = fbuf[ba];                            /* get tape word */
@@ -1009,17 +1011,15 @@ switch (fnc) {                                          /* at speed, check fnc *
                 dtdb = dt_comobv (dtdb);
             if (MEM_ADDR_OK (ma))                       /* mem addr legal? */
                 M[ma] = dtdb;
-            if (M[DT_WC] == 0)                          /* wc ovf? */
-                dt_substate = DTO_WCO;
             /* fall through */
         case DTO_WCO:                                   /* wc ovf, not sob */
             if (wrd != (dir? 0: DTU_BSIZE (uptr) - 1))  /* not last? */
                 sim_activate (uptr, DT_WSIZE * dt_ltime);
             else {
-                dt_substate = dt_substate | DTO_SOB;
                 sim_activate (uptr, ((2 * DT_HTLIN) + DT_WSIZE) * dt_ltime);
-                if (((dtsa & DTA_MODE) == 0) || (M[DT_WC] == 0))
+                if (((dtsa & DTA_MODE) == 0) || (dt_substate == DTO_WCO))
                     dtsb = dtsb | DTB_DTF;              /* set DTF */
+                dt_substate = dt_substate | DTO_SOB;
                 }
             break;                      
 
@@ -1108,6 +1108,8 @@ switch (fnc) {                                          /* at speed, check fnc *
             relpos = DT_LIN2OF (uptr->pos, uptr);       /* cur pos in blk */
             M[DT_WC] = (M[DT_WC] + 1) & DMASK;          /* incr WC, CA */
             M[DT_CA] = (M[DT_CA] + 1) & DMASK;
+            if (M[DT_WC] == 0)
+                dt_substate = DTO_WCO;
             ma = M[DT_CA] & AMASK;                      /* mem addr */
             if ((relpos >= DT_HTLIN) &&                 /* in data zone? */
                 (relpos < (DTU_LPERB (uptr) - DT_HTLIN))) {
@@ -1121,9 +1123,7 @@ switch (fnc) {                                          /* at speed, check fnc *
             sim_activate (uptr, DT_WSIZE * dt_ltime);
             if (MEM_ADDR_OK (ma))                       /* mem addr legal? */
                 M[ma] = dtdb;
-            if (M[DT_WC] == 0)
-                dt_substate = DTO_WCO;
-            if (((dtsa & DTA_MODE) == 0) || (M[DT_WC] == 0))
+            if (((dtsa & DTA_MODE) == 0) || (dt_substate == DTO_WCO))
                 dtsb = dtsb | DTB_DTF;                  /* set DTF */
             break;
 
@@ -1515,6 +1515,7 @@ int32 k;
 uint32 ba, *fbuf;
 
 if (uptr->WRITTEN && uptr->hwmark && ((uptr->flags & UNIT_RO)== 0)) {    /* any data? */
+    sim_printf ("%s: writing buffer to file: %s\n", sim_uname (uptr), uptr->filename);
     rewind (uptr->fileref);                             /* start of file */
     fbuf = (uint32 *) uptr->filebuf;                    /* file buffer */
     if (uptr->flags & UNIT_8FMT) {                      /* 12b? */
@@ -1564,10 +1565,8 @@ if (sim_is_active (uptr)) {
         }
     uptr->STATE = uptr->pos = 0;
     }
-if (uptr->hwmark && ((uptr->flags & UNIT_RO) == 0)) {   /* any data? */
-    sim_printf ("%s%d: writing buffer to file\n", sim_dname (&dt_dev), u);
-    dt_flush (uptr);
-    }                                                   /* end if hwmark */
+if (uptr->hwmark && ((uptr->flags & UNIT_RO) == 0))     /* any data? */
+    dt_flush (uptr);                                    /* end if hwmark */
 free (uptr->filebuf);                                   /* release buf */
 uptr->flags = uptr->flags & ~UNIT_BUF;                  /* clear buf flag */
 uptr->filebuf = NULL;                                   /* clear buf ptr */

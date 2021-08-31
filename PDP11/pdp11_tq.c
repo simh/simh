@@ -474,10 +474,10 @@ REG tq_reg[] = {
     };
 
 MTAB tq_mod[] = {
-    { MTUF_WLK,         0, "write enabled",  "WRITEENABLED", 
-        NULL, NULL, NULL, "Write enable tape drive" },
-    { MTUF_WLK,  MTUF_WLK, "write locked",   "LOCKED", 
-        NULL, NULL, NULL, "Write lock tape drive"  },
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable tape drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock tape drive" },
     { MTAB_XTD|MTAB_VDV,  TQ5_TYPE,           NULL,   "TK50",
         &tq_set_type, NULL, NULL, "Set TK50 Device Type" },
     { MTAB_XTD|MTAB_VDV,  TQ7_TYPE,           NULL,   "TK70",
@@ -2454,7 +2454,7 @@ static t_stat tq_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const cha
 const char *devtype = UNIBUS ? "TUK50" : "TQK50";
 
 fprintf (st, "%s (TQ)\n\n", tq_description (dptr));
-fprintf (st, "The TQ controller simulates the %s TMSCP disk controller.  TQ options\n", devtype);
+fprintf (st, "The TQ controller simulates the %s TMSCP tape controller.  TQ options\n", devtype);
 fprintf (st, "include the ability to set units write enabled or write locked, and to\n");
 fprintf (st, "specify the controller type and tape length:\n");
 fprint_set_help (st, dptr);
