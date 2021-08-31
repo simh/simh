@@ -980,32 +980,32 @@ static DEBTAB dj2d_dt[] = {
 };
 
 DEVICE dj2d_dev = {
-    DJ2D_SNAME,                        /* name */
-    dj2d_unit,                         /* unit */
-    dj2d_reg,                          /* registers */
-    dj2d_mod,                          /* modifiers */
-    DJ2D_UNITS,                   /* # units */
-    10,                                   /* address radix */
-    31,                                   /* address width */
-    1,                                    /* addr increment */
-    DJ2D_UNITS,                   /* data radix */
-    DJ2D_UNITS,                   /* data width */
-    NULL,                                 /* examine routine */
-    NULL,                                 /* deposit routine */
-    &dj2d_reset,                       /* reset routine */
-    &dj2d_boot,                        /* boot routine */
-    &dj2d_attach,                      /* attach routine */
-    &dj2d_detach,                      /* detach routine */
-    &dj2d_info_data,                   /* context */
-    (DEV_DISABLE | DEV_DIS | DEV_DEBUG),  /* flags */
-    ERROR_MSG,                            /* debug control */
-    dj2d_dt,                           /* debug flags */
-    NULL,                                 /* mem size routine */
-    NULL,                                 /* logical name */
-    NULL,                                 /* help */
-    NULL,                                 /* attach help */
-    NULL,                                 /* context for help */
-    &dj2d_description                  /* description */
+    DJ2D_SNAME,                             /* name */
+    dj2d_unit,                              /* unit */
+    dj2d_reg,                               /* registers */
+    dj2d_mod,                               /* modifiers */
+    DJ2D_UNITS,                             /* # units */
+    10,                                     /* address radix */
+    31,                                     /* address width */
+    1,                                      /* addr increment */
+    DJ2D_UNITS,                             /* data radix */
+    DJ2D_UNITS,                             /* data width */
+    NULL,                                   /* examine routine */
+    NULL,                                   /* deposit routine */
+    &dj2d_reset,                            /* reset routine */
+    &dj2d_boot,                             /* boot routine */
+    &dj2d_attach,                           /* attach routine */
+    &dj2d_detach,                           /* detach routine */
+    &dj2d_info_data,                        /* context */
+    (DEV_DISABLE | DEV_DIS | DEV_DEBUG),    /* flags */
+    ERROR_MSG,                              /* debug control */
+    dj2d_dt,                                /* debug flags */
+    NULL,                                   /* mem size routine */
+    NULL,                                   /* logical name */
+    NULL,                                   /* help */
+    NULL,                                   /* attach help */
+    NULL,                                   /* context for help */
+    &dj2d_description                       /* description */
 };
 
 /* Reset routine */
@@ -1014,9 +1014,19 @@ static t_stat dj2d_reset(DEVICE *dptr)
     uint8 i;
     DJ2D_INFO *pInfo = (DJ2D_INFO *)dptr->ctxt;
 
+    for (i = 0; i < DJ2D_UNITS; i++) {
+        if (dj2d_info->uptr[i] == NULL) {
+            dj2d_info->uptr[i] = &dj2d_dev.units[i];
+        }
+    }
+
     if (dptr->flags & DEV_DIS) { /* Disconnect I/O Ports */
         sim_map_resource(pInfo->prom_base, pInfo->prom_size, RESOURCE_TYPE_MEMORY, &dj2dprom, "dj2dprom", TRUE);
         sim_map_resource(pInfo->mem_base, pInfo->mem_size, RESOURCE_TYPE_MEMORY, &dj2dmem, "dj2dmem", TRUE);
+
+        /* Cancel timers */
+        sim_cancel(dj2d_info->uptr[0]);
+        sim_cancel(dj2d_info->uptr[DJ2D_SIO_UNIT]);
     } else {
         if (sim_map_resource(pInfo->prom_base, pInfo->prom_size, RESOURCE_TYPE_MEMORY, &dj2dprom, "dj2dprom", FALSE) != 0) {
             sim_debug(ERROR_MSG, &dj2d_dev, DJ2D_SNAME ": Error mapping PROM resource at 0x%04x\n", pInfo->prom_base);
@@ -1026,12 +1036,22 @@ static t_stat dj2d_reset(DEVICE *dptr)
             sim_debug(ERROR_MSG, &dj2d_dev, DJ2D_SNAME ": Error mapping MEM resource at 0x%04x\n", pInfo->mem_base);
             return SCPE_ARG;
         }
-    }
 
-    for (i = 0; i < DJ2D_UNITS; i++) {
-        if (dj2d_info->uptr[i] == NULL) {
-            dj2d_info->uptr[i] = &dj2d_dev.units[i];
+        /* Start timer for unit 0 (we only need 1 timer for all drive units) */
+        dj2d_info->indexTimeout = DJ2D_ROTATION_MS;
+        sim_activate_after(dj2d_info->uptr[0], DJ2D_TIMER * 1000);
+
+        /* Start timer for SIO unit */
+        sim_activate_after(dj2d_info->uptr[DJ2D_SIO_UNIT], 500);  /* activate 500 us timer */
+
+        /* Disable clockFrequency if it's set */
+        if (getClockFrequency()) {
+            setClockFrequency(0);
+            sim_printf(DJ2D_SNAME ": CPU CLOCK register not supported. Use THROTTLE.\n");
         }
+
+        /* Configure the serial interface */
+        dj2d_config_line();
     }
 
     /* Reset Registers */
@@ -1065,22 +1085,6 @@ static t_stat dj2d_reset(DEVICE *dptr)
     for (i = 0; i < DJ2D_MAX_DRIVES; i++) {
         dj2d_info->headLoaded[i] = FALSE;
     }
-
-    /* Start timer for unit 0 (we only need 1 timer for all drive units) */
-    dj2d_info->indexTimeout = DJ2D_ROTATION_MS;
-    sim_activate_after(dj2d_info->uptr[0], DJ2D_TIMER * 1000);
-
-    /* Start timer for SIO unit */
-    sim_activate_after(dj2d_info->uptr[DJ2D_SIO_UNIT], 500);  /* activate 500 us timer */
-
-    /* Disable clockFrequency if it's set */
-    if (getClockFrequency()) {
-        setClockFrequency(0);
-        sim_printf(DJ2D_SNAME ": CPU CLOCK register not supported. Use THROTTLE.\n");
-    }
-
-    /* Configure the serial interface */
-    dj2d_config_line();
 
     sim_debug(STATUS_MSG, &dj2d_dev, DJ2D_SNAME ": reset controller.\n");
 
