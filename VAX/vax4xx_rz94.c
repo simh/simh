@@ -106,6 +106,7 @@ DEBTAB rz_debug[] = {
     { "SMSG", SCSI_DBG_MSG, "SCSI messages" },
     { "SBUS", SCSI_DBG_BUS, "SCSI bus activity" },
     { "SDSK", SCSI_DBG_DSK, "SCSI disk activity" },
+    { "STAP", SCSI_DBG_TAP, "SCSI tape activity" },
     { 0 }
 };
 
