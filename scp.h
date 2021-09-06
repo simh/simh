@@ -259,6 +259,7 @@ void sim_debug_bits (uint32 dbits, DEVICE* dptr, BITFIELD* bitdefs,
 #if defined (__DECC) && defined (__VMS) && (defined (__VAX) || (__DECC_VER < 60590001))
 #define CANT_USE_MACRO_VA_ARGS 1
 #endif
+void _sim_vdebug (uint32 dbits, DEVICE* dptr, UNIT *uptr, const char* fmt, va_list arglist);
 #ifdef CANT_USE_MACRO_VA_ARGS
 #define _sim_debug_device sim_debug
 void sim_debug (uint32 dbits, DEVICE* dptr, const char *fmt, ...) GCC_FMT_ATTR(3, 4);

@@ -13772,7 +13772,7 @@ return stat | ((stat != SCPE_OK) ? SCPE_NOMESSAGE : 0);
    Callers should be calling sim_debug() which is a macro
    defined in scp.h which evaluates the action condition before 
    incurring call overhead. */
-static void _sim_vdebug (uint32 dbits, DEVICE* dptr, UNIT *uptr, const char* fmt, va_list arglist)
+void _sim_vdebug (uint32 dbits, DEVICE* dptr, UNIT *uptr, const char* fmt, va_list arglist)
 {
 if (sim_deb && dptr && ((dptr->dctrl | (uptr ? uptr->dctrl : 0)) & dbits)) {
     TMLN *saved_oline = sim_oline;
