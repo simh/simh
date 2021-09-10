@@ -3404,7 +3404,24 @@ if (dptr->modifiers) {
         if (mptr->mstring) {
             fprint_header (st, &found, header);
             snprintf (buf, sizeof (buf), "set %s %s%s", sim_dname (dptr), mptr->mstring, (strchr(mptr->mstring, '=')) ? "" : (MODMASK(mptr,MTAB_VALR) ? "=val" : (MODMASK(mptr,MTAB_VALO) ? "{=val}" : "")));
-            fprint_wrapped (st, buf, 30, gap, mptr->help, 80);
+            if ((mptr->valid != NULL) && (mptr->disp != NULL) && (mptr->help != NULL)) {
+                char gbuf[CBUFSIZE];
+                const char *rem;
+
+                rem = get_glyph (mptr->help, gbuf, 0);
+                if ((strcasecmp (gbuf, "Display") == 0) || 
+                    (strcasecmp (gbuf, "Show") == 0)) {
+                    char *thelp = (char *)malloc (9 + strlen (rem));
+
+                    sprintf (thelp, "Specify %s", rem);
+                    fprint_wrapped (st, buf, 30, gap, thelp, 80);
+                    free (thelp);
+                    }
+                else
+                    fprint_wrapped (st, buf, 30, gap, mptr->help, 80);
+                }
+            else
+                fprint_wrapped (st, buf, 30, gap, mptr->help, 80);
             }
         }
     }
@@ -3487,7 +3504,24 @@ if ((dptr->modifiers) && (dptr->units)) {   /* handle unit specific modifiers */
         if (mptr->mstring) {
             fprint_header (st, &found, header);
             snprintf (buf, sizeof (buf), "set %s %s%s", unit_spec, mptr->mstring, (strchr(mptr->mstring, '=')) ? "" : (MODMASK(mptr,MTAB_VALR) ? "=val" : (MODMASK(mptr,MTAB_VALO) ? "{=val}": "")));
-            fprint_wrapped (st, buf, 30, gap, mptr->help, 80);
+            if ((mptr->valid != NULL) && (mptr->disp != NULL) && (mptr->help != NULL)) {
+                char gbuf[CBUFSIZE];
+                const char *rem;
+
+                rem = get_glyph (mptr->help, gbuf, 0);
+                if ((strcasecmp (gbuf, "Display") == 0) || 
+                    (strcasecmp (gbuf, "Show") == 0)) {
+                    char *thelp = (char *)malloc (9 + strlen (rem));
+
+                    sprintf (thelp, "Specify %s", rem);
+                    fprint_wrapped (st, buf, 30, gap, thelp, 80);
+                    free (thelp);
+                    }
+                else
+                    fprint_wrapped (st, buf, 30, gap, mptr->help, 80);
+                }
+            else
+                fprint_wrapped (st, buf, 30, gap, mptr->help, 80);
             }
         }
     }
