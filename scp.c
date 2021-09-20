@@ -6405,13 +6405,15 @@ FILE *f;
 
 #if defined(_WIN32)
 #define FIND_CMD "where"
+#define FIND_CMD2 "2>NUL"
 #define popen _popen
 #define pclose _pclose
 #else
 #define FIND_CMD "which"
+#define FIND_CMD2 ""
 #endif
 memset (toolpath, 0, sizeof(toolpath));
-snprintf (findcmd, sizeof (findcmd), "%s %s", FIND_CMD, tool);
+snprintf (findcmd, sizeof (findcmd), "%s %s %s", FIND_CMD, tool, FIND_CMD2);
 if ((f = popen (findcmd, "r"))) {
     do {
         if (NULL == fgets (toolpath, sizeof(toolpath)-1, f))
