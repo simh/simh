@@ -3838,6 +3838,11 @@ if (DEV_TYPE(dptr) != DEV_TAPE)
 return sim_add_debug_flags (dptr, tape_debug);
 }
 
+t_stat sim_tape_init (void)
+{
+return SCPE_OK;
+}
+
 static t_bool p7b_parity_inited = FALSE;
 static uint8 p7b_odd_parity[64];
 static uint8 p7b_even_parity[64];

@@ -67,6 +67,7 @@ typedef void (*DISK_PCALLBACK)(UNIT *unit, t_stat status);
 
 /* Prototypes */
 
+t_stat sim_disk_init (void);
 t_stat sim_disk_attach (UNIT *uptr, 
                         const char *cptr, 
                         size_t memory_sector_size,  /* memory footprint of sector data */
