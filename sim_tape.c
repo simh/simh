@@ -4234,7 +4234,7 @@ for (t = classify_tests; t->testname != NULL; t++) {
         char args[CBUFSIZE*2];
         t_stat r;
 
-        snprintf (args, sizeof (args), "%s %s %s", sim_uname (uptr), t->success_attach_args, t->testname);
+        snprintf (args, sizeof (args), "%s -v %s %s", sim_uname (uptr), t->success_attach_args, t->testname);
         r = attach_cmd (0, args);
         if (r != SCPE_OK)
             return sim_messagef (r, "ATTACH %s failed\n", args);
@@ -4244,7 +4244,7 @@ for (t = classify_tests; t->testname != NULL; t++) {
         char args[CBUFSIZE*2];
         t_stat r;
 
-        snprintf (args, sizeof (args), "%s %s %s", sim_uname (uptr), t->fail_attach_args, t->testname);
+        snprintf (args, sizeof (args), "%s -v %s %s", sim_uname (uptr), t->fail_attach_args, t->testname);
         r = attach_cmd (0, args);
         if (r == SCPE_OK) {
             detach_cmd (0, sim_uname (uptr));
