@@ -804,8 +804,6 @@ switch (MT_GET_FMT (uptr)) {
                             error = TRUE;
                             }
                         }
-                    if (data_read > 0)
-                        error = memory_tape_add_block (tape, block, tape->block_size);
                     }
                 }
             else {                                              /* text file */
@@ -4205,7 +4203,7 @@ static struct classify_test {
          "51251251251251251251251251251251251251251251251251251251251251255125125125125125"
          "12512512512512512512512512512512512512512512512551251251251251251251251251251251"
          "2512512512512512512512512512~~~~\r\n",
-         512, FALSE, TRUE, "-fb FIXED 516", "-fb ANSI-VMS 512"},
+         512, FALSE, TRUE, "-fb FIXED 512", "-fb ANSI-VMS 512"},
         {"TapeTest-Classify-82.bin",
          "Now is the time for all good men to come to the aid of their country.\001\002~~~~~~~~~\r\n"
          "Now is the time for all good men to come to the aid of their country.\001\002~~~~~~~~~\r\n",
