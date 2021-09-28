@@ -4240,7 +4240,7 @@ for (t = classify_tests; t->testname != NULL; t++) {
         r = attach_cmd (0, args);
         if (r != SCPE_OK)
             return sim_messagef (r, "ATTACH %s failed\n", args);
-        detach_unit (uptr);
+        detach_cmd (0, sim_uname (uptr));
         }
     if (t->fail_attach_args) {
         char args[CBUFSIZE*2];
@@ -4249,7 +4249,7 @@ for (t = classify_tests; t->testname != NULL; t++) {
         snprintf (args, sizeof (args), "%s %s %s", sim_uname (uptr), t->fail_attach_args, t->testname);
         r = attach_cmd (0, args);
         if (r == SCPE_OK) {
-            detach_unit (uptr);
+            detach_cmd (0, sim_uname (uptr));
             return sim_messagef (r, "** UNEXPECTED ATTACH SUCCESS ** %s\n", args);
             }
         }
