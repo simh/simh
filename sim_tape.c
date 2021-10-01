@@ -694,15 +694,10 @@ switch (MT_GET_FMT (uptr)) {
             int file_errors = 0;
 
             if ((MT_GET_ANSI_TYP (uptr) == MTAT_F_RT11)  ||
-                (MT_GET_ANSI_TYP (uptr) == MTAT_F_RSX11) ||
                 (MT_GET_ANSI_TYP (uptr) == MTAT_F_RSTS))
                 uptr->recsize = 512;
             if (uptr->recsize == 0)
                 uptr->recsize = 2048;
-            else {
-                if ((uptr->recsize < 512) || (uptr->recsize % 512))
-                    return sim_messagef (SCPE_ARG, "Block size of %u is below or not a multiple of the required minimum ANSI size of 512.\n", uptr->recsize); 
-                }
             tape = ansi_create_tape (label, uptr->recsize, MT_GET_ANSI_TYP (uptr));
             uptr->fileref = (FILE *)tape;
             if (uptr->fileref == NULL)
@@ -782,11 +777,8 @@ switch (MT_GET_FMT (uptr)) {
             r = SCPE_OK;
             tape_classify_file_contents (f, &max_record_size, &lf_line_endings, &crlf_line_endings);
             if (!lf_line_endings && !crlf_line_endings) {       /* binary file? */
-                if (uptr->recsize == 0) {
-                    r = sim_messagef (SCPE_ARG, "Binary file %s must specify a record size with -B\n", cptr);
-                    fclose (f);
-                    break;
-                    }
+                if (uptr->recsize == 0)
+                    uptr->recsize = 512;
                 if ((statb.st_size % uptr->recsize) != 0) {
                     r = sim_messagef (SCPE_ARG, "Binary file data is not a multiple of the specifyed record size (%d)\n", (int)uptr->recsize);
                     fclose (f);
@@ -1453,7 +1445,6 @@ switch (f) {                                       /* otherwise the read method 
         break;
 
     case MTUF_F_AWS:
-        saved_pos = (t_addr)sim_ftell (uptr->fileref);
         memset (&awshdr, 0, sizeof (awshdr));
         rdcnt = sim_fread (&awshdr, sizeof (t_awslnt), 3, uptr->fileref);
         if (ferror (uptr->fileref)) {           /* error? */
@@ -1548,6 +1539,7 @@ static t_stat sim_tape_rdrlfwd (UNIT *uptr, t_mtrlnt *bc)
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 t_stat status;
 
+*bc = 0;
 if (ctx == NULL)                                        /* if not properly attached? */
     return sim_messagef (SCPE_IERR, "Bad Attach\n");    /*   that's a problem */
 
@@ -1880,6 +1872,7 @@ static t_stat sim_tape_rdrlrev (UNIT *uptr, t_mtrlnt *bc)
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 t_stat status;
 
+*bc = 0;
 if (ctx == NULL)                                        /* if not properly attached? */
     return sim_messagef (SCPE_IERR, "Bad Attach\n");    /*   that's a problem */
 
@@ -1997,6 +1990,7 @@ uint32 f = MT_GET_FMT (uptr);
 t_mtrlnt i, rbc, tbc;
 t_stat st;
 
+*bc = 0;
 if (ctx == NULL)                                        /* if not properly attached? */
     return sim_messagef (SCPE_IERR, "Bad Attach\n");    /*   that's a problem */
 sim_debug_unit (ctx->dbit, uptr, "sim_tape_rdrecr(unit=%d, buf=%p, max=%d)\n", (int)(uptr-ctx->dptr->units), buf, max);
@@ -2792,6 +2786,7 @@ t_stat sim_tape_sprecf (UNIT *uptr, t_mtrlnt *bc)
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 t_stat st;
 
+*bc = 0;
 if (ctx == NULL)                                        /* if not properly attached? */
     return sim_messagef (SCPE_IERR, "Bad Attach\n");    /*   that's a problem */
 sim_debug_unit (ctx->dbit, uptr, "sim_tape_sprecf(unit=%d)\n", (int)(uptr-ctx->dptr->units));
@@ -2835,11 +2830,11 @@ struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 t_stat st;
 t_mtrlnt tbc;
 
+*skipped = 0;
 if (ctx == NULL)                                        /* if not properly attached? */
     return sim_messagef (SCPE_IERR, "Bad Attach\n");    /*   that's a problem */
 sim_debug_unit (ctx->dbit, uptr, "sim_tape_sprecsf(unit=%d, count=%d)\n", (int)(uptr-ctx->dptr->units), count);
 
-*skipped = 0;
 while (*skipped < count) {                              /* loopo */
     st = sim_tape_sprecf (uptr, &tbc);                  /* spc rec */
     if (st != MTSE_OK)
@@ -2882,6 +2877,7 @@ t_stat sim_tape_sprecr (UNIT *uptr, t_mtrlnt *bc)
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 t_stat st;
 
+*bc = 0;
 if (ctx == NULL)                                        /* if not properly attached? */
     return sim_messagef (SCPE_IERR, "Bad Attach\n");    /*   that's a problem */
 sim_debug_unit (ctx->dbit, uptr, "sim_tape_sprecr(unit=%d)\n", (int)(uptr-ctx->dptr->units));
@@ -2982,6 +2978,7 @@ t_stat st;
 t_bool last_tapemark = FALSE;
 uint32 filerecsskipped;
 
+*skipped = *recsskipped = 0;
 if (ctx == NULL)                                        /* if not properly attached? */
     return sim_messagef (SCPE_IERR, "Bad Attach\n");    /*   that's a problem */
 sim_debug_unit (ctx->dbit, uptr, "sim_tape_spfilebyrecf(unit=%d, count=%d, check_leot=%d)\n", (int)(uptr-ctx->dptr->units), count, check_leot);
@@ -3052,6 +3049,7 @@ t_stat sim_tape_spfilef (UNIT *uptr, uint32 count, uint32 *skipped)
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 uint32 totalrecsskipped;
 
+*skipped = 0;
 if (ctx == NULL)                                        /* if not properly attached? */
     return sim_messagef (SCPE_IERR, "Bad Attach\n");    /*   that's a problem */
 sim_debug_unit (ctx->dbit, uptr, "sim_tape_spfilef(unit=%d, count=%d)\n", (int)(uptr-ctx->dptr->units), count);
@@ -3095,12 +3093,12 @@ struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 t_stat st;
 uint32 filerecsskipped;
 
+*skipped = 0;
+*recsskipped = 0;
 if (ctx == NULL)                                        /* if not properly attached? */
     return sim_messagef (SCPE_IERR, "Bad Attach\n");    /*   that's a problem */
 sim_debug_unit (ctx->dbit, uptr, "sim_tape_spfilebyrecr(unit=%d, count=%d)\n", (int)(uptr-ctx->dptr->units), count);
 
-*skipped = 0;
-*recsskipped = 0;
 while (*skipped < count) {                              /* loopo */
     while (1) {
         st = sim_tape_sprecsr (uptr, 0x1ffffff, &filerecsskipped);/* spc recs rev */
@@ -3150,6 +3148,7 @@ t_stat sim_tape_spfiler (UNIT *uptr, uint32 count, uint32 *skipped)
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 uint32 totalrecsskipped;
 
+*skipped = 0;
 if (ctx == NULL)                                        /* if not properly attached? */
     return sim_messagef (SCPE_IERR, "Bad Attach\n");    /*   that's a problem */
 sim_debug_unit (ctx->dbit, uptr, "sim_tape_spfiler(unit=%d, count=%d)\n", (int)(uptr-ctx->dptr->units), count);
@@ -3202,11 +3201,11 @@ t_stat sim_tape_position (UNIT *uptr, uint32 flags, uint32 recs, uint32 *recsski
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 t_stat r = MTSE_OK;
 
+*recsskipped = *filesskipped = *objectsskipped = 0;
 if (ctx == NULL)                                        /* if not properly attached? */
     return sim_messagef (SCPE_IERR, "Bad Attach\n");    /*   that's a problem */
 sim_debug_unit (ctx->dbit, uptr, "sim_tape_position(unit=%d, flags=0x%X, recs=%d, files=%d)\n", (int)(uptr-ctx->dptr->units), flags, recs, files);
 
-*recsskipped = *filesskipped = *objectsskipped = 0;
 if (flags & MTPOS_M_REW)
     r = sim_tape_rewind (uptr);
 if (r != MTSE_OK)
@@ -3856,6 +3855,9 @@ FILE *fAWS2 = NULL;
 FILE *fAWS3 = NULL;
 FILE *fTAR = NULL;
 FILE *fTAR2 = NULL;
+FILE *fBIN = NULL;
+FILE *fTXT = NULL;
+FILE *fVAR = NULL;
 int i, j, k;
 t_tpclnt tpclnt;
 t_mtrlnt mtrlnt;
@@ -3864,11 +3866,17 @@ t_awslnt awslnt_last = 0;
 t_awslnt awsrec_typ = AWS_REC;
 char name[256];
 t_stat stat = SCPE_OPENERR;
-uint8 *buf = NULL;
+uint8 *buf = NULL, zpad = 0;
 t_stat aws_stat = MTSE_UNATT;
 int32 saved_switches = sim_switches;
 
-srand (0);                      /* All devices use the same random sequence for file data */
+const char hello_world[] =      /* FORTRAN IV text data file */
+"      WRITE (6,7)                                                       HELLO001\r\n"
+"    7 FORMAT(14H HELLO, WORLD!)                                         HELLO002\r\n"
+"      STOP                                                              HELLO003\r\n"
+"      END                                                               HELLO004\r\n";
+
+srand (0);                      /* All devices use the same random sequence for binary data */
 if (max_size == 0)
     max_size = MAX_RECORD_SIZE;
 if (!p7b_parity_inited) {
@@ -3923,6 +3931,18 @@ sprintf (name, "%s.3.aws", filename);
 fAWS3 = fopen (name, "wb");
 if (fAWS3  == NULL)
     goto Done_Files;
+sprintf (name, "%s.bin.fixed", filename);
+fBIN = fopen (name, "wb");
+if (fBIN  == NULL)
+    goto Done_Files;
+sprintf (name, "%s.txt.fixed", filename);
+fTXT = fopen (name, "wb");
+if (fTXT  == NULL)
+    goto Done_Files;
+sprintf (name, "%s.txt.ansi-var", filename);
+fVAR = fopen (name, "wb");
+if (fVAR  == NULL)
+    goto Done_Files;
 sprintf (name, "aws %s.aws.tape", filename);
 sim_switches = SWMASK ('F') | (sim_switches & SWMASK ('D')) | SWMASK ('N');
 if (sim_switches & SWMASK ('D'))
@@ -3966,8 +3986,8 @@ for (i=0; i<files; i++) {
         if (MTSE_OK != stat)
             goto Done_Files;
         if (rec_size & 1) {
-            (void)sim_fwrite (&tpclnt, 1, 1, fSIMH);
-            (void)sim_fwrite (&tpclnt, 1, 1, fTPC);
+            (void)sim_fwrite (&zpad, 1, 1, fSIMH);
+            (void)sim_fwrite (&zpad, 1, 1, fTPC);
             }
         (void)sim_fwrite (&mtrlnt, sizeof (mtrlnt), 1, fSIMH);
         (void)sim_fwrite (&mtrlnt, sizeof (mtrlnt), 1, fE11);
@@ -4033,6 +4053,7 @@ for (j=0; j<records; j++) {
     memset (buf, j, 10240);
     (void)sim_fwrite (buf, 1, 10240, fTAR);
     (void)sim_fwrite (buf, 1, 10240, fTAR2);
+    (void)sim_fwrite (buf, 1, 10240, fBIN);
     }
 memset (buf, j, 10240);
 (void)sim_fwrite (buf, 1, 5120, fTAR2);
@@ -4043,6 +4064,8 @@ for (j=0; j<3; j++) {
     (void)sim_fwrite (&awslnt_last,  sizeof (awslnt_last),  1, fAWS2);
     (void)sim_fwrite (&awsrec_typ,   sizeof (awsrec_typ),   1, fAWS2);
     }
+(void)sim_fwrite (hello_world, 1, strlen(hello_world), fTXT);
+(void)sim_fwrite (hello_world, 1, strlen(hello_world), fVAR);
 Done_Files:
 if (fSIMH)
     fclose (fSIMH);
@@ -4062,6 +4085,12 @@ if (fTAR)
     fclose (fTAR);
 if (fTAR2)
     fclose (fTAR2);
+if (fBIN)
+    fclose (fBIN);
+if (fTXT)
+    fclose (fTXT);
+if (fVAR)
+    fclose (fVAR);
 free (buf);
 if (aws_stat == MTSE_OK)
     sim_tape_detach (uptr);
@@ -4132,7 +4161,11 @@ sprintf (name, "%s.tar", filename);
 (void)remove (name);
 sprintf (name, "%s.2.tar", filename);
 (void)remove (name);
-sprintf (name, "%s.3.tar", filename);
+sprintf (name, "%s.bin.fixed", filename);
+(void)remove (name);
+sprintf (name, "%s.txt.fixed", filename);
+(void)remove (name);
+sprintf (name, "%s.txt.ansi-var", filename);
 (void)remove (name);
 sprintf (name, "%s.aws.tape", filename);
 (void)remove (name);
@@ -4279,6 +4312,15 @@ SIM_TEST(sim_tape_test_remove_tape_files (dptr->units, "TapeTestFile1"));
 SIM_TEST(sim_tape_test_create_tape_files (dptr->units, "TapeTestFile1", 2, 5, 4096));
 
 sim_switches = saved_switches;
+SIM_TEST(sim_tape_test_process_tape_file (dptr->units, "TapeTestFile1.bin", "fixed", 2048));
+
+sim_switches = saved_switches;
+SIM_TEST(sim_tape_test_process_tape_file (dptr->units, "TapeTestFile1.txt", "fixed", 80));
+
+sim_switches = saved_switches;
+SIM_TEST(sim_tape_test_process_tape_file (dptr->units, "TapeTestFile1.*", "dos11", 0));
+
+sim_switches = saved_switches;
 SIM_TEST(sim_tape_test_process_tape_file (dptr->units, "TapeTestFile1.*", "ansi-vms", 0));
 
 sim_switches = saved_switches;
@@ -4291,25 +4333,22 @@ sim_switches = saved_switches;
 SIM_TEST(sim_tape_test_process_tape_file (dptr->units, "TapeTestFile1.*", "ansi-rsts", 0));
 
 sim_switches = saved_switches;
-SIM_TEST(sim_tape_test_process_tape_file (dptr->units, "TapeTestFile1.*", "ansi-var", 0));
+SIM_TEST(sim_tape_test_process_tape_file (dptr->units, "TapeTestFile1.txt", "ansi-var", 0));
 
 sim_switches = saved_switches;
 SIM_TEST(sim_tape_test_process_tape_file (dptr->units, "TapeTestFile1", "tar", 0));
-
-sim_switches = saved_switches;
-SIM_TEST(sim_tape_test_process_tape_file (dptr->units, "TapeTestFile1", "aws", 0));
-
-sim_switches = saved_switches;
-SIM_TEST(sim_tape_test_process_tape_file (dptr->units, "TapeTestFile1.3", "aws", 0));
-
-sim_switches = saved_switches;
-SIM_TEST(sim_tape_test_process_tape_file (dptr->units, "TapeTestFile1.2", "aws", 0));
 
 sim_switches = saved_switches;
 SIM_TEST(sim_tape_test_process_tape_file (dptr->units, "TapeTestFile1.2", "tar", 0));
 
 sim_switches = saved_switches;
 SIM_TEST(sim_tape_test_process_tape_file (dptr->units, "TapeTestFile1", "aws", 0));
+
+sim_switches = saved_switches;
+SIM_TEST(sim_tape_test_process_tape_file (dptr->units, "TapeTestFile1.2", "aws", 0));
+
+sim_switches = saved_switches;
+SIM_TEST(sim_tape_test_process_tape_file (dptr->units, "TapeTestFile1.3", "aws", 0));
 
 sim_switches = saved_switches;
 SIM_TEST(sim_tape_test_process_tape_file (dptr->units, "TapeTestFile1", "p7b", 0));
@@ -4723,6 +4762,8 @@ else {
 
 fclose (f);
 free (block);
+if (error)
+    sim_messagef (SCPE_IERR, "Error processing input file %s\n", FullPath);
 memory_tape_add_block (tape, NULL, 0); /* Tape Mark */
 ++tape->file_count;
 }
@@ -4850,6 +4891,11 @@ if (f == NULL)
 
 tape_classify_file_contents (f, &rms_record_size, &lf_line_endings, &crlf_line_endings);
 if (!lf_line_endings && !crlf_line_endings) {           /* Binary File? */
+    if (ansi->record_format == 'D') {                   /* ANSI format forces 'D' Record Format? */
+        sim_messagef (SCPE_ARG, "%s format does not support binary files\n", ansi->name);
+        fclose (f);
+        return TRUE;
+        }
     max_record_size = rms_record_size;
     }
 else {                                                  /* Text file */
