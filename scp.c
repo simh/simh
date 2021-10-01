@@ -15728,7 +15728,7 @@ void sim_srand (unsigned int seed)
 sim_rand_seed = (int32)(seed % RAND_MAX) + 1;
 }
 
-int sim_rand ()
+int sim_rand (void)
 {
 const int32 a = 16807;
 const int32 q = 127773;         /* (RAND_MAX + 1) / a */
@@ -15784,7 +15784,7 @@ return 0;
 }
 
 static MFILE *
-MOpen ()
+MOpen (void)
 {
 return (MFILE *)calloc (1, sizeof (MFILE));
 }
