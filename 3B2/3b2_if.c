@@ -305,10 +305,6 @@ void if_handle_command()
         }
 #endif
         break;
-
-    case IF_FORCE_INT:
-        if_state.cmd_type = 4;
-        break;
     }
 
     switch(if_state.cmd & 0xf0) {
@@ -508,26 +504,6 @@ void if_handle_command()
             if_activate(IF_W_DELAY + head_switch_delay);
         }
         break;
-    case IF_FORCE_INT:
-        sim_debug(EXECUTE_MSG, &if_dev, "\tCOMMAND\t%02x\tForce Interrupt\n", if_state.cmd);
-        if_state.status = 0;
-
-        if (if_state.track == 0) {
-            if_state.status |= (IF_TK_0|IF_HEAD_LOADED);
-        }
-
-        if ((if_state.cmd & 0xf) == 0) {
-            sim_cancel(&if_unit);
-#if defined(REV2)
-            CLR_INT; /* TODO: Confirm this is right */
-#endif
-        } else if ((if_state.cmd & 0x8) == 0x8) {
-            if_state.status |= IF_DRQ;
-            SET_INT;
-        }
-
-        break;
-
     }
 }
 
@@ -546,6 +522,29 @@ void if_write(uint32 pa, uint32 val, size_t size)
         if_state.cmd = (uint8) val;
         /* Writing to the command register always de-asserts the IRQ line */
         CLR_INT;
+
+        /* If this is a FORCE INTERRUPT, handle it immediately. All
+         * other commands require that the unit be attached and a
+         * diskette loaded. This one does not. */
+        if ((if_state.cmd & 0xf0) == IF_FORCE_INT) {
+            sim_debug(EXECUTE_MSG, &if_dev, "\tCOMMAND\t%02x\tForce Interrupt\n", if_state.cmd);
+            if_state.status = 0;
+
+            if ((uptr->flags & UNIT_ATT) && if_state.track == 0) {
+                if_state.status |= (IF_TK_0|IF_HEAD_LOADED);
+            }
+
+            if ((if_state.cmd & 0xf) == 0) {
+                sim_cancel(&if_unit);
+#if defined(REV2)
+                CLR_INT; /* TODO: Confirm this is right */
+#endif
+            } else if ((if_state.cmd & 0x8) == 0x8) {
+                if_state.status |= IF_DRQ;
+                SET_INT;
+            }
+            break;
+        }
 
         if ((uptr->flags & UNIT_ATT) == 0) {
             /* If not attached, do nothing */
