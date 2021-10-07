@@ -550,8 +550,8 @@ Ubuntu:
     # apt-get install libpcap-dev
     # apt-get install libpcre3-dev
     # apt-get install vde2
-    # apt-get install libsdl2
-    # apt-get install libsdl2_ttf
+    # apt-get install libsdl2-dev
+    # apt-get install libsdl2_ttf-dev
 
 #### Windows
 
