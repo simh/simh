@@ -157,6 +157,8 @@ typedef struct {
     int32 ctb;           /* Control Buffer   */
     int32 rie;           /* Rx Int Enable    */
     int32 tie;           /* Tx Int Enable    */
+    uint8 intenable;     /* Interrupt Enable */
+    uint8 intvector;     /* Interrupt Vector */
 } M2SIO_CTX;
 
 extern uint32 getClockFrequency(void);
@@ -182,6 +184,8 @@ static int32 m2sio1_io(int32 addr, int32 io, int32 data);
 static int32 m2sio_io(DEVICE *dptr, int32 addr, int32 io, int32 data);
 static int32 m2sio_stat(DEVICE *dptr, int32 io, int32 data);
 static int32 m2sio_data(DEVICE *dptr, int32 io, int32 data);
+
+extern int32 vectorInterrupt;           /* Vector Interrupt bits */
 
 /* Debug Flags */
 static DEBTAB m2sio_dt[] = {
@@ -267,6 +271,8 @@ static REG m2sio0_reg[] = {
     { FLDATAD (M2CTS0, m2sio0_ctx.stb, 3, "2SIO port 0 CTS status (active low)"), },
     { FLDATAD (M2OVRN0, m2sio0_ctx.stb, 4, "2SIO port 0 OVRN status"), },
     { DRDATAD (M2WAIT0, m2sio0_unit[0].wait, 32, "2SIO port 0 wait cycles"), },
+    { FLDATAD (M2INTEN0, m2sio0_ctx.intenable, 1, "2SIO port 0 Global vectored interrupt enable"), },
+    { DRDATAD (M2VEC0, m2sio0_ctx.intvector, 8, "2SIO port 0 interrupt vector"), },
     { NULL }
 };
 static REG m2sio1_reg[] = {
@@ -285,6 +291,8 @@ static REG m2sio1_reg[] = {
     { FLDATAD (M2CTS1, m2sio1_ctx.stb, 3, "2SIO port 1 CTS status (active low)"), },
     { FLDATAD (M2OVRN1, m2sio1_ctx.stb, 4, "2SIO port 1 OVRN status"), },
     { DRDATAD (M2WAIT1, m2sio1_unit[0].wait, 32, "2SIO port 1 wait cycles"), },
+    { FLDATAD (M2INTEN1, m2sio1_ctx.intenable, 1, "2SIO port 1 Global vectored interrupt enable"), },
+    { DRDATAD (M2VEC1, m2sio1_ctx.intvector, 8, "2SIO port 1 interrupt vector"), },
     { NULL }
 };
 
@@ -400,6 +408,7 @@ static t_stat m2sio_reset(DEVICE *dptr, int32 (*routine)(const int32, const int3
     return SCPE_OK;
 }
 
+
 static t_stat m2sio_svc(UNIT *uptr)
 {
     M2SIO_CTX *xptr;
@@ -481,6 +490,7 @@ static t_stat m2sio_svc(UNIT *uptr)
             xptr->rxb = c & 0xff;
             xptr->stb |= M2SIO_RDRF;
             xptr->stb &= ~(M2SIO_FE | M2SIO_OVRN | M2SIO_PE);
+            if ((xptr->rie) && (xptr->intenable)) vectorInterrupt |= (1 << xptr->intvector);
         }
     }
 
@@ -738,12 +748,13 @@ static int32 m2sio_stat(DEVICE *dptr, int32 io, int32 data)
             xptr->stb &= (M2SIO_CTS | M2SIO_DCD);           /* Reset status register */
             xptr->rxb = 0;
             xptr->txp = 0;
+            xptr->tie = 1;
+            xptr->rie = 1;
             m2sio_config_rts(dptr, 1);    /* disable RTS */
-        } else if (dptr->units[0].flags & UNIT_ATT) {
+        } else {
             /* Interrupt Enable */
-            xptr->tie = (data & M2SIO_RIE) == M2SIO_RIE;           /* Receive enable  */
-            xptr->rie = (data & M2SIO_RTSMSK) == M2SIO_RTSLTIE;    /* Transmit enable */
-
+            xptr->rie = (data & M2SIO_RIE) == M2SIO_RIE;           /* Receive enable  */
+            xptr->tie = (data & M2SIO_RTSMSK) == M2SIO_RTSLTIE;    /* Transmit enable */
             switch (data & M2SIO_RTSMSK) {
                 case M2SIO_RTSLTIE:
                 case M2SIO_RTSLTID:
