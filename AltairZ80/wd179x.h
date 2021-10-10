@@ -55,6 +55,8 @@ extern uint8 wd179x_get_nheads(void);
 typedef struct {
     PNP_INFO pnp;       /* Plug-n-Play Information */
     uint16 fdctype;     /* Default is 1793 */
+    uint8 intenable;    /* Interrupt Enable */
+    uint8 intvector;    /* Interrupt Vector */
     uint8 intrq;        /* WD179X Interrupt Request Output (EOJ) */
     uint8 hld;          /* WD179X Head Load Output */
     uint8 drq;          /* WD179X DMA Request Output */
