@@ -241,6 +241,7 @@ UNIT cpu_unit = {
         int32 IP_S;                                 /* IP register (8086)                           */
         int32 FLAGS_S;                              /* flags register (8086)                        */
         int32 SR                = 0;                /* switch register                              */
+        int32 vectorInterrupt   = 0;                /* Vector Interrupt bitfield                    */
 static  int32 bankSelect        = 0;                /* determines selected memory bank              */
 static  uint32 common           = 0xc000;           /* addresses >= 'common' are in common memory   */
 static  uint32 common_low       = 0;                /* Common area is in low memory                 */
@@ -2078,7 +2079,6 @@ void setClockFrequency(const uint32 Value) {
     clockHasChanged = TRUE;
 }
 
-
 static t_stat sim_instr_mmu (void) {
     extern int32 timerInterrupt;
     extern int32 timerInterruptHandler;
@@ -2135,7 +2135,7 @@ static t_stat sim_instr_mmu (void) {
     SP = SP_S;
     IX = IX_S;
     IY = IY_S;
-    specialProcessing = clockFrequency | timerInterrupt | keyboardInterrupt | sim_brk_summ;
+    specialProcessing = clockFrequency | timerInterrupt | vectorInterrupt | keyboardInterrupt | sim_brk_summ;
     tStates = 0;
     if (rtc_avail) {
         startTime = sim_os_msec();
@@ -2157,7 +2157,7 @@ static t_stat sim_instr_mmu (void) {
                 } else /* make sure that sim_os_msec() is not called later */
                     clockFrequency = startTime = tStatesInSlice = 0;
             }
-            specialProcessing = clockFrequency | timerInterrupt | keyboardInterrupt | sim_brk_summ;
+            specialProcessing = clockFrequency | timerInterrupt | vectorInterrupt | keyboardInterrupt | sim_brk_summ;
         }
 
         if (specialProcessing) { /* quick check for special processing */
@@ -2184,6 +2184,35 @@ static t_stat sim_instr_mmu (void) {
                     PCQ_ENTRY(PC - 1);
                 }
                 PC = timerInterruptHandler & ADDRMASK;
+            }
+
+            if ((IM_S == 2) && vectorInterrupt && (IFF_S & 1)) {
+                int32 vectable = (IR_S & 0xFF00);
+                int32 vector;
+                uint32 tempVectorInterrupt = vectorInterrupt;
+                uint8 intVector = 0;
+
+                while ((tempVectorInterrupt & 1) == 0) {
+                    tempVectorInterrupt >>= 1;
+                    intVector++;
+                }
+
+                vectorInterrupt &= ~(1 << intVector);
+                specialProcessing = clockFrequency | sim_brk_summ;
+                IFF_S = 0; /* disable interrupts */
+                CHECK_BREAK_TWO_BYTES_EXTENDED(SP - 2, SP - 1, (vectorInterrupt |= (1 << intVector), IFF_S |= 1));
+                if ((GetBYTE(PC) == HALTINSTRUCTION) && ((cpu_unit.flags & UNIT_CPU_STOPONHALT) == 0)) {
+                    PUSH(PC + 1);
+                    PCQ_ENTRY(PC);
+                }
+                else {
+                    PUSH(PC);
+                    PCQ_ENTRY(PC - 1);
+                }
+
+                vector = GetBYTE(vectable + (intVector * 2)+1) << 8;
+                vector |= GetBYTE(vectable + (intVector * 2));
+                PC = vector & ADDRMASK;
             }
 
             if (keyboardInterrupt && (IFF_S & 1)) {

@@ -518,9 +518,10 @@ struct DEVICE {
     t_stat              (*attach_help)(FILE *st, DEVICE *dptr,
                             UNIT *uptr, int32 flag, const char *cptr);
                                                         /* attach help */
-    void *help_ctx;                                     /* Context available to help routines */
+    void                *help_ctx;                      /* Context available to help routines */
     const char          *(*description)(DEVICE *dptr);  /* Device Description */
     BRKTYPTAB           *brk_types;                     /* Breakpoint types */
+    void                *type_ctx;                      /* Device Type/Library Context */
     };
 
 /* Device flags */
