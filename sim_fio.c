@@ -681,7 +681,7 @@ if ((stbuf.st_mode & S_IFIFO)) {
 return -1;
 }
 
-#if defined (__linux__) || defined (__APPLE__) || defined (__CYGWIN__) || defined (__FreeBSD__)
+#if defined (__linux__) || defined (__APPLE__) || defined (__CYGWIN__) || defined (__FreeBSD__) || defined(__NetBSD__) || defined (__OpenBSD__)
 #include <sys/mman.h>
 
 struct SHMEM {
