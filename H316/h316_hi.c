@@ -119,7 +119,7 @@ t_stat hi_detach (UNIT *uptr);
 // Host interface data blocks ...
 //   The HIDB is our own internal data structure for each host.  It keeps data
 // about the TCP/IP connection, buffers, etc.
-#define HI_HIDB(N)  {FALSE, FALSE, 0, 0, 0, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 0, HI_TXBPS}
+#define HI_HIDB(N)  {FALSE, FALSE, 0, {0}, 0, 0, 0, 0, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 0, HI_TXBPS}
 HIDB hi1_db = HI_HIDB(1), hi2_db = HI_HIDB(2);
 HIDB hi3_db = HI_HIDB(3), hi4_db = HI_HIDB(4);
 
@@ -228,6 +228,7 @@ void hi_reset_rx (uint16 host)
   PHIDB(host)->iloop = PHIDB(host)->error = PHIDB(host)->enabled = FALSE;
   PHIDB(host)->ready = TRUE; // XXX
   PHIDB(host)->eom = FALSE;
+  PHIDB(host)->rxsize = PHIDB(host)->rxnext = 0;
   PHIDB(host)->rxtotal = 0;
   CLR_RX_IRQ(host);  CLR_RX_IEN(host);
 }
@@ -401,7 +402,6 @@ void hi_poll_rx (uint16 line)
   // the receive operation.  If a packet is waiting but no receive is pending
   // then the packet is discarded...
   uint16 next, last, maxbuf;  uint16 *pdata;  int16 count;
-  uint16 *tmp = NULL;
   uint16 i;
 
   // If the modem isn't attached, then the read never completes!
@@ -420,39 +420,47 @@ void hi_poll_rx (uint16 line)
   // struct
   //   uint16 flags;
   //   uint16 data [MAXDATA - 1];
-  // Read the packet into a temp buffer for disassembly.
-  tmp = (uint16 *)malloc (MAXDATA * sizeof (*tmp));
+  
+  if (PHIDB(line)->rxnext < PHIDB(line)->rxsize) {
+    // There is data left from a previously recieved UDP packet.
+    count = PHIDB(line)->rxsize - PHIDB(line)->rxnext;
+  } else if (!PHIDB(line)->eom && (PHIDB(line)->rxdata[0] & PFLG_FINAL)
+             && PHIDB(line)->rxsize > 1) {
+    // No data left, time to signal end of message if the UDP packet said so.
+    PHIDB(line)->eom = TRUE;
+  } else {
+    // Get a new UDP packet.
+    count = udp_receive(PDEVICE(line), PHIDB(line)->link, PHIDB(line)->rxdata, MAXDATA);
+    PHIDB(line)->eom = FALSE;
+    PHIDB(line)->rxsize = count;
+    if (count == 0) { return; }
+    if (count < 0) { hi_link_error(line); return; }
+    // Exclude the flags from the count.
+    PHIDB(line)->rxnext = 1;  count--; 
+    if (count == 0) return;
+    PHIDB(line)->rxtotal++;
+  }
 
-  count = udp_receive(PDEVICE(line), PHIDB(line)->link, tmp, maxbuf+1);
-  if (count == 0) {free (tmp); return; }
-  if (count < 0) {free (tmp); hi_link_error(line); return; }
+  //   We really got a packet!  Update the DMC pointers to reflect the actual
+  // size of the packet received.
+  if (count > maxbuf) {
+    // Limit data to the DMC word count.  Keep the UDP packet for next round.
+    count = maxbuf;
+  }
+  hi_update_dmc(PDIB(line)->rxdmc, count);
+  hi_debug_msg (line, next, count, "received");
 
-  PHIDB(line)->eom = !! tmp[0] & PFLG_FINAL;
-  for (i = 0; i < count - 1; i ++)
-    * (pdata + i) = tmp [i + 1];
-  free (tmp);
-  tmp = NULL;
+  for (i = 0; i < count; i ++)
+    * (pdata + i) = PHIDB(line)->rxdata[PHIDB(line)->rxnext++];
+
   // Now would be a good time to worry about whether a receive is pending!
   if (!PHIDB(line)->rxpending) {
     sim_debug(IMP_DBG_WARN, PDEVICE(line), "data received with no input pending\n");
     return;
   }
 
-  // Exclude the flags from the count.
-  count--;
-
-  //   We really got a packet!  Update the DMC pointers to reflect the actual
-  // size of the packet received.  If the packet length would have exceeded the
-  // receiver buffer, then that sets the error flag too.
-  if (count > maxbuf) {
-    sim_debug(IMP_DBG_WARN, PDEVICE(line), "receiver overrun (length=%d maxbuf=%d)\n", count, maxbuf);
-    PHIDB(line)->rxerror = TRUE;  count = maxbuf;
-  }
-  hi_update_dmc(PDIB(line)->rxdmc, count);
-  hi_debug_msg (line, next, count, "received");
-
   // Assert the interrupt request and we're done!
-  SET_RX_IRQ(line);  PHIDB(line)->rxpending = FALSE;  PHIDB(line)->rxtotal++;
+  SET_RX_IRQ(line);  PHIDB(line)->rxpending = FALSE;
   sim_debug(IMP_DBG_IOT, PDEVICE(line), "receive done (message #%d, intreq=%06o)\n", PHIDB(line)->rxtotal, dev_ext_int);
 }
 
@@ -584,7 +592,7 @@ t_stat hi_rx_service (UNIT *uptr)
   // queue entry expires.  It just polls the receiver and reschedules itself.
   // That's it!
   uint16 line = uptr->hline;
-  hi_poll_rx(line);
+  if (PHIDB(line)->rxpending) hi_poll_rx(line);
   sim_activate(uptr, uptr->wait);
   return SCPE_OK;
 }
