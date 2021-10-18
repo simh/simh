@@ -344,7 +344,7 @@ void hi_start_tx (uint16 line, uint16 flags)
     tmp [0] = flags;
     for (i = 0; i < count; i ++)
       tmp [i + 1] = M [next+i];
-    ret = udp_send(PDEVICE(line), PHIDB(line)->link, tmp, count);
+    ret = udp_send(PDEVICE(line), PHIDB(line)->link, tmp, count + 1);
     free (tmp);
     if (ret != SCPE_OK && ret != 66) hi_link_error(line);
   }
@@ -437,6 +437,9 @@ void hi_poll_rx (uint16 line)
     sim_debug(IMP_DBG_WARN, PDEVICE(line), "data received with no input pending\n");
     return;
   }
+
+  // Exclude the flags from the count.
+  count--;
 
   //   We really got a packet!  Update the DMC pointers to reflect the actual
   // size of the packet received.  If the packet length would have exceeded the
