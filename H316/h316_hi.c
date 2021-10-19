@@ -80,12 +80,8 @@
 
 // Last-IMP-Bit is implemented as an out-of-band flag in UDP_PACKET
 #define PFLG_FINAL 00001
-
-// TODO
-//
-// For the nonce, assume ready bits are always on. We need an out-of-band
-// packet exchange to model the ready bit behavior. (This could also reset
-// the UDP_PACKET sequence numbers.)
+// Host or IMP Ready bit.
+#define PFLG_READY 00002
 
 
 #ifdef VM_IMPTIP
@@ -225,8 +221,8 @@ HIDB   *const hi_hidbs  [HI_NUM] = {&hi1_db,   &hi2_db,   &hi3_db,   &hi4_db  };
 // Reset receiver (clear flags AND initialize all data) ...
 void hi_reset_rx (uint16 host)
 {
-  PHIDB(host)->iloop = PHIDB(host)->error = PHIDB(host)->enabled = FALSE;
-  PHIDB(host)->ready = TRUE; // XXX
+  PHIDB(host)->iloop = PHIDB(host)->error = FALSE;
+  PHIDB(host)->ready = FALSE;
   PHIDB(host)->eom = FALSE;
   PHIDB(host)->rxsize = PHIDB(host)->rxnext = 0;
   PHIDB(host)->rxtotal = 0;
@@ -343,6 +339,8 @@ void hi_start_tx (uint16 line, uint16 flags)
     uint16 i;
 
     tmp [0] = flags;
+    if (PHIDB(line)->enabled)
+      tmp [0] |= PFLG_READY;
     for (i = 0; i < count; i ++)
       tmp [i + 1] = M [next+i];
     ret = udp_send(PDEVICE(line), PHIDB(line)->link, tmp, count + 1);
@@ -435,6 +433,8 @@ void hi_poll_rx (uint16 line)
     PHIDB(line)->rxsize = count;
     if (count == 0) { return; }
     if (count < 0) { hi_link_error(line); return; }
+    // Make note of the host ready bit.
+    PHIDB(line)->ready = !! (PHIDB(line)->rxdata[0] & PFLG_READY);
     // Exclude the flags from the count.
     PHIDB(line)->rxnext = 1;  count--; 
     if (count == 0) return;
@@ -507,6 +507,7 @@ int32 hi4_io(int32 inst, int32 fnc, int32 dat, int32 dev)  {return hi_io(4, inst
 // Common I/O simulation routine ...
 int32 hi_io (uint16 host, int32 inst, int32 fnc, int32 dat, int32 dev)
 {
+  uint16 tmp;
   //   This routine is invoked by the CPU module whenever the code executes any
   // I/O instruction (OCP, SKS, INA or OTA) with one of our modem's device
   // address.
@@ -539,10 +540,16 @@ int32 hi_io (uint16 host, int32 inst, int32 fnc, int32 dat, int32 dev)
         sim_debug(IMP_DBG_IOT, PDEVICE(host), "disable cross patch (PC=%06o)\n", PC-1);
         PHIDB(host)->iloop = FALSE;
         udp_set_link_loopback (PDEVICE(host), PHIDB(host)->link, FALSE);
+        PHIDB(host)->enabled = FALSE;
+        // Send out the IMP not ready bit.
+        tmp = PFLG_FINAL;
+        udp_send(PDEVICE(host), PHIDB(host)->link, &tmp, 1);
         return dat;
       case 005:
-        sim_printf("HnENAB unimp.\n");
-        // HnENAB - enable ...
+        PHIDB(host)->enabled = TRUE;
+        // Send out the IMP ready bit.
+        tmp = PFLG_FINAL | PFLG_READY;
+        udp_send(PDEVICE(host), PHIDB(host)->link, &tmp, 1);
         sim_debug(IMP_DBG_IOT, PDEVICE(host), "enable host (PC=%06o)\n", PC-1);
         return dat;
     }
@@ -558,7 +565,6 @@ int32 hi_io (uint16 host, int32 inst, int32 fnc, int32 dat, int32 dev)
       case 001:
         // HnRDY - skip on host ready ...
         //sim_debug(IMP_DBG_IOT, PDEVICE(host), "skip on ready (PC=%06o %s)\n", PC-1, PHIDB(host)->ready ? "SKIP" : "NOSKIP");
-        sim_printf("HnRDY unimpl.; always ready\n");
         return  PHIDB(host)->ready ? IOSKIP(dat) : dat;
       case 002:
         // HnEOM - skip on end of message ...
