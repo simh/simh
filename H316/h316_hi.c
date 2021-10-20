@@ -172,6 +172,7 @@ DEBTAB hi_debug[] = {
   {"WARN",  IMP_DBG_WARN}, // print warnings that would otherwise be suppressed
   {"UDP",   IMP_DBG_UDP},  // print all UDP messages sent and received
   {"IO",    IMP_DBG_IOT},  // print all program I/O instructions
+  {"MSG",    HI_DBG_MSG},  // decode and print all messages
   {0}
 };
 
@@ -292,12 +293,12 @@ void hi_debug_hio (uint16 line, uint32 dmc, const char *ptext)
 void hi_debug_msg (uint16 line, uint16 next, uint16 count, const char *ptext)
 {
   uint16 i;  char buf[CBUFSIZE];  int len = 0;
-  if (!ISHDBG(line, MI_DBG_MSG)) return;
-  sim_debug(MI_DBG_MSG, PDEVICE(line), "message %s (length=%d)\n", ptext, count);
+  if (!ISHDBG(line, HI_DBG_MSG)) return;
+  sim_debug(HI_DBG_MSG, PDEVICE(line), "message %s (length=%d)\n", ptext, count);
   for (i = 1, len = 0;  i <= count;  ++i) {
     len += sprintf(buf+len, "%06o ", M[next+i-1]);
     if (((i & 7) == 0) || (i == count)) {
-      sim_debug(MI_DBG_MSG, PDEVICE(line), "- %s\n", buf);  len = 0;
+      sim_debug(HI_DBG_MSG, PDEVICE(line), "- %s\n", buf);  len = 0;
     }
   }
 }

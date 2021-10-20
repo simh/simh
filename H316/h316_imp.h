@@ -128,6 +128,7 @@
 #define IMP_DBG_IOT     0x0002  // all: trace all program I/O instructions
 #define IMP_DBG_UDP     0x0004  // all: trace UDP packets
 #define MI_DBG_MSG      0x8000  // modem: decode and print all messages
+#define HI_DBG_MSG      0x8000  // host interface: decode and print all messages
 #define WDT_DBG_LIGHTS  0x8000  // wdt: show status light changes
 
 // Synonyms for DIB and UNIT fields ...
