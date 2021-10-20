@@ -349,14 +349,9 @@ void hi_start_tx (uint16 line, uint16 flags)
     if (ret != SCPE_OK && ret != 66) hi_link_error(line);
   }
 
-// XXX the host interface is significantly faster... Need new math here.
-// 1822 pg 4-9 100 KBS
-
-  //   Do some fancy math to figure out how long, in RTC ticks, it would actually
-  // take to transmit a packet of this length with a real modem and phone line.
-  // Note that the "+12" is an approximation for the modem overhead, including
-  // DLE, STX, ETX and checksum bytes, that would be added to the packet.
-  nbits = (((uint32) count)*2UL + 12UL) * 8UL;
+  // Do some fancy math to figure out how long, in RTC ticks, it would actually
+  // take to transmit a message of this length with a real host interface.
+  nbits = ((uint32) count)*16UL;
   PHIDB(line)->txdelay = (nbits * 1000000UL) / (PHIDB(line)->bps * rtc_interval);
   sim_debug(IMP_DBG_IOT, PDEVICE(line), "HI%d - transmit packet, length=%d, bits=%u, interval=%u, delay=%u\n", line, count, nbits, rtc_interval, PHIDB(line)->txdelay);
   // That's it - we're done until it's time for the TX done interrupt ...
