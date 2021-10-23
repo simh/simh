@@ -1,6 +1,6 @@
 /* pdp8_fpp.c: PDP-8 floating point processor (FPP8A)
 
-   Copyright (c) 2007-2011, Robert M Supnik
+   Copyright (c) 2007-2021, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    fpp          FPP8A floating point processor
 
+   21-Oct-21    RMS     Added device number display
    03-Jan-10    RMS     Initialized variables statically, for VMS compiler
    19-Apr-09    RHM     FPICL does not clear all command and status reg bits
                             modify fpp_reset to conform with FPP
@@ -242,8 +243,13 @@ REG fpp_reg[] = {
     { NULL }
     };
 
+MTAB fpp_mod[] = {
+    { MTAB_XTD|MTAB_VDV, 0, "DEVNO", NULL, NULL, &show_dev },
+    { 0 }
+    };
+
 DEVICE fpp_dev = {
-    "FPP", &fpp_unit, fpp_reg, NULL,
+    "FPP", &fpp_unit, fpp_reg, fpp_mod,
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &fpp_reset,
     NULL, NULL, NULL,
