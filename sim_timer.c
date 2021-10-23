@@ -1994,16 +1994,33 @@ switch (sim_throt_state) {
                     d_cps = (double) sim_throt_val * 1000.0;
                 else
                     d_cps = (sim_throt_peak_cps * sim_throt_val) / 100.0;
-            if (d_cps > a_cps) {
+            if (d_cps >= a_cps) {
+                /* the initial throttling calibration measures a slower cps rate than the desired cps rate, */
                 sim_debug (DBG_THR, &sim_timer_dev, "sim_throt_svc() CPU too slow.  Values a_cps = %f, d_cps = %f\n", 
                                                     a_cps, d_cps);
-                sim_throt_state = SIM_THROT_STATE_INIT;
-                sim_printf ("*********** WARNING ***********\n");
-                sim_printf ("Host CPU is too slow to simulate %s %s per second\n", sim_fmt_numeric(d_cps), sim_vm_interval_units);
-                sim_printf ("Host CPU can only simulate %s %s per second\n", sim_fmt_numeric(sim_throt_peak_cps), sim_vm_interval_units);
-                sim_printf ("Throttling disabled.\n");
-                sim_set_throt (0, NULL);
-                return SCPE_OK;
+                /* if the measured rate is well below the measured peak rate? */
+                if (sim_throt_peak_cps >= (2.0 * d_cps)) {
+                    /* distrust the measured rate and instead use half the peak rate as measured 
+                       cps rate. */
+                    sim_printf ("*********** WARNING ***********\n");
+                    sim_printf ("Host CPU could be too slow to simulate %s %s per second\n", sim_fmt_numeric(d_cps), sim_vm_interval_units);
+                    sim_printf ("Host CPU did only simulate %s %s per second\n", sim_fmt_numeric(a_cps), sim_vm_interval_units);
+                    sim_printf ("But peak rate was: %s %s per second\n", sim_fmt_numeric(sim_throt_peak_cps), sim_vm_interval_units);
+
+                    a_cps = (sim_throt_peak_cps / 2.0) + 1.0;
+
+                    sim_printf ("Assuming rate: %s %s per second\n", sim_fmt_numeric(a_cps), sim_vm_interval_units);
+                    }
+                else {
+                    sim_throt_state = SIM_THROT_STATE_INIT;
+                    sim_printf ("*********** WARNING ***********\n");
+                    sim_printf ("Host CPU is too slow to simulate %s %s per second\n", sim_fmt_numeric(d_cps), sim_vm_interval_units);
+                    sim_printf ("Host CPU did only simulate %s %s per second\n", sim_fmt_numeric(a_cps), sim_vm_interval_units);
+                    sim_printf ("Peak rate: %s %s per second\n", sim_fmt_numeric(sim_throt_peak_cps), sim_vm_interval_units);
+                    sim_printf ("Throttling disabled.\n");
+                    sim_set_throt (0, NULL);
+                    return SCPE_OK;
+                    }
                 }
             while (1) {
                 sim_throt_wait = (int32)                /* cycles between sleeps */
