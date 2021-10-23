@@ -54,12 +54,6 @@
 #define noret void
 #endif
 
-#if defined(__GLIBC__) && !defined(__cplusplus)
-/* use glibc internal longjmp to bypass fortify checks */
-noret __libc_longjmp(jmp_buf buf, int val);
-#define longjmp __libc_longjmp
-#endif
-
 #ifndef MAX
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
 #endif
