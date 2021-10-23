@@ -1,6 +1,6 @@
 /* pdp8_ttx.c: PDP-8 additional terminals simulator
 
-   Copyright (c) 1993-2016, Robert M Supnik
+   Copyright (c) 1993-2021, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    ttix,ttox    PT08/KL8JA terminal input/output
 
+   21-Oct-21    RMS     Added device number display from V4
    18-Sep-16    RMS     Expanded support to 16 terminals
    27-Mar-15    RMS     Backported Dave Gesswein's fix to prevent data loss
    11-Oct-13    RMS     Poll TTIX immediately to pick up initial connect (Mark Pizzolato)
@@ -90,6 +91,7 @@ t_stat ttx_attach (UNIT *uptr, char *cptr);
 t_stat ttx_detach (UNIT *uptr);
 void ttx_reset_ln (int32 i);
 t_stat ttx_vlines (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat ttx_show_devno (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 #define TTIX_SET_DONE(ln)       ttx_new_flags (ttix_done | (1u << (ln)), ttox_done, ttx_enbl)
 #define TTIX_CLR_DONE(ln)       ttx_new_flags (ttix_done & ~(1u << (ln)), ttox_done, ttx_enbl)
@@ -146,6 +148,8 @@ REG ttix_reg[] = {
 MTAB ttix_mod[] = {
     { MTAB_XTD | MTAB_VDV, 0, "LINES", "LINES",
       &ttx_vlines, &tmxr_show_lines, (void *) &ttx_desc },
+    { MTAB_XTD | MTAB_VDV, 0, "DEVNO", NULL,
+      NULL, &ttx_show_devno, (void *) &ttx_desc },
     { UNIT_ATT, UNIT_ATT, "summary", NULL,
       NULL, &tmxr_show_summ, (void *) &ttx_desc },
     { MTAB_XTD | MTAB_VDV, 1, NULL, "DISCONNECT",
@@ -207,6 +211,8 @@ MTAB ttox_mod[] = {
     { TT_MODE, TT_MODE_7B, "7b", "7B", NULL },
     { TT_MODE, TT_MODE_8B, "8b", "8B", NULL },
     { TT_MODE, TT_MODE_7P, "7p", "7P", NULL },
+    { MTAB_XTD | MTAB_VDV, 1, "DEVNO", NULL,
+      NULL, &ttx_show_devno, (void *) &ttx_desc },
     { MTAB_XTD|MTAB_VUN, 0, NULL, "DISCONNECT",
       &tmxr_dscln, NULL, &ttx_desc },
     { MTAB_XTD|MTAB_VUN|MTAB_NC, 0, "LOG", "LOG",
@@ -503,3 +509,24 @@ ttx_dib.num = newln * 2;
 return SCPE_OK;
 }
 
+/* Show device numbers */
+
+t_stat ttx_show_devno (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+int32 i;
+DEVICE *dptr;
+
+if (uptr == NULL)
+    return SCPE_IERR;
+dptr = find_dev_from_unit (uptr);
+if (dptr == NULL)
+    return SCPE_IERR;
+if ((((uint32) val) & ~1u) != 0)
+    return SCPE_IERR;
+fprintf(st, "devno=");
+for (i = 0; i < ttx_lines; i++) {
+    fprintf(st, "%02o%s", ttx_dsp[(i * 2) + val].dev, (i < ttx_lines-1)? 
+         "," : "");
+    }
+return SCPE_OK;
+}
