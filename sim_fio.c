@@ -682,7 +682,10 @@ return -1;
 }
 
 #if defined (__linux__) || defined (__APPLE__) || defined (__CYGWIN__) || defined (__FreeBSD__) || defined(__NetBSD__) || defined (__OpenBSD__)
+
+#if defined (HAVE_SHM_OPEN)
 #include <sys/mman.h>
+#endif
 
 struct SHMEM {
     int shm_fd;
@@ -751,7 +754,7 @@ if ((*shmem)->shm_base == MAP_FAILED) {
 return SCPE_OK;
 #else
 *shmem = NULL;
-return SCPE_NOFNC;
+return sim_messagef (SCPE_NOFNC, "Shared memory not available - Missing shm_open() API\n");
 #endif
 }
 
