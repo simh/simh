@@ -1,6 +1,6 @@
 /* pdp8_cpu.c: PDP-8 CPU simulator
 
-   Copyright (c) 1993-2017, Robert M Supnik
+   Copyright (c) 1993-2021, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -1533,7 +1533,7 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* add devices */
                 if (dspp->dsp) {                        /* any dispatch? */
                     if (dev_tab[dspp->dev]) {           /* already filled? */
                         sim_printf ("%s device number conflict at %02o\n",
-                            sim_dname (dptr), dibp->dev + j);
+                            sim_dname (dptr), dspp->dev);
                         return TRUE;
                         }
                     dev_tab[dspp->dev] = dspp->dsp;     /* fill */

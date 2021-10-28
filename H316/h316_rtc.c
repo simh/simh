@@ -245,6 +245,7 @@ t_stat rtc_service (UNIT *uptr)
     SET_RTC_IRQ();
   }
   mi_tx_service(rtc_quantum);
+  hi_tx_service(rtc_quantum);
   uptr->wait = sim_rtc_calb (rtc_tps);                  /* recalibrate */
   sim_activate_after (uptr, 1000000/rtc_tps);           /* reactivate unit */
   return SCPE_OK;

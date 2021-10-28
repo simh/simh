@@ -80,12 +80,8 @@
 
 // Last-IMP-Bit is implemented as an out-of-band flag in UDP_PACKET
 #define PFLG_FINAL 00001
-
-// TODO
-//
-// For the nonce, assume ready bits are always on. We need an out-of-band
-// packet exchange to model the ready bit behavior. (This could also reset
-// the UDP_PACKET sequence numbers.)
+// Host or IMP Ready bit.
+#define PFLG_READY 00002
 
 
 #ifdef VM_IMPTIP
@@ -119,7 +115,7 @@ t_stat hi_detach (UNIT *uptr);
 // Host interface data blocks ...
 //   The HIDB is our own internal data structure for each host.  It keeps data
 // about the TCP/IP connection, buffers, etc.
-#define HI_HIDB(N)  {FALSE, FALSE, 0, 0, 0, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 0, HI_TXBPS}
+#define HI_HIDB(N)  {FALSE, FALSE, 0, {0}, 0, 0, 0, 0, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 0, HI_TXBPS}
 HIDB hi1_db = HI_HIDB(1), hi2_db = HI_HIDB(2);
 HIDB hi3_db = HI_HIDB(3), hi4_db = HI_HIDB(4);
 
@@ -176,6 +172,7 @@ DEBTAB hi_debug[] = {
   {"WARN",  IMP_DBG_WARN}, // print warnings that would otherwise be suppressed
   {"UDP",   IMP_DBG_UDP},  // print all UDP messages sent and received
   {"IO",    IMP_DBG_IOT},  // print all program I/O instructions
+  {"MSG",    HI_DBG_MSG},  // decode and print all messages
   {0}
 };
 
@@ -225,9 +222,10 @@ HIDB   *const hi_hidbs  [HI_NUM] = {&hi1_db,   &hi2_db,   &hi3_db,   &hi4_db  };
 // Reset receiver (clear flags AND initialize all data) ...
 void hi_reset_rx (uint16 host)
 {
-  PHIDB(host)->iloop = PHIDB(host)->error = PHIDB(host)->enabled = FALSE;
-  PHIDB(host)->ready = TRUE; // XXX
+  PHIDB(host)->iloop = PHIDB(host)->error = FALSE;
+  PHIDB(host)->ready = FALSE;
   PHIDB(host)->eom = FALSE;
+  PHIDB(host)->rxsize = PHIDB(host)->rxnext = 0;
   PHIDB(host)->rxtotal = 0;
   CLR_RX_IRQ(host);  CLR_RX_IEN(host);
 }
@@ -295,12 +293,12 @@ void hi_debug_hio (uint16 line, uint32 dmc, const char *ptext)
 void hi_debug_msg (uint16 line, uint16 next, uint16 count, const char *ptext)
 {
   uint16 i;  char buf[CBUFSIZE];  int len = 0;
-  if (!ISHDBG(line, MI_DBG_MSG)) return;
-  sim_debug(MI_DBG_MSG, PDEVICE(line), "message %s (length=%d)\n", ptext, count);
+  if (!ISHDBG(line, HI_DBG_MSG)) return;
+  sim_debug(HI_DBG_MSG, PDEVICE(line), "message %s (length=%d)\n", ptext, count);
   for (i = 1, len = 0;  i <= count;  ++i) {
     len += sprintf(buf+len, "%06o ", M[next+i-1]);
     if (((i & 7) == 0) || (i == count)) {
-      sim_debug(MI_DBG_MSG, PDEVICE(line), "- %s\n", buf);  len = 0;
+      sim_debug(HI_DBG_MSG, PDEVICE(line), "- %s\n", buf);  len = 0;
     }
   }
 }
@@ -342,21 +340,18 @@ void hi_start_tx (uint16 line, uint16 flags)
     uint16 i;
 
     tmp [0] = flags;
+    if (PHIDB(line)->enabled)
+      tmp [0] |= PFLG_READY;
     for (i = 0; i < count; i ++)
       tmp [i + 1] = M [next+i];
-    ret = udp_send(PDEVICE(line), PHIDB(line)->link, tmp, count);
+    ret = udp_send(PDEVICE(line), PHIDB(line)->link, tmp, count + 1);
     free (tmp);
     if (ret != SCPE_OK && ret != 66) hi_link_error(line);
   }
 
-// XXX the host interface is significantly faster... Need new math here.
-// 1822 pg 4-9 100 KBS
-
-  //   Do some fancy math to figure out how long, in RTC ticks, it would actually
-  // take to transmit a packet of this length with a real modem and phone line.
-  // Note that the "+12" is an approximation for the modem overhead, including
-  // DLE, STX, ETX and checksum bytes, that would be added to the packet.
-  nbits = (((uint32) count)*2UL + 12UL) * 8UL;
+  // Do some fancy math to figure out how long, in RTC ticks, it would actually
+  // take to transmit a message of this length with a real host interface.
+  nbits = ((uint32) count)*16UL;
   PHIDB(line)->txdelay = (nbits * 1000000UL) / (PHIDB(line)->bps * rtc_interval);
   sim_debug(IMP_DBG_IOT, PDEVICE(line), "HI%d - transmit packet, length=%d, bits=%u, interval=%u, delay=%u\n", line, count, nbits, rtc_interval, PHIDB(line)->txdelay);
   // That's it - we're done until it's time for the TX done interrupt ...
@@ -401,7 +396,6 @@ void hi_poll_rx (uint16 line)
   // the receive operation.  If a packet is waiting but no receive is pending
   // then the packet is discarded...
   uint16 next, last, maxbuf;  uint16 *pdata;  int16 count;
-  uint16 *tmp = NULL;
   uint16 i;
 
   // If the modem isn't attached, then the read never completes!
@@ -420,36 +414,49 @@ void hi_poll_rx (uint16 line)
   // struct
   //   uint16 flags;
   //   uint16 data [MAXDATA - 1];
-  // Read the packet into a temp buffer for disassembly.
-  tmp = (uint16 *)malloc (MAXDATA * sizeof (*tmp));
+  
+  if (PHIDB(line)->rxnext < PHIDB(line)->rxsize) {
+    // There is data left from a previously recieved UDP packet.
+    count = PHIDB(line)->rxsize - PHIDB(line)->rxnext;
+  } else if (!PHIDB(line)->eom && (PHIDB(line)->rxdata[0] & PFLG_FINAL)
+             && PHIDB(line)->rxsize > 1) {
+    // No data left, time to signal end of message if the UDP packet said so.
+    PHIDB(line)->eom = TRUE;
+  } else {
+    // Get a new UDP packet.
+    count = udp_receive(PDEVICE(line), PHIDB(line)->link, PHIDB(line)->rxdata, MAXDATA);
+    PHIDB(line)->eom = FALSE;
+    PHIDB(line)->rxsize = count;
+    if (count == 0) { return; }
+    if (count < 0) { hi_link_error(line); return; }
+    // Make note of the host ready bit.
+    PHIDB(line)->ready = !! (PHIDB(line)->rxdata[0] & PFLG_READY);
+    // Exclude the flags from the count.
+    PHIDB(line)->rxnext = 1;  count--; 
+    if (count == 0) return;
+    PHIDB(line)->rxtotal++;
+  }
 
-  count = udp_receive(PDEVICE(line), PHIDB(line)->link, tmp, maxbuf+1);
-  if (count == 0) {free (tmp); return; }
-  if (count < 0) {free (tmp); hi_link_error(line); return; }
+  //   We really got a packet!  Update the DMC pointers to reflect the actual
+  // size of the packet received.
+  if (count > maxbuf) {
+    // Limit data to the DMC word count.  Keep the UDP packet for next round.
+    count = maxbuf;
+  }
+  hi_update_dmc(PDIB(line)->rxdmc, count);
+  hi_debug_msg (line, next, count, "received");
 
-  PHIDB(line)->eom = !! tmp[0] & PFLG_FINAL;
-  for (i = 0; i < count - 1; i ++)
-    * (pdata + i) = tmp [i + 1];
-  free (tmp);
-  tmp = NULL;
+  for (i = 0; i < count; i ++)
+    * (pdata + i) = PHIDB(line)->rxdata[PHIDB(line)->rxnext++];
+
   // Now would be a good time to worry about whether a receive is pending!
   if (!PHIDB(line)->rxpending) {
     sim_debug(IMP_DBG_WARN, PDEVICE(line), "data received with no input pending\n");
     return;
   }
 
-  //   We really got a packet!  Update the DMC pointers to reflect the actual
-  // size of the packet received.  If the packet length would have exceeded the
-  // receiver buffer, then that sets the error flag too.
-  if (count > maxbuf) {
-    sim_debug(IMP_DBG_WARN, PDEVICE(line), "receiver overrun (length=%d maxbuf=%d)\n", count, maxbuf);
-    PHIDB(line)->rxerror = TRUE;  count = maxbuf;
-  }
-  hi_update_dmc(PDIB(line)->rxdmc, count);
-  hi_debug_msg (line, next, count, "received");
-
   // Assert the interrupt request and we're done!
-  SET_RX_IRQ(line);  PHIDB(line)->rxpending = FALSE;  PHIDB(line)->rxtotal++;
+  SET_RX_IRQ(line);  PHIDB(line)->rxpending = FALSE;
   sim_debug(IMP_DBG_IOT, PDEVICE(line), "receive done (message #%d, intreq=%06o)\n", PHIDB(line)->rxtotal, dev_ext_int);
 }
 
@@ -496,6 +503,7 @@ int32 hi4_io(int32 inst, int32 fnc, int32 dat, int32 dev)  {return hi_io(4, inst
 // Common I/O simulation routine ...
 int32 hi_io (uint16 host, int32 inst, int32 fnc, int32 dat, int32 dev)
 {
+  uint16 tmp;
   //   This routine is invoked by the CPU module whenever the code executes any
   // I/O instruction (OCP, SKS, INA or OTA) with one of our modem's device
   // address.
@@ -528,10 +536,16 @@ int32 hi_io (uint16 host, int32 inst, int32 fnc, int32 dat, int32 dev)
         sim_debug(IMP_DBG_IOT, PDEVICE(host), "disable cross patch (PC=%06o)\n", PC-1);
         PHIDB(host)->iloop = FALSE;
         udp_set_link_loopback (PDEVICE(host), PHIDB(host)->link, FALSE);
+        PHIDB(host)->enabled = FALSE;
+        // Send out the IMP not ready bit.
+        tmp = PFLG_FINAL;
+        udp_send(PDEVICE(host), PHIDB(host)->link, &tmp, 1);
         return dat;
       case 005:
-        sim_printf("HnENAB unimp.\n");
-        // HnENAB - enable ...
+        PHIDB(host)->enabled = TRUE;
+        // Send out the IMP ready bit.
+        tmp = PFLG_FINAL | PFLG_READY;
+        udp_send(PDEVICE(host), PHIDB(host)->link, &tmp, 1);
         sim_debug(IMP_DBG_IOT, PDEVICE(host), "enable host (PC=%06o)\n", PC-1);
         return dat;
     }
@@ -547,7 +561,6 @@ int32 hi_io (uint16 host, int32 inst, int32 fnc, int32 dat, int32 dev)
       case 001:
         // HnRDY - skip on host ready ...
         //sim_debug(IMP_DBG_IOT, PDEVICE(host), "skip on ready (PC=%06o %s)\n", PC-1, PHIDB(host)->ready ? "SKIP" : "NOSKIP");
-        sim_printf("HnRDY unimpl.; always ready\n");
         return  PHIDB(host)->ready ? IOSKIP(dat) : dat;
       case 002:
         // HnEOM - skip on end of message ...
@@ -581,7 +594,7 @@ t_stat hi_rx_service (UNIT *uptr)
   // queue entry expires.  It just polls the receiver and reschedules itself.
   // That's it!
   uint16 line = uptr->hline;
-  hi_poll_rx(line);
+  if (PHIDB(line)->rxpending) hi_poll_rx(line);
   sim_activate(uptr, uptr->wait);
   return SCPE_OK;
 }
