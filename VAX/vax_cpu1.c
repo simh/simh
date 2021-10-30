@@ -1213,7 +1213,8 @@ int32 newpc = Read (SP, L_LONG, RA);
 int32 newpsl = Read (SP + 4, L_LONG, RA);
 int32 newcur = PSL_GETCUR (newpsl);
 int32 oldcur = PSL_GETCUR (PSL);
-int32 newipl, i;
+uint32 newipl;
+int32 i;
 
 if ((newpsl & PSL_MBZ) ||                               /* rule 8 */
     (newcur < oldcur))                                  /* rule 1 */
