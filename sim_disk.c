@@ -2875,25 +2875,37 @@ if (container_size && (container_size != (t_offset)-1)) {
                     sim_messagef (SCPE_OK, "%s: No File System found on '%s', skipping autosizing\n", sim_uname (uptr), cptr);
                 }
             }
-        if ((container_size != current_unit_size) && 
-            ((DKUF_F_VHD == DK_GET_FMT (uptr)) || (0 != (uptr->flags & UNIT_RO)) ||
-             (ctx->footer))) {
-            if (!sim_quiet) {
-                int32 saved_switches = sim_switches;
-                const char *container_dtype = ctx->footer ? (const char *)ctx->footer->DriveType : "";
-
-                sim_switches = SWMASK ('R');
-                uptr->capac = (t_addr)(container_size/(ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1)));
-                sim_printf ("%s: non expandable %s%sdisk container '%s' is %s than simulated device (%s %s ", 
-                                sim_uname (uptr), container_dtype, (*container_dtype != '\0') ? " " : "", cptr, 
-                            (container_size < current_unit_size) ? "smaller" : "larger", sprint_capac (dptr, uptr), 
-                            (container_size < current_unit_size) ? "<" : ">");
-                uptr->capac = saved_capac;
-                sim_printf ("%s)\n", sprint_capac (dptr, uptr));
-                sim_switches = saved_switches;
+        if (filesystem_size != (t_offset)-1) {
+            if (filesystem_size > current_unit_size) {
+                if (!sim_quiet) {
+                    uptr->capac = (t_addr)(filesystem_size/(ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1)));
+                    sim_printf ("%s: The file system on the %s disk container is larger than simulated device (%s > ", sim_uname (uptr), cptr, sprint_capac (dptr, uptr));
+                    uptr->capac = saved_capac;
+                    sim_printf ("%s)\n", sprint_capac (dptr, uptr));
+                    }
+                sim_disk_detach (uptr);
+                return SCPE_FSSIZE;
                 }
-            sim_disk_detach (uptr);
-            return SCPE_OPENERR;
+            }
+        if ((container_size != current_unit_size)) {
+            if ((DKUF_F_VHD == DK_GET_FMT (uptr)) && 
+                (0 == (uptr->flags & UNIT_RO))) {
+                if (!sim_quiet) {
+                    int32 saved_switches = sim_switches;
+                    const char *container_dtype = ctx->footer ? (const char *)ctx->footer->DriveType : "";
+
+                    sim_switches = SWMASK ('R');
+                    uptr->capac = (t_addr)(container_size/(ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1)));
+                    sim_printf ("%s: non expandable %s%sdisk container '%s' is smaller than simulated device (%s < ", 
+                                sim_uname (uptr), container_dtype, (*container_dtype != '\0') ? " " : "", cptr, 
+                                sprint_capac (dptr, uptr));
+                    uptr->capac = saved_capac;
+                    sim_printf ("%s)\n", sprint_capac (dptr, uptr));
+                    sim_switches = saved_switches;
+                    }
+                sim_disk_detach (uptr);
+                return SCPE_OPENERR;
+                }
             }
         }
     else {          /* Autosize by changing capacity */
