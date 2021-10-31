@@ -508,6 +508,40 @@ if (CopyFileA (sourcename, destname, !overwrite_existing))
 return sim_messagef (SCPE_ARG, "Error Copying '%s' to '%s': %s\n", source_file, dest_file, sim_get_os_error_text (GetLastError ()));
 }
 
+static void _time_t_to_filetime (time_t ttime, FILETIME *filetime)
+{
+t_uint64 time64;
+
+time64 = 134774;                /* Days betwen Jan 1, 1601 and Jan 1, 1970 */
+time64 *= 24;                   /* Hours */
+time64 *= 3600;                 /* Seconds */
+time64 += (t_uint64)ttime;      /* include time_t seconds */
+
+time64 *= 10000000;             /* Convert seconds to 100ns units */
+filetime->dwLowDateTime = (DWORD)time64;
+filetime->dwHighDateTime = (DWORD)(time64 >> 32);
+}
+
+t_stat sim_set_file_times (const char *file_name, time_t access_time, time_t write_time)
+{
+char filename[PATH_MAX + 1];
+FILETIME accesstime, writetime;
+HANDLE hFile;
+BOOL bStat;
+
+_time_t_to_filetime (access_time, &accesstime);
+_time_t_to_filetime (write_time, &writetime);
+if (NULL == _sim_expand_homedir (file_name, filename, sizeof (filename)))
+    return sim_messagef (SCPE_ARG, "Error Setting File Times - Problem Source Filename '%s'\n", filename);
+hFile = CreateFileA (filename, GENERIC_READ|GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+if (hFile == INVALID_HANDLE_VALUE)
+    return sim_messagef (SCPE_ARG, "Can't open file '%s' to set it's times: %s\n", filename, sim_get_os_error_text (GetLastError ()));
+bStat = SetFileTime (hFile, NULL, &accesstime, &writetime);
+CloseHandle (hFile);
+return bStat ? SCPE_OK : sim_messagef (SCPE_ARG, "Error setting file '%s' times: %s\n", filename, sim_get_os_error_text (GetLastError ()));
+}
+
+
 #include <io.h>
 #include <direct.h>
 int sim_set_fsize (FILE *fptr, t_addr size)
@@ -611,7 +645,7 @@ return ftruncate(fileno(fptr), (off_t)size);
 
 #include <sys/stat.h>
 #include <fcntl.h>
-#if HAVE_UTIME
+#if defined (HAVE_UTIME)
 #include <utime.h>
 #endif
 
@@ -662,6 +696,22 @@ if (st == SCPE_OK) {
     else
         st = SCPE_IOERR;
     }
+#endif
+return st;
+}
+
+t_stat sim_set_file_times (const char *file_name, time_t access_time, time_t write_time)
+{
+t_stat st = SCPE_IOERR;
+#if defined (HAVE_UTIME)
+struct utimbuf utim;
+
+utim.actime = access_time;
+utim.modtime = write_time;
+if (!utime (file_name, &utim))
+    st = SCPE_OK;
+#else
+st = SCPE_NOFNC;
 #endif
 return st;
 }
