@@ -56,10 +56,8 @@
   information as a consequence of the "sim_rev.h export-subst" 
   line in the .gitattributes file.
  */
-#if !defined(SIM_GIT_COMMIT_ID)
-#define SIM_GIT_COMMIT_ID $Format:%H$
-#define SIM_GIT_COMMIT_TIME $Format:%aI$
-#endif
+#define SIM_ARCHIVE_GIT_COMMIT_ID $Format:%H$
+#define SIM_ARCHIVE_GIT_COMMIT_TIME $Format:%aI$
 
 /*
   The comment section below reflects the manual editing process which was in place

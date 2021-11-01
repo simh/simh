@@ -6671,6 +6671,25 @@ if (flag) {
         strlcpy (os_type, getenv ("OSTYPE"), sizeof (os_type));
     setenv ("SIM_OSTYPE", os_type, 1);
     }
+#if defined(SIM_ARCHIVE_GIT_COMMIT_ID)
+#define S_xstr(a) S_str(a)
+#define S_str(a) #a
+if (NULL == strchr (S_xstr(SIM_ARCHIVE_GIT_COMMIT_ID), '$')) {
+    const char *extras = strchr (S_xstr(SIM_ARCHIVE_GIT_COMMIT_ID), '+');
+
+    fprintf (st, "%ssimh git commit id: %8.8s%s", flag ? "\n        " : "        ", S_xstr(SIM_ARCHIVE_GIT_COMMIT_ID), extras ? extras : "");
+    setenv ("SIM_ARCHIVE_GIT_COMMIT_ID", S_xstr(SIM_ARCHIVE_GIT_COMMIT_ID), 1);
+    }
+#if defined(SIM_ARCHIVE_GIT_COMMIT_TIME)
+if (NULL == strchr (S_xstr(SIM_ARCHIVE_GIT_COMMIT_TIME), '$')) {
+    setenv ("SIM_ARCHIVE_GIT_COMMIT_TIME", S_xstr(SIM_ARCHIVE_GIT_COMMIT_TIME), 1);
+    if (flag)
+        fprintf (st, "%ssimh git commit time: %s", "\n        ", S_xstr(SIM_ARCHIVE_GIT_COMMIT_TIME));
+    }
+#endif
+#undef S_str
+#undef S_xstr
+#endif
 #if defined(SIM_GIT_COMMIT_ID)
 #define S_xstr(a) S_str(a)
 #define S_str(a) #a
