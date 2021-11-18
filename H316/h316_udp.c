@@ -131,7 +131,6 @@
 #ifdef VM_IMPTIP
 #include "sim_defs.h"           // simh machine independent definitions
 #include "sim_tmxr.h"           // The MUX layer exposes packet send and receive semantics
-#include "h316_defs.h"          // H316 emulator definitions
 #include "h316_imp.h"           // ARPAnet IMP/TIP definitions
 
 // Local constants ...

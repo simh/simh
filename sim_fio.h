@@ -64,6 +64,7 @@ int sim_fseek (FILE *st, t_addr offset, int whence);
 int sim_fseeko (FILE *st, t_offset offset, int whence);
 t_bool sim_can_seek (FILE *st);
 int sim_set_fsize (FILE *fptr, t_addr size);
+t_stat sim_set_file_times (const char *file_name, time_t access_time, time_t write_time);
 int sim_set_fifo_nonblock (FILE *fptr);
 size_t sim_fread (void *bptr, size_t size, size_t count, FILE *fptr);
 size_t sim_fwrite (const void *bptr, size_t size, size_t count, FILE *fptr);
