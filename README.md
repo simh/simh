@@ -503,6 +503,11 @@ First download the latest source code from the github repository's master branch
 
 Depending on your host platform one of the following steps should be followed:
 
+#### Meson-based build
+
+	$ meson build
+	$ ninja -C build
+
 #### Linux/OSX other *nix platforms
 
 If you are interested in using a simulator with Ethernet networking support (i.e. one of the VAX simulators or the PDP11), then you should make sure you have the correct networking components available.  The instructions in https://github.com/simh/simh/blob/master/0readme_ethernet.txt describe the required steps to get ethernet networking components installed and how to configure your environment.
@@ -512,6 +517,7 @@ See the 0readme_ethernet.txt file for details about the required network compone
    $ make {simulator-name (i.e. vax)}
 
 The makefile provided requires GNU make, which is the default make facility for most systems these days.  Any host system which doesn't have GNU make available as the default make facility may have it installed as 'gmake'.  GNU make (gmake) is generally available an installation package for all current operating systems which have a package installation system.
+
 
 ##### Build Dependencies
 

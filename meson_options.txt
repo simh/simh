@@ -1,0 +1,3 @@
+option('static_runtime', type: 'boolean', value: false, description: 'Set to true when you want static libraries/dependencies and runtime for SIMH')
+option('use_sys_pcap', type: 'feature', value: 'disabled')
+option('local', type: 'combo', choices: ['enabled', 'disabled', 'absolute', 'auto'], value: 'auto', description: 'Adds support for local/side-by-side installation (sets rpath if needed). enabled uses rpaths relative to $ORIGIN, absolute uses absolute paths.')
