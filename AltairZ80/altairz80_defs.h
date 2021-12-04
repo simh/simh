@@ -45,6 +45,7 @@
 #define ALTAIR_ROM_LOW          0xff00                      /* start address of regular Altair ROM          */
 #define RESOURCE_TYPE_MEMORY    1
 #define RESOURCE_TYPE_IO        2
+#define MAX_INT_VECTORS         32                          /* maximum number of interrupt vectors          */
 
 #define NUM_OF_DSK              16                          /* NUM_OF_DSK must be power of two              */
 #define LDA_INSTRUCTION         0x3e                        /* op-code for LD A,<8-bit value> instruction   */
