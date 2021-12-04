@@ -6411,8 +6411,10 @@ FILE *f;
 #define popen _popen
 #define pclose _pclose
 #else
-#define FIND_CMD "which"
-#define FIND_CMD2 ""
+#define FIND_CMD "command -v"
+#define FIND_CMD2 "2>/dev/null"
+#define FIND_CMD_EXTRA "which"
+#define FIND_CMD2_EXTRA "2>/dev/null"
 #endif
 memset (toolpath, 0, sizeof(toolpath));
 snprintf (findcmd, sizeof (findcmd), "%s %s %s", FIND_CMD, tool, FIND_CMD2);
@@ -6423,6 +6425,19 @@ if ((f = popen (findcmd, "r"))) {
         sim_trim_endspc (toolpath);
         } while (toolpath[0] == '\0');
     pclose (f);
+    }
+if (toolpath[0] == '\0') { /* Not found yet? */
+#if defined(FIND_CMD_EXTRA) /* Try with alternative command */
+    snprintf (findcmd, sizeof (findcmd), "%s %s %s", FIND_CMD_EXTRA, tool, FIND_CMD2_EXTRA);
+    if ((f = popen (findcmd, "r"))) {
+        do {
+            if (NULL == fgets (toolpath, sizeof(toolpath)-1, f))
+                break;
+            sim_trim_endspc (toolpath);
+            } while (toolpath[0] == '\0');
+        pclose (f);
+        }
+#endif
     }
 return toolpath;
 }
