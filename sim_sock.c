@@ -55,7 +55,7 @@ extern "C" {
 #include <ws2tcpip.h>
 #endif
 
-#ifdef HAVE_DLOPEN
+#ifdef SIM_HAVE_DLOPEN
 #include <dlfcn.h>
 #endif
 

@@ -238,7 +238,7 @@
 #endif
 #include <setjmp.h>
 
-#if defined(HAVE_DLOPEN)                                /* Dynamic Readline support */
+#if defined(SIM_HAVE_DLOPEN)                                /* Dynamic Readline support */
 #include <dlfcn.h>
 #endif
 
@@ -10091,7 +10091,7 @@ return read_line_p (NULL, cptr, size, stream);
 char *read_line_p (const char *prompt, char *cptr, int32 size, FILE *stream)
 {
 char *tptr;
-#if defined(HAVE_DLOPEN)
+#if defined(SIM_HAVE_DLOPEN)
 static int initialized = 0;
 typedef char *(*readline_func)(const char *);
 static readline_func p_readline = NULL;
@@ -10104,15 +10104,15 @@ if (prompt && (!initialized)) {
 
 #define S__STR_QUOTE(tok) #tok
 #define S__STR(tok) S__STR_QUOTE(tok)
-    handle = dlopen("libncurses." S__STR(HAVE_DLOPEN), RTLD_NOW|RTLD_GLOBAL);
-    handle = dlopen("libcurses." S__STR(HAVE_DLOPEN), RTLD_NOW|RTLD_GLOBAL);
-    handle = dlopen("libreadline." S__STR(HAVE_DLOPEN), RTLD_NOW|RTLD_GLOBAL);
+    handle = dlopen("libncurses." S__STR(SIM_HAVE_DLOPEN), RTLD_NOW|RTLD_GLOBAL);
+    handle = dlopen("libcurses." S__STR(SIM_HAVE_DLOPEN), RTLD_NOW|RTLD_GLOBAL);
+    handle = dlopen("libreadline." S__STR(SIM_HAVE_DLOPEN), RTLD_NOW|RTLD_GLOBAL);
     if (!handle)
-        handle = dlopen("libreadline." S__STR(HAVE_DLOPEN) ".7", RTLD_NOW|RTLD_GLOBAL);
+        handle = dlopen("libreadline." S__STR(SIM_HAVE_DLOPEN) ".7", RTLD_NOW|RTLD_GLOBAL);
     if (!handle)
-        handle = dlopen("libreadline." S__STR(HAVE_DLOPEN) ".6", RTLD_NOW|RTLD_GLOBAL);
+        handle = dlopen("libreadline." S__STR(SIM_HAVE_DLOPEN) ".6", RTLD_NOW|RTLD_GLOBAL);
     if (!handle)
-        handle = dlopen("libreadline." S__STR(HAVE_DLOPEN) ".5", RTLD_NOW|RTLD_GLOBAL);
+        handle = dlopen("libreadline." S__STR(SIM_HAVE_DLOPEN) ".5", RTLD_NOW|RTLD_GLOBAL);
     if (handle) {
         p_readline = (readline_func)((size_t)dlsym(handle, "readline"));
         p_add_history = (add_history_func)((size_t)dlsym(handle, "add_history"));
@@ -10165,7 +10165,7 @@ if ((*cptr == ';') || (*cptr == '#')) {                 /* ignore comment */
     *cptr = 0;
     }
 
-#if defined (HAVE_DLOPEN)
+#if defined (SIM_HAVE_DLOPEN)
 if (prompt && p_add_history && *cptr)                   /* Save non blank lines in history */
     p_add_history (cptr);
 #endif
