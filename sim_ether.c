@@ -1225,11 +1225,11 @@ extern "C" {
 #include <winreg.h>
 #endif
 
-#ifdef HAVE_DLOPEN
+#ifdef SIM_HAVE_DLOPEN
 #include <dlfcn.h>
 #endif
 
-#if defined(USE_SHARED) && (defined(_WIN32) || defined(HAVE_DLOPEN))
+#if defined(USE_SHARED) && (defined(_WIN32) || defined(SIM_HAVE_DLOPEN))
 /* Dynamic DLL loading technique and modified source comes from
    Etherial/WireShark capture_pcap.c */
 
@@ -1249,7 +1249,7 @@ static const char* lib_name =
 #elif defined(__APPLE__)
                           "/usr/lib/libpcap.A.dylib";
 #else
-                          "libpcap." __STR(HAVE_DLOPEN);
+                          "libpcap." __STR(SIM_HAVE_DLOPEN);
 #endif
 
 static char no_pcap[PCAP_ERRBUF_SIZE] =
@@ -1258,7 +1258,7 @@ static char no_pcap[PCAP_ERRBUF_SIZE] =
 #elif defined(__APPLE__)
     "/usr/lib/libpcap.A.dylib failed to load, install libpcap to use pcap networking";
 #else
-    "libpcap." __STR(HAVE_DLOPEN) " failed to load, install libpcap to use pcap networking";
+    "libpcap." __STR(SIM_HAVE_DLOPEN) " failed to load, install libpcap to use pcap networking";
 #endif
 #undef __STR
 #undef __STR_QUOTE
@@ -1529,7 +1529,7 @@ int pcap_setnonblock(pcap_t* a, int nonblock, char *errbuf) {
     return 0;
   }
 }
-#endif /* defined(USE_SHARED) && (defined(_WIN32) || defined(HAVE_DLOPEN)) */
+#endif /* defined(USE_SHARED) && (defined(_WIN32) || defined(SIM_HAVE_DLOPEN)) */
 
 /* Some platforms have always had pcap_sendpacket */
 #if defined(_WIN32) || defined(__VMS)

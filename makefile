@@ -577,21 +577,21 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
   endif
   ifneq (,$(call find_include,dlfcn))
     ifneq (,$(call find_lib,dl))
-      OS_CCDEFS += -DHAVE_DLOPEN=$(LIBSOEXT)
+      OS_CCDEFS += -DSIM_HAVE_DLOPEN=$(LIBSOEXT)
       OS_LDFLAGS += -ldl
       $(info using libdl: $(call find_lib,dl) $(call find_include,dlfcn))
     else
       ifneq (,$(findstring BSD,$(OSTYPE))$(findstring AIX,$(OSTYPE))$(findstring Haiku,$(OSTYPE)))
-        OS_CCDEFS += -DHAVE_DLOPEN=so
+        OS_CCDEFS += -DSIM_HAVE_DLOPEN=so
         $(info using libdl: $(call find_include,dlfcn))
       else
         ifneq (,$(call find_lib,dld))
-          OS_CCDEFS += -DHAVE_DLOPEN=$(LIBSOEXT)
+          OS_CCDEFS += -DSIM_HAVE_DLOPEN=$(LIBSOEXT)
           OS_LDFLAGS += -ldld
           $(info using libdld: $(call find_lib,dld) $(call find_include,dlfcn))
         else
           ifeq (Darwin,$(OSTYPE))
-            OS_CCDEFS += -DHAVE_DLOPEN=dylib
+            OS_CCDEFS += -DSIM_HAVE_DLOPEN=dylib
             $(info using macOS dlopen with .dylib)
           endif
         endif

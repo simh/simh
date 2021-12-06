@@ -35,6 +35,7 @@
 /* Debug flags */
 #define IN_MSG          (1 << 0)
 #define OUT_MSG         (1 << 1)
+#define INT_MSG         (1 << 2)
 
 #define PCQ_SIZE        64                      /* must be 2**n                     */
 #define PCQ_SIZE_LOG2   6                       /* log2 of PCQ_SIZE                 */
@@ -241,7 +242,8 @@ UNIT cpu_unit = {
         int32 IP_S;                                 /* IP register (8086)                           */
         int32 FLAGS_S;                              /* flags register (8086)                        */
         int32 SR                = 0;                /* switch register                              */
-        int32 vectorInterrupt   = 0;                /* Vector Interrupt bitfield                    */
+        uint32 vectorInterrupt  = 0;                /* VI0-7 Vector Interrupt bitfield              */
+        uint8 dataBus[MAX_INT_VECTORS];             /* Vector Interrupt data bus value              */
 static  int32 bankSelect        = 0;                /* determines selected memory bank              */
 static  uint32 common           = 0xc000;           /* addresses >= 'common' are in common memory   */
 static  uint32 common_low       = 0;                /* Common area is in low memory                 */
@@ -473,6 +475,10 @@ REG cpu_reg[] = {
     }, /* 82 */
     { HRDATAD(COMMONLOW,common_low,         1, "If set, use low memory for common area"),
     }, /* 83 */
+    { HRDATAD(VECINT,vectorInterrupt,       2, "Vector Interrupt psuedo register"),
+    }, /* 84 */
+    { BRDATAD (DATABUS, dataBus, 16, 8,     MAX_INT_VECTORS, "Data bus pseudo register"),
+        REG_RO + REG_CIRC   }, /* 85 */
     { NULL }
 };
 
@@ -572,6 +578,7 @@ static MTAB cpu_mod[] = {
 static DEBTAB cpu_dt[] = {
     { "LOG_IN",     IN_MSG,     "Log IN operations"     },
     { "LOG_OUT",    OUT_MSG,    "Log OUT operations"    },
+    { "LOG_INT",    INT_MSG,    "Log interrupts"        },
     { NULL,         0                                   }
 };
 
@@ -2186,9 +2193,7 @@ static t_stat sim_instr_mmu (void) {
                 PC = timerInterruptHandler & ADDRMASK;
             }
 
-            if ((IM_S == 2) && vectorInterrupt && (IFF_S & 1)) {
-                int32 vectable = (IR_S & 0xFF00);
-                int32 vector;
+            if ((IM_S == 1) && vectorInterrupt && (IFF_S & 1)) {    /* Z80 Interrupt Mode 1 */
                 uint32 tempVectorInterrupt = vectorInterrupt;
                 uint8 intVector = 0;
 
@@ -2198,6 +2203,7 @@ static t_stat sim_instr_mmu (void) {
                 }
 
                 vectorInterrupt &= ~(1 << intVector);
+
                 specialProcessing = clockFrequency | sim_brk_summ;
                 IFF_S = 0; /* disable interrupts */
                 CHECK_BREAK_TWO_BYTES_EXTENDED(SP - 2, SP - 1, (vectorInterrupt |= (1 << intVector), IFF_S |= 1));
@@ -2210,9 +2216,39 @@ static t_stat sim_instr_mmu (void) {
                     PCQ_ENTRY(PC - 1);
                 }
 
-                vector = GetBYTE(vectable + (intVector * 2)+1) << 8;
-                vector |= GetBYTE(vectable + (intVector * 2));
-                PC = vector & ADDRMASK;
+                PC = 0x0038;
+
+                sim_debug(INT_MSG, &cpu_dev, ADDRESS_FORMAT
+                    " INT(mode=1 intVector=%d PC=%04X)\n", PCX, intVector, PC);
+            } else if ((IM_S == 2) && vectorInterrupt && (IFF_S & 1)) {
+                int32 vector;
+                uint32 tempVectorInterrupt = vectorInterrupt;
+                uint8 intVector = 0;
+
+                while ((tempVectorInterrupt & 1) == 0) {
+                    tempVectorInterrupt >>= 1;
+                    intVector++;
+                }
+
+                vectorInterrupt &= ~(1 << intVector);
+
+                specialProcessing = clockFrequency | sim_brk_summ;
+                IFF_S = 0; /* disable interrupts */
+                CHECK_BREAK_TWO_BYTES_EXTENDED(SP - 2, SP - 1, (vectorInterrupt |= (1 << intVector), IFF_S |= 1));
+                if ((GetBYTE(PC) == HALTINSTRUCTION) && ((cpu_unit.flags & UNIT_CPU_STOPONHALT) == 0)) {
+                    PUSH(PC + 1);
+                    PCQ_ENTRY(PC);
+                }
+                else {
+                    PUSH(PC);
+                    PCQ_ENTRY(PC - 1);
+                }
+
+                vector = (HIGH_REGISTER(IR_S) << 8) | dataBus[intVector];
+                PC = ((GetBYTE(vector+1) << 8) | GetBYTE(vector)) & ADDRMASK;
+
+                sim_debug(INT_MSG, &cpu_dev, ADDRESS_FORMAT
+                    " INT(mode=2 intVector=%d vector=%04X PC=%04X)\n", PCX, intVector, vector, PC);
             }
 
             if (keyboardInterrupt && (IFF_S & 1)) {
@@ -2246,7 +2282,32 @@ static t_stat sim_instr_mmu (void) {
         PCX = PC;
         INCR(1);
 
-        switch(RAM_PP(PC)) {
+        op = RAM_PP(PC);
+
+        /* 8080 INT/Z80 Interrupt Mode 0
+           Instruction to execute (ex. RST0-7) is on the data bus
+           NOTE: does not support multi-byte instructions such as CALL
+        */
+        if ((IM_S == 0) && vectorInterrupt && (IFF_S & 1)) {    /* 8080/Z80 Interrupt Mode 0 */
+            uint32 tempVectorInterrupt = vectorInterrupt;
+            uint8 intVector = 0;
+
+            while ((tempVectorInterrupt & 1) == 0) {
+                tempVectorInterrupt >>= 1;
+                intVector++;
+            }
+
+            IFF_S = 0; /* disable interrupts */
+
+            vectorInterrupt &= ~(1 << intVector);
+
+            op = dataBus[intVector];
+
+            sim_debug(INT_MSG, &cpu_dev, ADDRESS_FORMAT
+                " INT(mode=0 vectorInterrupt=%X intVector=%d op=%02X)\n", PCX, vectorInterrupt, intVector, op);
+        }
+
+        switch(op) {
 
             case 0x00:          /* NOP */
                 tStates += 4;   /* NOP 4 */
@@ -6261,7 +6322,7 @@ static t_stat cpu_reset(DEVICE *dptr) {
     BC_S = DE_S = HL_S = 0;
     BC1_S = DE1_S = HL1_S = 0;
     IR_S = IX_S = IY_S = SP_S = 0;
-    IFF_S = 3;
+    IM_S = IFF_S = 0;  /* Set IM0, reset IFF1 and IFF2 */
     setBankSelect(0);
     cpu8086reset();
     m68k_cpu_reset();
