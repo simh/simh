@@ -170,6 +170,7 @@ static void bootp_reply(Slirp *slirp, const struct bootp_t *bp)
     rbp = (struct bootp_t *)m->m_data;
     m->m_data += sizeof(struct udpiphdr);
     memset(rbp, 0, sizeof(struct bootp_t));
+    daddr.sin_addr.s_addr = 0xffffffffu;
 
     if (dhcp_msg_type == DHCPDISCOVER) {
         if (preq_addr.s_addr != htonl(0L)) {
@@ -307,8 +308,6 @@ static void bootp_reply(Slirp *slirp, const struct bootp_t *bp)
         q += sizeof(nak_msg) - 1;
     }
     *q = RFC1533_END;
-
-    daddr.sin_addr.s_addr = 0xffffffffu;
 
     m->m_len = sizeof(struct bootp_t) -
         sizeof(struct ip) - sizeof(struct udphdr);
