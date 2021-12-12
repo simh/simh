@@ -2403,8 +2403,9 @@ t_stat xq_wr_srqr_action(CTLR* xq)
           xq->var->sanity.quarter_secs = 4*xq->var->init.hit_timeout;
         }
         xq->var->icr = xq->var->init.options & XQ_IN_OP_INT;
-        status = eth_filter_hash (xq->var->etherface, 1, &xq->var->init.phys, 0, xq->var->init.mode & XQ_IN_MO_PRO, &xq->var->init.hash_filter);
-
+        memcpy (&xq->var->turbo_macs[0], &xq->var->init.phys, sizeof (xq->var->turbo_macs[0]));
+        memset (&xq->var->turbo_macs[1], 0xFF, sizeof (xq->var->turbo_macs[1]));    /* LANCE explicitly also matches the broadcast address */
+        status = eth_filter_hash (xq->var->etherface, 2, xq->var->turbo_macs, 0, xq->var->init.mode & XQ_IN_MO_PRO, &xq->var->init.hash_filter);
         xq->dev->dctrl = saved_debug; /* restore original debugging */
       }
       /* start the read service timer or enable asynch reading as appropriate */
@@ -2925,8 +2926,11 @@ t_stat xq_attach(UNIT* uptr, CONST char* cptr)
     return status;
     }
 
-  if (xq->var->mode == XQ_T_DELQA_PLUS)
-    eth_filter_hash (xq->var->etherface, 1, &xq->var->init.phys, 0, xq->var->init.mode & XQ_IN_MO_PRO, &xq->var->init.hash_filter);
+  if (xq->var->mode == XQ_T_DELQA_PLUS) {
+    memcpy (&xq->var->turbo_macs[0], &xq->var->init.phys, sizeof (xq->var->turbo_macs[0]));
+    memset (&xq->var->turbo_macs[1], 0xFF, sizeof (xq->var->turbo_macs[1]));    /* LANCE explicitly also matches the broadcast address */
+    eth_filter_hash (xq->var->etherface, 2, xq->var->turbo_macs, 0, xq->var->init.mode & XQ_IN_MO_PRO, &xq->var->init.hash_filter);
+    }
   else
     if (xq->var->setup.valid) {
       int i, count = 0;
