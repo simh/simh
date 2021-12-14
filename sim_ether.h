@@ -342,11 +342,17 @@ t_stat eth_filter (ETH_DEV* dev, int addr_count,        /* set filter on incomin
                    ETH_MAC* const addresses,
                    ETH_BOOL all_multicast,
                    ETH_BOOL promiscuous);
-t_stat eth_filter_hash (ETH_DEV* dev, int addr_count,   /* set filter on incoming packets with AUTODIN II based hash */
+t_stat eth_filter_hash (ETH_DEV* dev, int addr_count,   /* set filter on incoming packets with hash */
                         ETH_MAC* const addresses,
                         ETH_BOOL all_multicast,
                         ETH_BOOL promiscuous,
-                        ETH_MULTIHASH* const hash);
+                        ETH_MULTIHASH* const hash);     /* AUTODIN II based 8 byte imperfect hash */
+t_stat eth_filter_hash_ex (ETH_DEV* dev, int addr_count,/* set filter on incoming packets with hash */
+                           ETH_MAC* const addresses,
+                           ETH_BOOL all_multicast,
+                           ETH_BOOL promiscuous,
+                           ETH_BOOL match_broadcast,
+                           ETH_MULTIHASH* const hash);  /* AUTODIN II based 8 byte imperfect hash */
 t_stat eth_check_address_conflict (ETH_DEV* dev, 
                                    ETH_MAC* const address);
 const char *eth_version (void);                         /* Version of dynamically loaded library (pcap) */

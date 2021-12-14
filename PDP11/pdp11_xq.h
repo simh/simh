@@ -285,7 +285,6 @@ struct xq_device {
   uint16            pending_interrupt;                  /* Pending Interrupt - DELQA-T only */
   struct xq_turbo_init_block
                     init;
-  ETH_MAC           turbo_macs[2];                      /* Hardware MAC address + broadcast */
   struct transmit_buffer_descriptor
                     xring[XQ_TURBO_XM_BCNT];            /* Transmit Buffer Ring */
   uint32            tbindx;                             /* Transmit Buffer Ring Index */

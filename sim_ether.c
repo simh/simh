@@ -4014,14 +4014,23 @@ return SCPE_OK;
 t_stat eth_filter(ETH_DEV* dev, int addr_count, ETH_MAC* const addresses,
                   ETH_BOOL all_multicast, ETH_BOOL promiscuous)
 {
-return eth_filter_hash(dev, addr_count, addresses, 
-                       all_multicast, promiscuous, 
-                       NULL);
+return eth_filter_hash_ex(dev, addr_count, addresses, 
+                          all_multicast, promiscuous, FALSE,
+                          NULL);
 }
 
 t_stat eth_filter_hash(ETH_DEV* dev, int addr_count, ETH_MAC* const addresses,
                        ETH_BOOL all_multicast, ETH_BOOL promiscuous, 
                        ETH_MULTIHASH* const hash)
+{
+return eth_filter_hash_ex(dev, addr_count, addresses, 
+                          all_multicast, promiscuous, TRUE,
+                          hash);
+}
+
+t_stat eth_filter_hash_ex(ETH_DEV* dev, int addr_count, ETH_MAC* const addresses,
+                          ETH_BOOL all_multicast, ETH_BOOL promiscuous, 
+                          ETH_BOOL match_broadcast, ETH_MULTIHASH* const hash)
 {
 int i;
 char buf[116+66*ETH_FILTER_MAX];
@@ -4035,7 +4044,7 @@ struct bpf_program bpf;
 if (!dev) return SCPE_UNATT;
 
 /* filter count OK? */
-if ((addr_count < 0) || (addr_count > ETH_FILTER_MAX))
+if ((addr_count < 0) || ((addr_count + (match_broadcast ? 1 : 0)) > ETH_FILTER_MAX))
   return SCPE_ARG;
 else
   if (!addresses && (addr_count != 0)) 
@@ -4049,6 +4058,11 @@ if (dev->reflections == -1)
 /* set new filter addresses */
 for (i = 0; i < addr_count; i++)
   memcpy(dev->filter_address[i], addresses[i], sizeof(ETH_MAC));
+dev->addr_count = addr_count;
+if (match_broadcast) {
+  memset(&dev->filter_address[addr_count], 0xFF, sizeof(ETH_MAC));
+  ++addr_count;
+  }
 dev->addr_count = addr_count;
 
 /* store other flags */
@@ -4219,6 +4233,26 @@ fprintf(st, "  Read Queue: High:        %d\n", dev->read_queue.high);
 fprintf(st, "  Read Queue: Loss:        %d\n", dev->read_queue.loss);
 fprintf(st, "  Peak Write Queue Size:   %d\n", dev->write_queue_peak);
 #endif
+if (dev->error_needs_reset)
+  fprintf(st, "  In Error Needs Reset:    True\n");
+if (dev->error_reopen_count)
+  fprintf(st, "  Error Reopen Count:      %d\n", (int)dev->error_reopen_count);
+if (1) {
+  int i, count = 0;
+  ETH_MAC zeros = {0, 0, 0, 0, 0, 0};
+  char  buffer[20];
+
+  for (i = 0; i < ETH_FILTER_MAX; i++) {
+    if (memcmp(zeros, &dev->filter_address[i], sizeof(ETH_MAC))) {
+      eth_mac_fmt(&dev->filter_address[i], buffer);
+      fprintf(st, "  MAC Filter[%2d]: %s\n", count++, buffer);
+      }
+    }
+  }
+if (dev->all_multicast)
+  fprintf(st, "  All Multicast mode:      Enabled\n");
+if (dev->promiscuous)
+  fprintf(st, "  Promiscuous mode:        Enabled\n");
 if (dev->bpf_filter)
   fprintf(st, "  BPF Filter: %s\n", dev->bpf_filter);
 #if defined(HAVE_SLIRP_NETWORK)
