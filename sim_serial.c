@@ -582,6 +582,7 @@ COMMCONFIG commdefault;
 DWORD error;
 DWORD commsize = sizeof (commdefault);
 COMMTIMEOUTS cto;
+char dosname[1028];
 
 if (!GetDefaultCommConfig (name, &commdefault, &commsize)) {    /* get default comm parameters */
     error = GetLastError ();                                    /* function failed; get error */
@@ -592,7 +593,10 @@ if (!GetDefaultCommConfig (name, &commdefault, &commsize)) {    /* get default c
     return INVALID_HANDLE;                                      /* indicate bad port name */
     }
 
-hPort = CreateFile (name, GENERIC_READ | GENERIC_WRITE, /* open the port */
+strncpy(dosname, "\\\\.\\", 4);
+strncat(dosname, name, sizeof(dosname));
+
+hPort = CreateFile (dosname, GENERIC_READ | GENERIC_WRITE, /* open the port */
                    0, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, 0);
 
 if (hPort == INVALID_HANDLE_VALUE) {                    /* open failed? */
