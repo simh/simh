@@ -15,7 +15,7 @@
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+   MARK PIZZOLATO BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
@@ -2783,7 +2783,7 @@ if (sim_switches & SWMASK ('K')) {
     t_lba lba, sect;
     uint32 capac_factor = ((dptr->dwidth / dptr->aincr) >= 32) ? 8 : ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* capacity units (word: 2, byte: 1) */
     t_seccnt sectors_per_buffer = (t_seccnt)((1024*1024)/sector_size);
-    t_lba total_sectors = (t_lba)((uptr->capac*capac_factor)/(sector_size/((dptr->flags & DEV_SECTORS) ? 512 : 1)));
+    t_lba total_sectors = (t_lba)((uptr->capac*capac_factor)/(sector_size/((dptr->flags & DEV_SECTORS) ? ctx->sector_size : 1)));
     t_seccnt sects = sectors_per_buffer;
     t_seccnt sects_verify;
     uint8 *verify_buf = (uint8*) malloc (1024*1024);
@@ -2837,7 +2837,7 @@ if (get_disk_footer (uptr) != SCPE_OK) {
     }
 filesystem_size = get_filesystem_size (uptr);
 container_size = sim_disk_size (uptr);
-current_unit_size = ((t_offset)uptr->capac)*ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1);
+current_unit_size = ((t_offset)uptr->capac)*ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? ctx->sector_size : 1);
 if (container_size && (container_size != (t_offset)-1)) {
     if (dontchangecapac) {  /* autosize by changing drive type */
         t_addr saved_capac = uptr->capac;
@@ -2854,15 +2854,15 @@ if (container_size && (container_size != (t_offset)-1)) {
                     st = set_cmd (0, cmd);
                     uptr->flags |= UNIT_ATT;    /* restore attached indicator */
                     if (st == SCPE_OK)
-                        current_unit_size = ((t_offset)uptr->capac)*ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1);
+                        current_unit_size = ((t_offset)uptr->capac)*ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? ctx->sector_size : 1);
                     if (current_unit_size >= filesystem_size)
                         break;
                     ++drivetypes;
                     }
             if (filesystem_size > current_unit_size) {
                 if (!sim_quiet) {
-                    uptr->capac = (t_addr)(filesystem_size/(ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1)));
-                        sim_printf ("%s: The file system on the disk %s is larger than simulated device (%s > ", sim_uname (uptr), cptr, sprint_capac (dptr, uptr));
+                    uptr->capac = (t_addr)(filesystem_size/(ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? ctx->sector_size : 1)));
+                    sim_printf ("%s: The file system on the disk %s is larger than simulated device (%s > ", sim_uname (uptr), cptr, sprint_capac (dptr, uptr));
                     uptr->capac = saved_capac;
                     sim_printf ("%s)\n", sprint_capac (dptr, uptr));
                     }
@@ -2871,14 +2871,25 @@ if (container_size && (container_size != (t_offset)-1)) {
                 }
             }
             else {
-                if (!created)
+                if (!created) {
                     sim_messagef (SCPE_OK, "%s: No File System found on '%s', skipping autosizing\n", sim_uname (uptr), cptr);
+                    if (container_size > current_unit_size) {
+                        if (!sim_quiet) {
+                            uptr->capac = (t_addr)(container_size/(ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? ctx->sector_size : 1)));
+                            sim_printf ("%s: The disk container '%s' is larger than simulated device (%s > ", sim_uname (uptr), cptr, sprint_capac (dptr, uptr));
+                            uptr->capac = saved_capac;
+                            sim_printf ("%s)\n", sprint_capac (dptr, uptr));
+                            }
+                        sim_disk_detach (uptr);
+                        return SCPE_FSSIZE | SCPE_NOMESSAGE;
+                        }
+                    }
                 }
             }
         if (filesystem_size != (t_offset)-1) {
             if (filesystem_size > current_unit_size) {
                 if (!sim_quiet) {
-                    uptr->capac = (t_addr)(filesystem_size/(ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1)));
+                    uptr->capac = (t_addr)(filesystem_size/(ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? ctx->sector_size : 1)));
                     sim_printf ("%s: The file system on the %s disk container is larger than simulated device (%s > ", sim_uname (uptr), cptr, sprint_capac (dptr, uptr));
                     uptr->capac = saved_capac;
                     sim_printf ("%s)\n", sprint_capac (dptr, uptr));
@@ -2895,7 +2906,7 @@ if (container_size && (container_size != (t_offset)-1)) {
                     const char *container_dtype = ctx->footer ? (const char *)ctx->footer->DriveType : "";
 
                     sim_switches = SWMASK ('R');
-                    uptr->capac = (t_addr)(container_size/(ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1)));
+                    uptr->capac = (t_addr)(container_size/(ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? ctx->sector_size : 1)));
                     sim_printf ("%s: non expandable %s%sdisk container '%s' is smaller than simulated device (%s < ", 
                                 sim_uname (uptr), container_dtype, (*container_dtype != '\0') ? " " : "", cptr, 
                                 sprint_capac (dptr, uptr));

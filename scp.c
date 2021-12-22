@@ -10108,6 +10108,8 @@ if (prompt && (!initialized)) {
     handle = dlopen("libcurses." S__STR(SIM_HAVE_DLOPEN), RTLD_NOW|RTLD_GLOBAL);
     handle = dlopen("libreadline." S__STR(SIM_HAVE_DLOPEN), RTLD_NOW|RTLD_GLOBAL);
     if (!handle)
+        handle = dlopen("libreadline." S__STR(SIM_HAVE_DLOPEN) ".8", RTLD_NOW|RTLD_GLOBAL);
+    if (!handle)
         handle = dlopen("libreadline." S__STR(SIM_HAVE_DLOPEN) ".7", RTLD_NOW|RTLD_GLOBAL);
     if (!handle)
         handle = dlopen("libreadline." S__STR(SIM_HAVE_DLOPEN) ".6", RTLD_NOW|RTLD_GLOBAL);
