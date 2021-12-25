@@ -1891,6 +1891,17 @@ const char helpString[] =
     "\n"
     "+sim> ATTACH %U port,UDP\n"
     "\n"
+    " Communication may also use the DDCMP synchronous framer device.  This is\n"
+    " a USB device that appears as an Ethernet interface, and can send and\n"
+    " receive DDCMP frames over either RS-232 or coax synchronous lines.\n"
+    " Refer to https://github.com/pkoning2/ddcmp for documentation.\n"
+    "\n"
+    "+sim> ATTACH %U FRAMER=eth:mode:speed\n"
+    "\n"
+    " Communicate via the synchronous DDCMP framer at Ethernet interface\n"
+    " \"eth\", and framer mode \"mode\" -- one of INTERNAL, RS232_DTE, or\n"
+    " RS232_DCE.  The \"speed\" argument is the bit rate for the line.\n"
+    " In FRAMER mode, the \"PEER\" parameter is not used and need not be set.\n"
     "2 Examples\n"
     " To configure two simulators to talk to each other use the following\n"
     " example:\n"
@@ -1905,6 +1916,8 @@ const char helpString[] =
     "+sim> SET %U PEER=LOCALHOST:1111\n"
     "+sim> ATTACH %U 2222\n"
     "\n"
+    " To communicate with an \"integral modem\" DMC or similar, at 56 kbps:\n"
+    "+sim> ATTACH %U FRAMER=eth7:INTERNAL:56000\n"
     "1 Monitoring\n"
     " The %D device and %U line configuration and state can be displayed with\n"
     " one of the available show commands.\n"
@@ -2474,6 +2487,8 @@ CONTROL_OUT *control;
 
 sim_debug(DBG_INF, controller->device, "%s%d: Master clear\n", controller->device->name, controller->index);
 dmc_clear_master_clear(controller);
+/* Stop the framer, if using one */
+tmxr_stop_framer (controller->line);
 dmc_clr_modem_dtr(controller);
 controller->link.state = Halt;
 controller->state = Initialised;
@@ -2924,6 +2939,8 @@ if (dmc_is_dmc(controller)) {
                                                        (sel6&DMC_SEL6_M_HDX) ? ", Half Duples" : "", 
                                                        (sel6&DMC_SEL6_M_LONGSTRT) ? ", Long Start Timer" : "");
                 dmc_set_modem_dtr (controller);
+                /* If using the framer, start it now */
+                tmxr_start_framer (controller->line, controller->dev_type == DMC);
                 controller->transfer_state = Idle;
                 ddcmp_dispatch (controller, (sel6&DMC_SEL6_M_MAINT) ? DDCMP_EVENT_MAINTMODE : 0);
                 return;
@@ -2953,6 +2970,8 @@ else {  /* DMP */
             else
                 config = (mode & 2) ? "Tributary station" : "Control Station";
 
+            /* If using the framer, start it now */
+            tmxr_start_framer (controller->line, (mode & 6) == 0);
             sim_debug(DBG_INF, controller->device, "%s%d: Completing Mode input transfer, %s %s\n", controller->device->name, controller->index, duplex, config);
             }
         else 
@@ -3972,14 +3991,21 @@ if (!cptr || !*cptr)
     return SCPE_ARG;
 if (!(uptr->flags & UNIT_ATTABLE))
     return SCPE_NOATT;
-if (!peer[0]) {
-    sim_printf ("Peer must be specified before attach\n");
-    return SCPE_ARG;
+if (0 == strncasecmp (cptr, "FRAMER", 6)) {
+    sprintf (attach_string, "Line=%d,%s", dmc, cptr);
+    ans = tmxr_open_master (mp, attach_string);
+}
+else {
+    if (!peer[0]) {
+        sim_printf ("Peer must be specified before attach\n");
+        return SCPE_ARG;
     }
-sprintf (attach_string, "Line=%d,Connect=%s,%s", dmc, peer, cptr);
-ans = tmxr_open_master (mp, attach_string);                 /* open master socket */
+    sprintf (attach_string, "Line=%d,Connect=%s,%s", dmc, peer, cptr);
+    ans = tmxr_open_master (mp, attach_string);                 /* open master socket */
+}
 if (ans != SCPE_OK)
     return ans;
+mp->dptr = dptr;
 strncpy (port, cptr, sizeof(dmc_port[0]));
 uptr->filename = (char *)malloc (strlen(port)+1);
 strcpy (uptr->filename, port);

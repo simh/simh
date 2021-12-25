@@ -554,8 +554,8 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
         dup_set_modem (dup, data);
         dup_rxcsr[dup] &= ~RXCSR_WRITEABLE;
         dup_rxcsr[dup] |= (data & RXCSR_WRITEABLE);
-        if ((dup_rxcsr[dup] & RXCSR_M_RTS) &&           /* Upward transition of RTS */
-            (!(orig_val & RXCSR_M_RTS)))                /* Enables Receive on the line */
+        if ((dup_rxcsr[dup] & RXCSR_M_DTR) &&           /* Upward transition of DTR */
+            (!(orig_val & RXCSR_M_DTR)))                /* Enables Receive on the line */
             dup_desc.ldsc[dup].rcve = TRUE;
         if ((dup_rxcsr[dup] & RXCSR_M_RTS) &&           /* Upward transition of RTS */
             (!(orig_val & RXCSR_M_RTS)) &&              /* while receiver is enabled and */
@@ -1267,6 +1267,9 @@ free (uptr->filename);
 uptr->filename = tmxr_line_attach_string(&dup_desc.ldsc[dup]);
 if (r != SCPE_OK)                                       /* error? */
     return r;
+dup_desc.dptr = dptr;
+/* If framer, start it in DMC mode */
+tmxr_start_framer (&dup_desc.ldsc[dup], TRUE);
 uptr->flags |= UNIT_ATT;
 sim_activate_after (dup_units+dup_desc.lines, DUP_CONNECT_POLL*1000000);/* start poll */
 return r;
@@ -1289,7 +1292,10 @@ for (i=attached=0; i<dup_desc.lines; i++)
         ++attached;
 if (!attached)
     sim_cancel (dup_units+dup_desc.lines);              /* stop poll on last detach */
+tmxr_stop_framer (lp);
 r = tmxr_detach_ln (lp);
+if (r == SCPE_OK)
+    r = tmxr_close_master (&dup_desc);
 free (uptr->filename);
 uptr->filename = NULL;
 free (dup_rcvpacket[dup]);
@@ -1560,6 +1566,16 @@ const char helpString[] =
     " the peer.  Alternatively, UDP can be used by specifying UDP on the\n"
     " ATTACH command.\n"
     "\n"
+    " Communication may also use the DDCMP synchronous framer device.  This is\n"
+    " a USB device that appears as an Ethernet interface, and can send and\n"
+    " receive DDCMP frames over either RS-232 or coax synchronous lines.\n"
+    " Refer to https://github.com/pkoning2/ddcmp for documentation.\n"
+    "\n"
+    "+sim> ATTACH %U FRAMER=eth:mode:speed\n"
+    "\n"
+    " Communicate via the synchronous DDCMP framer at Ethernet interface\n"
+    " \"eth\", and framer mode \"mode\" -- one of INTERNAL, RS232_DTE, or\n"
+    " RS232_DCE.  The \"speed\" argument is the bit rate for the line.\n"
     "2 Examples\n"
     " To configure two simulators to talk to each other use the following\n"
     " example:\n"
@@ -1572,6 +1588,8 @@ const char helpString[] =
     "+sim> SET %D ENABLE\n"
     "+sim> ATTACH %U 2222,connect=LOCALHOST:1111\n"
     "\n"
+    " To communicate with an \"integral modem\" DMC or similar, at 56 kbps:\n"
+    "+sim> ATTACH %U FRAMER=eth7:INTERNAL:56000\n"
     "1 Monitoring\n"
     " The %D device and %U line configuration and state can be displayed with\n"
     " one of the available show commands.\n"
