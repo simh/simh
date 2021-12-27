@@ -96,6 +96,9 @@ static t_stat ports_show_queue_common(FILE *st, UNIT *uptr, int32 val,
 #define PORTS_DIAG_CRC1 0x7ceec900
 #define PORTS_DIAG_CRC2 0x77a1ea56
 #define PORTS_DIAG_CRC3 0x84cf938b
+#define PORTS_DIAG_CRC4 0x31b32383  /* Used by SVR 2.0.5 */
+#define PORTS_DIAG_CRC5 0x4be7bccc  /* Used by SVR 2.0.5 */
+#define PORTS_DIAG_CRC6 0x3197f6dd  /* Used by SVR 2.0.5 */
 
 #define LN(cid,port)   ((PORTS_LINES * ((cid) - ports_base_cid)) + (port))
 #define LCID(ln)       (((ln) / PORTS_LINES) + ports_base_cid)
@@ -301,7 +304,10 @@ static void ports_cmd(uint8 cid, cio_entry *rentry, uint8 *rapp_data)
          * 0x200f000 */
         if (ports_crc == PORTS_DIAG_CRC1 ||
             ports_crc == PORTS_DIAG_CRC2 ||
-            ports_crc == PORTS_DIAG_CRC3) {
+            ports_crc == PORTS_DIAG_CRC3 ||
+            ports_crc == PORTS_DIAG_CRC4 ||
+            ports_crc == PORTS_DIAG_CRC5 ||
+            ports_crc == PORTS_DIAG_CRC6) {
             pwrite_h(0x200f000, 0x1);   /* Test success */
             pwrite_h(0x200f002, 0x0);   /* Test Number */
             pwrite_h(0x200f004, 0x0);   /* Actual */
