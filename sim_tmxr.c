@@ -2810,7 +2810,6 @@ SOCKET sock;
 SERHANDLE serport;
 CONST char *tptr = cptr;
 t_bool nolog, notelnet, listennotelnet, nomessage, listennomessage, modem_control, loopback, datagram, packet, disabled;
-int32 fmode, fspeed;
 TMLN *lp;
 t_stat r = SCPE_OK;
 
