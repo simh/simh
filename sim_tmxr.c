@@ -1725,7 +1725,8 @@ return SCPE_OK;
        session state is set, cleared and/or returned.  If the line is
        connected to a DDCMP sync framer, only DTR and RTS set/clear
        are acted on, and the returned modem state bits are constructed
-       based on the framer state.
+       based on the framer state.  For the framer, setting DTR starts
+       the framer, and clearing DTR stops it.
 */
 t_stat tmxr_set_get_modem_bits (TMLN *lp, int32 bits_to_set, int32 bits_to_clear, int32 *status_bits)
 {
@@ -1746,6 +1747,14 @@ if (lp->framer) {
      */
     bits_to_set &= TMXR_MDM_DTR | TMXR_MDM_RTS;
     bits_to_clear &= TMXR_MDM_DTR | TMXR_MDM_RTS;
+    if ((bits_to_set & TMXR_MDM_DTR) && !(lp->modembits & TMXR_MDM_DTR))
+        /* DTR being set, start framer if we're using one.  Use DMC
+         * mode for now.
+         */
+        tmxr_start_framer (lp, TRUE);
+    else if ((bits_to_clear & TMXR_MDM_DTR) && (lp->modembits & TMXR_MDM_DTR))
+        /* DTR being cleared, stop framer if we're using one. */
+        tmxr_stop_framer (lp);
     incoming_state = lp->modembits | bits_to_set;
     incoming_state &= ~bits_to_clear;
     if (lp->framer->status.on)
@@ -3017,11 +3026,13 @@ while (*tptr) {
             }
         }
     if (disabled) {
-        if (destination[0] || listen[0] || loopback)
-            return sim_messagef (SCPE_ARG, "Can't disable line with%s%s%s%s%s\n", destination[0] ? " CONNECT=" : "", destination, listen[0] ? " " : "", listen, loopback ? " LOOPBACK" : "");
+        if (destination[0] || listen[0] || loopback || framer[0])
+            return sim_messagef (SCPE_ARG, "Can't disable line with%s%s%s%s%s%s%s\n", destination[0] ? " CONNECT=" : "", destination, listen[0] ? " " : "", listen, loopback ? " LOOPBACK" : "", framer[0] ? " FRAMER=" : "", framer);
         }
     if (destination[0]) {
         /* Validate destination */
+        if (framer[0])
+            return sim_messagef (SCPE_ARG, "Can't combine CONNECT=%s with FRAMER=%s\n", destination, framer);
         serport = sim_open_serial (destination, NULL, &r);
         if (serport != INVALID_HANDLE) {
             sim_close_serial (serport);
@@ -3057,6 +3068,8 @@ while (*tptr) {
             }
         }
     if (framer[0]) {
+        if (listen[0] || loopback)
+            return sim_messagef (SCPE_ARG, "Can't combined FRAMER=%s with%s%s%s\n", framer, listen[0] ? " " : "", listen, loopback ? " LOOPBACK" : "");
         /* Validate framer spec */
         cptr = get_glyph_nc (framer, fr_eth, ':');
         cptr = get_glyph (cptr, option, ':');

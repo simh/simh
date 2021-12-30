@@ -2487,8 +2487,6 @@ CONTROL_OUT *control;
 
 sim_debug(DBG_INF, controller->device, "%s%d: Master clear\n", controller->device->name, controller->index);
 dmc_clear_master_clear(controller);
-/* Stop the framer, if using one */
-tmxr_stop_framer (controller->line);
 dmc_clr_modem_dtr(controller);
 controller->link.state = Halt;
 controller->state = Initialised;
@@ -2939,8 +2937,6 @@ if (dmc_is_dmc(controller)) {
                                                        (sel6&DMC_SEL6_M_HDX) ? ", Half Duples" : "", 
                                                        (sel6&DMC_SEL6_M_LONGSTRT) ? ", Long Start Timer" : "");
                 dmc_set_modem_dtr (controller);
-                /* If using the framer, start it now */
-                tmxr_start_framer (controller->line, controller->dev_type == DMC);
                 controller->transfer_state = Idle;
                 ddcmp_dispatch (controller, (sel6&DMC_SEL6_M_MAINT) ? DDCMP_EVENT_MAINTMODE : 0);
                 return;
@@ -2970,8 +2966,6 @@ else {  /* DMP */
             else
                 config = (mode & 2) ? "Tributary station" : "Control Station";
 
-            /* If using the framer, start it now */
-            tmxr_start_framer (controller->line, (mode & 6) == 0);
             sim_debug(DBG_INF, controller->device, "%s%d: Completing Mode input transfer, %s %s\n", controller->device->name, controller->index, duplex, config);
             }
         else 
