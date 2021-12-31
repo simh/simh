@@ -2629,6 +2629,17 @@ return 0;                           /* not done */
 
 static void _mux_detach_line (TMLN *lp, t_bool close_listener, t_bool close_connecting)
 {
+if (lp->framer) {
+    /* DDCMP framer in use, close that up.  Begin by making sure it is
+     * stopped.
+     */
+    tmxr_stop_framer (lp);
+    /* Finished with the framer's Ethernet interface */
+    eth_close (lp->framer->eth);
+    free (lp->framer->eth);
+    free (lp->framer);
+    lp->framer = NULL;
+}
 if (close_listener && lp->master) {
     sim_close_sock (lp->master);
     lp->master = 0;
@@ -4493,24 +4504,11 @@ t_stat tmxr_close_master (TMXR *mp)
 {
 int32 i;
 TMLN *lp;
-FRAMER *framer;
 
 for (i = 0; i < mp->lines; i++) {  /* loop thru conn */
     lp = mp->ldsc + i;
 
-    if (lp->framer) {
-        /* DDCMP framer in use, close that up.  Begin by making sure it is
-         * stopped.
-         */
-        tmxr_stop_framer (lp);
-        /* Finished with the framer's Ethernet interface */
-        framer = lp->framer;
-        eth_close (framer->eth);
-        free (framer->eth);
-        free (framer);
-        lp->framer = NULL;
-    }
-    else if (!lp->destination && lp->sock) {            /* not serial and is connected? */
+    if (!lp->destination && lp->sock) {                 /* not serial and is connected? */
         tmxr_report_disconnection (lp);                 /* report disconnection */
         tmxr_reset_ln (lp);                             /* disconnect line */
         }

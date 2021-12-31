@@ -1267,7 +1267,6 @@ free (uptr->filename);
 uptr->filename = tmxr_line_attach_string(&dup_desc.ldsc[dup]);
 if (r != SCPE_OK)                                       /* error? */
     return r;
-dup_desc.dptr = dptr;
 uptr->flags |= UNIT_ATT;
 sim_activate_after (dup_units+dup_desc.lines, DUP_CONNECT_POLL*1000000);/* start poll */
 return r;
@@ -1291,8 +1290,6 @@ for (i=attached=0; i<dup_desc.lines; i++)
 if (!attached)
     sim_cancel (dup_units+dup_desc.lines);              /* stop poll on last detach */
 r = tmxr_detach_ln (lp);
-if (r == SCPE_OK)
-    r = tmxr_close_master (&dup_desc);
 free (uptr->filename);
 uptr->filename = NULL;
 free (dup_rcvpacket[dup]);
