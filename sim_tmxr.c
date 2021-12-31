@@ -726,10 +726,12 @@ if (lp->loopback)
     return loop_read (lp, &(lp->rxb[i]), length);
 if (lp->serport)                                        /* serial port connection? */
     return sim_read_serial (lp->serport, &(lp->rxb[i]), length, &(lp->rbr[i]));
-else if (lp->framer)
-    return tmxr_framer_read (lp,  &(lp->rxb[i]), length);
-else                                                    /* Telnet connection */
-    return sim_read_sock (lp->sock, &(lp->rxb[i]), length);
+else {
+    if (lp->framer)
+        return tmxr_framer_read (lp,  &(lp->rxb[i]), length);
+    else                                                    /* Telnet connection */
+        return sim_read_sock (lp->sock, &(lp->rxb[i]), length);
+    }
 }
 
 
@@ -754,26 +756,28 @@ if (lp->loopback)
 if (lp->serport) {                                      /* serial port connection? */
     written = sim_write_serial (lp->serport, &(lp->txb[i]), length);
     }
-else if (lp->framer)
-    written = tmxr_framer_write (lp,  &(lp->txb[i]), length);
 else {
-    if (lp->sock) {                                     /* Telnet connection */
-        written = sim_write_sock (lp->sock, &(lp->txb[i]), length);
-
-        if (written == SOCKET_ERROR) {                  /* did an error occur? */
-            lp->txdone = TRUE;
-            if (lp->datagram)
-                return written;                         /* ignore errors on datagram sockets */
-            else
-                return -1;                              /* return error indication */
-            }
-        }
+    if (lp->framer)
+        written = tmxr_framer_write (lp,  &(lp->txb[i]), length);
     else {
-        if ((lp->conn == TMXR_LINE_DISABLED) ||
-            ((lp->conn == 0) && lp->txbfd)){
-            written = length;                           /* Count here output timing is correct */
-            if (lp->conn == TMXR_LINE_DISABLED)
-                lp->txdrp += length;                    /* Record as having been dropped on the floor */
+        if (lp->sock) {                                     /* Telnet connection */
+            written = sim_write_sock (lp->sock, &(lp->txb[i]), length);
+
+            if (written == SOCKET_ERROR) {                  /* did an error occur? */
+                lp->txdone = TRUE;
+                if (lp->datagram)
+                    return written;                         /* ignore errors on datagram sockets */
+                else
+                    return -1;                              /* return error indication */
+                }
+            }
+        else {
+            if ((lp->conn == TMXR_LINE_DISABLED) ||
+                ((lp->conn == 0) && lp->txbfd)){
+                written = length;                           /* Count here output timing is correct */
+                if (lp->conn == TMXR_LINE_DISABLED)
+                    lp->txdrp += length;                    /* Record as having been dropped on the floor */
+                }
             }
         }
     }
@@ -1227,9 +1231,9 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
             lp->framer->connect_pending = FALSE;
             lp->conn = TRUE;                            /* record connection */
             return i;
-        }
+            }
         continue;
-    }
+        }
 
     /* Don't service network connections for loopbacked lines */
 
@@ -1747,14 +1751,17 @@ if (lp->framer) {
      */
     bits_to_set &= TMXR_MDM_DTR | TMXR_MDM_RTS;
     bits_to_clear &= TMXR_MDM_DTR | TMXR_MDM_RTS;
-    if ((bits_to_set & TMXR_MDM_DTR) && !(lp->modembits & TMXR_MDM_DTR))
+    if ((bits_to_set & TMXR_MDM_DTR) && !(lp->modembits & TMXR_MDM_DTR)) {
         /* DTR being set, start framer if we're using one.  Use DMC
          * mode for now.
          */
         tmxr_start_framer (lp, TRUE);
-    else if ((bits_to_clear & TMXR_MDM_DTR) && (lp->modembits & TMXR_MDM_DTR))
-        /* DTR being cleared, stop framer if we're using one. */
-        tmxr_stop_framer (lp);
+        }
+    else {
+        if ((bits_to_clear & TMXR_MDM_DTR) && (lp->modembits & TMXR_MDM_DTR))
+            /* DTR being cleared, stop framer if we're using one. */
+            tmxr_stop_framer (lp);
+        }
     incoming_state = lp->modembits | bits_to_set;
     incoming_state &= ~bits_to_clear;
     if (lp->framer->status.on)
@@ -2122,9 +2129,11 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
     if (lp->rxbpi == 0)                                 /* need input? */
         nbytes = tmxr_read (lp,                         /* yes, read */
             lp->rxbsz - TMXR_GUARD);                    /* leave spc for Telnet cruft */
-    else if (lp->tsta)                                  /* in Telnet seq? */
-        nbytes = tmxr_read (lp,                         /* yes, read to end */
-            lp->rxbsz - lp->rxbpi);
+    else {
+        if (lp->tsta)                                   /* in Telnet seq? */
+            nbytes = tmxr_read (lp,                     /* yes, read to end */
+                                    lp->rxbsz - lp->rxbpi);
+        }
 
     if (nbytes < 0) {                                   /* line error? */
         if (!lp->datagram) {                            /* ignore errors reading UDP sockets */
@@ -2639,7 +2648,7 @@ if (lp->framer) {
     free (lp->framer->eth);
     free (lp->framer);
     lp->framer = NULL;
-}
+    }
 if (close_listener && lp->master) {
     sim_close_sock (lp->master);
     lp->master = 0;
@@ -3079,22 +3088,29 @@ while (*tptr) {
             }
         }
     if (framer[0]) {
-        if (listen[0] || loopback)
-            return sim_messagef (SCPE_ARG, "Can't combined FRAMER=%s with%s%s%s\n", framer, listen[0] ? " " : "", listen, loopback ? " LOOPBACK" : "");
+        if (listen[0] || loopback || (!notelnet) || (!datagram))
+            return sim_messagef (SCPE_ARG, "Can't combined FRAMER=%s with%s%s%s%s%s\n", framer, 
+                    listen[0] ? " " : "", listen, loopback ? " LOOPBACK" : "", 
+                                                  notelnet ? "" : " TELNET", 
+                                                  datagram ? "" : " STREAM");
         /* Validate framer spec */
         cptr = get_glyph_nc (framer, fr_eth, ':');
         cptr = get_glyph (cptr, option, ':');
         if (0 == MATCH_CMD (option, "INTERNAL") ||
             0 == MATCH_CMD (option, "COAX"))
             fr_mode = 1;
-        else if (0 == MATCH_CMD (option, "LOOPBACK"))
-            fr_mode = 1 | 4;  /* Internal modem, loopback */
-        else if (0 == MATCH_CMD (option, "RS232_DCE"))
-            fr_mode = 2;
-        else if (0 == MATCH_CMD (option, "RS232_DTE"))
-            fr_mode = 0;
-        else
-            return sim_messagef (SCPE_ARG, "Invalid framer mode: %s\n", cptr);
+        else {
+            if (0 == MATCH_CMD (option, "LOOPBACK"))
+                fr_mode = 1 | 4;  /* Internal modem, loopback */
+            else 
+                if (0 == MATCH_CMD (option, "RS232_DCE"))
+                    fr_mode = 2;
+                else 
+                    if (0 == MATCH_CMD (option, "RS232_DTE"))
+                        fr_mode = 0;
+                    else
+                        return sim_messagef (SCPE_ARG, "Invalid framer mode: %s\n", cptr);
+            }
         /* Speed is a third value in the FRAMER argument.  We don't
          * use the SPEED parameter because that only accepts the
          * standard UART rates, which for the most part are not normal
@@ -3120,8 +3136,8 @@ while (*tptr) {
         if (fr_speed < 500 || fr_speed > 1000000 ||
             (fr_speed < 56000 && (fr_mode & 1))) {
             return sim_messagef (SCPE_ARG, "Invalid framer speed %d\n", fr_speed);
+            }
         }
-    }
     if (line == -1) {
         if (disabled)
             return sim_messagef (SCPE_ARG, "Must specify line to disable\n");
@@ -3325,7 +3341,7 @@ while (*tptr) {
                 free (eth);
                 free (framer_s);
                 return r;
-            }
+                }
             /* Set the filters: our address, not all multi, not promiscuous */
             r = eth_filter (eth, 1, &(eth->host_nic_phy_hw_addr), 0, 0);
             if (r != SCPE_OK) {
@@ -3334,7 +3350,7 @@ while (*tptr) {
                 free (eth);
                 free (framer_s);
                 return r;
-            }
+                }
             lp = &mp->ldsc[line];
             lp->framer = framer_s;
             lp->datagram = lp->notelnet = TRUE;
@@ -3347,7 +3363,7 @@ while (*tptr) {
             /* Set the scheduling parameters from the line speed */
             lp->txdeltausecs = lp->rxdeltausecs = (uint32) (8000000 / fr_speed);
             tmxr_init_line (lp);                /* initialize line state */
-        }
+            }
         if (logfiletmpl[0]) {
             sim_close_logfile (&lp->txlogref);
             lp->txlog = NULL;
@@ -3385,7 +3401,7 @@ while (*tptr) {
             }
         if ((listen[0]) && (!datagram)) {
             if ((mp->lines == 1) && (mp->master))
-                return sim_messagef (SCPE_ARG, "Single Line MUX can have either line specific OR MUS listener but NOT both\n");
+                return sim_messagef (SCPE_ARG, "Single Line MUX can have either line specific OR MUX listener but NOT both\n");
             sock = sim_master_sock (listen, &r);            /* make master socket */
             if (r)
                 return sim_messagef (SCPE_ARG, "Invalid Listen Specification: %s\n", listen);
@@ -3421,35 +3437,37 @@ while (*tptr) {
                 if (sim_switches & SWMASK ('V'))            /* -V flag reports connection on port */
                     tmxr_report_connection (mp, lp);        /* report the connection to the line */
                 }
-            else if (!lp->framer) {
-                lp->datagram = datagram;
-                if (datagram) {
-                    if (listen[0]) {
-                        lp->port = (char *)realloc (lp->port, 1 + strlen (listen));
-                        strcpy (lp->port, listen);          /* save port */
+            else {
+                if (!lp->framer) {
+                    lp->datagram = datagram;
+                    if (datagram) {
+                        if (listen[0]) {
+                            lp->port = (char *)realloc (lp->port, 1 + strlen (listen));
+                            strcpy (lp->port, listen);          /* save port */
+                            }
+                        else
+                            return sim_messagef (SCPE_ARG, "Missing listen port for Datagram socket\n");
+                        }
+                    sock = sim_connect_sock_ex (datagram ? listen : NULL, hostport, "localhost", NULL, (datagram ? SIM_SOCK_OPT_DATAGRAM : 0) | 
+                                                                                                       (packet ? SIM_SOCK_OPT_NODELAY : 0));
+                    if (sock != INVALID_SOCKET) {
+                        _mux_detach_line (lp, FALSE, TRUE);
+                        lp->destination = (char *)malloc(1+strlen(hostport));
+                        strcpy (lp->destination, hostport);
+                        if (!lp->modem_control || (lp->modembits & TMXR_MDM_DTR)) {
+                            lp->connecting = sock;
+                            lp->ipad = (char *)malloc (1 + strlen (lp->destination));
+                            strcpy (lp->ipad, lp->destination);
+                            }
+                        else
+                            sim_close_sock (sock);
+                        lp->notelnet = notelnet;
+                        lp->nomessage = nomessage;
+                        tmxr_init_line (lp);                    /* init the line state */
                         }
                     else
-                        return sim_messagef (SCPE_ARG, "Missing listen port for Datagram socket\n");
+                        return sim_messagef (SCPE_ARG, "Can't open %s socket on %s%s%s\n", datagram ? "Datagram" : "Stream", datagram ? listen : "", datagram ? "<->" : "", hostport);
                     }
-                sock = sim_connect_sock_ex (datagram ? listen : NULL, hostport, "localhost", NULL, (datagram ? SIM_SOCK_OPT_DATAGRAM : 0) | 
-                                                                                                   (packet ? SIM_SOCK_OPT_NODELAY : 0));
-                if (sock != INVALID_SOCKET) {
-                    _mux_detach_line (lp, FALSE, TRUE);
-                    lp->destination = (char *)malloc(1+strlen(hostport));
-                    strcpy (lp->destination, hostport);
-                    if (!lp->modem_control || (lp->modembits & TMXR_MDM_DTR)) {
-                        lp->connecting = sock;
-                        lp->ipad = (char *)malloc (1 + strlen (lp->destination));
-                        strcpy (lp->ipad, lp->destination);
-                        }
-                    else
-                        sim_close_sock (sock);
-                    lp->notelnet = notelnet;
-                    lp->nomessage = nomessage;
-                    tmxr_init_line (lp);                    /* init the line state */
-                    }
-                else
-                    return sim_messagef (SCPE_ARG, "Can't open %s socket on %s%s%s\n", datagram ? "Datagram" : "Stream", datagram ? listen : "", datagram ? "<->" : "", hostport);
                 }
             }
         if (loopback) {
@@ -4508,7 +4526,7 @@ TMLN *lp;
 for (i = 0; i < mp->lines; i++) {  /* loop thru conn */
     lp = mp->ldsc + i;
 
-    if (!lp->destination && lp->sock) {                 /* not serial and is connected? */
+    if (!lp->destination && lp->sock) {            /* not serial and is connected? */
         tmxr_report_disconnection (lp);                 /* report disconnection */
         tmxr_reset_ln (lp);                             /* disconnect line */
         }
@@ -6004,13 +6022,13 @@ while (try < 5) {
             memcpy (&line->framer->status, framer_rpkt.msg + 18, flen);
             line->framer->status_cnt++;
             continue;
+            }
         }
-    }
     if (i != line->framer->status_cnt)
         return 1;
     try++;
     sim_os_ms_sleep (50);
-}
+    }
 tmxr_debug_trace_line (line, "no status received\n");
 return 0;
 }
@@ -6117,15 +6135,15 @@ while (1) {
         line->framer->status_cnt++;
         /* Look for another packet */
         continue;
-    }
+        }
     else {
         /* Real DDCMP packet.  Pass the buffer pointer/len */
         if (flen > nbytes)
             flen = nbytes;
         memcpy (buf, framer_rpkt.msg + 18, flen);
         return flen;
+        }
     }
-}
 }
 
 static int tmxr_framer_write (TMLN *line, const char *buf, int32 length)
