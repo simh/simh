@@ -2969,7 +2969,7 @@ while (*tptr) {
                 strlcpy (destination, cptr, sizeof(destination));
                 continue;
                 }
-            if (0 == MATCH_CMD (gbuf, "FRAMER")) {
+            if (0 == MATCH_CMD (gbuf, "SYNC")) {
                 if ((NULL == cptr) || ('\0' == *cptr))
                     return sim_messagef (SCPE_2FARG, "Missing Framer Specifier\n");
                 strlcpy (framer, cptr, sizeof(framer));
@@ -3047,12 +3047,12 @@ while (*tptr) {
         }
     if (disabled) {
         if (destination[0] || listen[0] || loopback || framer[0])
-            return sim_messagef (SCPE_ARG, "Can't disable line with%s%s%s%s%s%s%s\n", destination[0] ? " CONNECT=" : "", destination, listen[0] ? " " : "", listen, loopback ? " LOOPBACK" : "", framer[0] ? " FRAMER=" : "", framer);
+            return sim_messagef (SCPE_ARG, "Can't disable line with%s%s%s%s%s%s%s\n", destination[0] ? " CONNECT=" : "", destination, listen[0] ? " " : "", listen, loopback ? " LOOPBACK" : "", framer[0] ? " SYNC=" : "", framer);
         }
     if (destination[0]) {
         /* Validate destination */
         if (framer[0])
-            return sim_messagef (SCPE_ARG, "Can't combine CONNECT=%s with FRAMER=%s\n", destination, framer);
+            return sim_messagef (SCPE_ARG, "Can't combine CONNECT=%s with SYNC=%s\n", destination, framer);
         serport = sim_open_serial (destination, NULL, &r);
         if (serport != INVALID_HANDLE) {
             sim_close_serial (serport);
@@ -3089,19 +3089,19 @@ while (*tptr) {
         }
     if (framer[0]) {
         if (listen[0] || loopback || (!notelnet) || (!datagram))
-            return sim_messagef (SCPE_ARG, "Can't combined FRAMER=%s with%s%s%s%s%s\n", framer, 
+            return sim_messagef (SCPE_ARG, "Can't combined SYNC=%s with%s%s%s%s%s\n", framer, 
                     listen[0] ? " " : "", listen, loopback ? " LOOPBACK" : "", 
                                                   notelnet ? "" : " TELNET", 
                                                   datagram ? "" : " STREAM");
         /* Validate framer spec */
         cptr = get_glyph_nc (framer, fr_eth, ':');
         cptr = get_glyph (cptr, option, ':');
-        if (0 == MATCH_CMD (option, "INTERNAL") ||
+        if (0 == MATCH_CMD (option, "INTEGRAL") ||
             0 == MATCH_CMD (option, "COAX"))
             fr_mode = 1;
         else {
             if (0 == MATCH_CMD (option, "LOOPBACK"))
-                fr_mode = 1 | 4;  /* Internal modem, loopback */
+                fr_mode = 1 | 4;  /* Integral modem, loopback */
             else 
                 if (0 == MATCH_CMD (option, "RS232_DCE"))
                     fr_mode = 2;
@@ -3111,7 +3111,7 @@ while (*tptr) {
                     else
                         return sim_messagef (SCPE_ARG, "Invalid framer mode: %s\n", cptr);
             }
-        /* Speed is a third value in the FRAMER argument.  We don't
+        /* Speed is a third value in the SYNC argument.  We don't
          * use the SPEED parameter because that only accepts the
          * standard UART rates, which for the most part are not normal
          * DDCMP line rates.

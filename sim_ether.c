@@ -383,6 +383,9 @@
 
 /* Internal routine - forward declaration */
 static int _eth_get_system_id (char *buf, size_t buf_size);
+static void eth_get_nic_hw_addr(ETH_DEV* dev, const char *devname, int set_on);
+
+static const unsigned char framer_oui[3] = { 0xaa, 0x00, 0x03 };
 
 /*============================================================================*/
 /*                  OS-independant ethernet routines                          */
@@ -779,6 +782,11 @@ t_stat eth_show_devices (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, CONST ch
 return eth_show (st, uptr, val, NULL);
 }
 
+t_stat eth_show_framers (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, CONST char *desc)
+{
+return eth_show_fr (st, uptr, val, NULL);
+}
+
 #if defined (USE_NETWORK) || defined (USE_SHARED)
 /* Internal routine - forward declaration */
 static int _eth_devices (int max, ETH_LIST* dev);   /* get ethernet devices on host */
@@ -926,6 +934,31 @@ t_stat eth_show (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
   return SCPE_OK;
 }
 
+t_stat eth_show_fr (FILE* st, UNIT* uptr, int32 val, CONST void *desc)
+{
+  ETH_LIST  list[ETH_MAX_DEVICE];
+  int number, fcnt = 0;
+
+  number = _eth_devices(ETH_MAX_DEVICE, list);
+  fprintf(st, "DDCMP sync framer devices:\n");
+  if (number == -1)
+    fprintf(st, "  network support not available in simulator\n");
+  else
+    if (number == 0)
+      fprintf(st, "  no dddcmp sync framer devices are available\n");
+    else {
+      int i;
+      for (i=0; i<number; i++) {
+          if (memcmp (list[i].hwaddr, framer_oui, 3) == 0) {
+              fprintf(st," eth%d\t%s\n", i, list[i].name);
+              fcnt++;
+          }
+      }
+      if (fcnt == 0)
+          fprintf(st, "  no dddcmp sync framer devices are available\n");
+    }
+}
+
 #endif
 /*============================================================================*/
 /*                        Non-implemented versions                            */
@@ -970,6 +1003,12 @@ void eth_show_dev (FILE* st, ETH_DEV* dev)
 t_stat eth_show (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
   {
   fprintf(st, "ETH devices:\n");
+  fprintf(st, "  network support not available in simulator\n");
+  return SCPE_OK;
+  }
+t_stat eth_show_fr (FILE* st, UNIT* uptr, int32 val, CONST void *desc)
+  {
+  fprintf(st, "DDCMP sync framer devices:\n");
   fprintf(st, "  network support not available in simulator\n");
   return SCPE_OK;
   }
@@ -1119,6 +1158,7 @@ char errbuf[PCAP_ERRBUF_SIZE] = "";
 #ifndef DONT_USE_PCAP_FINDALLDEVS
 pcap_if_t* alldevs;
 pcap_if_t* dev;
+ETH_DEV edev;
 
 memset(list, 0, max*sizeof(*list));
 errbuf[0] = '\0';
@@ -1135,8 +1175,15 @@ else {
     strlcpy(list[used].name, dev->name, sizeof(list[used].name));
     if (dev->description)
       strlcpy(list[used].desc, dev->description, sizeof(list[used].desc));
-    else
-      strlcpy(list[used].desc, "No description available", sizeof(list[used].desc));
+    else {
+        edev.eth_api = ETH_API_PCAP;
+        eth_get_nic_hw_addr (&edev, dev->name, 0);
+        memcpy (list[used].hwaddr, edev.host_nic_phy_hw_addr, 6);
+        if (!dev->description && memcmp (edev.host_nic_phy_hw_addr, framer_oui, 3) == 0)
+            strlcpy(list[used].desc, "DDCMP synchronous interface", sizeof(list[used].desc));        
+        else
+            strlcpy(list[used].desc, "No description available", sizeof(list[used].desc));
+       }
     }
 
   /* free device list */
@@ -1736,7 +1783,7 @@ static int pcap_mac_if_vms(const char *AdapterName, unsigned char MACAddress[6])
 }
 #endif /* defined (__VMS) && !defined(__VAX) */
 
-static void eth_get_nic_hw_addr(ETH_DEV* dev, const char *devname)
+static void eth_get_nic_hw_addr(ETH_DEV* dev, const char *devname, int set_on)
 {
   memset(&dev->host_nic_phy_hw_addr, 0, sizeof(dev->host_nic_phy_hw_addr));
   dev->have_host_nic_phy_addr = 0;
@@ -1766,15 +1813,17 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, const char *devname)
         NULL};
 
     memset(command, 0, sizeof(command));
-    /* try to force an otherwise unused interface to be turned on */
-    for (i=0; turnon[i]; ++i) {
-      snprintf(command, sizeof(command), turnon[i], (int)(sizeof(command) - (2 + strlen(patterns[i]))), devname);
-      get_glyph_nc (command, tool, 0);
-      if (sim_get_tool_path (tool)[0]) {
-        if (NULL != (f = popen(command, "r")))
-          pclose(f);
+    if (set_on) {
+        /* try to force an otherwise unused interface to be turned on */
+        for (i=0; turnon[i]; ++i) {
+            snprintf(command, sizeof(command), turnon[i], (int)(sizeof(command) - (2 + strlen(patterns[i]))), devname);
+            get_glyph_nc (command, tool, 0);
+            if (sim_get_tool_path (tool)[0]) {
+                if (NULL != (f = popen(command, "r")))
+                    pclose(f);
+            }
         }
-      }
+    }
     for (i=0; patterns[i] && (0 == dev->have_host_nic_phy_addr); ++i) {
       snprintf(command, sizeof(command), patterns[i], (int)(sizeof(command) - (2 + strlen(patterns[i]))), devname);
       get_glyph_nc (command, tool, 0);
@@ -2545,7 +2594,7 @@ if (!strcmp (desc, "No description available"))
 sim_messagef (SCPE_OK, "Eth: opened OS device %s%s%s\n", savname, desc[0] ? " - " : "", desc);
 
 /* get the NIC's hardware MAC address */
-eth_get_nic_hw_addr(dev, savname);
+eth_get_nic_hw_addr(dev, savname, 1);
 
 /* save name of device */
 dev->name = (char *)malloc(strlen(savname)+1);

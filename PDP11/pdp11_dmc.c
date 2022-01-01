@@ -118,6 +118,7 @@ extern int32 IREQ (HLVL);
 extern int32 tmxr_poll;                                 /* calibrated delay */
 extern int32 clk_tps;                                   /* clock ticks per second */
 extern int32 tmr_poll;                                  /* instructions per tick */
+extern t_stat eth_show_fr (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
 
 #if !defined(DMC_NUMDEVICE)
 #define DMC_NUMDEVICE 8         /* default MAX # DMC-11 devices */
@@ -1250,6 +1251,8 @@ MTAB dmc_mod[] = {
         &set_addr, &show_addr, NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR,          1, "VECTOR", "VECTOR",
         &set_vec,  &show_vec,  NULL, "Interrupt vector" },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "SYNC", NULL,
+      NULL, &eth_show_fr, NULL, "Display attachable DDCMP synchronous framers" },
     { 0 } };
 
 extern DEVICE dmp_dev;
@@ -1896,12 +1899,13 @@ const char helpString[] =
     " receive DDCMP frames over either RS-232 or coax synchronous lines.\n"
     " Refer to https://github.com/pkoning2/ddcmp for documentation.\n"
     "\n"
-    "+sim> ATTACH %U FRAMER=eth:mode:speed\n"
+    "+sim> ATTACH %U SYNC=eth:mode:speed\n"
     "\n"
     " Communicate via the synchronous DDCMP framer at Ethernet interface\n"
-    " \"eth\", and framer mode \"mode\" -- one of INTERNAL, RS232_DTE, or\n"
+    " \"eth\", and framer mode \"mode\" -- one of INTEGRAL, RS232_DTE, or\n"
     " RS232_DCE.  The \"speed\" argument is the bit rate for the line.\n"
-    " In FRAMER mode, the \"PEER\" parameter is not used and need not be set.\n"
+    " In SYNC mode, the \"PEER\" parameter is not used and need not be set.\n"
+    " You can use \"SHOW SYNC\" to see the list of synchronous DDCMP devices.\n"
     "2 Examples\n"
     " To configure two simulators to talk to each other use the following\n"
     " example:\n"
@@ -1917,7 +1921,7 @@ const char helpString[] =
     "+sim> ATTACH %U 2222\n"
     "\n"
     " To communicate with an \"integral modem\" DMC or similar, at 56 kbps:\n"
-    "+sim> ATTACH %U FRAMER=eth7:INTERNAL:56000\n"
+    "+sim> ATTACH %U SYNC=eth7:INTEGRAL:56000\n"
     "1 Monitoring\n"
     " The %D device and %U line configuration and state can be displayed with\n"
     " one of the available show commands.\n"
@@ -3985,7 +3989,7 @@ if (!cptr || !*cptr)
     return SCPE_ARG;
 if (!(uptr->flags & UNIT_ATTABLE))
     return SCPE_NOATT;
-if (0 == strncasecmp (cptr, "FRAMER", 6)) {
+if (0 == strncasecmp (cptr, "SYNC", 4)) {
     sprintf (attach_string, "Line=%d,%s", dmc, cptr);
     ans = tmxr_open_master (mp, attach_string);
 }
