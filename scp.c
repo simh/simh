@@ -2908,23 +2908,25 @@ if (SCPE_BARE_STATUS(stat) == SCPE_OPENERR)
     stat = docmdp->action (-1, "simh.ini");             /* simh.ini proc cmd file */
 if (*cbuf)                                              /* cmd file arg? */
     stat = docmdp->action (0, cbuf);                    /* proc cmd file */
-else if (*argv[0]) {                                    /* sim name arg? */
-    char *np;                                           /* "path.ini" */
-    nbuf[0] = '"';                                      /* starting " */
-    strlcpy (nbuf + 1, argv[0], PATH_MAX + 2);          /* copy sim name */
-    if ((np = (char *)match_ext (nbuf, "EXE")))         /* remove .exe */
-        *np = 0;
-    strlcat (nbuf, ".ini\"", sizeof (nbuf));            /* add .ini" */
-    stat = docmdp->action (-1, nbuf) & ~SCPE_NOMESSAGE; /* proc default cmd file */
-    if (stat == SCPE_OPENERR) {                         /* didn't exist/can't open? */
-        np = strrchr (nbuf, '/');                       /* stript path and try again in cwd */
-        if (np == NULL)
-            np = strrchr (nbuf, '\\');                  /* windows path separator */
-        if (np == NULL)
-            np = strrchr (nbuf, ']');                   /* VMS path separator */
-        if (np != NULL) {
-            *np = '"';
-            stat = docmdp->action (-1, np) & ~SCPE_NOMESSAGE;/* proc default cmd file */
+else {
+    if (*argv[0]) {                                    /* sim name arg? */
+        char *np;                                      /* "path.ini" */
+        nbuf[0] = '"';                                 /* starting " */
+        strlcpy (nbuf + 1, argv[0], PATH_MAX + 2);     /* copy sim name */
+        if ((np = (char *)match_ext (nbuf, "EXE")))    /* remove .exe */
+            *np = 0;
+        strlcat (nbuf, ".ini\"", sizeof (nbuf));       /* add .ini" */
+        stat = docmdp->action (-1, nbuf) & ~SCPE_NOMESSAGE; /* proc default cmd file */
+        if (stat == SCPE_OPENERR) {                    /* didn't exist/can't open? */
+            np = strrchr (nbuf, '/');                  /* stript path and try again in cwd */
+            if (np == NULL)
+                np = strrchr (nbuf, '\\');             /* windows path separator */
+            if (np == NULL)
+                np = strrchr (nbuf, ']');              /* VMS path separator */
+            if (np != NULL) {
+                *np = '"';
+                stat = docmdp->action (-1, np) & ~SCPE_NOMESSAGE;/* proc default cmd file */
+                }
             }
         }
     }
@@ -3182,7 +3184,7 @@ if ((strlen (buf) >= max_width) &&
     size_t front_gap_size = front_gap - buf + 1;
 
     line_pos = 0;
-    end = buf + (buf ? strlen (buf) : 0);
+    end = buf + strlen (buf);
     while (1) {
         chunk_size = (end - buf);
         if (line_pos + chunk_size >= max_width)
