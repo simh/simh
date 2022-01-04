@@ -957,6 +957,7 @@ t_stat eth_show_fr (FILE* st, UNIT* uptr, int32 val, CONST void *desc)
       if (fcnt == 0)
           fprintf(st, "  no dddcmp sync framer devices are available\n");
     }
+  return SCPE_OK;
 }
 
 #endif
