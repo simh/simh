@@ -13396,12 +13396,12 @@ static void _debug_fwrite_all (const char *buf, size_t len, FILE *f)
 size_t len_written;
 
 while (len > 0) {
+    errno = 0;
     len_written = fwrite (buf, 1, len, f);
     len -= len_written;
     buf += len_written;
     if (errno == EAGAIN)    /* Non blocking file descriptor buffer full? */
         sim_os_ms_sleep(10);/* wait a bit to retry */
-    errno = 0;
     }
 }
 
