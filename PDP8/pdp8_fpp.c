@@ -25,6 +25,8 @@
 
    fpp          FPP8A floating point processor
 
+   05-Jan-22    RHM     Fix fencepost error in FP multiply for extended
+                        precision
    21-Oct-21    RMS     Added device number display
    03-Jan-10    RMS     Initialized variables statically, for VMS compiler
    19-Apr-09    RHM     FPICL does not clear all command and status reg bits
@@ -1182,7 +1184,8 @@ for (i = 0; i < cnt; i++) {
         wc++;                                       /* do another word */
         lo--;                                       /* and next mpyr word */
         fpp_fr_algn (c, 24, wc + 1);
-        c[wc] = 0;
+        if (wc < FPN_NFR_MDS)                       /* don't assume guard word */
+            c[wc] = 0;
         c[0] = c[1] = fill;                         /* propagate sign */
         }
     if (b[lo] & FPN_FRSIGN)                         /* mpyr bit set? */
@@ -1372,7 +1375,8 @@ if (sc >= (cnt * 12)) {                             /* out of range? */
     }
 while (sc >= 12) {
     for (i = cnt - 1; i > 0; i--)
-        a[i] = a[i - 1];
+        if (i <= FPN_NFR_MDS)                       /* Don't overwrite if EP */
+            a[i] = a[i - 1];
     a[0] = sign;
     sc = sc - 12;
     }
