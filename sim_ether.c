@@ -966,6 +966,8 @@ t_stat eth_filter_hash (ETH_DEV* dev, int addr_count, ETH_MAC* const addresses,
   {return SCPE_NOFNC;}
 const char *eth_version (void)
   {return NULL;}
+int eth_devices(int max, ETH_LIST* list, t_bool framers)
+  {return 0;}
 void eth_show_dev (FILE* st, ETH_DEV* dev)
   {}
 t_stat eth_show (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
