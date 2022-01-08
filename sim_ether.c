@@ -966,7 +966,7 @@ t_stat eth_filter_hash (ETH_DEV* dev, int addr_count, ETH_MAC* const addresses,
   {return SCPE_NOFNC;}
 const char *eth_version (void)
   {return NULL;}
-int eth_devices(int max, ETH_LIST* list, t_bool framers)
+int eth_devices(int max, ETH_LIST* list, ETH_BOOL framers)
   {return 0;}
 void eth_show_dev (FILE* st, ETH_DEV* dev)
   {}
@@ -1115,7 +1115,7 @@ for (i=0; i<used; i++) {
 return used;
 }
 
-int eth_devices(int max, ETH_LIST* list, t_bool framers)
+int eth_devices(int max, ETH_LIST* list, ETH_BOOL framers)
 {
 int used = 0;
 char errbuf[PCAP_ERRBUF_SIZE] = "";
@@ -1779,16 +1779,16 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, const char *devname, int set_on)
 
     memset(command, 0, sizeof(command));
     if (set_on) {
-        /* try to force an otherwise unused interface to be turned on */
-        for (i=0; turnon[i]; ++i) {
-            snprintf(command, sizeof(command), turnon[i], (int)(sizeof(command) - (2 + strlen(patterns[i]))), devname);
-            get_glyph_nc (command, tool, 0);
-            if (sim_get_tool_path (tool)[0]) {
-                if (NULL != (f = popen(command, "r")))
-                    pclose(f);
-            }
+      /* try to force an otherwise unused interface to be turned on */
+      for (i=0; turnon[i]; ++i) {
+        snprintf(command, sizeof(command), turnon[i], (int)(sizeof(command) - (2 + strlen(patterns[i]))), devname);
+        get_glyph_nc (command, tool, 0);
+        if (sim_get_tool_path (tool)[0]) {
+          if (NULL != (f = popen(command, "r")))
+            pclose(f);
+          }
         }
-    }
+      }
     for (i=0; patterns[i] && (0 == dev->have_host_nic_phy_addr); ++i) {
       snprintf(command, sizeof(command), patterns[i], (int)(sizeof(command) - (2 + strlen(patterns[i]))), devname);
       get_glyph_nc (command, tool, 0);

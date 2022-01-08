@@ -369,7 +369,7 @@ t_stat eth_show (FILE* st, UNIT* uptr,                  /* show ethernet devices
                  int32 val, CONST void* desc);
 t_stat eth_show_devices (FILE* st, DEVICE *dptr,        /* show ethernet devices */
                          UNIT* uptr, int32 val, CONST char* desc);
-int eth_devices (int max, ETH_LIST* dev, t_bool framers); /* get ethernet devices on host */
+int eth_devices (int max, ETH_LIST* dev, ETH_BOOL framers); /* get ethernet devices on host */
 void eth_show_dev (FILE*st, ETH_DEV* dev);              /* show ethernet device state */
 
 void eth_mac_fmt (ETH_MAC* const add, char* buffer);    /* format ethernet mac address */
