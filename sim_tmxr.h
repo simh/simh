@@ -123,7 +123,8 @@ typedef struct SERPORT *SERHANDLE;
 #define TMLN_SPD_80000_BPS     125 /* usec per character */
 #define TMLN_SPD_115200_BPS     86 /* usec per character */
 
-
+/* Internal struct */
+struct framer_data;    
 
 typedef struct tmln TMLN;
 typedef struct tmxr TMXR;
@@ -206,6 +207,7 @@ struct tmln {
     DEVICE              *dptr;                          /* line specific device */
     EXPECT              expect;                         /* Expect rules */
     SEND                send;                           /* Send input state */
+    struct framer_data  *framer;                        /* ddcmp framer data */
     };
 
 struct tmxr {
@@ -297,6 +299,8 @@ t_stat tmxr_show_summ (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat tmxr_show_cstat (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat tmxr_show_lines (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat tmxr_show_open_devices (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, CONST char* desc);
+t_stat tmxr_show_sync_devices (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, CONST char *desc);
+t_stat tmxr_show_sync (FILE* st, UNIT* uptr, int32 val, CONST void *desc);
 t_stat tmxr_flush_log_files (void);
 t_stat tmxr_activate (UNIT *uptr, int32 interval);
 t_stat tmxr_activate_abs (UNIT *uptr, int32 interval);
@@ -317,6 +321,10 @@ t_stat tmxr_shutdown (void);
 t_stat tmxr_sock_test (DEVICE *dptr);
 t_stat tmxr_start_poll (void);
 t_stat tmxr_stop_poll (void);
+/* Framer support.  These are a NOP if called on a non-framer line. */
+void tmxr_start_framer (TMLN *line, int dmc_mode);
+void tmxr_stop_framer (TMLN *line);
+
 void _tmxr_debug (uint32 dbits, TMLN *lp, const char *msg, char *buf, int bufsize);
 #define tmxr_debug(dbits, lp, msg, buf, bufsize) do {if (sim_deb && (lp)->mp && (lp)->mp->dptr && ((dbits) & (lp)->mp->dptr->dctrl)) _tmxr_debug (dbits, lp, msg, buf, bufsize); } while (0)
 #define tmxr_debug_msg(dbits, lp, msg) do {if (sim_deb && (lp)->mp && (lp)->mp->dptr && ((dbits) & (lp)->mp->dptr->dctrl)) sim_debug (dbits, (lp)->mp->dptr, "%s", msg); } while (0)

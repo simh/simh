@@ -383,6 +383,9 @@
 
 /* Internal routine - forward declaration */
 static int _eth_get_system_id (char *buf, size_t buf_size);
+static void eth_get_nic_hw_addr(ETH_DEV* dev, const char *devname, int set_on);
+
+static const unsigned char framer_oui[3] = { 0xaa, 0x00, 0x03 };
 
 /*============================================================================*/
 /*                  OS-independant ethernet routines                          */
@@ -780,13 +783,11 @@ return eth_show (st, uptr, val, NULL);
 }
 
 #if defined (USE_NETWORK) || defined (USE_SHARED)
-/* Internal routine - forward declaration */
-static int _eth_devices (int max, ETH_LIST* dev);   /* get ethernet devices on host */
 
 static const char* _eth_getname(int number, char* name, char *desc)
 {
   ETH_LIST  list[ETH_MAX_DEVICE];
-  int count = _eth_devices(ETH_MAX_DEVICE, list);
+  int count = eth_devices(ETH_MAX_DEVICE, list, FALSE);
 
   if ((number < 0) || (count <= number))
       return NULL;
@@ -803,7 +804,7 @@ static const char* _eth_getname(int number, char* name, char *desc)
 const char* eth_getname_bydesc(const char* desc, char* name, char *ndesc)
 {
   ETH_LIST  list[ETH_MAX_DEVICE];
-  int count = _eth_devices(ETH_MAX_DEVICE, list);
+  int count = eth_devices(ETH_MAX_DEVICE, list, FALSE);
   int i;
   size_t j=strlen(desc);
 
@@ -829,7 +830,7 @@ const char* eth_getname_bydesc(const char* desc, char* name, char *ndesc)
 char* eth_getname_byname(const char* name, char* temp, char *desc)
 {
   ETH_LIST  list[ETH_MAX_DEVICE];
-  int count = _eth_devices(ETH_MAX_DEVICE, list);
+  int count = eth_devices(ETH_MAX_DEVICE, list, FALSE);
   size_t n;
   int i, found;
 
@@ -849,7 +850,7 @@ char* eth_getname_byname(const char* name, char* temp, char *desc)
 char* eth_getdesc_byname(char* name, char* temp)
 {
   ETH_LIST  list[ETH_MAX_DEVICE];
-  int count = _eth_devices(ETH_MAX_DEVICE, list);
+  int count = eth_devices(ETH_MAX_DEVICE, list, FALSE);
   size_t n;
   int i, found;
 
@@ -894,7 +895,7 @@ t_stat eth_show (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
   ETH_LIST  list[ETH_MAX_DEVICE];
   int number;
 
-  number = _eth_devices(ETH_MAX_DEVICE, list);
+  number = eth_devices(ETH_MAX_DEVICE, list, FALSE);
   fprintf(st, "ETH devices:\n");
   if (number == -1)
     fprintf(st, "  network support not available in simulator\n");
@@ -965,6 +966,8 @@ t_stat eth_filter_hash (ETH_DEV* dev, int addr_count, ETH_MAC* const addresses,
   {return SCPE_NOFNC;}
 const char *eth_version (void)
   {return NULL;}
+int eth_devices(int max, ETH_LIST* list, ETH_BOOL framers)
+  {return 0;}
 void eth_show_dev (FILE* st, ETH_DEV* dev)
   {}
 t_stat eth_show (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
@@ -1112,13 +1115,14 @@ for (i=0; i<used; i++) {
 return used;
 }
 
-static int _eth_devices(int max, ETH_LIST* list)
+int eth_devices(int max, ETH_LIST* list, ETH_BOOL framers)
 {
 int used = 0;
 char errbuf[PCAP_ERRBUF_SIZE] = "";
 #ifndef DONT_USE_PCAP_FINDALLDEVS
 pcap_if_t* alldevs;
 pcap_if_t* dev;
+ETH_DEV edev;
 
 memset(list, 0, max*sizeof(*list));
 errbuf[0] = '\0';
@@ -1129,7 +1133,11 @@ if (pcap_findalldevs(&alldevs, errbuf) == -1) {
   }
 else {
   /* copy device list into the passed structure */
-  for (used=0, dev=alldevs; dev && (used < max); dev=dev->next, ++used) {
+  for (used=0, dev=alldevs; dev && (used < max); dev=dev->next) {
+    edev.eth_api = ETH_API_PCAP;
+    eth_get_nic_hw_addr (&edev, dev->name, 0);
+    if ((memcmp (edev.host_nic_phy_hw_addr, framer_oui, 3) == 0) != framers)
+      continue;
     if ((dev->flags & PCAP_IF_LOOPBACK) || (!strcmp("any", dev->name)))
       continue;
     strlcpy(list[used].name, dev->name, sizeof(list[used].name));
@@ -1137,6 +1145,7 @@ else {
       strlcpy(list[used].desc, dev->description, sizeof(list[used].desc));
     else
       strlcpy(list[used].desc, "No description available", sizeof(list[used].desc));
+    ++used;
     }
 
   /* free device list */
@@ -1151,6 +1160,9 @@ used = eth_host_pcap_devices(used, max, list);
 if ((used == 0) && (errbuf[0])) {
     sim_printf ("Eth: pcap_findalldevs warning: %s\n", errbuf);
     }
+
+if (framers)
+    return used;    /* don't add pseudo-ethernet devices */
 
 #ifdef HAVE_TAP_NETWORK
 if (used < max) {
@@ -1736,7 +1748,7 @@ static int pcap_mac_if_vms(const char *AdapterName, unsigned char MACAddress[6])
 }
 #endif /* defined (__VMS) && !defined(__VAX) */
 
-static void eth_get_nic_hw_addr(ETH_DEV* dev, const char *devname)
+static void eth_get_nic_hw_addr(ETH_DEV* dev, const char *devname, int set_on)
 {
   memset(&dev->host_nic_phy_hw_addr, 0, sizeof(dev->host_nic_phy_hw_addr));
   dev->have_host_nic_phy_addr = 0;
@@ -1766,13 +1778,15 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, const char *devname)
         NULL};
 
     memset(command, 0, sizeof(command));
-    /* try to force an otherwise unused interface to be turned on */
-    for (i=0; turnon[i]; ++i) {
-      snprintf(command, sizeof(command), turnon[i], (int)(sizeof(command) - (2 + strlen(patterns[i]))), devname);
-      get_glyph_nc (command, tool, 0);
-      if (sim_get_tool_path (tool)[0]) {
-        if (NULL != (f = popen(command, "r")))
-          pclose(f);
+    if (set_on) {
+      /* try to force an otherwise unused interface to be turned on */
+      for (i=0; turnon[i]; ++i) {
+        snprintf(command, sizeof(command), turnon[i], (int)(sizeof(command) - (2 + strlen(patterns[i]))), devname);
+        get_glyph_nc (command, tool, 0);
+        if (sim_get_tool_path (tool)[0]) {
+          if (NULL != (f = popen(command, "r")))
+            pclose(f);
+          }
         }
       }
     for (i=0; patterns[i] && (0 == dev->have_host_nic_phy_addr); ++i) {
@@ -2500,12 +2514,13 @@ if (bufsz < ETH_MAX_JUMBO_FRAME)
 /* initialize device */
 eth_zero(dev);
 
-/* translate name of type "ethX" to real device name */
-if ((strlen(name) == 4)
+/* translate name of type "eth<num>" to real device name */
+if ((strlen(name) == 4 || strlen(name) == 5)
     && (tolower(name[0]) == 'e')
     && (tolower(name[1]) == 't')
     && (tolower(name[2]) == 'h')
     && isdigit(name[3])
+    && (strlen(name) == 4 || isdigit(name[4]))
    ) {
   num = atoi(&name[3]);
   savname = _eth_getname(num, temp, desc);
@@ -2545,7 +2560,7 @@ if (!strcmp (desc, "No description available"))
 sim_messagef (SCPE_OK, "Eth: opened OS device %s%s%s\n", savname, desc[0] ? " - " : "", desc);
 
 /* get the NIC's hardware MAC address */
-eth_get_nic_hw_addr(dev, savname);
+eth_get_nic_hw_addr(dev, savname, 1);
 
 /* save name of device */
 dev->name = (char *)malloc(strlen(savname)+1);
@@ -4368,7 +4383,7 @@ int bpf_compile_skip_count = 0;
 
 
 memset (&eth_tst, 0, sizeof(eth_tst));
-eth_device_count = _eth_devices(ETH_MAX_DEVICE, eth_list);
+eth_device_count = eth_devices(ETH_MAX_DEVICE, eth_list, FALSE);
 eth_opened = 0;
 for (eth_num=0; eth_num<eth_device_count; eth_num++) {
   char eth_name[32];

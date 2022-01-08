@@ -1575,6 +1575,7 @@ static const char simh_help2[] =
       "+sh{ow} <unit> {arg,...}     show unit parameters\n"
       "+sh{ow} ethernet             show ethernet devices\n"
       "+sh{ow} serial               show serial devices\n"
+      "+sh{ow} synchronous          show DDCMP synchronous interface devices\n"
       "+sh{ow} multiplexer {dev}    show open multiplexer device info\n"
       "+sh{ow} video                show video capabilities\n"
       "+sh{ow} clocks               show calibrated timer information\n"
@@ -1603,6 +1604,7 @@ static const char simh_help2[] =
 #define HLP_SHOW_ASYNCH         "*Commands SHOW"
 #define HLP_SHOW_ETHERNET       "*Commands SHOW"
 #define HLP_SHOW_SERIAL         "*Commands SHOW"
+#define HLP_SHOW_SYNC           "*Commands SHOW"
 #define HLP_SHOW_MULTIPLEXER    "*Commands SHOW"
 #define HLP_SHOW_VIDEO          "*Commands SHOW"
 #define HLP_SHOW_CLOCKS         "*Commands SHOW"
@@ -2643,6 +2645,7 @@ static SHTAB show_glob_tab[] = {
     { "ASYNCH",         &sim_show_asynch,           0, HLP_SHOW_ASYNCH },
     { "ETHERNET",       &eth_show_devices,          0, HLP_SHOW_ETHERNET },
     { "SERIAL",         &sim_show_serial,           0, HLP_SHOW_SERIAL },
+    { "SYNCHRONOUS",    &tmxr_show_sync_devices,    0, HLP_SHOW_SYNC },
     { "MULTIPLEXER",    &tmxr_show_open_devices,    0, HLP_SHOW_MULTIPLEXER },
     { "MUX",            &tmxr_show_open_devices,    0, HLP_SHOW_MULTIPLEXER },
     { "VIDEO",          &vid_show,                  0, HLP_SHOW_VIDEO },

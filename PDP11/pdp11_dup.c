@@ -405,6 +405,8 @@ static MTAB dup_mod[] = {
         NULL, &tmxr_show_cstat, (void *) &dup_desc, "Display current connections" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "LINES", "LINES=n",
         &dup_setnl, &tmxr_show_lines, (void *) &dup_desc, "Display number of lines" },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "SYNC", NULL,
+      NULL, &tmxr_show_sync, NULL, "Display attachable DDCMP synchronous links" },
     { 0 }
     };
 
@@ -554,8 +556,8 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
         dup_set_modem (dup, data);
         dup_rxcsr[dup] &= ~RXCSR_WRITEABLE;
         dup_rxcsr[dup] |= (data & RXCSR_WRITEABLE);
-        if ((dup_rxcsr[dup] & RXCSR_M_RTS) &&           /* Upward transition of RTS */
-            (!(orig_val & RXCSR_M_RTS)))                /* Enables Receive on the line */
+        if ((dup_rxcsr[dup] & RXCSR_M_DTR) &&           /* Upward transition of DTR */
+            (!(orig_val & RXCSR_M_DTR)))                /* Enables Receive on the line */
             dup_desc.ldsc[dup].rcve = TRUE;
         if ((dup_rxcsr[dup] & RXCSR_M_RTS) &&           /* Upward transition of RTS */
             (!(orig_val & RXCSR_M_RTS)) &&              /* while receiver is enabled and */
@@ -1560,6 +1562,17 @@ const char helpString[] =
     " the peer.  Alternatively, UDP can be used by specifying UDP on the\n"
     " ATTACH command.\n"
     "\n"
+    " Communication may alternately use the DDCMP synchronous framer device.\n"
+    " The DDCMP synchronous device is a USB device that can send and\n"
+    " receive DDCMP frames over either RS-232 or coax synchronous lines.\n"
+    " Refer to https://github.com/pkoning2/ddcmp for documentation.\n"
+    "\n"
+    "+sim> ATTACH %U SYNC=ifname:mode:speed\n"
+    "\n"
+    " Communicate via the synchronous DDCMP framer interface \"ifname\", \n"
+    " and framer mode \"mode\" -- one of INTEGRAL, RS232_DTE, or\n"
+    " RS232_DCE.  The \"speed\" argument is the bit rate for the line.\n"
+    " You can use \"SHOW SYNC\" to see the list of synchronous DDCMP devices.\n"
     "2 Examples\n"
     " To configure two simulators to talk to each other use the following\n"
     " example:\n"
@@ -1572,6 +1585,8 @@ const char helpString[] =
     "+sim> SET %D ENABLE\n"
     "+sim> ATTACH %U 2222,connect=LOCALHOST:1111\n"
     "\n"
+    " To communicate with an \"integral modem\" DMC or similar, at 56 kbps:\n"
+    "+sim> ATTACH %U SYNC=sync0:INTEGRAL:56000\n"
     "1 Monitoring\n"
     " The %D device and %U line configuration and state can be displayed with\n"
     " one of the available show commands.\n"

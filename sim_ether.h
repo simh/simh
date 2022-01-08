@@ -232,6 +232,8 @@ struct eth_queue {
   struct eth_item*    item;
 };
 
+typedef unsigned char ETH_MAC[6];
+
 struct eth_list {
   char    name[ETH_DEV_NAME_MAX];
   char    desc[ETH_DEV_DESC_MAX];
@@ -239,7 +241,6 @@ struct eth_list {
 };
 
 typedef int ETH_BOOL;
-typedef unsigned char ETH_MAC[6];
 typedef unsigned char ETH_MULTIHASH[8];
 typedef struct eth_packet  ETH_PACK;
 typedef void (*ETH_PCALLBACK)(int status);
@@ -368,6 +369,7 @@ t_stat eth_show (FILE* st, UNIT* uptr,                  /* show ethernet devices
                  int32 val, CONST void* desc);
 t_stat eth_show_devices (FILE* st, DEVICE *dptr,        /* show ethernet devices */
                          UNIT* uptr, int32 val, CONST char* desc);
+int eth_devices (int max, ETH_LIST* dev, ETH_BOOL framers); /* get ethernet devices on host */
 void eth_show_dev (FILE*st, ETH_DEV* dev);              /* show ethernet device state */
 
 void eth_mac_fmt (ETH_MAC* const add, char* buffer);    /* format ethernet mac address */
