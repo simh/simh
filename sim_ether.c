@@ -782,19 +782,12 @@ t_stat eth_show_devices (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, CONST ch
 return eth_show (st, uptr, val, NULL);
 }
 
-t_stat eth_show_framers (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, CONST char *desc)
-{
-return eth_show_fr (st, uptr, val, NULL);
-}
-
 #if defined (USE_NETWORK) || defined (USE_SHARED)
-/* Internal routine - forward declaration */
-static int _eth_devices (int max, ETH_LIST* dev);   /* get ethernet devices on host */
 
 static const char* _eth_getname(int number, char* name, char *desc)
 {
   ETH_LIST  list[ETH_MAX_DEVICE];
-  int count = _eth_devices(ETH_MAX_DEVICE, list);
+  int count = eth_devices(ETH_MAX_DEVICE, list, FALSE);
 
   if ((number < 0) || (count <= number))
       return NULL;
@@ -811,7 +804,7 @@ static const char* _eth_getname(int number, char* name, char *desc)
 const char* eth_getname_bydesc(const char* desc, char* name, char *ndesc)
 {
   ETH_LIST  list[ETH_MAX_DEVICE];
-  int count = _eth_devices(ETH_MAX_DEVICE, list);
+  int count = eth_devices(ETH_MAX_DEVICE, list, FALSE);
   int i;
   size_t j=strlen(desc);
 
@@ -837,7 +830,7 @@ const char* eth_getname_bydesc(const char* desc, char* name, char *ndesc)
 char* eth_getname_byname(const char* name, char* temp, char *desc)
 {
   ETH_LIST  list[ETH_MAX_DEVICE];
-  int count = _eth_devices(ETH_MAX_DEVICE, list);
+  int count = eth_devices(ETH_MAX_DEVICE, list, FALSE);
   size_t n;
   int i, found;
 
@@ -857,7 +850,7 @@ char* eth_getname_byname(const char* name, char* temp, char *desc)
 char* eth_getdesc_byname(char* name, char* temp)
 {
   ETH_LIST  list[ETH_MAX_DEVICE];
-  int count = _eth_devices(ETH_MAX_DEVICE, list);
+  int count = eth_devices(ETH_MAX_DEVICE, list, FALSE);
   size_t n;
   int i, found;
 
@@ -902,7 +895,7 @@ t_stat eth_show (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
   ETH_LIST  list[ETH_MAX_DEVICE];
   int number;
 
-  number = _eth_devices(ETH_MAX_DEVICE, list);
+  number = eth_devices(ETH_MAX_DEVICE, list, FALSE);
   fprintf(st, "ETH devices:\n");
   if (number == -1)
     fprintf(st, "  network support not available in simulator\n");
@@ -930,32 +923,6 @@ t_stat eth_show (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
         fprintf(st, " %-7s%s\n", eth_open_devices[i]->dptr->name, eth_open_devices[i]->dptr->units[0].filename);
       eth_show_dev (st, eth_open_devices[i]);
       }
-    }
-  return SCPE_OK;
-}
-
-t_stat eth_show_fr (FILE* st, UNIT* uptr, int32 val, CONST void *desc)
-{
-  ETH_LIST  list[ETH_MAX_DEVICE];
-  int number, fcnt = 0;
-
-  number = _eth_devices(ETH_MAX_DEVICE, list);
-  fprintf(st, "DDCMP sync framer devices:\n");
-  if (number == -1)
-    fprintf(st, "  network support not available in simulator\n");
-  else
-    if (number == 0)
-      fprintf(st, "  no dddcmp sync framer devices are available\n");
-    else {
-      int i;
-      for (i=0; i<number; i++) {
-          if (memcmp (list[i].hwaddr, framer_oui, 3) == 0) {
-              fprintf(st," eth%d\t%s\n", i, list[i].name);
-              fcnt++;
-          }
-      }
-      if (fcnt == 0)
-          fprintf(st, "  no dddcmp sync framer devices are available\n");
     }
   return SCPE_OK;
 }
@@ -1004,12 +971,6 @@ void eth_show_dev (FILE* st, ETH_DEV* dev)
 t_stat eth_show (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
   {
   fprintf(st, "ETH devices:\n");
-  fprintf(st, "  network support not available in simulator\n");
-  return SCPE_OK;
-  }
-t_stat eth_show_fr (FILE* st, UNIT* uptr, int32 val, CONST void *desc)
-  {
-  fprintf(st, "DDCMP sync framer devices:\n");
   fprintf(st, "  network support not available in simulator\n");
   return SCPE_OK;
   }
@@ -1152,7 +1113,7 @@ for (i=0; i<used; i++) {
 return used;
 }
 
-static int _eth_devices(int max, ETH_LIST* list)
+int eth_devices(int max, ETH_LIST* list, t_bool framers)
 {
 int used = 0;
 char errbuf[PCAP_ERRBUF_SIZE] = "";
@@ -1170,21 +1131,19 @@ if (pcap_findalldevs(&alldevs, errbuf) == -1) {
   }
 else {
   /* copy device list into the passed structure */
-  for (used=0, dev=alldevs; dev && (used < max); dev=dev->next, ++used) {
+  for (used=0, dev=alldevs; dev && (used < max); dev=dev->next) {
+    edev.eth_api = ETH_API_PCAP;
+    eth_get_nic_hw_addr (&edev, dev->name, 0);
+    if ((memcmp (edev.host_nic_phy_hw_addr, framer_oui, 3) == 0) != framers)
+      continue;
     if ((dev->flags & PCAP_IF_LOOPBACK) || (!strcmp("any", dev->name)))
       continue;
     strlcpy(list[used].name, dev->name, sizeof(list[used].name));
     if (dev->description)
       strlcpy(list[used].desc, dev->description, sizeof(list[used].desc));
-    else {
-        edev.eth_api = ETH_API_PCAP;
-        eth_get_nic_hw_addr (&edev, dev->name, 0);
-        memcpy (list[used].hwaddr, edev.host_nic_phy_hw_addr, 6);
-        if (!dev->description && memcmp (edev.host_nic_phy_hw_addr, framer_oui, 3) == 0)
-            strlcpy(list[used].desc, "DDCMP synchronous interface", sizeof(list[used].desc));        
-        else
-            strlcpy(list[used].desc, "No description available", sizeof(list[used].desc));
-       }
+    else
+      strlcpy(list[used].desc, "No description available", sizeof(list[used].desc));
+    ++used;
     }
 
   /* free device list */
@@ -1199,6 +1158,9 @@ used = eth_host_pcap_devices(used, max, list);
 if ((used == 0) && (errbuf[0])) {
     sim_printf ("Eth: pcap_findalldevs warning: %s\n", errbuf);
     }
+
+if (framers)
+    return used;    /* don't add pseudo-ethernet devices */
 
 #ifdef HAVE_TAP_NETWORK
 if (used < max) {
@@ -2550,12 +2512,13 @@ if (bufsz < ETH_MAX_JUMBO_FRAME)
 /* initialize device */
 eth_zero(dev);
 
-/* translate name of type "ethX" to real device name */
-if ((strlen(name) == 4)
+/* translate name of type "eth<num>" to real device name */
+if ((strlen(name) == 4 || strlen(name) == 5)
     && (tolower(name[0]) == 'e')
     && (tolower(name[1]) == 't')
     && (tolower(name[2]) == 'h')
     && isdigit(name[3])
+    && (strlen(name) == 4 || isdigit(name[4]))
    ) {
   num = atoi(&name[3]);
   savname = _eth_getname(num, temp, desc);
@@ -4418,7 +4381,7 @@ int bpf_compile_skip_count = 0;
 
 
 memset (&eth_tst, 0, sizeof(eth_tst));
-eth_device_count = _eth_devices(ETH_MAX_DEVICE, eth_list);
+eth_device_count = eth_devices(ETH_MAX_DEVICE, eth_list, FALSE);
 eth_opened = 0;
 for (eth_num=0; eth_num<eth_device_count; eth_num++) {
   char eth_name[32];

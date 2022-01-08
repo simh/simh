@@ -299,6 +299,8 @@ t_stat tmxr_show_summ (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat tmxr_show_cstat (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat tmxr_show_lines (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat tmxr_show_open_devices (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, CONST char* desc);
+t_stat tmxr_show_sync_devices (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, CONST char *desc);
+t_stat tmxr_show_sync (FILE* st, UNIT* uptr, int32 val, CONST void *desc);
 t_stat tmxr_flush_log_files (void);
 t_stat tmxr_activate (UNIT *uptr, int32 interval);
 t_stat tmxr_activate_abs (UNIT *uptr, int32 interval);

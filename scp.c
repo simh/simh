@@ -2645,7 +2645,7 @@ static SHTAB show_glob_tab[] = {
     { "ASYNCH",         &sim_show_asynch,           0, HLP_SHOW_ASYNCH },
     { "ETHERNET",       &eth_show_devices,          0, HLP_SHOW_ETHERNET },
     { "SERIAL",         &sim_show_serial,           0, HLP_SHOW_SERIAL },
-    { "SYNCHRONOUS",    &eth_show_framers,          0, HLP_SHOW_SYNC },
+    { "SYNCHRONOUS",    &tmxr_show_sync_devices,    0, HLP_SHOW_SYNC },
     { "MULTIPLEXER",    &tmxr_show_open_devices,    0, HLP_SHOW_MULTIPLEXER },
     { "MUX",            &tmxr_show_open_devices,    0, HLP_SHOW_MULTIPLEXER },
     { "VIDEO",          &vid_show,                  0, HLP_SHOW_VIDEO },

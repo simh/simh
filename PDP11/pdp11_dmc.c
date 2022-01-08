@@ -118,7 +118,6 @@ extern int32 IREQ (HLVL);
 extern int32 tmxr_poll;                                 /* calibrated delay */
 extern int32 clk_tps;                                   /* clock ticks per second */
 extern int32 tmr_poll;                                  /* instructions per tick */
-extern t_stat eth_show_fr (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
 
 #if !defined(DMC_NUMDEVICE)
 #define DMC_NUMDEVICE 8         /* default MAX # DMC-11 devices */
@@ -1252,7 +1251,7 @@ MTAB dmc_mod[] = {
     { MTAB_XTD|MTAB_VDV|MTAB_VALR,          1, "VECTOR", "VECTOR",
         &set_vec,  &show_vec,  NULL, "Interrupt vector" },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "SYNC", NULL,
-      NULL, &eth_show_fr, NULL, "Display attachable DDCMP synchronous framers" },
+      NULL, &tmxr_show_sync, NULL, "Display attachable DDCMP synchronous links" },
     { 0 } };
 
 extern DEVICE dmp_dev;
@@ -1899,7 +1898,7 @@ const char helpString[] =
     " receive DDCMP frames over either RS-232 or coax synchronous lines.\n"
     " Refer to https://github.com/pkoning2/ddcmp for documentation.\n"
     "\n"
-    "+sim> ATTACH %U SYNC=eth:mode:speed\n"
+    "+sim> ATTACH %U SYNC=ifname:mode:speed\n"
     "\n"
     " Communicate via the synchronous DDCMP framer at Ethernet interface\n"
     " \"eth\", and framer mode \"mode\" -- one of INTEGRAL, RS232_DTE, or\n"
@@ -1921,7 +1920,7 @@ const char helpString[] =
     "+sim> ATTACH %U 2222\n"
     "\n"
     " To communicate with an \"integral modem\" DMC or similar, at 56 kbps:\n"
-    "+sim> ATTACH %U SYNC=eth7:INTEGRAL:56000\n"
+    "+sim> ATTACH %U SYNC=sync0:INTEGRAL:56000\n"
     "1 Monitoring\n"
     " The %D device and %U line configuration and state can be displayed with\n"
     " one of the available show commands.\n"

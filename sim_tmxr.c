@@ -2811,6 +2811,21 @@ if (lp->o_uptr)
 return SCPE_OK;
 }
 
+static const char* _tmxr_getname(int number, char* name)
+{
+  ETH_LIST  list[ETH_MAX_DEVICE];
+  int count = eth_devices(ETH_MAX_DEVICE, list, TRUE);
+
+  if ((number < 0) || (count <= number))
+      return NULL;
+  if (list[number].eth_api != ETH_API_PCAP) {
+    sim_printf ("Tmxr: Synchronous line device not found.  You may need to run as root\n");
+    return NULL;
+    }
+
+  strcpy(name, list[number].name);
+  return name;
+}
 
 /* Open a master listening socket (and all of the other variances of connections).
 
@@ -2831,6 +2846,7 @@ char tbuf[CBUFSIZE], listen[CBUFSIZE], destination[CBUFSIZE],
      logfiletmpl[CBUFSIZE], buffered[CBUFSIZE], hostport[CBUFSIZE], 
      port[CBUFSIZE], option[CBUFSIZE], speed[CBUFSIZE], dev_name[CBUFSIZE];
 char framer[CBUFSIZE],fr_eth[CBUFSIZE];
+int num;
 int8 fr_mode;
 int32 fr_speed;
 FRAMER *framer_s;
@@ -3327,6 +3343,19 @@ while (*tptr) {
         lp = &mp->ldsc[line];
         lp->mp = mp;
         if (framer[0]) {
+            /* translate name of type "sync<num>" to real eth device name */
+            if ((strlen(fr_eth) == 5 || strlen(fr_eth) == 6)
+                && (tolower(fr_eth[0]) == 's')
+                && (tolower(fr_eth[1]) == 'y')
+                && (tolower(fr_eth[2]) == 'n')
+                && (tolower(fr_eth[3]) == 'c')
+                && isdigit(fr_eth[4])
+                && (strlen(fr_eth) == 5 || isdigit(fr_eth[5]))
+                ) {
+                num = atoi(&fr_eth[4]);
+                if (_tmxr_getname(num, fr_eth) == NULL) /* didn't translate */
+                    return SCPE_OPENERR;
+            }
             /* Open the Ethernet device */
             framer_s = (FRAMER *)malloc (sizeof (FRAMER));
             memset (framer_s, 0, sizeof (*framer_s));
@@ -5629,6 +5658,35 @@ for (i = any = 0; i < mp->lines; i++) {
 if (any == 0)
     fprintf (st, (mp->lines == 1? "disconnected\n": "all disconnected\n"));
 return SCPE_OK;
+}
+
+/* Show synchronous devices */
+
+t_stat tmxr_show_sync_devices (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, CONST char *desc)
+{
+return tmxr_show_sync (st, uptr, val, NULL);
+}
+
+t_stat tmxr_show_sync (FILE* st, UNIT* uptr, int32 val, CONST void *desc)
+{
+  ETH_LIST  list[ETH_MAX_DEVICE];
+  int number, fcnt = 0;
+
+  number = eth_devices(ETH_MAX_DEVICE, list, TRUE);
+  fprintf(st, "DDCMP synchronous link devices:\n");
+  if (number == -1)
+    fprintf(st, "  network support not available in simulator\n");
+  else
+    if (number == 0)
+      fprintf(st, "  no dddcmp synchronous link devices are available\n");
+    else {
+      int i;
+      for (i=0; i<number; i++) {
+          fprintf(st," sync%d\t%s\n", i, list[i].name);
+          fcnt++;
+      }
+    }
+  return SCPE_OK;
 }
 
 /* Show number of lines */
