@@ -54,6 +54,7 @@
 
 #define CTC_DIAG_CRC1 0xa4a5752f
 #define CTC_DIAG_CRC2 0xd3d20eb3
+#define CTC_DIAG_CRC3 0x0f387ce3  /* Used by SVR 2.0.5 */
 
 #define TAPE_DEV      0    /* CTAPE device */
 #define XMF_DEV       1    /* XM Floppy device */
@@ -308,7 +309,8 @@ static void ctc_cmd(uint8 cid,
          * we are expected to write results into memory at address
          * 0x200f000 */
         if (ctc_crc == CTC_DIAG_CRC1 ||
-            ctc_crc == CTC_DIAG_CRC2) {
+            ctc_crc == CTC_DIAG_CRC2 ||
+            ctc_crc == CTC_DIAG_CRC3) {
             pwrite_h(0x200f000, 0x1);   /* Test success */
             pwrite_h(0x200f002, 0x0);   /* Test Number */
             pwrite_h(0x200f004, 0x0);   /* Actual */
