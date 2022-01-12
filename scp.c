@@ -5847,7 +5847,7 @@ else {
             }
         }
     if (!dptr)
-        return SCPE_NXDEV;                              /* no match */
+        return sim_messagef (SCPE_NXDEV, "Non-existent device: %s\n", gbuf);/* no match */
     lvl = MTAB_VDV;                                     /* device match */
     uptr = dptr->units;                                 /* first unit */
     }
@@ -5868,7 +5868,7 @@ while (*cptr != 0) {                                    /* do all mods */
                 if (((lvl & mptr->mask) & ~MTAB_XTD) == 0)
                     return SCPE_ARG;
                 if ((lvl == MTAB_VUN) && (uptr->flags & UNIT_DIS))
-                    return SCPE_UDIS;                   /* unit disabled? */
+                    return sim_messagef (SCPE_UDIS, "Unit disabled: %s\n", sim_uname (uptr));
                 if (mptr->valid) {                      /* validation rtn? */
                     if (cvptr && MODMASK(mptr,MTAB_QUOTE)) {
                         svptr = get_glyph_quoted (svptr, gbuf, ',');
@@ -5898,7 +5898,7 @@ while (*cptr != 0) {                                    /* do all mods */
                 if (cvptr)                              /* = value? */
                     return SCPE_ARG;
                 if (uptr->flags & UNIT_DIS)             /* disabled? */
-                    return SCPE_UDIS;
+                    return sim_messagef (SCPE_UDIS, "Unit disabled: %s\n", sim_uname (uptr));
                 if ((mptr->valid) &&                    /* invalid? */
                     ((r = mptr->valid (uptr, mptr->match, cvptr, mptr->desc)) != SCPE_OK))
                     return r;
@@ -5916,7 +5916,7 @@ while (*cptr != 0) {                                    /* do all mods */
             }
         else if (!dptr->modifiers)                      /* no modifiers? */
             return SCPE_NOPARAM;
-        else return SCPE_NXPAR;
+        else return sim_messagef (SCPE_NXPAR, "%s device: Non-existent parameter - %s\n", dptr->name, gbuf);
         }                                               /* end if no mat */
     }                                                   /* end while */
 return SCPE_OK;                                         /* done all */
@@ -6194,7 +6194,7 @@ while (*cptr != 0) {                                    /* do all mods */
             if (!dptr->modifiers)                       /* no modifiers? */
                 return sim_messagef (SCPE_NOPARAM, "%s device has no parameters\n", dptr->name);
             else
-                return sim_messagef (SCPE_NXPAR, "Non-existent parameter: %s\n", gbuf);
+                return sim_messagef (SCPE_NXPAR, "%s device: Non-existent parameter: %s\n", dptr->name, gbuf);
             }
         }                                               /* end if */
     }                                                   /* end while */
@@ -7630,7 +7630,7 @@ if (strcmp (gbuf, "ALL") == 0)
     return (reset_all (0));
 dptr = find_dev (gbuf);                                 /* locate device */
 if (dptr == NULL)                                       /* found it? */
-    return SCPE_NXDEV;
+    return sim_messagef (SCPE_NXDEV, "Non-existent device: %s\n", gbuf);
 if (dptr->reset != NULL)
     return dptr->reset (dptr);
 else return SCPE_OK;
@@ -7973,7 +7973,7 @@ if (*cptr == 0)                                         /* now eol? */
     return SCPE_2FARG;
 dptr = find_unit (gbuf, &uptr);                         /* locate unit */
 if (dptr == NULL)                                       /* found dev? */
-    return SCPE_NXDEV;
+    return sim_messagef (SCPE_NXDEV, "Non-existent device: %s\n", gbuf);
 if (uptr == NULL)                                       /* valid unit? */
     return SCPE_NXUN;
 if (uptr->flags & UNIT_ATT) {                           /* already attached? */
@@ -7985,7 +7985,7 @@ if (uptr->flags & UNIT_ATT) {                           /* already attached? */
         }
     else {
         if (!(uptr->dynflags & UNIT_ATTMULT))
-            return SCPE_ALATT;                          /* Already attached */
+            return sim_messagef (SCPE_ALATT, "%s: Already attached\n", sim_uname (uptr));
         }
     }
 gbuf[sizeof(gbuf)-1] = '\0';
@@ -7999,7 +7999,7 @@ return scp_attach_unit (dptr, uptr, gbuf);              /* attach */
 t_stat scp_attach_unit (DEVICE *dptr, UNIT *uptr, const char *cptr)
 {
 if (uptr->flags & UNIT_DIS)                             /* disabled? */
-    return SCPE_UDIS;
+    return sim_messagef (SCPE_UDIS, "Unit disabled: %s\n", sim_uname (uptr));
 if (dptr->attach != NULL)                               /* device routine? */
     return dptr->attach (uptr, (CONST char *)cptr);     /* call it */
 return attach_unit (uptr, (CONST char *)cptr);          /* no, std routine */
@@ -8119,7 +8119,7 @@ if (strcmp (gbuf, "ALL") == 0)
     return (detach_all (0, FALSE));
 dptr = find_unit (gbuf, &uptr);                         /* locate unit */
 if (dptr == NULL)                                       /* found dev? */
-    return SCPE_NXDEV;
+    return sim_messagef (SCPE_NXDEV, "Non-existent device: %s\n", gbuf);
 if (uptr == NULL)                                       /* valid unit? */
     return SCPE_NXUN;
 return scp_detach_unit (dptr, uptr);                    /* detach */
@@ -8240,7 +8240,7 @@ if (*cptr == 0)                                         /* now eol? */
     return SCPE_2FARG;
 dptr = find_dev (gbuf);                                 /* locate device */
 if (dptr == NULL)                                       /* found dev? */
-    return SCPE_NXDEV;
+    return sim_messagef (SCPE_NXDEV, "Non-existent device: %s\n", gbuf);
 cptr = get_glyph (cptr, gbuf, 0);                       /* get next glyph */
 if (*cptr != 0)                                         /* must be eol */
     return SCPE_2MARG;
@@ -8277,7 +8277,7 @@ if (*cptr != 0)                                         /* now eol? */
     return SCPE_2MARG;
 dptr = find_dev (gbuf);                                 /* locate device */
 if (dptr == NULL)                                       /* found dev? */
-    return SCPE_NXDEV;
+    return sim_messagef (SCPE_NXDEV, "Non-existent device: %s\n", gbuf);
 return deassign_device (dptr);
 }
 
@@ -9041,13 +9041,13 @@ else if (flag == RU_BOOT) {                             /* boot */
         return SCPE_2MARG;
     dptr = find_unit (gbuf, &uptr);                     /* locate unit */
     if (dptr == NULL)                                   /* found dev? */
-        return SCPE_NXDEV;
+        return sim_messagef (SCPE_NXDEV, "Non-existent device: %s\n", gbuf);
     if (uptr == NULL)                                   /* valid unit? */
         return SCPE_NXUN;
     if (dptr->boot == NULL)                             /* can it boot? */
         return SCPE_NOFNC;
     if (uptr->flags & UNIT_DIS)                         /* disabled? */
-        return SCPE_UDIS;
+        return sim_messagef (SCPE_UDIS, "Unit disabled: %s\n", sim_uname (uptr));
     if ((uptr->flags & UNIT_ATTABLE) &&                 /* if attable, att? */
         !(uptr->flags & UNIT_ATT))
         return SCPE_UNATT;
@@ -9554,7 +9554,7 @@ t_stat reason;
 int32 saved_switches = sim_switches;
 
 if (uptr->flags & UNIT_DIS)                             /* disabled? */
-    return SCPE_UDIS;
+    return sim_messagef (SCPE_UDIS, "Unit disabled: %s\n", sim_uname (uptr));
 mask = (t_addr) width_mask[dptr->awidth];
 if ((low > mask) || (high > mask) || (low > high))
     return SCPE_ARG;
