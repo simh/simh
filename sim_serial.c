@@ -582,7 +582,7 @@ COMMCONFIG commdefault;
 DWORD error;
 DWORD commsize = sizeof (commdefault);
 COMMTIMEOUTS cto;
-char dosname[1028];
+char win32name[1028];
 
 if (!GetDefaultCommConfig (name, &commdefault, &commsize)) {    /* get default comm parameters */
     error = GetLastError ();                                    /* function failed; get error */
@@ -593,10 +593,8 @@ if (!GetDefaultCommConfig (name, &commdefault, &commsize)) {    /* get default c
     return INVALID_HANDLE;                                      /* indicate bad port name */
     }
 
-strncpy(dosname, "\\\\.\\", 4);
-strncat(dosname, name, sizeof(dosname));
-
-hPort = CreateFile (dosname, GENERIC_READ | GENERIC_WRITE, /* open the port */
+snprintf (win32name, sizeof (win32name), "\\\\.\\%s", name);
+hPort = CreateFile (win32name, GENERIC_READ | GENERIC_WRITE, /* open the port */
                    0, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, 0);
 
 if (hPort == INVALID_HANDLE_VALUE) {                    /* open failed? */
@@ -966,18 +964,19 @@ if (1) {
             strcmp(namelist[i]->d_name, "..")) {
             char path[1024], devicepath[1024], driverpath[1024];
 
-            sprintf (path, "/sys/class/tty/%s", namelist[i]->d_name);
-            sprintf (devicepath, "/sys/class/tty/%s/device", namelist[i]->d_name);
-            sprintf (driverpath, "/sys/class/tty/%s/device/driver", namelist[i]->d_name);
+            snprintf (path, sizeof (path), "/sys/class/tty/%s", namelist[i]->d_name);
+            snprintf (devicepath, sizeof (devicepath), "/sys/class/tty/%s/device", namelist[i]->d_name);
+            snprintf (driverpath, sizeof (driverpath), "/sys/class/tty/%s/device/driver", namelist[i]->d_name);
             if ((lstat(devicepath, &st) == 0) && S_ISLNK(st.st_mode)) {
                 char buffer[1024];
 
                 memset (buffer, 0, sizeof(buffer));
                 if (readlink(driverpath, buffer, sizeof(buffer)) > 0) {
-                    sprintf (list[ports].name, "/dev/%s", basename (path));
+                    snprintf (list[ports].name, sizeof (list[ports].name), "/dev/%s", basename (path));
                     port = open (list[ports].name, O_RDWR | O_NOCTTY | O_NONBLOCK);     /* open the port */
                     if (port != -1) {                   /* open OK? */
-                        if (isatty (port))              /* is device a TTY? */
+                        if ((ports < max) &&            /* room for another? */
+                            (isatty (port)))            /* is device a TTY? */
                             ++ports;
                         close (port);
                         }
@@ -990,7 +989,7 @@ if (1) {
     }
 #elif defined(__hpux)
 for (i=0; (ports < max) && (i < 64); ++i) {
-    sprintf (list[ports].name, "/dev/tty%dp%d", i/8, i%8);
+    snprintf (list[ports].name, sizeof (list[ports].name), "/dev/tty%dp%d", i/8, i%8);
     port = open (list[ports].name, O_RDWR | O_NOCTTY | O_NONBLOCK);     /* open the port */
     if (port != -1) {                                   /* open OK? */
         if (isatty (port))                              /* is device a TTY? */
@@ -999,8 +998,27 @@ for (i=0; (ports < max) && (i < 64); ++i) {
         }
     }
 #else /* Non Linux/HP-UX, just try some well known device names */
+/* modern UNIX serial port names - usually USB */
+static char *serial_unix_serial_names[] = { "S", "U", "USB", ".serial", ".usbserial", NULL};
+char **sp;
+
+for (sp = serial_unix_serial_names; *sp; sp++) { 
+    for (i=0; (ports < max) && (i <= 64); ++i) {
+        if (i < 64)
+            snprintf (list[ports].name, sizeof (list[ports].name), "/dev/tty%s%d", *sp, i);
+        else    /* no trailing number */
+            snprintf (list[ports].name, sizeof (list[ports].name), "/dev/tty%s", *sp);
+        port = open (list[ports].name, O_RDWR | O_NOCTTY | O_NONBLOCK);     /* open the port */
+        if (port != -1) {                                   /* open OK? */
+            if (isatty (port))                              /* is device a TTY? */
+                ++ports;
+            close (port);
+            }
+        }
+    }
+/* now the traditional UNIX serial port names */
 for (i=0; (ports < max) && (i < 64); ++i) {
-    sprintf (list[ports].name, "/dev/ttyS%d", i);
+    snprintf (list[ports].name, sizeof (list[ports].name), "/dev/tty%02d", i);
     port = open (list[ports].name, O_RDWR | O_NOCTTY | O_NONBLOCK);     /* open the port */
     if (port != -1) {                                   /* open OK? */
         if (isatty (port))                              /* is device a TTY? */
@@ -1008,42 +1026,7 @@ for (i=0; (ports < max) && (i < 64); ++i) {
         close (port);
         }
     }
-for (i=0; (ports < max) && (i < 64); ++i) {
-    sprintf (list[ports].name, "/dev/ttyUSB%d", i);
-    port = open (list[ports].name, O_RDWR | O_NOCTTY | O_NONBLOCK);     /* open the port */
-    if (port != -1) {                                   /* open OK? */
-        if (isatty (port))                              /* is device a TTY? */
-            ++ports;
-        close (port);
-        }
-    }
-for (i=1; (ports < max) && (i < 64); ++i) {
-    sprintf (list[ports].name, "/dev/tty.serial%d", i);
-    port = open (list[ports].name, O_RDWR | O_NOCTTY | O_NONBLOCK);     /* open the port */
-    if (port != -1) {                                   /* open OK? */
-        if (isatty (port))                              /* is device a TTY? */
-            ++ports;
-        close (port);
-        }
-    }
-for (i=0; (ports < max) && (i < 64); ++i) {
-    sprintf (list[ports].name, "/dev/tty%02d", i);
-    port = open (list[ports].name, O_RDWR | O_NOCTTY | O_NONBLOCK);     /* open the port */
-    if (port != -1) {                                   /* open OK? */
-        if (isatty (port))                              /* is device a TTY? */
-            ++ports;
-        close (port);
-        }
-    }
-for (i=0; (ports < max) && (i < 8); ++i) {
-    sprintf (list[ports].name, "/dev/ttyU%d", i);
-    port = open (list[ports].name, O_RDWR | O_NOCTTY | O_NONBLOCK);     /* open the port */
-    if (port != -1) {                                   /* open OK? */
-        if (isatty (port))                              /* is device a TTY? */
-            ++ports;
-        close (port);
-        }
-    }
+
 #endif
 return ports;
 }
@@ -1127,10 +1110,6 @@ if (tcgetattr (port, &tio)) {                           /* get the terminal attr
     return INVALID_HANDLE;                              /*   and return failure to caller */
     }
 
-// which of these methods is best?
-
-#if 1
-
 tio.c_iflag = (tio.c_iflag & ~i_clear) | i_set;           /* configure the serial line for raw mode */
 tio.c_oflag = (tio.c_oflag & ~o_clear) | o_set;
 tio.c_cflag = (tio.c_cflag & ~c_clear) | c_set;
@@ -1140,24 +1119,6 @@ tio.c_cc[VMIN] = 1;
 #endif
 #ifdef VTIME
 tio.c_cc[VTIME] = 0;
-#endif
-
-#elif 0
-
-tio.c_iflag &= ~(IGNBRK | BRKINT | INPCK | ISTRIP | INLCR | IGNCR | ICRNL | IXON | IXOFF);
-tio.c_iflag |= PARMRK | IGNPAR;
-tio.c_oflag &= ~(OPOST);
-tio.c_cflag &= ~(HUPCL);
-tio.c_cflag |= CREAD | CLOCAL;
-tio.c_lflag &= ~(ISIG | ICANON | ECHO | ECHOE | ECHOK | ECHONL | NOFLSH | TOSTOP | IEXTEN);
-
-#elif 0
-
-tio.c_iflag = PARMRK | IGNPAR;
-tio.c_oflag = 0;
-tio.c_cflag = tio.c_cflag | CLOCAL | CREAD;
-tio.c_lflag = 0;
-
 #endif
 
 if (tcsetattr (port, TCSANOW, &tio)) {                  /* set the terminal attributes */
