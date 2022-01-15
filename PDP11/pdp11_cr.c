@@ -577,7 +577,7 @@ static MTAB cr_mod[] = {
     { MTAB_XTD|MTAB_VDV, 0, "RATE", "RATE={DEFAULT|200..1200}",
         &cr_set_rate, &cr_show_rate, NULL, "Display input rate" },
     { MTAB_XTD|MTAB_VDV, 0, "TRANSLATION",
-        NULL,
+        NULL,           /* Populated by cr_reset */
         &cr_set_trans, &cr_show_trans, NULL, "Display translation mode" },
     { 0 }  };
 
@@ -1442,18 +1442,18 @@ t_stat cr_reset (   DEVICE  *dptr    )
     if (!translation_help) {
         size_t i;
         const char trans_hlp[] = "TRANSLATION={";
-        size_t size = sizeof(trans_hlp) +1;
+        size_t size = sizeof(trans_hlp) + 2;
 
         for ( i = 0; i < NTRANS; i++ )
             size += strlen (transcodes[i].name)+1;
-        translation_help = (char *)malloc (size );
-        strlcpy(translation_help, trans_hlp, size);
+        translation_help = (char *)malloc (size);
+        strlcpy (translation_help, trans_hlp, size);
         for (i = 0; i < NTRANS; i++) {
-            strlcat(translation_help, transcodes[i].name, size);
-            strlcat(translation_help,"|", size);
+            strlcat (translation_help, transcodes[i].name, size);
+            strlcat (translation_help,"|", size);
         }
-        translation_help[strlen(translation_help)-1] = '\0';
-        strlcpy(translation_help, "}", size);
+        translation_help[strlen (translation_help) - 1] = '\0';
+        strlcat (translation_help, "}", size);
         for (i = 0; i < (sizeof cr_mod / sizeof cr_mod[0]); i++ ) 
             if (cr_mod[i].pstring && !strcmp(cr_mod[i].pstring, "TRANSLATION")) {
                 cr_mod[i].mstring = translation_help;
