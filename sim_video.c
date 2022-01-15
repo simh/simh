@@ -2044,15 +2044,25 @@ while (vid_active) {
                 /* EVENT_SCREENSHOT to take a screenshot */
                 /* EVENT_BEEP   to emit a beep sound */
                 while (vid_active && event.user.code) {
-                    vptr = vid_get_event_window (&event, event.user.windowID);
-                    if (vptr == NULL)
+                    /* Handle Beep first since it isn't a window oriented event */
+                    if (event.user.code == EVENT_BEEP) {
+                        vid_beep_event ();
+                        event.user.code = 0;    /* Mark as done */
                         continue;
+                        }
+                    vptr = vid_get_event_window (&event, event.user.windowID);
+                    if (vptr == NULL) {
+                        sim_debug (SIM_VID_DBG_VIDEO, vptr->vid_dev, "vid_thread() - Ignored event not bound to a window\n");
+                        event.user.code = 0;    /* Mark as done */
+                        break;
+                        }
                     if (event.user.code == EVENT_REDRAW) {
                         vid_update (vptr);
                         event.user.code = 0;    /* Mark as done */
-if (0)                        while (SDL_PeepEvents (&event, 1, SDL_GETEVENT, SDL_USEREVENT, SDL_USEREVENT)) {
-                            if (event.user.code == EVENT_REDRAW) {
-                                /* Only do a single video update between waiting for events */
+                        while (SDL_PeepEvents (&event, 1, SDL_GETEVENT, SDL_USEREVENT, SDL_USEREVENT)) {
+                            if ((event.user.code == EVENT_REDRAW) &&
+                                (vptr == vid_get_event_window (&event, event.user.windowID))) {
+                                /* Only do a single video update to the same window between waiting for events */
                                 sim_debug (SIM_VID_DBG_VIDEO, vptr->vid_dev, "vid_thread() - Ignored extra REDRAW Event\n");
                                 event.user.code = 0;    /* Mark as done */
                                 continue;
