@@ -1907,27 +1907,225 @@ void xu_dump_txring (CTLR* xu)
 
 t_stat xu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
-fprintf (st, "DELUA/DEUNA Unibus Ethernet Controllers (XU, XUB)\n\n");
-fprintf (st, "The simulator implements two DELUA/DEUNA Unibus Ethernet controllers (XU, XUB).\n");
-fprintf (st, "Initially, both XU and XQB are disabled.  Options allow control of the MAC\n");
-fprintf (st, "address and the controller type.\n\n");
-fprint_set_help (st, dptr);
-fprintf (st, "\nConfigured options and controller state can be displayed with:\n\n");
-fprint_show_help (st, dptr);
-fprintf (st, "\nMAC address octets must be delimited by dashes, colons or periods.\n");
-fprintf (st, "The controller defaults to a relatively unique MAC address in the range\n");
-fprintf (st, "08-00-2B-00-00-00 thru 08-00-2B-FF-FF-FF, which should be sufficient\n");
-fprintf (st, "for most network environments.  If desired, the simulated MAC address\n");
-fprintf (st, "can be directly set.\n");
-fprintf (st, "To access the network, the simulated Ethernet controller must be attached to a\n");
-fprintf (st, "real Ethernet interface.\n\n");
-eth_attach_help(st, dptr, uptr, flag, cptr);
-fprintf (st, "One final note: because of its asynchronous nature, the XU controller is not\n");
-fprintf (st, "limited to the ~1.5Mbit/sec of the real DEUNA/DELUA controllers, nor the\n");
-fprintf (st, "10Mbit/sec of a standard Ethernet.  Attach it to a Fast or Gigabit Ethernet\n");
-fprintf (st, "card, and \"Feel the Power!\" :-)\n");
-return SCPE_OK;
+const char helpString[] =
+ /* The '*'s in the next line represent the standard text width of a help line */
+     /****************************************************************************/
+//  " The %1s is a communication subsystem which consists of a microprocessor\n"
+    " The DELUA/DEUNA Unibus Ethernet Controller (XU, XUB) devices interface\n"
+    " the %S processors to an Ethernet Local Area Network (LAN).\n"
+    "\n"
+#ifdef VM_PDP11
+    " The controllers are compatible with both 18- and 22-bit Unibus backplanes.\n"
+    "\n"
+#endif
+    " The simulator implements two DELUA/DEUNA  Unibus Ethernet controllers\n"
+    " (XU, XUB).  Initially, both XU and XUB are disabled.\n"
+    "1 Hardware Description\n"
+    " The %D conforms to the Ethernet 2.0 specification performing the\n"
+    " data link layer functions, and part of the physical layer functions.\n"
+    "2 Models\n"
+    "3 DEUNA\n"
+    " A DEUNA is comprised of a M7793 and a M7793 Unibus hex-height modules.\n"
+    " Both of which must be pluged into adjacent slots in a Unibus backplane.\n"
+    "3 DELUA\n"
+    " A M7521 Unibus Module.  The DELUA module is a hex-height module which\n"
+    " plugs directly into the Unibus backplane.\n"
+    "2 $Registers\n"
+    "\n"
+    " These registers contain the emulated state of the device.  These values\n"
+    " don't necessarily relate to any detail of the original device being\n"
+    " emulated but are merely internal details of the emulation.\n"
+    "1 Configuration\n"
+    " A %D device is configured with various SET and ATTACH commands\n"
+     /****************************************************************************/
+    "2 $Set commands\n"
+    "3 MAC\n"
+    " The MAC address of the controller is the Hardware MAC address which on\n"
+    " real hardware is uniquely assigned by the factory.  Each LAN device on a\n"
+    " network must have unique MAC addresses for proper operation.\n"
+    "\n"
+    "+sim> SET %D MAC=<mac-address>\n"
+    "\n"
+    " A Valid MAC address is comprised of 6 pairs of hex digits delimited by\n"
+    " dashes, colons or period characters.\n"
+    "\n"
+    " The default MAC address for the %D device is set to a value in the range\n"
+    " from 08-00-2B-00-00-00 thru 08-00-2B-FF-FF-FF.\n"
+    "\n"
+    " The SET MAC command must be done before the %D device is attached to a\n"
+    " network.\n"
+    "4 Generated MAC\n"
+    " Support exists to provide a way to dynamically generate relatively\n"
+    " unique MAC addresses and to provide a way to save generated addresses\n"
+    " for subsequent reuse in later simulator invocations.\n"
+    "\n"
+    "+sim> SET XQ MAC=AA:BB:CC:DD:EE:FF{/bits}{>filespec}\n"
+    "\n"
+    " where:\n"
+    "+1.  All of the AA:BB:CC:DD:EE:FF values must be hex digits\n"
+    "+2.  bits is the number of bits which are to be taken from the\n"
+    "++  supplied MAC aa:bb:cc:dd:ee:ff with legal values from 16\n"
+    "++  to 48 and a default of 48 bits.\n"
+    "+3.  filespec specifies a file which contains the MAC address\n"
+    "++  to be used and if it doesn't exist an appropriate generated\n"
+    "++  address will be stored in this file and a subsequent SET MAC\n"
+    "++  invocation specifying the same file will use the value stored\n"
+    "++  in the file rather than generating a new MAC.\n"
+    "3 Type\n"
+    " The type of device being emulated can be changed with the following\n"
+    " command:\n"
+    "\n"
+    "+sim> SET %D TYPE={DEUNA|DELUA}\n"
+    "\n"
+    " A SET TYPE command should be entered before the device is attached.\n"
+     /****************************************************************************/
+    "3 THROTTLE\n"
+    " The faster network operation of a simulated DELQA-T/DELQA/DEQNA device\n"
+    " might be too fast to interact with real PDP11 or VAX systems running on\n"
+    " the same LAN.\n"
+    " Traffic from the simulated device can easily push the real hardware\n"
+    " harder than it ever would have seen historically.  The net result can\n"
+    " be excessive packet loss due to various over-run conditions.  To support\n"
+    " interoperation of simulated systems with legacy hardware, the simulated\n"
+    " system can explictly be configured to throttle back the traffic it puts\n"
+    " on the wire.\n"
+    "\n"
+    " Throttling is configured with the SET XQ THROTTLE commands:\n"
+    "\n"
+    "+sim> SET XQ THROTTLE=DISABLE\n"
+    "+sim> SET XQ THROTTLE=ON\n"
+    "+sim> SET XQ THROTTLE=TIME=n;BURST=p;DELAY=t\n"
+    "\n"
+    " TIME specifies the number of milliseconds between successive packet\n"
+    " transmissions which will trigger throttling.\n"
+    " BURST specifies the number of successive packets which each are less than\n"
+    " the TIME gap that will cause a delay in sending subsequent packets.\n"
+    " DELAY specifies the number of milliseconds which a throttled packet will\n"
+    " be delayed prior to its transmission.\n"
+    "\n"
+     /****************************************************************************/
+    "2 Attach\n"
+    " The device must be attached to a LAN device to communicate with systems\n"
+    " on that LAN\n"
+    "\n"
+    "+sim> SHOW %D ETH\n"
+    "+ETH devices:\n"
+#if defined(_WIN32)
+    "+ eth0   \\Device\\NPF_{A6F81789-B849-4220-B09B-19760D401A38} (Local Area Connection)\n"
+    "+ eth1   udp:sourceport:remotehost:remoteport               (Integrated UDP bridge support)\n"
+    "+sim> ATTACH %D eth0\n"
+#else
+    "+ eth0   en0      (No description available)\n"
+    "+ eth1   tap:tapN (Integrated Tun/Tap support)\n"
+    "+ eth2   udp:sourceport:remotehost:remoteport               (Integrated UDP bridge support)\n"
+    "+sim> ATTACH %D eth0\n"
+    "+sim> ATTACH %D en0\n"
+#endif
+    "+sim> ATTACH %D udp:1234:remote.host.com:1234\n"
+    "\n"
+    "2 Examples\n\n"
+    " Given a simulator that only wants to talk IP to the outside world use\n"
+    " the following example:\n"
+    " \n"
+    "+sim> ATTACH %D NAT:\n"
+    " \n"
+    " Given a simulator that only wants to talk IP but also wants to allow\n"
+    " incoming telnet use the following example:\n"
+    " \n"
+    "+sim> ATTACH %D NAT:tcp=2323:10.0.2.15:23\n"
+    " \n"
+    " This allows connections to host port 2323 to reach port 23 on the\n"
+    " simulated which is configured with IP Address 10.0.2.15\n"
+    "\n"
+    " Given a simulator that only wants to talk IP but also wants to allow\n"
+    " incoming telnet and ftp use the following example:\n"
+    " \n"
+    "+sim> ATTACH %D NAT:tcp=2323:10.0.2.15:23,tcp=2121:10.0.2.15:21\n"
+    " \n"
+    " This allows connections to host port 2323 to reach port 23 on the\n"
+    " simulated which is configured with IP Address 10.0.2.15 and connections\n"
+    " to host port 2121 to reach port 21 on the simulated system.\n"
+    "\n"
+    "1 Monitoring\n"
+    " The %D device configuration and state can be displayed with one of the\n"
+    " available show commands.\n"
+    "2 $Show commands\n"
+    "1 Debugging\n"
+    " The simulator has a number of debug options, these are:\n"
+    "\n"
+    "++TRACE   Shows detailed routine calls.\n"
+    "++WARN    Shows warnings.\n"
+    "++REG     Shows all device register programatic read/write activity\n"
+    "++PACKET  Shows packet headers.\n"
+    "++DATA    Shows packet data.\n"
+    "++ETH     Shows ethernet device details.\n"
+    "\n"
+    " To get a full trace use\n"
+    "\n"
+    "+sim> SET %D DEBUG\n"
+    "\n"
+     /****************************************************************************/
+    "1 Dependencies\n"
+#if defined(_WIN32)
+    " The NPcap or WinPcap package must be installed in order to enable\n"
+    " communication with other computers on the local LAN.\n"
+    "\n"
+    " The NPcap package is available from https://github.com/nmap/npcap\n"
+    " The WinPcap package is available from http://www.winpcap.org/\n"
+#else
+    " To build simulators with the ability to communicate to other computers\n"
+    " on the local LAN, the libpcap development package must be installed on\n"
+    " the system which builds the simulator.\n"
+    "\n"
+#if defined(__APPLE__)
+#else
+#if defined(__linux__)
+#else
+#endif
+#endif
+#endif
+    "1 Privileges Required\n"
+#if defined(_WIN32)
+    " Windows systems can attach the simulated %D device to the local LAN\n"
+    " network interface without any special privileges as long as the\n"
+    " WinPcap package has been previously installed on the host system.\n"
+#else
+    " Linux, MacOS and most other Unix like systems require root privilege\n"
+    " to access network interfaces on the host system.\n"
+#endif
+    "1 Host Computer Communications\n"
+#if defined(_WIN32)
+    " On Windows using the WinPcap interface, the simulated %D device\n"
+    " can be used to communicate with the host computer on the same LAN\n"
+    " which it is attached to.\n"
+#else
+#endif
+     /****************************************************************************/
+    "1 Performance\n"
+    " On modern host systems and networks, the simulated DEUNA/DELUA\n"
+    " device can easily move data at more than 20Mbits per second.\n"
+    " Real DEUNA/DELUA hardware rarely exceeded more than 1.5Mbits/second\n"
+    "\n"
+    " Due to this significant speed mismatch, there can be issues when\n"
+    " simulated systems attempt to communicate with real PDP11 and VAX systems\n"
+    " on the LAN.  See SET %D THROTTLE to help accommodate such communications\n"
+    " HELP %D CONF SET THROTTLE\n"
+    "1 Related Devices\n"
+    " The %D can facilitate communication with other simh simulators which\n"
+    " have emulated Ethernet devices available as well as real systems that\n"
+    " are directly connected to the LAN.\n"
+    "\n"
+    " The other simulated Ethernet devices include:\n"
+    "\n"
+    "++DEQNA/DELQA  Qbus PDP11 and VAX simulators\n"
+    "++XS           VAX simulators\n"
+    "++NI           AT&T 3b2 simulator\n"
+    "++NIA-20       KL10 simulator\n"
+    "\n"
+    ;
+return scp_help (st, dptr, uptr, flag, helpString, cptr);
 }
+
 
 const char *xu_description (DEVICE *dptr)
 {
