@@ -6480,6 +6480,8 @@ const char *cpp = "";
 const char *build = "";
 const char *arch = "";
 
+#define S_xstr(a) S_str(a)
+#define S_str(a) #a
 if (cptr && (*cptr != 0))
     return SCPE_2MARG;
 sprintf (vmaj_s, "%d", vmaj);
@@ -6499,8 +6501,14 @@ if (vdelt) {
     fprintf (st, " delta %d", vdelt);
     }
 #if defined (SIM_VERSION_MODE)
-fprintf (st, " %s", SIM_VERSION_MODE);
-setenv ("SIM_VERSION_MODE", SIM_VERSION_MODE, 1);
+if (1) {
+    char mode[] = S_xstr(SIM_VERSION_MODE);
+
+    if (NULL != strchr (mode, '\"'))                /* Quoted String? */
+        strlcpy (mode, mode + 1, strlen (mode) - 1);/* strip quotes */
+    fprintf (st, " %s", mode);
+    setenv ("SIM_VERSION_MODE", mode, 1);
+    }
 #endif
 if (flag) {
     t_bool idle_capable;
@@ -6544,11 +6552,7 @@ if (flag) {
 #elif defined (__DECC_VER)
     fprintf (st, "\n        Compiler: DEC C %c%d.%d-%03d", ("T SV")[((__DECC_VER/10000)%10)-6], __DECC_VER/10000000, (__DECC_VER/100000)%100, __DECC_VER%10000);
 #elif defined (SIM_COMPILER)
-#define S_xstr(a) S_str(a)
-#define S_str(a) #a
     fprintf (st, "\n        Compiler: %s", S_xstr(SIM_COMPILER));
-#undef S_str
-#undef S_xstr
 #endif
 #if defined(__GNUC__)
 #if defined(__OPTIMIZE__)
@@ -6577,19 +6581,11 @@ if (flag) {
 #if !defined (SIM_BUILD_OS)
     fprintf (st, "\n        Simulator Compiled as %s%s%s on %s at %s", cpp, arch, build, __DATE__, __TIME__);
 #else
-#define S_xstr(a) S_str(a)
-#define S_str(a) #a
     fprintf (st, "\n        Simulator Compiled as %s%s%s on %s at %s %s", cpp, arch, build, __DATE__, __TIME__, S_xstr(SIM_BUILD_OS));
-#undef S_str
-#undef S_xstr
 #endif
 #endif
 #if defined (SIM_BUILD_TOOL)
-#define S_xstr(a) S_str(a)
-#define S_str(a) #a
     fprintf (st, "\n        Build Tool: %s", S_xstr(SIM_BUILD_TOOL));
-#undef S_str
-#undef S_xstr
 #else
     fprintf (st, "\n        Build Tool: undefined (probably cmake)");
 #endif
@@ -6692,8 +6688,6 @@ if (flag) {
     setenv ("SIM_OSTYPE", os_type, 1);
     }
 #if defined(SIM_ARCHIVE_GIT_COMMIT_ID)
-#define S_xstr(a) S_str(a)
-#define S_str(a) #a
 if (NULL == strchr (S_xstr(SIM_ARCHIVE_GIT_COMMIT_ID), '$')) {
     const char *extras = strchr (S_xstr(SIM_ARCHIVE_GIT_COMMIT_ID), '+');
 
@@ -6707,12 +6701,8 @@ if (NULL == strchr (S_xstr(SIM_ARCHIVE_GIT_COMMIT_TIME), '$')) {
         fprintf (st, "%ssimh git commit time: %s", "\n        ", S_xstr(SIM_ARCHIVE_GIT_COMMIT_TIME));
     }
 #endif
-#undef S_str
-#undef S_xstr
 #endif
 #if defined(SIM_GIT_COMMIT_ID)
-#define S_xstr(a) S_str(a)
-#define S_str(a) #a
 if (1) {
     const char *extras = strchr (S_xstr(SIM_GIT_COMMIT_ID), '+');
 
@@ -6724,19 +6714,15 @@ setenv ("SIM_GIT_COMMIT_TIME", S_xstr(SIM_GIT_COMMIT_TIME), 1);
 if (flag)
     fprintf (st, "%sgit commit time: %s", "\n        ", S_xstr(SIM_GIT_COMMIT_TIME));
 #endif
-#undef S_str
-#undef S_xstr
 #endif
 #if defined(SIM_BUILD)
-#define S_xstr(a) S_str(a)
-#define S_str(a) #a
 fprintf (st, "%sBuild: %s", flag ? "\n        " : "        ", S_xstr(SIM_BUILD));
-#undef S_str
-#undef S_xstr
 #endif
 fprintf (st, "\n");
 if (sim_vm_release_message != NULL)                    /* if a release message string is defined */
     fprintf (st, "\n%s", sim_vm_release_message);      /*   then display it */
+#undef S_str
+#undef S_xstr
 return SCPE_OK;
 }
 
