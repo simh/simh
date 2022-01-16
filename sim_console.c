@@ -2897,8 +2897,10 @@ if (!sim_rem_master_mode) {
         }
     }
 tmxr_poll_rx (&sim_con_tmxr);                               /* poll for input */
-if ((c = (t_stat)tmxr_getc_ln (&sim_con_ldsc)))             /* any char? */ 
+if ((c = (t_stat)tmxr_getc_ln (&sim_con_ldsc))) {           /* any char? */ 
+    sim_debug (DBG_RCV, &sim_con_telnet, "sim_poll_kbd() tmxr_getc_ln() returning: '%c' (0x%02X)\n", sim_isprint (c & 0xFF) ? c & 0xFF : '.', c);
     return (c & (SCPE_BREAK | 0377)) | SCPE_KFLAG;
+    }
 return SCPE_OK;
 }
 
