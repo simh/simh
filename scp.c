@@ -6504,8 +6504,10 @@ if (vdelt) {
 if (1) {
     char mode[] = S_xstr(SIM_VERSION_MODE);
 
-    if (NULL != strchr (mode, '\"'))                /* Quoted String? */
-        strlcpy (mode, mode + 1, strlen (mode) - 1);/* strip quotes */
+	if (NULL != strchr (mode, '\"')) {              /* Quoted String? */
+		mode[strlen (mode) - 1] = '\0';				/* strip quotes */
+		memmove (mode, mode + 1, strlen (mode));
+		}
     fprintf (st, " %s", mode);
     setenv ("SIM_VERSION_MODE", mode, 1);
     }
