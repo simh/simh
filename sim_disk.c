@@ -102,7 +102,9 @@ struct simh_disk_footer {
     uint8       FooterVersion;          /* Initially 0 */
 #define FOOTER_VERSION  0
     uint8       AccessFormat;           /* 1 - SIMH, 2 - RAW */
-    uint8       Reserved[382];          /* Currently unused */
+    uint8       Reserved[370];          /* Currently unused */
+    uint32      PriorSize[2];           /* Prior Size before footer addition */
+    uint32      Unused;                 /* Currently unused */
     uint32      Checksum;               /* CRC32 of the prior 508 bytes */
     };
 
@@ -2259,6 +2261,7 @@ struct stat statb;
 struct simh_disk_footer *f;
 time_t now = time (NULL);
 t_offset total_sectors;
+t_offset prior_size;
 
 if ((dptr = find_dev_from_unit (uptr)) == NULL)
     return SCPE_NOATT;
@@ -2279,6 +2282,9 @@ f->SectorCount = NtoHl ((uint32)total_sectors);
 f->TransferElementSize = NtoHl (ctx->xfer_element_size);
 memset (f->CreationTime, 0, sizeof (f->CreationTime));
 strlcpy ((char*)f->CreationTime, ctime (&now), sizeof (f->CreationTime));
+prior_size = sim_fsize_name_ex (uptr->filename);
+f->PriorSize[0] = NtoHl ((uint32)(prior_size >> 32));
+f->PriorSize[1] = NtoHl ((uint32)(prior_size & 0xFFFFFFFF));
 f->Checksum = NtoHl (eth_crc32 (0, f, sizeof (*f) - sizeof (f->Checksum)));
 free (ctx->footer);
 ctx->footer = f;
@@ -6107,12 +6113,15 @@ if (info->flag) {        /* zap type */
             uint8 *sector_data;
             uint8 *zero_sector;
             size_t sector_size = NtoHl (f->SectorSize);
+            t_offset prior_size = (((t_offset)NtoHl (f->PriorSize[0])) << 32) | ((t_offset)NtoHl (f->PriorSize[1]));
 
+            /* determine whole sectors in original size */
+            prior_size = (prior_size + (sector_size - 1)) & (~(t_offset)(sector_size - 1));
             sector_data = (uint8 *)malloc (sector_size * sizeof (*sector_data));
             zero_sector = (uint8 *)calloc (sector_size, sizeof (*sector_data));
-            /* Chop off the disk footer and trailing zero sectors */
+            /* Chop off the disk footer and trailing zero sectors added since the footer was appended */
             container_size -= sizeof (*f);
-            while ((sim_switches & SWMASK ('Z')) && (container_size > 0)) {
+            while (container_size > prior_size) {
                 if ((sim_fseeko (container, container_size - sector_size, SEEK_SET) != 0) ||
                     (sector_size != sim_fread (sector_data, 1, sector_size, container))   ||
                     (0 != memcmp (sector_data, zero_sector, sector_size)))
