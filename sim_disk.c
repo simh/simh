@@ -543,7 +543,7 @@ return filesystem_size;
 t_stat sim_disk_set_async (UNIT *uptr, int latency)
 {
 #if !defined(SIM_ASYNCH_IO)
-char *msg = "Disk: can't operate asynchronously\r\n";
+char *msg = "Disk: cannot operate asynchronously\r\n";
 sim_printf ("%s", msg);
 return SCPE_NOFNC;
 #else
@@ -2878,7 +2878,7 @@ if (container_size && (container_size != (t_offset)-1)) {
             }
             else {
                 if (!created) {
-                    sim_messagef (SCPE_OK, "%s: No File System found on '%s', skipping autosizing\n", sim_uname (uptr), cptr);
+                    sim_messagef (SCPE_OK, "%s: Amount of data in use in disk container '%s' cannot be determined, skipping autosizing\n", sim_uname (uptr), cptr);
                     if (container_size > current_unit_size) {
                         if (!sim_quiet) {
                             uptr->capac = (t_addr)(container_size/(ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? ctx->sector_size : 1)));
@@ -6072,6 +6072,63 @@ typedef struct {
     int32 flag;
     } DISK_INFO_CTX;
 
+static t_bool sim_disk_check_attached_container (const char *filename)
+{
+DEVICE *dptr;
+UNIT *uptr;
+uint32 i, j;
+struct stat filestat;
+char *fullname;
+
+errno = 0;
+if (sim_stat (filename, &filestat))
+    return TRUE;
+fullname = sim_filepath_parts (filename, "f");
+if (fullname == NULL)
+    return TRUE;                                        /* can't expand path assume attached */
+
+for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru dev */
+    if (0 == (dptr->flags & DEV_DISK))
+        continue;                                       /* Only interested in disk devices */
+    for (j = 0; j < dptr->numunits; j++) {              /* loop thru units */
+        uptr = (dptr->units) + j;
+        if (uptr->flags & UNIT_ATT) {                   /* attached? */
+            struct stat statb;
+            char *fullpath;
+
+            errno = 0;
+            fullpath = sim_filepath_parts (uptr->filename, "f");
+            if (fullpath == NULL)
+                continue;
+            if (0 != strcasecmp (fullname, fullpath)) {
+                free (fullpath);
+                continue;
+                }
+            if (sim_stat (fullpath, &statb)) {
+                free (fullpath);
+                free (fullname);
+                return TRUE;                            /* can't stat assume attached */
+                }
+            free (fullpath);
+            if ((statb.st_dev   != filestat.st_dev)   || 
+                (statb.st_ino   != filestat.st_ino)   ||
+                (statb.st_mode  != filestat.st_mode)  ||
+                (statb.st_nlink != filestat.st_nlink) ||
+                (statb.st_uid   != filestat.st_uid)   ||
+                (statb.st_gid   != filestat.st_gid)   ||
+                (statb.st_atime != filestat.st_atime) ||
+                (statb.st_mtime != filestat.st_mtime) ||
+                (statb.st_ctime != filestat.st_ctime))
+                continue;
+            free (fullname);
+            return TRUE;                                /* file currently attached */
+            }
+        }
+    }
+free (fullname);
+return FALSE;                                           /* Not attached */
+}
+
 static void sim_disk_info_entry (const char *directory, 
                                  const char *filename,
                                  t_offset FileSize,
@@ -6089,10 +6146,15 @@ sprintf (FullPath, "%s%s", directory, filename);
 
 if (info->flag) {        /* zap type */
     struct stat statb;
+
+    if (sim_disk_check_attached_container (FullPath)) {
+        info->stat = sim_messagef (SCPE_ALATT, "Cannot ZAP an attached disk container: %s\n", FullPath);
+        return;
+        }
     container = sim_vhd_disk_open (FullPath, "r");
     if (container != NULL) {
         sim_vhd_disk_close (container);
-        info->stat = sim_messagef (SCPE_OPENERR, "Cannot change the disk type of a VHD container file\n");
+        info->stat = sim_messagef (SCPE_OPENERR, "Cannot change the disk type of a VHD container file: %s\n", FullPath);
         return;
         }
     if (sim_stat (FullPath, &statb)) {
@@ -6115,11 +6177,13 @@ if (info->flag) {        /* zap type */
             size_t sector_size = NtoHl (f->SectorSize);
             t_offset prior_size = (((t_offset)NtoHl (f->PriorSize[0])) << 32) | ((t_offset)NtoHl (f->PriorSize[1]));
 
-            /* determine whole sectors in original size */
+            /* determine whole sectors in original container size */
+            /* By default we chop off the disk footer and trailing zero sectors added since the footer was appended */
             prior_size = (prior_size + (sector_size - 1)) & (~(t_offset)(sector_size - 1));
+            if (sim_switches & SWMASK ('Z'))    /* Unless -Z switch specified */
+                prior_size = 0;                 /* then removes all trailing zero sectors */
             sector_data = (uint8 *)malloc (sector_size * sizeof (*sector_data));
             zero_sector = (uint8 *)calloc (sector_size, sizeof (*sector_data));
-            /* Chop off the disk footer and trailing zero sectors added since the footer was appended */
             container_size -= sizeof (*f);
             while (container_size > prior_size) {
                 if ((sim_fseeko (container, container_size - sector_size, SEEK_SET) != 0) ||
