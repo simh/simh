@@ -1654,6 +1654,7 @@ if (!mp->port_speed_control && mp->uptr && !(mp->uptr->flags & UNIT_ATT))
 mp->port_speed_control = TRUE;
 for (i=0; i<mp->lines; ++i)
     mp->ldsc[i].port_speed_control = mp->port_speed_control;
+sim_debug (TMXR_DBG_CFG, mp->dptr, "Speed Mode: Enabled\n");
 return SCPE_OK;
 }
 
@@ -1672,6 +1673,7 @@ if (mp->port_speed_control && mp->uptr && !(mp->uptr->flags & UNIT_ATT))
 mp->port_speed_control = FALSE;
 for (i=0; i<mp->lines; ++i)
     mp->ldsc[i].port_speed_control = mp->port_speed_control;
+sim_debug (TMXR_DBG_CFG, mp->dptr, "Speed Mode: Disabled\n");
 return SCPE_OK;
 }
 
@@ -1690,6 +1692,7 @@ if (mp->uptr && !(mp->uptr->flags & UNIT_ATT))
 if (line >= mp->lines)
     return sim_messagef (SCPE_ARG, "Invalid line for multiplexer: %d\n", line);
 mp->ldsc[line].port_speed_control = TRUE;
+sim_debug (TMXR_DBG_CFG, mp->dptr, "Speed Mode: Enabled for line %d\n", line);
 return SCPE_OK;
 }
 
@@ -1706,6 +1709,7 @@ if (mp->uptr && !(mp->uptr->flags & UNIT_ATT))
 if (line >= mp->lines)
     return sim_messagef (SCPE_ARG, "Invalid line for multiplexer: %d\n", line);
 mp->ldsc[line].port_speed_control = FALSE;
+sim_debug (TMXR_DBG_CFG, mp->dptr, "Speed Mode: Disabled for line %d\n", line);
 return SCPE_OK;
 }
 
@@ -1913,6 +1917,8 @@ return SCPE_INCOMP;
 */
 t_stat tmxr_set_line_loopback (TMLN *lp, t_bool enable_loopback)
 {
+DEVICE *dptr = (lp->dptr ? lp->dptr : (lp->mp ? lp->mp->dptr : NULL));
+
 if (lp->loopback == (enable_loopback != FALSE))
     return SCPE_OK;                 /* Nothing to do */
 lp->loopback = (enable_loopback != FALSE);
@@ -1928,6 +1934,7 @@ else {
     lp->lpb = NULL;
     lp->lpbsz = 0;
     }
+sim_debug (TMXR_DBG_CFG, dptr, "Loopback %s for line %d\n", enable_loopback ? "Enabled" : "Disabled", (int)(lp - lp->mp->ldsc));
 return SCPE_OK;
 }
 
@@ -1952,9 +1959,12 @@ return (lp->loopback != FALSE);
 */
 t_stat tmxr_set_line_halfduplex (TMLN *lp, t_bool enable_halfduplex)
 {
+DEVICE *dptr = (lp->dptr ? lp->dptr : (lp->mp ? lp->mp->dptr : NULL));
+
 if (lp->halfduplex == (enable_halfduplex != FALSE))
     return SCPE_OK;                 /* Nothing to do */
 lp->halfduplex = (enable_halfduplex != FALSE);
+sim_debug (TMXR_DBG_CFG, dptr, "Half Duplex %s for line %d\n", enable_halfduplex ? "Enabled" : "Disabled", (int)(lp - lp->mp->ldsc));
 return SCPE_OK;
 }
 
@@ -1966,6 +1976,8 @@ return (lp->halfduplex != FALSE);
 t_stat tmxr_set_config_line (TMLN *lp, CONST char *config)
 {
 t_stat r;
+DEVICE *dptr = (lp->dptr ? lp->dptr : (lp->mp ? lp->mp->dptr : NULL));
+char *prior = lp->serconfig ? strdup (lp->serconfig) : NULL;
 
 tmxr_debug_trace_line (lp, "tmxr_set_config_line()");
 if (lp->serport) {
@@ -1982,6 +1994,8 @@ else {
         lp->serconfig = NULL;
         }
     }
+sim_debug (TMXR_DBG_CFG, dptr, "Line %d changed from %s to %s\n", (int)(lp - lp->mp->ldsc), prior ? prior : "", lp->serconfig);
+free (prior);
 if ((r == SCPE_OK) && (lp->mp) && (lp->mp->uptr))   /* Record port state for proper restore */
     lp->mp->uptr->filename = tmxr_mux_attach_string (lp->mp->uptr->filename, lp->mp);
 return r;

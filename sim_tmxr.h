@@ -66,10 +66,11 @@ typedef struct SERPORT *SERHANDLE;
 #define TMXR_MODEM_RING_TIME 3                          /* seconds to wait for DTR for incoming connections */
 #define TMXR_DEFAULT_CONNECT_POLL_INTERVAL 1            /* seconds between connection polls */
 
-#define TMXR_DBG_XMT    0x00200000                       /* Debug Transmit Data */
-#define TMXR_DBG_RCV    0x00400000                       /* Debug Received Data */
-#define TMXR_DBG_RET    0x00800000                       /* Debug Returned Received Data */
-#define TMXR_DBG_MDM    0x01000000                       /* Debug Modem Signals */
+#define TMXR_DBG_XMT    0x00100000                       /* Debug Transmit Data */
+#define TMXR_DBG_RCV    0x00200000                       /* Debug Received Data */
+#define TMXR_DBG_RET    0x00400000                       /* Debug Returned Received Data */
+#define TMXR_DBG_MDM    0x00800000                       /* Debug Modem Signals */
+#define TMXR_DBG_CFG    0x01000000                       /* Debug Line Configuration Activities */
 #define TMXR_DBG_CON    0x02000000                       /* Debug Connection Activities */
 #define TMXR_DBG_ASY    0x04000000                       /* Debug Asynchronous Activities */
 #define TMXR_DBG_TRC    0x08000000                       /* Debug trace routine calls */
