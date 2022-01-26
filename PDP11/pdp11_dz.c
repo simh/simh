@@ -243,6 +243,7 @@ TMXR dz_desc = { 0, 0, 0, NULL };                       /* mux descriptor */
 #define DBG_RCV  TMXR_DBG_RCV                           /* display Received Data */
 #define DBG_RET  TMXR_DBG_RET                           /* display Read Data */
 #define DBG_MDM  TMXR_DBG_MDM                           /* display Modem Signals */
+#define DBG_CFG  TMXR_DBG_CFG                           /* display Line Configuration Changes */
 #define DBG_CON  TMXR_DBG_CON                           /* display connection activities */
 #define DBG_TRC  TMXR_DBG_TRC                           /* display trace routine calls */
 #define DBG_ASY  TMXR_DBG_ASY                           /* display Asynchronous Activities */
@@ -254,6 +255,7 @@ DEBTAB dz_debug[] = {
   {"RCV",    DBG_RCV, "Received Data"},
   {"RET",    DBG_RET, "Read Data"},
   {"MDM",    DBG_MDM, "Modem Signals"},
+  {"CFG",    DBG_CFG, "Line Configuration Changes"},
   {"CON",    DBG_CON, "connection activities"},
   {"TRC",    DBG_TRC, "trace routine calls"},
   {"ASY",    DBG_ASY, "Asynchronous Activities"},
