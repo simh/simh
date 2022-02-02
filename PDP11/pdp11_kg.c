@@ -342,6 +342,7 @@ static t_stat kg_wr (int32 data, int32 PA, int32 access)
                 fprintf (sim_deb, ">>KG%d: wr DR %06o, data %06o, PC %06o\n",
                          unit, kg_unit[unit].DR, data, PC);
             kg_unit[unit].SR &= ~KGSR_M_DONE;
+            kg_unit[unit].PULSCNT = 0;
 
 /* In a typical device, this is normally where we would use sim_activate()
    to initiate an I/O to be completed later.  The KG is a little
