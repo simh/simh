@@ -3183,7 +3183,7 @@ const char helpString[] =
     " data link layer functions, and part of the physical layer functions.\n"
     "2 Models\n"
     "3 DEQNA\n"
-    " A M7504 Qbus Module.  The DELQA module is a dual-height module which\n"
+    " A M7504 Qbus Module.  The DEQNA module is a dual-height module which\n"
     " plugs directly into the Qbus backplane.\n"
     "3 DELQA\n"
     " A M7516 Qbus Module.  The DELQA module is a dual-height module which\n"
@@ -3399,6 +3399,8 @@ const char helpString[] =
     " network interface without any special privileges as long as the\n"
     " WinPcap package has been previously installed on the host system.\n"
 #else
+    " Linux, MacOS and most other Unix like systems require root privilege\n"
+    " to access network interfaces on the host system.\n"
 #endif
     "1 Host Computer Communications\n"
 #if defined(_WIN32)
