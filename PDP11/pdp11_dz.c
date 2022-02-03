@@ -841,6 +841,12 @@ if (sim_switches & SWMASK ('M')) {                      /* modem control? */
     }
 
 for (dz = 0; dz < dz_desc.lines/DZ_LINES; dz++) {
+    for (muxln = 0; muxln < DZ_LINES; muxln++) {
+        TMLN *lp = &dz_ldsc[(dz * DZ_LINES) + muxln];
+
+		if (lp->serconfig)
+            tmxr_set_config_line (lp, lp->serconfig);	/* make settings consistent */
+        }
     if (!dz_mctl || (0 == (dz_csr[dz] & CSR_MSE)))      /* enabled? */
         continue;
     for (muxln = 0; muxln < DZ_LINES; muxln++) {
@@ -858,10 +864,19 @@ return SCPE_OK;
 
 t_stat dz_detach (UNIT *uptr)
 {
+int32 dz, muxln;
 t_stat r = tmxr_detach (&dz_desc, uptr);
 
 dz_mctl = dz_auto = 0;                                  /* modem ctl off */
 tmxr_clear_modem_control_passthru (&dz_desc);
+for (dz = 0; dz < dz_desc.lines/DZ_LINES; dz++) {
+    for (muxln = 0; muxln < DZ_LINES; muxln++) {
+        TMLN *lp = &dz_ldsc[(dz * DZ_LINES) + muxln];
+
+		free (lp->serconfig);
+		lp->serconfig = NULL;
+        }
+	}
 return r;
 }
 
