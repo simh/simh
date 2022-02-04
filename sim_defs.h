@@ -986,6 +986,7 @@ struct MEMFILE {
 /* Hidden Blob of Data - Only used for SAVE/RESTORE */
 #define SAVEDATA(nm,loc) \
     _REGDATANF(#nm,&(loc),0,8,0,1,NULL,NULL,0,sizeof(loc),sizeof(loc),SAVEDATA),(REG_HRO)
+#define STARTBIT             {"",  0x00000000, 0,  NULL, NULL}  /* Start at beginning bit */
 #define BIT(nm)              {#nm, 0xffffffff, 1,  NULL, NULL}  /* Single Bit definition */
 #define BITNC                {"",  0xffffffff, 1,  NULL, NULL}  /* Don't care Bit definition */
 #define BITF(nm,sz)          {#nm, 0xffffffff, sz, NULL, NULL}  /* Bit Field definition */
@@ -1073,6 +1074,7 @@ struct MEMFILE {
 /* Hidden Blob of Data - Only used for SAVE/RESTORE */
 #define SAVEDATA(nm,loc) \
     _REGDATANF("nm",&(loc),0,8,0,1,NULL,NULL,0,sizeof(loc),sizeof(loc)),SAVEDATA),(REG_HRO)
+#define STARTBIT             {"",   0x00000000, 0,  NULL, NULL} /* Start at beginning bit */
 #define BIT(nm)              {"nm", 0xffffffff, 1,  NULL, NULL} /* Single Bit definition */
 #define BITNC                {"",   0xffffffff, 1,  NULL, NULL} /* Don't care Bit definition */
 #define BITF(nm,sz)          {"nm", 0xffffffff, sz, NULL, NULL} /* Bit Field definition */

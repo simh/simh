@@ -13607,7 +13607,7 @@ static const char *debtab_nomatch = "DEBTAB_NOMATCH";
 const char *some_match = NULL;
 int32 offset = 0;
 
-if (dptr->debflags == 0)
+if (dptr->debflags == NULL)
     return debtab_none;
 
 dbits &= (dptr->dctrl | (uptr ? uptr->dctrl : 0));/* Look for just the bits that matched */
@@ -13676,6 +13676,8 @@ uint32 value, beforevalue, mask;
 for (fields=offset=0; bitdefs[fields].name; ++fields) {
     if (bitdefs[fields].offset == 0xffffffff)       /* fixup uninitialized offsets */
         bitdefs[fields].offset = offset;
+    else
+        offset = bitdefs[fields].offset;
     offset += bitdefs[fields].width;
     }
 for (i = fields-1; i >= 0; i--) {                   /* print xlation, transition */
@@ -13731,6 +13733,7 @@ if (sim_deb && dptr && (dptr->dctrl & dbits)) {
     sim_oline = saved_oline;                                            /* restore original socket */
     }
 }
+
 void sim_debug_bits(uint32 dbits, DEVICE* dptr, BITFIELD* bitdefs,
     uint32 before, uint32 after, int terminate)
 {
