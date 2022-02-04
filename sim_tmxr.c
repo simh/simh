@@ -916,11 +916,21 @@ tptr = (char *) calloc (1, 1);
 if (tptr == NULL)                                       /* no more mem? */
     return tptr;
 
-if (mp->port)                                           /* copy port */
+if (mp->port) {                                         /* copy port */
     sprintf (growstring(&tptr, 33 + strlen (mp->port)), "%s%s", mp->port, 
                                                                 mp->notelnet ? ";notelnet" : 
                                                                                (mp->nomessage ? ";nomessage" : 
                                                                                                 ""));
+    if (mp->acl) {                                      /* copy acl in pieces */
+        char gbuf[CBUFSIZE];
+        const char *c = mp->acl;
+
+        while (*c != '\0') {
+            c = get_glyph_nc (c, gbuf, ',');
+            sprintf (growstring(&tptr, 9 + strlen (gbuf)), ";%s=%s", (gbuf[0] == '+') ? "Accept" : "Reject", gbuf + 1);
+            }
+        }
+    }
 if (mp->logfiletmpl[0])                                 /* logfile info */
     sprintf (growstring(&tptr, 7 + strlen (mp->logfiletmpl)), ",Log=%s", mp->logfiletmpl);
 if (mp->buffered)
@@ -989,10 +999,20 @@ if (lp->destination || lp->port || lp->txlogname || (lp->conn == TMXR_LINE_DISAB
         sprintf (growstring(&tptr, 8), ",%s", lp->datagram ? "UDP" : "TCP");
     if (lp->mp->packet != lp->packet)
         sprintf (growstring(&tptr, 8), ",Packet");
-    if (lp->port)
+    if (lp->port) {
         sprintf (growstring(&tptr, 32 + strlen (lp->port)), ",%s%s%s", lp->port, 
                                                                        ((lp->mp->notelnet != lp->notelnet) && (!lp->datagram)) ? (lp->notelnet ? ";notelnet" : ";telnet") : "", 
                                                                        ((lp->mp->nomessage != lp->nomessage) && (!lp->datagram)) ? (lp->nomessage ? ";nomessage" : ";message") : "");
+        if (lp->acl) {                                      /* copy acl in pieces */
+            char gbuf[CBUFSIZE];
+            const char *c = lp->acl;
+
+            while (*c != '\0') {
+                c = get_glyph_nc (c, gbuf, ',');
+                sprintf (growstring(&tptr, 9 + strlen (gbuf)), ";%s=%s", (gbuf[0] == '+') ? "Accept" : "Reject", gbuf + 1);
+                }
+            }
+        }
     if (lp->destination) {
         if (lp->serport) {
             char portname[CBUFSIZE];
@@ -1120,93 +1140,105 @@ if (mp->master) {
         i = mp->lines;                                  /* play it safe in case lines == 0 */
         ++mp->sessions;                                 /* count the new session */
 
-        for (j = 0; j < mp->lines; j++, i++) {          /* find next avail line */
-            if (op && (*op >= 0) && (*op < mp->lines))  /* order list present and valid? */
-                i = *op++;                              /* get next line in list to try */
-            else                                        /* no list or not used or range error */
-                i = j;                                  /* get next sequential line */
-
-            lp = mp->ldsc + i;                          /* get pointer to line descriptor */
-            if ((lp->conn == FALSE) &&                  /* is the line available? */
-                (lp->destination == NULL) &&
-                (lp->master == 0) &&
-                (lp->ser_connect_pending == FALSE) &&
-                (lp->modem_control ? ((lp->modembits & TMXR_MDM_DTR) != 0) : TRUE))
-                break;                                  /* yes, so stop search */
+        if (mp->acl) {
+            if (sim_addr_acl_check (address, mp->acl) != 0) {
+                tmxr_debug_connect (mp, "tmxr_poll_conn() - Connection Specifically rejected by ACL");
+                sim_close_sock (newsock);
+                free (address);
+                ++mp->acl_rejected_sessions;
+                }
+            else
+                ++mp->acl_accepted_sessions;
             }
+        else {
+            for (j = 0; j < mp->lines; j++, i++) {          /* find next avail line */
+                if (op && (*op >= 0) && (*op < mp->lines))  /* order list present and valid? */
+                    i = *op++;                              /* get next line in list to try */
+                else                                        /* no list or not used or range error */
+                    i = j;                                  /* get next sequential line */
 
-        if (i >= mp->lines) {                           /* all busy? */
-            int32 ringable_count = 0;
-
-            for (j = 0; j < mp->lines; j++, i++) {      /* find next avail line */
-                lp = mp->ldsc + j;                      /* get pointer to line descriptor */
-                if (lp->framer)
-                    continue;
-                
-                if ((lp->conn == FALSE) &&              /* is the line available? */
+                lp = mp->ldsc + i;                          /* get pointer to line descriptor */
+                if ((lp->conn == FALSE) &&                  /* is the line available? */
                     (lp->destination == NULL) &&
                     (lp->master == 0) &&
                     (lp->ser_connect_pending == FALSE) &&
-                    ((lp->modembits & TMXR_MDM_DTR) == 0)) {
-                    ++ringable_count;
-                    lp->modembits |= TMXR_MDM_RNG;
-                    tmxr_debug_connect_line (lp, "tmxr_poll_conn() - Ringing line");
-                    }
+                    (lp->modem_control ? ((lp->modembits & TMXR_MDM_DTR) != 0) : TRUE))
+                    break;                                  /* yes, so stop search */
                 }
-            if (ringable_count > 0) {
-                ringing = -2;
-                if (mp->ring_start_time == 0) {
-                    mp->ring_start_time = poll_time;
-                    mp->ring_sock = newsock;
-                    mp->ring_ipad = address;
+
+            if (i >= mp->lines) {                           /* all busy? */
+                int32 ringable_count = 0;
+
+                for (j = 0; j < mp->lines; j++, i++) {      /* find next avail line */
+                    lp = mp->ldsc + j;                      /* get pointer to line descriptor */
+                    if (lp->framer)
+                        continue;
+                    
+                    if ((lp->conn == FALSE) &&              /* is the line available? */
+                        (lp->destination == NULL) &&
+                        (lp->master == 0) &&
+                        (lp->ser_connect_pending == FALSE) &&
+                        ((lp->modembits & TMXR_MDM_DTR) == 0)) {
+                        ++ringable_count;
+                        lp->modembits |= TMXR_MDM_RNG;
+                        tmxr_debug_connect_line (lp, "tmxr_poll_conn() - Ringing line");
+                        }
                     }
-                else {
-                    if ((poll_time - mp->ring_start_time) < TMXR_MODEM_RING_TIME*1000) {
+                if (ringable_count > 0) {
+                    ringing = -2;
+                    if (mp->ring_start_time == 0) {
+                        mp->ring_start_time = poll_time;
                         mp->ring_sock = newsock;
                         mp->ring_ipad = address;
                         }
-                    else {                                      /* Timeout waiting for DTR */
-                        int ln;
-
-                        /* turn off pending ring signals */
-                        for (ln = 0; ln < lp->mp->lines; ln++) {
-                            TMLN *tlp = lp->mp->ldsc + ln;
-                            if (((tlp->destination == NULL) && (tlp->master == 0)) &&
-                                (tlp->modembits & TMXR_MDM_RNG) && (tlp->conn == FALSE))
-                                tlp->modembits &= ~TMXR_MDM_RNG;
+                    else {
+                        if ((poll_time - mp->ring_start_time) < TMXR_MODEM_RING_TIME*1000) {
+                            mp->ring_sock = newsock;
+                            mp->ring_ipad = address;
                             }
-                        mp->ring_start_time = 0;
-                        tmxr_msg (newsock, "No answer on any connection\r\n");
-                        tmxr_debug_connect (mp, "tmxr_poll_conn() - No Answer - All connections busy");
-                        sim_close_sock (newsock);
-                        free (address);
+                        else {                                      /* Timeout waiting for DTR */
+                            int ln;
+
+                            /* turn off pending ring signals */
+                            for (ln = 0; ln < lp->mp->lines; ln++) {
+                                TMLN *tlp = lp->mp->ldsc + ln;
+                                if (((tlp->destination == NULL) && (tlp->master == 0)) &&
+                                    (tlp->modembits & TMXR_MDM_RNG) && (tlp->conn == FALSE))
+                                    tlp->modembits &= ~TMXR_MDM_RNG;
+                                }
+                            mp->ring_start_time = 0;
+                            tmxr_msg (newsock, "No answer on any connection\r\n");
+                            tmxr_debug_connect (mp, "tmxr_poll_conn() - No Answer - All connections busy");
+                            sim_close_sock (newsock);
+                            free (address);
+                            }
                         }
+                    }
+                else {
+                    tmxr_msg (newsock, "All connections busy\r\n");
+                    tmxr_debug_connect (mp, "tmxr_poll_conn() - All connections busy");
+                    sim_close_sock (newsock);
+                    free (address);
                     }
                 }
             else {
-                tmxr_msg (newsock, "All connections busy\r\n");
-                tmxr_debug_connect (mp, "tmxr_poll_conn() - All connections busy");
-                sim_close_sock (newsock);
-                free (address);
+                lp = mp->ldsc + i;                          /* get line desc */
+                lp->conn = TRUE;                            /* record connection */
+                lp->sock = newsock;                         /* save socket */
+                lp->ipad = address;                         /* ip address */
+                tmxr_init_line (lp);                        /* init line */
+                lp->notelnet = mp->notelnet;                /* apply mux default telnet setting */
+                lp->nomessage = mp->nomessage;              /* apply mux default telnet setting */
+                if (!lp->notelnet) {
+                    sim_write_sock (newsock, (char *)mantra, sizeof(mantra));
+                    tmxr_debug (TMXR_DBG_XMT, lp, "Sending", (char *)mantra, sizeof(mantra));
+                    lp->telnet_sent_opts = (uint8 *)realloc (lp->telnet_sent_opts, 256);
+                    memset (lp->telnet_sent_opts, 0, 256);
+                    }
+                tmxr_report_connection (mp, lp);
+                lp->cnms = sim_os_msec ();                  /* time of connection */
+                return i;
                 }
-            }
-        else {
-            lp = mp->ldsc + i;                          /* get line desc */
-            lp->conn = TRUE;                            /* record connection */
-            lp->sock = newsock;                         /* save socket */
-            lp->ipad = address;                         /* ip address */
-            tmxr_init_line (lp);                        /* init line */
-            lp->notelnet = mp->notelnet;                /* apply mux default telnet setting */
-            lp->nomessage = mp->nomessage;              /* apply mux default telnet setting */
-            if (!lp->notelnet) {
-                sim_write_sock (newsock, (char *)mantra, sizeof(mantra));
-                tmxr_debug (TMXR_DBG_XMT, lp, "Sending", (char *)mantra, sizeof(mantra));
-                lp->telnet_sent_opts = (uint8 *)realloc (lp->telnet_sent_opts, 256);
-                memset (lp->telnet_sent_opts, 0, 256);
-                }
-            tmxr_report_connection (mp, lp);
-            lp->cnms = sim_os_msec ();                  /* time of connection */
-            return i;
             }
         }                                               /* end if newsock */
     }
@@ -1296,6 +1328,18 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
                         free (peername);
                         ++mp->sessions;                             /* count the new session */
 
+                        if (lp->acl) {                              /* Restrict connection with ACL rules? */
+                            if (sim_addr_acl_check (address, lp->acl) != 0) {
+                                snprintf (msg, sizeof (msg) -1, "tmxr_poll_conn() - ACL Rejecting line connection from: %s", address);
+                                tmxr_debug_connect_line (lp, msg);
+                                sim_close_sock (newsock);
+                                free (address);
+                                ++lp->acl_rejected_sessions;
+                                continue;                               /* Go back for another connection */
+                                }
+                            else
+                                ++lp->acl_accepted_sessions;
+                            }
                         if (lp->destination) {                      /* Virtual Null Modem Cable? */
                             char host[sizeof(msg) - 64];
 
@@ -2858,7 +2902,8 @@ t_stat tmxr_open_master (TMXR *mp, CONST char *cptr)
 int32 i, line, nextline = -1;
 char tbuf[CBUFSIZE], listen[CBUFSIZE], destination[CBUFSIZE], 
      logfiletmpl[CBUFSIZE], buffered[CBUFSIZE], hostport[CBUFSIZE], 
-     port[CBUFSIZE], option[CBUFSIZE], speed[CBUFSIZE], dev_name[CBUFSIZE];
+     port[CBUFSIZE], option[CBUFSIZE], speed[CBUFSIZE], dev_name[CBUFSIZE],
+     acl[CBUFSIZE];
 char framer[CBUFSIZE],fr_eth[CBUFSIZE];
 int num;
 int8 fr_mode;
@@ -2896,6 +2941,7 @@ while (*tptr) {
     memset(destination, '\0', sizeof(destination));
     memset(buffered,    '\0', sizeof(buffered));
     memset(port,        '\0', sizeof(port));
+    memset(acl,         '\0', sizeof(acl));
     memset(option,      '\0', sizeof(option));
     memset(speed,       '\0', sizeof(speed));
     memset(framer,      '\0', sizeof(framer));
@@ -3026,6 +3072,7 @@ while (*tptr) {
             cptr = get_glyph (gbuf, port, ';');
             if (sim_parse_addr (port, NULL, 0, NULL, NULL, 0, NULL, NULL))
                 return sim_messagef (SCPE_ARG, "Invalid Port Specifier: %s\n", port);
+            memset (acl, '\0', sizeof (acl));
             while (cptr && *cptr) {
                 char *tptr = gbuf + (cptr - gbuf);
 
@@ -3041,10 +3088,28 @@ while (*tptr) {
                         else
                             if (0 == MATCH_CMD (tptr, "MESSAGE"))
                                 listennomessage = FALSE;
-                            else {
-                                if (*tptr)
-                                    return sim_messagef (SCPE_ARG, "Invalid Specifier: %s\n", tptr);
-                                }
+                            else
+                                if (0 == memcmp (option, "ACCEPT=", 7)) {
+                                    if (sim_addr_acl_check (option + 7, NULL))
+                                        return sim_messagef (SCPE_ARG, "Invalid Accept Criteria: %s\n", option + 7);
+                                    if (acl[0] != '\0')
+                                        strlcat (acl, ",", sizeof (acl));
+                                    strlcat (acl, "+", sizeof (acl));       /* Tag as Accept rule */
+                                    strlcat (acl, option + 7, sizeof (acl));
+                                    }
+                                else
+                                    if (0 == memcmp (option, "REJECT=", 7)) {
+                                        if (sim_addr_acl_check (option + 7, NULL))
+                                            return sim_messagef (SCPE_ARG, "Invalid Reject Criteria: %s\n", option + 7);
+                                        if (acl[0] != '\0')
+                                            strlcat (acl, ",", sizeof (acl));
+                                        strlcat (acl, "-", sizeof (acl));   /* Tag as Reject rule */
+                                        strlcat (acl, option + 7, sizeof (acl));
+                                        }
+                                    else {
+                                        if (*tptr)
+                                            return sim_messagef (SCPE_ARG, "Invalid Specifier: %s\n", tptr);
+                                        }
                 }
             cptr = init_cptr;
             }
@@ -3057,6 +3122,7 @@ while (*tptr) {
         sim_close_sock (sock);
         sim_os_ms_sleep (2);                                    /* let the close finish (required on some platforms) */
         strcpy (listen, port);
+        memset (acl, '\0', sizeof (acl));
         cptr = get_glyph (cptr, option, ';');
         while (option[0]) {
             if (0 == MATCH_CMD (option, "NOTELNET"))
@@ -3071,7 +3137,25 @@ while (*tptr) {
                         if (0 == MATCH_CMD (option, "MESSAGE"))
                             listennomessage = FALSE;
                         else
-                            return sim_messagef (SCPE_ARG, "Invalid Specifier: %s\n", option);
+                            if (0 == memcmp (option, "ACCEPT=", 7)) {
+                                if (sim_addr_acl_check (option + 7, NULL))
+                                    return sim_messagef (SCPE_ARG, "Invalid Accept Criteria: %s\n", option + 7);
+                                if (acl[0] != '\0')
+                                    strlcat (acl, ",", sizeof (acl));
+                                strlcat (acl, "+", sizeof (acl));       /* Tag as Accept rule */
+                                strlcat (acl, option + 7, sizeof (acl));
+                                }
+                            else
+                                if (0 == memcmp (option, "REJECT=", 7)) {
+                                    if (sim_addr_acl_check (option + 7, NULL))
+                                        return sim_messagef (SCPE_ARG, "Invalid Reject Criteria: %s\n", option + 7);
+                                    if (acl[0] != '\0')
+                                        strlcat (acl, ",", sizeof (acl));
+                                    strlcat (acl, "-", sizeof (acl));   /* Tag as Reject rule */
+                                    strlcat (acl, option + 7, sizeof (acl));
+                                    }
+                                else
+                                    return sim_messagef (SCPE_ARG, "Invalid Specifier: %s\n", option);
             cptr = get_glyph (cptr, option, ';');
             }
         }
@@ -3249,6 +3333,8 @@ while (*tptr) {
             mp->ring_start_time = 0;
             mp->notelnet = listennotelnet;                  /* save desired telnet behavior flag */
             mp->nomessage = listennomessage;                /* save desired telnet behavior flag */
+            if (acl[0])
+                mp->acl = strdup (acl);                     /* save specified access control list */
             for (i = 0; i < mp->lines; i++) {               /* initialize lines */
                 lp = mp->ldsc + i;
                 lp->mp = mp;                                /* set the back pointer */
@@ -3463,6 +3549,8 @@ while (*tptr) {
                 lp->nomessage = listennomessage;
             else
                 lp->nomessage = mp->nomessage;
+            if (acl[0])
+                lp->acl = strdup (acl);
             }
         if (destination[0]) {
             serport = sim_open_serial (destination, lp, &r);
@@ -4455,6 +4543,10 @@ if (attach)
 free (attach);
 tmxr_show_summ(st, NULL, 0, mp);
 fprintf(st, ", sessions=%d", mp->sessions);
+if (mp->acl_accepted_sessions)
+    fprintf(st, ", accepted=%d", mp->acl_accepted_sessions);
+if (mp->acl_rejected_sessions)
+    fprintf(st, ", rejected=%d", mp->acl_rejected_sessions);
 if (mp->lines == 1) {
     if (mp->ldsc->rxbps) {
         fprintf(st, ", Speed=%d", mp->ldsc->rxbps);
@@ -4496,6 +4588,13 @@ for (j = 0; j < mp->lines; j++) {
         else {
             if (lp->bpsfactor != 1.0)
                 fprintf(st, ", Speed=*%.0f bps", lp->bpsfactor);
+            }
+        if (lp->sessions) {
+            fprintf(st, ", Sessions=%d", lp->sessions);
+            if (lp->acl_accepted_sessions)
+                fprintf(st, ", Accepted=%d", lp->acl_accepted_sessions);
+            if (lp->acl_rejected_sessions)
+                fprintf(st, ", Rejected=%d", lp->acl_rejected_sessions);
             }
         fprintf (st, "\n");
         }
@@ -4584,6 +4683,8 @@ for (i = 0; i < mp->lines; i++) {  /* loop thru conn */
             }
         free (lp->destination);
         lp->destination = NULL;
+        free (lp->acl);
+        lp->acl = NULL;
         if (lp->connecting) {
             lp->sock = lp->connecting;
             lp->connecting = 0;
@@ -4845,6 +4946,15 @@ if (single_line) {          /* Single Line Multiplexer */
         }
     fprintf (st, "A Telnet listening port can be configured with:\n\n");
     fprintf (st, "   sim> ATTACH %s {interface:}port\n\n", dptr->name);
+    fprintf (st, "Connections to the specified port, by default, will be unrestricted.\n");
+    fprintf (st, "Connections from particular IPv4 or IPv6 addresses can be restricted\n");
+    fprintf (st, "or allowed based on rules you can add to the \"{interface:}port\"\n");
+    fprintf (st, "specifier on the attach command.  You can add as many rules as you need\n");
+    fprintf (st, "to the attach command specified with \";ACCEPT=rule-detail\" or\n");
+    fprintf (st, "\";REJECT=rule-detail\" where rule-detail can be an IP address, hostname\n");
+    fprintf (st, "or network block in CIDR form.  Rules are interpreted in order and if,\n");
+    fprintf (st, "while processing the list, the end is reached the connection will be\n");
+    fprintf (st, "rejected.\n\n");
     fprintf (st, "The -U switch can be specified on the attach command that specifies\n");
     fprintf (st, "a listening port.  This will allow a listening port to be reused if\n");
     fprintf (st, "some prior connections haven't completely shutdown.\n\n");
@@ -5012,6 +5122,15 @@ else {
     fprintf (st, "Line specific tcp listening ports are supported.  These are configured\n");
     fprintf (st, "using commands of the form:\n\n");
     fprintf (st, "   sim> ATTACH %s Line=n,{interface:}port{;notelnet}|{;nomessage}\n\n", dptr->name);
+    fprintf (st, "Connections to the specified port, by default, will be unrestricted.\n");
+    fprintf (st, "Connections from particular IPv4 or IPv6 addresses can be restricted\n");
+    fprintf (st, "or allowed based on rules you can add to the \"{interface:}port\"\n");
+    fprintf (st, "specifier on the attach command.  You can add as many rules as you need\n");
+    fprintf (st, "to the attach command specified with \";ACCEPT=rule-detail\" or\n");
+    fprintf (st, "\";REJECT=rule-detail\" where rule-detail can be an IP address, hostname\n");
+    fprintf (st, "or network block in CIDR form.  Rules are interpreted in order and if,\n");
+    fprintf (st, "while processing the list, the end is reached the connection will be\n");
+    fprintf (st, "rejected.\n\n");
     }
 fprintf (st, "Direct computer to computer connections (Virutal Null Modem cables) may\n");
 fprintf (st, "be established using the telnet protocol or via raw tcp sockets.\n\n");
@@ -5194,8 +5313,11 @@ if (lp->sock) {
     free (peername);
     }
 
-if ((lp->port) && (!lp->datagram))
+if ((lp->port) && (!lp->datagram)) {
     fprintf (st, "Listening on port %s\n", lp->port);   /* print port name */
+    if (lp->acl)
+        fprintf (st, "Connections will be accepted/rejected based on: %s\n", lp->acl);
+    }
 
 if (lp->serport)                                        /* serial connection? */
     fprintf (st, "Connected to serial port %s\n", lp->destination);  /* print port name */
@@ -6036,6 +6158,13 @@ SIM_TEST(sim_parse_addr ("", NULL, 0, "localhost", NULL, 0, "1234", NULL) != -1)
 SIM_TEST(sim_parse_addr ("", host, 0, "localhost", NULL, 0, "1234", NULL) != -1);
 SIM_TEST(sim_parse_addr ("", host, sizeof(host), "localhost", port, 0, "1234", NULL) != -1);
 SIM_TEST((sim_parse_addr ("", host, sizeof(host), "localhost", port, sizeof(port), "1234", NULL) == -1) || (strcmp(host, "localhost")) || (strcmp(port,"1234")));
+SIM_TEST(sim_addr_acl_check ("127.0.0.1", NULL) == -1);
+SIM_TEST(sim_addr_acl_check ("127.0.0.1/0", NULL) != -1);
+SIM_TEST(sim_addr_acl_check ("127.0.0.1/32", NULL) == -1);
+SIM_TEST(sim_addr_acl_check ("127.0.0.1/64", NULL) != -1);
+SIM_TEST(sim_addr_acl_check ("127.0.0.6", "+127.0.0.1/32,-127.0.0.2") != -1);
+SIM_TEST(sim_addr_acl_check ("127.0.0.2", "+127.0.0.1,-127.0.0.2/32,+127.0.0.3") != -1);
+SIM_TEST(sim_parse_addr ("", host, sizeof(host), "localhost", port, sizeof(port), "1234", "127.0.0.1") == -1);
 SIM_TEST((sim_parse_addr ("localhost:6666", host, sizeof(host), "localhost", port, sizeof(port), "1234", NULL) == -1) || (strcmp(host, "localhost")) || (strcmp(port,"6666")));
 SIM_TEST(sim_parse_addr ("localhost:66666", host, sizeof(host), "localhost", port, sizeof(port), "1234", NULL) != -1);
 SIM_TEST((sim_parse_addr ("localhost:telnet", host, sizeof(host), "localhost", port, sizeof(port), "1234", NULL) == -1) || (strcmp(host, "localhost")) || (strcmp(port,"telnet")));

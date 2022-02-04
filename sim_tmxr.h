@@ -141,6 +141,9 @@ struct tmln {
     char                *ipad;                          /* IP address */
     SOCKET              master;                         /* line specific master socket */
     char                *port;                          /* line specific listening port */
+    char                *acl;                           /* Access control list (CIDR) to accept or reject connects from */
+    int32               acl_accepted_sessions;          /* count of ACL accepted tcp connections */
+    int32               acl_rejected_sessions;          /* count of ACL rejected tcp connections */
     int32               sessions;                       /* count of tcp connections received */
     uint32              cnms;                           /* conn time */
     int32               tsta;                           /* Telnet state */
@@ -218,6 +221,9 @@ struct tmxr {
     TMLN                *ldsc;                          /* line descriptors */
     int32               *lnorder;                       /* line connection order */
     DEVICE              *dptr;                          /* multiplexer device */
+    char                *acl;                           /* Access control list (CIDR) to accept or reject connects from */
+    int32               acl_accepted_sessions;          /* count of ACL accepted tcp connections */
+    int32               acl_rejected_sessions;          /* count of ACL rejected tcp connections */
     UNIT                *uptr;                          /* polling unit (connection) */
     char                logfiletmpl[FILENAME_MAX];      /* template logfile name */
     int32               txcount;                        /* count of transmit bytes */
