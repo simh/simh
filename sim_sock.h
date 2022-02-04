@@ -111,8 +111,12 @@ extern "C" {
 #define sim_printf printf
 #endif
 
-int sim_parse_addr (const char *cptr, char *host, size_t hostlen, const char *default_host, char *port, size_t port_len, const char *default_port, const char *validate_addr);
-int sim_parse_addr_ex (const char *cptr, char *host, size_t hostlen, const char *default_host, char *port, size_t port_len, char *localport, size_t local_port_len, const char *default_port);
+int sim_parse_addr (const char *cptr, char *host, size_t hostlen, const char *default_host, 
+                                      char *port, size_t port_len, const char *default_port, 
+                                      const char *validate_addr);
+int sim_parse_addr_ex (const char *cptr, char *host, size_t hostlen, const char *default_host, 
+                                         char *port, size_t port_len, char *localport, size_t local_port_len, const char *default_port);
+int sim_addr_acl_check (const char *validate_addr, const char *acl);
 #define SIM_SOCK_OPT_REUSEADDR      0x0001
 #define SIM_SOCK_OPT_DATAGRAM       0x0002
 #define SIM_SOCK_OPT_NODELAY        0x0004
