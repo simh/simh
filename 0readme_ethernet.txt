@@ -222,11 +222,12 @@ Windows notes:
     developed or supported. These packages for windows simulate the libpcap 
     package that is freely available for un*x systems.  
 
- 2. You must *install* the WinPCAP runtime package.
+ 2. You must *install* the npcap or WinPCAP runtime package.
 
- 3. The first time the WinPCAP driver is used, it will be dynamically loaded,
-    and the user must be an Administrator on the machine to do so. If you need
-    to run as an unprivileged user, you must set the "npf" driver to autostart. 
+ 3. The first time the npcap/WinPCAP driver is used, it will be dynamically 
+    loaded, and the user must be an Administrator on the machine to do so. 
+    If you need to run as an unprivileged user, you must set the "npf" driver 
+    to autostart. 
     Current Npcap and WinPcap installers provide an option to configure this 
     at installation time, so if that choice is made, then there is no need for
     administrator privileged to run simulators with network support.
