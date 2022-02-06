@@ -87,6 +87,9 @@ typedef void (*DIR_ENTRY_CALLBACK)(const char *directory,
                                    const struct stat *filestat,
                                    void *context);
 t_stat sim_dir_scan (const char *cptr, DIR_ENTRY_CALLBACK entry, void *context);
+char **sim_get_filelist (const char *filename);
+void sim_free_filelist (char ***pfilelist);
+void sim_print_filelist (char **filelist);
 
 void sim_buf_swap_data (void *bptr, size_t size, size_t count);
 void sim_byte_swap_data (void *bptr, size_t size, size_t count);
