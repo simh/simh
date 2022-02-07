@@ -4292,7 +4292,7 @@ return SCPE_OK;
 
 #include <setjmp.h>
 
-t_stat sim_tape_test (DEVICE *dptr)
+t_stat sim_tape_test (DEVICE *dptr, const char *cptr)
 {
 int32 saved_switches = sim_switches;
 SIM_TEST_INIT;

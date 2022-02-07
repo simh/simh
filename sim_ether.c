@@ -4472,7 +4472,7 @@ return (errors == 0) ? SCPE_OK : SCPE_IERR;
 
 #include <setjmp.h>
 
-t_stat sim_ether_test (DEVICE *dptr)
+t_stat sim_ether_test (DEVICE *dptr, const char *cptr)
 {
 t_stat stat = SCPE_OK;
 SIM_TEST_INIT;

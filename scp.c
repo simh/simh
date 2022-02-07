@@ -16356,20 +16356,20 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
         switch (DEV_TYPE(dptr)) {
 #if defined(USE_SIM_CARD)
             case DEV_CARD:
-                tstat = sim_card_test (dptr);
+                tstat = sim_card_test (dptr, cptr);
                 break;
 #endif
             case DEV_DISK:
-                tstat = sim_disk_test (dptr);
+                tstat = sim_disk_test (dptr, cptr);
                 break;
             case DEV_ETHER:
-                tstat = sim_ether_test (dptr);
+                tstat = sim_ether_test (dptr, cptr);
                 break;
             case DEV_TAPE:
-                tstat = sim_tape_test (dptr);
+                tstat = sim_tape_test (dptr, cptr);
                 break;
             case DEV_MUX:
-                tstat = tmxr_sock_test (dptr);
+                tstat = tmxr_sock_test (dptr, cptr);
                 break;
             default:
                 break;

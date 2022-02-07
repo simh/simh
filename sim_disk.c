@@ -6408,7 +6408,7 @@ if (r == SCPE_OK) {
 return r;
 }
 
-t_stat sim_disk_test (DEVICE *dptr)
+t_stat sim_disk_test (DEVICE *dptr, const char *cptr)
 {
 const char *fmt[] = {"RAW", "VHD", "VHD", "SIMH", NULL};
 uint32 sect_size[] = {576, 4096, 1024, 512, 256, 128, 64, 0};

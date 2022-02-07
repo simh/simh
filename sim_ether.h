@@ -387,7 +387,7 @@ void ethq_insert_data(ETH_QUE* que, int32 type,         /* insert item into FIFO
                   size_t crc_len, const uint8 *crc_data, int32 status);
 t_stat ethq_destroy(ETH_QUE* que);                      /* release FIFO queue */
 const char *eth_capabilities(void);
-t_stat sim_ether_test (DEVICE *dptr);                   /* unit test routine */
+t_stat sim_ether_test (DEVICE *dptr, const char *cptr); /* unit test routine */
 
 #if !defined(SIM_TEST_INIT)     /* Need stubs for test APIs */
 #define SIM_TEST_INIT

@@ -6141,7 +6141,7 @@ return SCPE_OK;
 
 #include <setjmp.h>
 
-t_stat tmxr_sock_test (DEVICE *dptr)
+t_stat tmxr_sock_test (DEVICE *dptr, const char *cptr)
 {
 char cmd[CBUFSIZE], host[CBUFSIZE], port[CBUFSIZE];
 int line;
