@@ -6207,12 +6207,12 @@ return stat;
 
 static int framer_await_status (TMLN *line, int cnt)
 {
-int i, stat, try, flen;
+int i, stat, attempt, flen;
 ETH_PACK framer_rpkt;
 
 i = line->framer->status_cnt;
-try = 0;
-while (try < 5) {
+attempt = 0;
+while (attempt < 5) {
     stat = eth_read (line->framer->eth, &framer_rpkt, NULL);
     if (stat) {
         flen  = framer_rpkt.msg[14] + (framer_rpkt.msg[15] << 8);
@@ -6227,7 +6227,7 @@ while (try < 5) {
         }
     if (i != line->framer->status_cnt)
         return 1;
-    try++;
+    attempt++;
     sim_os_ms_sleep (50);
     }
 tmxr_debug_trace_line (line, "no status received\n");
