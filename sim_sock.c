@@ -707,7 +707,8 @@ int status = -1;
 int done = 0;
 struct addrinfo *ai_validate;
 unsigned long bits = 0;
-char *c, *c1, v_cpy[256];
+const char *c;
+char *c1, v_cpy[256];
 
 if (validate_addr == NULL)
     return status;
@@ -737,22 +738,23 @@ while ((*acl != '\0') && !done) {
     struct addrinfo *ai_rule, *ai, *aiv;
     int permit; 
     unsigned long bits = 0;
-    char *c, *c1, rule[260];
+    const char *cc;
+    char *c,*c1, rule[260];
 
     permit = (*acl == '+');
-    c = strchr (acl, ',');
-    if (c != NULL) {
-        if ((c - acl) > sizeof (rule))
+    cc = strchr (acl, ',');
+    if (cc != NULL) {
+        if ((cc - acl) > sizeof (rule))
             break;                  /* Too big - error */
-        memcpy (rule, acl + 1, c - (acl + 1));
-        rule[c - (acl + 1)] = '\0';
+        memcpy (rule, acl + 1, cc - (acl + 1));
+        rule[cc - (acl + 1)] = '\0';
         }
     else {
         if (strlen (acl) > sizeof (rule))
             break;                  /* Too big - error */
         strcpy (rule, acl + 1);
         }
-    acl += strlen (rule) + 1 + (c != NULL);
+    acl += strlen (rule) + 1 + (cc != NULL);
     c = strchr (rule, '/');
     if (c != NULL) {
         bits = strtoul (c + 1, &c1, 10);
