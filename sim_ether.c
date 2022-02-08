@@ -978,7 +978,7 @@ t_stat eth_show (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
   }
 static int _eth_get_system_id (char *buf, size_t buf_size)
   {memset (buf, 0, buf_size); return 0;}
-t_stat sim_ether_test (DEVICE *dptr)
+t_stat sim_ether_test (DEVICE *dptr, const char *cptr)
   {return SCPE_OK;}
 #else    /* endif unimplemented */
 
