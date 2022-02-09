@@ -105,7 +105,7 @@ struct simh_disk_footer {
     uint8       AccessFormat;           /* 1 - SIMH, 2 - RAW */
     uint8       Reserved[354];          /* Currently unused */
     uint8       DeviceName[16];         /* Name of the Device when created */
-    uint32      PriorSize[2];           /* Prior Size before footer addition */
+    uint32      Highwater[2];           /* Size before footer addition or furthest container point written */
     uint32      Unused;                 /* Currently unused */
     uint32      Checksum;               /* CRC32 of the prior 508 bytes */
     };
@@ -151,6 +151,7 @@ return value;
 
 struct disk_context {
     t_offset            container_size;     /* Size of the data portion (of the pseudo disk) */
+    t_offset            highwater;          /* Furthest written sector in the disk */
     DEVICE              *dptr;              /* Device for unit (access to debug flags) */
     uint32              dbit;               /* debugging bit */
     uint32              sector_size;        /* Disk Sector Size (of the pseudo disk) */
@@ -754,9 +755,12 @@ struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 uint32 f = DK_GET_FMT (uptr);
 t_stat r;
 uint8 *tbuf = NULL;
+t_seccnt written = 0;
 
 sim_debug_unit (ctx->dbit, uptr, "sim_disk_wrsect(unit=%d, lba=0x%X, sects=%d)\n", (int)(uptr - ctx->dptr->units), lba, sects);
 
+if (sectswritten)
+    *sectswritten = 0;
 ctx->write_count++;                                     /* record write operation */
 if (uptr->dynflags & UNIT_DISK_CHK) {
     DEVICE *dptr = find_dev_from_unit (uptr);
@@ -789,7 +793,8 @@ if (uptr->dynflags & UNIT_DISK_CHK) {
     }
 switch (f) {                                            /* case on format */
     case DKUF_F_STD:                                    /* SIMH format */
-        return _sim_disk_wrsect (uptr, lba, buf, sectswritten, sects);
+        r = _sim_disk_wrsect (uptr, lba, buf, &written, sects);
+        break;
     case DKUF_F_VHD:                                    /* VHD format */
         if (!sim_end && (ctx->xfer_element_size != sizeof (char))) {
             tbuf = (uint8*) malloc (sects * ctx->sector_size);
@@ -798,54 +803,60 @@ switch (f) {                                            /* case on format */
             sim_buf_copy_swapped (tbuf, buf, ctx->xfer_element_size, (sects * ctx->sector_size) / ctx->xfer_element_size);
             buf = tbuf;
             }
-        r = sim_vhd_disk_wrsect  (uptr, lba, buf, sectswritten, sects);
-        free (tbuf);
-        return r;
+        r = sim_vhd_disk_wrsect  (uptr, lba, buf, &written, sects);
+        break;
     case DKUF_F_RAW:                                    /* Raw Physical Disk Access */
         break;                                          /* handle below */
     default:
         return SCPE_NOFNC;
     }
-if ((0 == (ctx->sector_size & (ctx->storage_sector_size - 1))) ||   /* Sector Aligned & whole sector transfers */
-    ((0 == ((lba*ctx->sector_size) & (ctx->storage_sector_size - 1))) &&
-     (0 == ((sects*ctx->sector_size) & (ctx->storage_sector_size - 1))))) {
+if (f == DKUF_F_RAW) {
+    if ((0 == (ctx->sector_size & (ctx->storage_sector_size - 1))) ||   /* Sector Aligned & whole sector transfers */
+        ((0 == ((lba*ctx->sector_size) & (ctx->storage_sector_size - 1))) &&
+         (0 == ((sects*ctx->sector_size) & (ctx->storage_sector_size - 1))))) {
 
-    if (!sim_end && (ctx->xfer_element_size != sizeof (char))) {
-        tbuf = (uint8*) malloc (sects * ctx->sector_size);
-        if (NULL == tbuf)
-            return SCPE_MEM;
-        sim_buf_copy_swapped (tbuf, buf, ctx->xfer_element_size, (sects * ctx->sector_size) / ctx->xfer_element_size);
-        buf = tbuf;
+        if (!sim_end && (ctx->xfer_element_size != sizeof (char))) {
+            tbuf = (uint8*) malloc (sects * ctx->sector_size);
+            if (NULL == tbuf)
+                return SCPE_MEM;
+            sim_buf_copy_swapped (tbuf, buf, ctx->xfer_element_size, (sects * ctx->sector_size) / ctx->xfer_element_size);
+            buf = tbuf;
+            }
+
+        r = sim_os_disk_wrsect (uptr, lba, buf, &written, sects);
         }
+    else { /* Unaligned and/or partial sector transfers in RAW mode */
+        size_t tbufsize = sects * ctx->sector_size + 2 * ctx->storage_sector_size;
+        t_offset ssaddr = (lba * (t_offset)ctx->sector_size) & ~(t_offset)(ctx->storage_sector_size -1);
+        t_offset sladdr = ((lba + sects) * (t_offset)ctx->sector_size) & ~(t_offset)(ctx->storage_sector_size -1);
+        uint32 soffset = (uint32)((lba * (t_offset)ctx->sector_size) - ssaddr);
+        uint32 byteswritten;
 
-    r = sim_os_disk_wrsect (uptr, lba, buf, sectswritten, sects);
-    }
-else { /* Unaligned and/or partial sector transfers in RAW mode */
-    size_t tbufsize = sects * ctx->sector_size + 2 * ctx->storage_sector_size;
-    t_offset ssaddr = (lba * (t_offset)ctx->sector_size) & ~(t_offset)(ctx->storage_sector_size -1);
-    t_offset sladdr = ((lba + sects) * (t_offset)ctx->sector_size) & ~(t_offset)(ctx->storage_sector_size -1);
-    uint32 soffset = (uint32)((lba * (t_offset)ctx->sector_size) - ssaddr);
-    uint32 byteswritten;
-
-    tbuf = (uint8*) malloc (tbufsize);
-    if (sectswritten)
-        *sectswritten = 0;
-    if (tbuf == NULL)
-        return SCPE_MEM;
-    /* Partial Sector writes require a read-modify-write sequence for the partial sectors */
-    if (soffset) 
-        sim_os_disk_read (uptr, ssaddr, tbuf, NULL, ctx->storage_sector_size);
-    sim_os_disk_read (uptr, sladdr, tbuf + (size_t)(sladdr - ssaddr), NULL, ctx->storage_sector_size);
-    sim_buf_copy_swapped (tbuf + soffset,
-                          buf, ctx->xfer_element_size, (sects * ctx->sector_size) / ctx->xfer_element_size);
-    r = sim_os_disk_write (uptr, ssaddr, tbuf, &byteswritten, (soffset + (sects * ctx->sector_size) + ctx->storage_sector_size - 1) & ~(ctx->storage_sector_size - 1));
-    if (sectswritten) {
-        *sectswritten = byteswritten / ctx->sector_size;
-        if (*sectswritten > sects)
-            *sectswritten = sects;
+        tbuf = (uint8*) malloc (tbufsize);
+        if (tbuf == NULL)
+            return SCPE_MEM;
+        /* Partial Sector writes require a read-modify-write sequence for the partial sectors */
+        if (soffset) 
+            sim_os_disk_read (uptr, ssaddr, tbuf, NULL, ctx->storage_sector_size);
+        sim_os_disk_read (uptr, sladdr, tbuf + (size_t)(sladdr - ssaddr), NULL, ctx->storage_sector_size);
+        sim_buf_copy_swapped (tbuf + soffset,
+                              buf, ctx->xfer_element_size, (sects * ctx->sector_size) / ctx->xfer_element_size);
+        r = sim_os_disk_write (uptr, ssaddr, tbuf, &byteswritten, (soffset + (sects * ctx->sector_size) + ctx->storage_sector_size - 1) & ~(ctx->storage_sector_size - 1));
+        written = byteswritten / ctx->sector_size;
+        if (written > sects)
+            written = sects;
         }
     }
 free (tbuf);
+if (sectswritten)
+    *sectswritten = written;
+if (written > 0) {
+    t_offset da = ((t_offset)lba) * ctx->sector_size;
+    t_offset end_write = da + (written * ctx->sector_size);
+
+    if (ctx->highwater < end_write)
+        ctx->highwater = end_write;
+    }
 return r;
 }
 
@@ -2237,6 +2248,7 @@ if (f) {
             }
         free (ctx->footer);
         ctx->footer = f;
+        ctx->highwater = (((t_offset)NtoHl (f->Highwater[0])) << 32) | ((t_offset)NtoHl (f->Highwater[1]));
         container_size -= sizeof (*f);
         sim_debug_unit (ctx->dbit, uptr, "Footer: %s - %s\n"
             "   Simulator:           %s\n"
@@ -2253,6 +2265,8 @@ if (f) {
         if (f->DeviceName[0] != '\0')
             sim_debug_unit (ctx->dbit, uptr, 
                 "   DeviceName:          %s\n", (char *)f->DeviceName);
+        sim_debug_unit (ctx->dbit, uptr, 
+            "   HighwaterSector:     %u\n", (uint32)(ctx->highwater/ctx->sector_size));
         }
     }
 sim_debug_unit (ctx->dbit, uptr, "Container Size: %u sectors %u bytes each\n", (uint32)(container_size/ctx->sector_size), ctx->sector_size);
@@ -2268,7 +2282,7 @@ struct stat statb;
 struct simh_disk_footer *f;
 time_t now = time (NULL);
 t_offset total_sectors;
-t_offset prior_size;
+t_offset highwater;
 
 if ((dptr = find_dev_from_unit (uptr)) == NULL)
     return SCPE_NOATT;
@@ -2291,12 +2305,67 @@ memset (f->CreationTime, 0, sizeof (f->CreationTime));
 strlcpy ((char*)f->CreationTime, ctime (&now), sizeof (f->CreationTime));
 memset (f->DeviceName, 0, sizeof (f->DeviceName));
 strlcpy ((char*)f->DeviceName, dptr->name, sizeof (f->DeviceName));
-prior_size = sim_fsize_name_ex (uptr->filename);
-f->PriorSize[0] = NtoHl ((uint32)(prior_size >> 32));
-f->PriorSize[1] = NtoHl ((uint32)(prior_size & 0xFFFFFFFF));
+highwater = sim_fsize_name_ex (uptr->filename);
+/* Align Initial Highwater to a sector boundary */
+highwater = ((highwater + ctx->sector_size - 1) / ctx->sector_size) * ctx->sector_size;
+f->Highwater[0] = NtoHl ((uint32)(highwater >> 32));
+f->Highwater[1] = NtoHl ((uint32)(highwater & 0xFFFFFFFF));
 f->Checksum = NtoHl (eth_crc32 (0, f, sizeof (*f) - sizeof (f->Checksum)));
 free (ctx->footer);
 ctx->footer = f;
+switch (f->AccessFormat) {
+    case DKUF_F_STD:                                    /* SIMH format */
+        if (sim_fseeko ((FILE *)uptr->fileref, total_sectors * ctx->sector_size, SEEK_SET) == 0) {
+            sim_fwrite (f, sizeof (*f), 1, (FILE *)uptr->fileref);
+            fclose ((FILE *)uptr->fileref);
+            sim_set_file_times (uptr->filename, statb.st_atime, statb.st_mtime);
+            uptr->fileref = sim_fopen (uptr->filename, "rb+");
+            }
+        break;
+    case DKUF_F_VHD:                                    /* VHD format */
+        break;
+    case DKUF_F_RAW:                                    /* Raw Physical Disk Access */
+        sim_os_disk_write (uptr, total_sectors * ctx->sector_size, (uint8 *)f, NULL, sizeof (*f));
+        sim_os_disk_close_raw (uptr->fileref);
+        sim_set_file_times (uptr->filename, statb.st_atime, statb.st_mtime);
+        uptr->fileref = sim_os_disk_open_raw (uptr->filename, "rb+");
+        break;
+    default:
+        break;
+    }
+return SCPE_OK;
+}
+
+static t_stat update_disk_footer (UNIT *uptr)
+{
+DEVICE *dptr;
+struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
+struct stat statb;
+struct simh_disk_footer *f;
+t_offset total_sectors;
+t_offset highwater;
+t_offset footer_highwater;
+
+if ((dptr = find_dev_from_unit (uptr)) == NULL)
+    return SCPE_NOATT;
+if (uptr->flags & UNIT_RO)
+    return SCPE_RO;
+if (ctx == NULL)
+    return SCPE_IERR;
+f = ctx->footer;
+if (f == NULL)
+    return SCPE_IERR;
+
+footer_highwater = (((t_offset)NtoHl (f->Highwater[0])) << 32) | ((t_offset)NtoHl (f->Highwater[1]));
+if (ctx->highwater <= footer_highwater)
+    return SCPE_OK;
+
+sim_stat (uptr->filename, &statb);
+total_sectors = (((t_offset)uptr->capac) * ctx->capac_factor * ((dptr->flags & DEV_SECTORS) ? 512 : 1)) / ctx->sector_size;
+highwater = ctx->highwater;
+f->Highwater[0] = NtoHl ((uint32)(highwater >> 32));
+f->Highwater[1] = NtoHl ((uint32)(highwater & 0xFFFFFFFF));
+f->Checksum = NtoHl (eth_crc32 (0, f, sizeof (*f) - sizeof (f->Checksum)));
 switch (f->AccessFormat) {
     case DKUF_F_STD:                                    /* SIMH format */
         if (sim_fseeko ((FILE *)uptr->fileref, total_sectors * ctx->sector_size, SEEK_SET) == 0) {
@@ -3074,6 +3143,9 @@ if (!(uptr->flags & UNIT_ATT))                          /* attached? */
     return SCPE_OK;
 if (NULL == find_dev_from_unit (uptr))
     return SCPE_OK;
+
+update_disk_footer (uptr);                              /* Update meta data if highwater has changed */
+
 auto_format = ctx->auto_format;
 
 if (uptr->io_flush)
@@ -6261,17 +6333,19 @@ if (info->flag) {        /* zap type */
             uint8 *sector_data;
             uint8 *zero_sector;
             size_t sector_size = NtoHl (f->SectorSize);
-            t_offset prior_size = (((t_offset)NtoHl (f->PriorSize[0])) << 32) | ((t_offset)NtoHl (f->PriorSize[1]));
+            t_offset highwater = (((t_offset)NtoHl (f->Highwater[0])) << 32) | ((t_offset)NtoHl (f->Highwater[1]));
 
             /* determine whole sectors in original container size */
-            /* By default we chop off the disk footer and trailing zero sectors added since the footer was appended */
-            prior_size = (prior_size + (sector_size - 1)) & (~(t_offset)(sector_size - 1));
+            /* By default we chop off the disk footer and trailing */
+            /* zero sectors added since the footer was appended that */
+            /* hadn't been written by normal disk operations. */
+            highwater = (highwater + (sector_size - 1)) & (~(t_offset)(sector_size - 1));
             if (sim_switches & SWMASK ('Z'))    /* Unless -Z switch specified */
-                prior_size = 0;                 /* then removes all trailing zero sectors */
+                highwater = 0;                  /* then removes all trailing zero sectors */
             sector_data = (uint8 *)malloc (sector_size * sizeof (*sector_data));
             zero_sector = (uint8 *)calloc (sector_size, sizeof (*sector_data));
             container_size -= sizeof (*f);
-            while (container_size > prior_size) {
+            while (container_size > highwater) {
                 if ((sim_fseeko (container, container_size - sector_size, SEEK_SET) != 0) ||
                     (sector_size != sim_fread (sector_data, 1, sector_size, container))   ||
                     (0 != memcmp (sector_data, zero_sector, sector_size)))
@@ -6325,6 +6399,8 @@ if (info->flag == 0) {
         get_disk_footer (uptr);
         f = ctx->footer;
         if (f) {
+            t_offset highwater_sector = ((((t_offset)NtoHl (f->Highwater[0])) << 32) | ((t_offset)NtoHl (f->Highwater[1]))) / NtoHl(f->SectorSize);
+
             sim_printf ("Container:              %s\n"
                         "   Simulator:           %s\n"
                         "   DriveType:           %s\n"
@@ -6338,6 +6414,8 @@ if (info->flag == 0) {
                         NtoHl (f->TransferElementSize), fmts[f->AccessFormat].name, f->CreationTime);
             if (f->DeviceName[0] != '\0')
                 sim_printf ("   DeviceName:          %s\n", (char *)f->DeviceName);
+            if (highwater_sector > 0)
+                sim_printf ("   HighwaterSector:     %u\n", (uint32)highwater_sector);
             sim_printf ("Container Size: %s bytes\n", sim_fmt_numeric ((double)ctx->container_size));
             }
         else {
