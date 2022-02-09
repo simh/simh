@@ -626,12 +626,16 @@ if (sectsread)
 while (tbc) {
     size_t sectbytes;
 
+    clearerr (uptr->fileref);
     err = sim_fseeko (uptr->fileref, da, SEEK_SET);          /* set pos */
     if (err)
         return SCPE_IOERR;
     i = sim_fread (buf, 1, tbc, uptr->fileref);
     if (i < tbc)                 /* fill */
         memset (&buf[i], 0, tbc-i);
+    if ((i == 0) &&             /* Reading at or past EOF? */
+        feof (uptr->fileref))   
+        i = tbc;                /* return 0's which have already been filled in buffer */
     sectbytes = (i / ctx->sector_size) * ctx->sector_size;
     if (i > sectbytes)
         sectbytes += ctx->sector_size;
@@ -2463,6 +2467,8 @@ if (sim_switches & SWMASK ('C')) {                      /* create new disk conta
     FILE *dest;
     int saved_sim_switches = sim_switches;
     int32 saved_sim_quiet = sim_quiet;
+    t_addr target_capac = uptr->capac;
+    t_addr source_capac;
     uint32 capac_factor;
     t_stat r;
 
@@ -2479,6 +2485,7 @@ if (sim_switches & SWMASK ('C')) {                      /* create new disk conta
         sim_switches = saved_sim_switches;
         return sim_messagef (r, "%s: Cannot open copy source: %s - %s\n", sim_uname (uptr), cptr, sim_error_text (r));
         }
+    source_capac = uptr->capac;
     sim_messagef (SCPE_OK, "%s: Creating new %s '%s' disk container copied from '%s'\n", sim_uname (uptr), dest_fmt, gbuf, cptr);
     capac_factor = ((dptr->dwidth / dptr->aincr) >= 32) ? 8 : ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* capacity units (quadword: 8, word: 2, byte: 1) */
     if (strcmp ("VHD", dest_fmt) == 0)
@@ -2493,7 +2500,7 @@ if (sim_switches & SWMASK ('C')) {                      /* create new disk conta
         uint8 *copy_buf = (uint8*) malloc (1024*1024);
         t_lba lba;
         t_seccnt sectors_per_buffer = (t_seccnt)((1024*1024)/sector_size);
-        t_lba total_sectors = (t_lba)((uptr->capac*capac_factor)/(sector_size/((dptr->flags & DEV_SECTORS) ? 512 : 1)));
+        t_lba total_sectors = (t_lba)((target_capac*capac_factor)/(sector_size/((dptr->flags & DEV_SECTORS) ? 512 : 1)));
         t_seccnt sects = sectors_per_buffer;
         t_seccnt sects_read;
 
@@ -2507,7 +2514,13 @@ if (sim_switches & SWMASK ('C')) {                      /* create new disk conta
             return SCPE_MEM;
             }
         sim_messagef (SCPE_OK, "Copying %u sectors each %u bytes in size\n", (uint32)total_sectors, (uint32)sector_size);
+        if (source_capac > target_capac) {
+            sim_messagef (SCPE_OK, "The source container is %u sectors larger than the destination disk container\n", 
+                        (t_lba)(((source_capac - target_capac)*capac_factor)/(sector_size/((dptr->flags & DEV_SECTORS) ? 512 : 1))));
+            sim_messagef (SCPE_OK, "these additional sectors will be unavailable on the target drive\n");
+            }
         for (lba = 0; (lba < total_sectors) && (r == SCPE_OK); lba += sects_read) {
+            uptr->capac = source_capac;
             sects = sectors_per_buffer;
             if (lba + sects > total_sectors)
                 sects = total_sectors - lba;
@@ -2519,6 +2532,7 @@ if (sim_switches & SWMASK ('C')) {                      /* create new disk conta
 
                 sim_disk_set_fmt (uptr, 0, dest_fmt, NULL);
                 uptr->fileref = dest;
+                uptr->capac = target_capac;
                 r = sim_disk_wrsect (uptr, lba, copy_buf, &sects_written, sects_read);
                 uptr->fileref = save_unit_fileref;
                 uptr->flags = saved_unit_flags;
@@ -2547,6 +2561,7 @@ if (sim_switches & SWMASK ('C')) {                      /* create new disk conta
                 }
             for (lba = 0; (lba < total_sectors) && (r == SCPE_OK); lba += sects_read) {
                 sim_messagef (SCPE_OK, "%s: Verified %u/%u sectors.  %d%% complete.\r", sim_uname (uptr), (uint32)lba, (uint32)total_sectors, (int)((((float)lba)*100)/total_sectors));
+                uptr->capac = source_capac;
                 sects = sectors_per_buffer;
                 if (lba + sects > total_sectors)
                     sects = total_sectors - lba;
@@ -2557,6 +2572,7 @@ if (sim_switches & SWMASK ('C')) {                      /* create new disk conta
 
                     sim_disk_set_fmt (uptr, 0, dest_fmt, NULL);
                     uptr->fileref = dest;
+                    uptr->capac = target_capac;
                     r = sim_disk_rdsect (uptr, lba, verify_buf, &verify_read, sects_read);
                     uptr->fileref = save_unit_fileref;
                     uptr->flags = saved_unit_flags;
@@ -3277,6 +3293,9 @@ fprintf (st, "                (simh, VHD, or RAW format).  The current (or speci
 fprintf (st, "                container format will be the format of the created container.\n");
 fprintf (st, "                AUTO or VHD will create a VHD container, SIMH will create a.\n");
 fprintf (st, "                SIMH container. Add a -V switch to verify a copy operation.\n");
+fprintf (st, "                Note: A copy will be performed between dissimilar sized\n");
+fprintf (st, "                containers.  Copying from a larger container to a smaller\n");
+fprintf (st, "                one will produce a truncated result.\n");
 fprintf (st, "    -V          Perform a verification pass to confirm successful data copy\n");
 fprintf (st, "                operation.\n");
 fprintf (st, "    -X          When creating a VHD, create a fixed sized VHD (vs a Dynamically\n");
@@ -6560,6 +6579,19 @@ if (!(uptr->flags & UNIT_RO)) { /* Only test drives open Read/Write - Read Only 
         else {
             sim_printf("Reading BAD\n");
             r = SCPE_IERR;
+            }
+        }
+    if (r == SCPE_OK) { /* If still good, then do EOF and beyond boundary test */
+        t_offset current_unit_size = ((t_offset)uptr->capac)*ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? ctx->sector_size : 1);
+        t_seccnt sectors_read, sectors_to_read;
+        t_lba lba = (t_lba)(current_unit_size / ctx->sector_size) - 2;
+        int i;
+
+        sectors_to_read = 1;
+        for (i = 0; (i < 4) && (r == SCPE_OK); i++) {
+            r = sim_disk_rdsect (uptr, lba + i, (uint8 *)c->data, &sectors_read, sectors_to_read);
+            if ((r != SCPE_OK) || (sectors_read != sectors_to_read))
+                r = SCPE_IERR;
             }
         }
     free (c->data);
