@@ -2796,7 +2796,7 @@ if ((DK_GET_FMT (uptr) == DKUF_F_VHD) || (ctx->footer)) {
                 }
             else { /* Type already matches, Need to confirm compatibility */
                 t_addr saved_capac = uptr->capac;
-                t_lba current_unit_sectors = (t_lba)((uptr->capac*ctx->capac_factor)/(ctx->sector_size/((dptr->flags & DEV_SECTORS) ? 512 : 1)));
+                t_lba current_unit_sectors = (t_lba)((uptr->capac*ctx->capac_factor)/(ctx->sector_size/((dptr->flags & DEV_SECTORS) ? ctx->sector_size : 1)));
 
                 if ((container_sector_size != 0) && (sector_size != container_sector_size))
                     r = sim_messagef (SCPE_OPENERR, "%s: Incompatible Container Sector Size %d\n", sim_uname (uptr), container_sector_size);
@@ -3990,8 +3990,6 @@ while (bytestoread) {
     if (sectsread)
         *sectsread += sectorbytes / ctx->sector_size;
     bytestoread -= sectorbytes;
-    if (bytestoread == 0)
-        break;
     buf +=  sectorbytes;
     addr += sectorbytes;
     }
@@ -4192,8 +4190,6 @@ while (bytestoread) {
     if (sectsread)
         *sectsread += sectorbytes / ctx->sector_size;
     bytestoread -= sectorbytes;
-    if ((bytestoread == 0) || (bytesread == 0))
-        break;
     buf += sectorbytes;
     addr += sectorbytes;
     }
