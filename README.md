@@ -9,6 +9,7 @@
 . . [New Simulators](#new-simulators)  
 . . [Simulator Front Panel API](#simulator-front-panel-api)  
 . . [New Functionality](#new-functionality)  
+. . . . [DDCMP Synchronous host physical device support - framer](#ddcmp-synchronous-host-physical-device-support---framer)  
 . . . . [Remote Console Facility](#remote-console-facility)  
 . . . . [VAX/PDP11 Enhancements](#vaxpdp11-enhancements)  
 . . . . [PDP11 Specific Enhancements](#pdp11-specific-enhancements)  
@@ -109,6 +110,10 @@
 The sim_frontpanel API provides a programmatic interface to start and control any simulator without any special additions to the simulator code.
 
 ### New Functionality
+
+#### DDCMP Synchronous host physical device support - framer
+Paul Koning has implemented a USB hardware device which can interface transport DDCMP packets across a synchronous line 
+to physical host systems with native synchronous devices or other simulators using framer devices.
 
 #### Remote Console Facility
 A new capability has been added which allows a TELNET Connection to a user designated port so that some out of band commands can be entered to manipulate and/or adjust a running simulator.  The commands which enable and control this capability are SET REMOTE TELNET=port, SET REMOTE CONNECTIONS=n, SET REMOTE TIMEOUT=seconds, and SHOW REMOTE.

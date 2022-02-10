@@ -54,7 +54,16 @@
    sim_byte_swap_data -      swap data elements inplace in buffer
    sim_shmem_open            create or attach to a shared memory region
    sim_shmem_close           close a shared memory region
-
+   sim_chdir                 change working directory
+   sim_mkdir                 create a directory
+   sim_rmdir                 remove a directory
+   sim_getcwd                get the current working directory
+   sim_copyfile              copy a file
+   sim_filepath_parts        expand and extract filename/path parts
+   sim_dirscan               scan for a filename pattern
+   sim_get_filelist          get a list of files matching a pattern
+   sim_free_filelist         free a filelist
+   sim_print_filelist        print the elements of a filelist
 
    sim_fopen and sim_fseek are OS-dependent.  The other routines are not.
    sim_fsize is always a 32b routine (it is used only with small capacity random
@@ -345,6 +354,55 @@ char pathbuf[PATH_MAX + 1];
 if (NULL == _sim_expand_homedir (path, pathbuf, sizeof (pathbuf)))
     return -1;
 return rmdir (pathbuf);
+}
+
+static void _sim_filelist_entry (const char *directory, 
+                                 const char *filename,
+                                 t_offset FileSize,
+                                 const struct stat *filestat,
+                                 void *context)
+{
+char **filelist = *(char ***)context;
+char FullPath[PATH_MAX + 1];
+int listcount = 0;
+
+snprintf (FullPath, sizeof (FullPath), "%s%s", directory, filename);
+if (filelist != NULL) {
+    while (filelist[listcount++] != NULL);
+    --listcount;
+    }
+filelist = (char **)realloc (filelist, (listcount + 2) * sizeof (*filelist));
+filelist[listcount] = strdup (FullPath);
+filelist[listcount + 1] = NULL;
+*(char ***)context = filelist;
+}
+
+char **sim_get_filelist (const char *filename)
+{
+char **filelist = NULL;
+
+sim_dir_scan (filename, _sim_filelist_entry, &filelist);
+return filelist;
+}
+
+void sim_free_filelist (char ***pfilelist)
+{
+char **listp = *pfilelist;
+
+if (listp == NULL)
+    return;
+while (*listp != NULL)
+    free (*listp++);
+free (*pfilelist);
+*pfilelist = NULL;
+}
+
+void sim_print_filelist (char **filelist)
+{
+if (filelist == NULL)
+    return;
+while (*filelist != NULL)
+    sim_printf ("%s\n", *filelist++);
 }
 
 
@@ -913,7 +971,7 @@ return getcwd (buf, buf_size);
  *
  * In the above example above %I% can be replaced by other 
  * environment variables or numeric parameters to a DO command
- * invokation.
+ * invocation.
  */
 
 char *sim_filepath_parts (const char *filepath, const char *parts)

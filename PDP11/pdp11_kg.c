@@ -137,6 +137,78 @@ extern int32 R[];
 #define POLY_CRC16      (0xa001)
 #define POLY_CCITT      (0x8408)
 
+static const char *polys[] = {
+        "CRC-12",
+        "CRC-16",
+        "LRC-8",
+        "LRC-16",
+        "undefined",
+        "CRC-CCITT",
+        "undefined",
+        "undefined"
+    };
+
+static const char *polypulse[] = {
+                                                        /* DDB=0 */
+        "6",
+        "8",
+        "8",
+        "8",
+        "0",
+        "8",
+        "0",
+        "0",
+                                                        /* DDB=1 */
+        "12",
+        "16",
+        "16",
+        "16",
+        "0",
+        "16",
+        "0",
+        "0"
+};
+
+static BITFIELD kg_csr_bits[] = {
+    BITF(MODESEL,3),                        /* mode select */
+    BIT(DDB),                               /* double data byte */
+    BIT(CLR),                               /* clear */
+    BIT(STEP),                              /* single step */
+    BIT(SEN),                               /* shift enable */
+    BIT(DONE),                              /* operation complete */
+    BIT(QUO),                               /* quotient */
+    BITNCF(7),                              /* not used */
+    BITFNAM(pulses,4,polypulse),
+    STARTBIT,                               /* restart Bits */
+    BITFNAM(poly,3,polys),
+    STARTBIT,                               /* restart Bits */
+    ENDBITS
+    };
+
+static BITFIELD kg_bcc_bits[] = {
+    BITF(CRC12-1,6),                        /* CRC-12 (1st char) */
+    BITNCF(2),                              /* not used */
+    BITF(CRC12-2,6),                        /* CRC-12 (2nd char) */
+    BITNCF(2),                              /* not used */
+    STARTBIT,                               /* restart Bits */
+    BITFFMT(CRC16-1,8,0x%02X),              /* CRC-16 (1st char) */
+    BITFFMT(CRC16-2,8,0x%02X),              /* CRC-16 (2nd char) */
+    STARTBIT,                               /* restart Bits */
+    BITFFMT(LRC16,16,0x%04X),               /* LRC-16 */
+    ENDBITS
+    };
+
+static BITFIELD kg_dr_bits[] = {
+    BITFFMT(DR,16,0x%04X),                  /* Data Register */
+    ENDBITS
+    };
+
+static BITFIELD* kg_bitdefs[] = {kg_csr_bits, kg_bcc_bits, kg_dr_bits, kg_dr_bits};
+
+
+static const char *kg_regs[] =
+    {"CSR", "BCC", "DR", "UNKNOWN"};
+
 static const struct {
     uint16              poly;
     uint16              pulses;
@@ -202,20 +274,20 @@ static DIB kg_dib = {
 
 static UNIT kg_unit[KG_UNITS];
 
-static const REG kg_reg[] = {
-    { URDATAD (SR,           kg_unit[0].u3, DEV_RDX, 16, 0, KG_UNITS, 0, "control and status register; R/W") },
-    { URDATAD (BCC,          kg_unit[0].u4, DEV_RDX, 16, 0, KG_UNITS, 0, "result block check character; R/O") },
-    { URDATAD (DR,           kg_unit[0].u5, DEV_RDX, 16, 0, KG_UNITS, 0, "input data register; W/O") },
-    { URDATAD (PULSCNT,      kg_unit[0].u6, DEV_RDX, 16, 0, KG_UNITS, 0, "polynomial cycle stage") },
-    { ORDATA  (DEVADDR,          kg_dib.ba, 32), REG_HRO },
-    { NULL }
-};
-
 /* Unit structure redefinitions */
 #define SR              u3
 #define BCC             u4
 #define DR              u5
 #define PULSCNT         u6
+
+static const REG kg_reg[] = {
+    { URDATADF (SR,           kg_unit[0].SR, DEV_RDX, 16, 0, KG_UNITS, 0, "control and status register; R/W", kg_csr_bits) },
+    { URDATADF (BCC,          kg_unit[0].BCC, DEV_RDX, 16, 0, KG_UNITS, 0, "result block check character; R/O", kg_bcc_bits) },
+    { URDATADF (DR,           kg_unit[0].DR, DEV_RDX, 16, 0, KG_UNITS, 0, "input data register; W/O", kg_dr_bits) },
+    { URDATAD (PULSCNT,       kg_unit[0].PULSCNT, DEV_RDX, 16, 0, KG_UNITS, 0, "polynomial cycle stage") },
+    { ORDATA  (DEVADDR,       kg_dib.ba, 32), REG_HRO },
+    { NULL }
+};
 
 static const MTAB kg_mod[] = {
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 020, "ADDRESS", NULL,
@@ -230,9 +302,9 @@ static const MTAB kg_mod[] = {
 #define DBG_CYCLE       (04)
 
 static const DEBTAB kg_debug[] = {
-    {"REG",   DBG_REG},
-    {"POLY",  DBG_POLY},
-    {"CYCLE", DBG_CYCLE},
+    {"REG",   DBG_REG,   "Register Access"},
+    {"POLY",  DBG_POLY,  "Polygon changes"},
+    {"CYCLE", DBG_CYCLE, "Computed changes while processing"},
     {0},
 };
 
@@ -264,19 +336,14 @@ static t_stat kg_rd (int32 *data, int32 PA, int32 access)
 
     if ((unit >= KG_UNITS) || (kg_unit[unit].flags & UNIT_DIS))
         return (SCPE_NXM);
+
     switch ((PA >> 1) & 03) {
 
         case 00:                                        /* SR */
-            if (DEBUG_PRI(kg_dev, DBG_REG))
-                fprintf (sim_deb, ">>KG%d: rd SR %06o, PC %06o\n",
-                         unit, kg_unit[unit].SR, PC);
             *data = kg_unit[unit].SR & KG_SR_RDMASK;
             break;
 
         case 01:                                        /* BCC */
-            if (DEBUG_PRI(kg_dev, DBG_REG))
-                fprintf (sim_deb, ">>KG%d rd BCC %06o, PC %06o\n",
-                         unit, kg_unit[unit].BCC, PC);
             *data = kg_unit[unit].BCC & DMASK;
             break;
 
@@ -286,6 +353,8 @@ static t_stat kg_rd (int32 *data, int32 PA, int32 access)
         default:
             break;
     }
+    sim_debug (DBG_REG, &kg_dev, "kg_rd(PA=%o [%s], access=%d, data=0x%X) ", PA, kg_regs[(PA >> 1) & 03], access, *data);
+    sim_debug_bits(DBG_REG, &kg_dev, kg_bitdefs[(PA >> 1) & 03], (uint32)(*data), (uint32)(*data), TRUE);
     return (SCPE_OK);
 }
 
@@ -293,9 +362,15 @@ static t_stat kg_wr (int32 data, int32 PA, int32 access)
 {
     int setup;
     int unit = (PA >> 3) & 07;
+    int32 saved_SR, saved_BCC, saved_DR;
 
     if ((unit >= KG_UNITS) || (kg_unit[unit].flags & UNIT_DIS))
         return (SCPE_NXM);
+
+    saved_SR = kg_unit[unit].SR;
+    saved_BCC = kg_unit[unit].BCC;
+    saved_DR = kg_unit[unit].DR;
+    sim_debug (DBG_REG, &kg_dev, "kg_wr(PA=%o [%s], access=%d, data=0x%X) PC=%06o ", PA, kg_regs[(PA >> 1) & 03], access, data, PC);
     switch ((PA >> 1) & 03) {
 
         case 00:                                        /* SR */
@@ -303,9 +378,7 @@ static t_stat kg_wr (int32 data, int32 PA, int32 access)
                 data = (PA & 1) ?
                     (kg_unit[unit].SR & 0377) | (data << 8) :
                     (kg_unit[unit].SR & ~0377) | data;
-            if (DEBUG_PRI(kg_dev, DBG_REG))
-                fprintf (sim_deb, ">>KG%d: wr SR %06o, PC %06o\n",
-                         unit, data, PC);
+            sim_debug_bits(DBG_REG, &kg_dev, kg_bitdefs[00], (uint32)saved_SR, (uint32)data, TRUE);
             if (data & KGSR_M_CLR) {
                 kg_unit[unit].PULSCNT = 0;              /* not sure about this */
                 kg_unit[unit].BCC = 0;
@@ -317,10 +390,12 @@ static t_stat kg_wr (int32 data, int32 PA, int32 access)
                                                         /* if  low 4b changed, reset C1 & C2 */
             if (setup) {
                 kg_unit[unit].PULSCNT = 0;
-                if (DEBUG_PRI(kg_dev, DBG_POLY))
-                    fprintf (sim_deb, ">>KG%d poly %s %d\n",
-                             unit, config[data & 017].name, config[data & 017].pulses);
             }
+            if ((saved_SR & KG_SR_POLYMASK) != (data & KG_SR_POLYMASK))
+                sim_debug_bits(DBG_POLY, &kg_dev, kg_bitdefs[00], (uint32)saved_SR, (uint32)data, FALSE);
+            sim_debug_bits(DBG_REG, &kg_dev, kg_bitdefs[00], (uint32)saved_SR, (uint32)data, FALSE);
+            sim_debug_bits(DBG_REG, &kg_dev, kg_bitdefs[01], (uint32)saved_BCC, (uint32)data, FALSE);
+            sim_debug_bits(DBG_REG, &kg_dev, kg_bitdefs[02], (uint32)saved_DR, (uint32)data, TRUE);
             if (data & KGSR_M_SEN)
                 break;
             if (data & KGSR_M_STEP) {
@@ -330,6 +405,7 @@ static t_stat kg_wr (int32 data, int32 PA, int32 access)
             break;
 
         case 01:                                        /* BCC */
+            sim_debug_bits(DBG_REG, &kg_dev, kg_bitdefs[(PA >> 1) & 03], (uint32)saved_BCC, (uint32)data, TRUE);
             break;                                      /* ignored */
 
         case 02:                                        /* DR */
@@ -338,10 +414,9 @@ static t_stat kg_wr (int32 data, int32 PA, int32 access)
                     (kg_unit[unit].DR & 0377) | (data << 8) :
                     (kg_unit[unit].DR & ~0377) | data;
             kg_unit[unit].DR = data & DMASK;
-            if (DEBUG_PRI(kg_dev, DBG_REG))
-                fprintf (sim_deb, ">>KG%d: wr DR %06o, data %06o, PC %06o\n",
-                         unit, kg_unit[unit].DR, data, PC);
+            sim_debug_bits(DBG_REG, &kg_dev, kg_bitdefs[02], (uint32)saved_DR, (uint32)data, TRUE);
             kg_unit[unit].SR &= ~KGSR_M_DONE;
+            kg_unit[unit].PULSCNT = 0;
 
 /* In a typical device, this is normally where we would use sim_activate()
    to initiate an I/O to be completed later.  The KG is a little
@@ -357,6 +432,8 @@ static t_stat kg_wr (int32 data, int32 PA, int32 access)
 
             if (kg_unit[unit].SR & KGSR_M_SEN)
                 do_poly (unit, FALSE);
+            sim_debug (DBG_REG, &kg_dev, ">>KG%d: wr DR %06o[0x%x], data %06o[0x%x], PC %06o\n",
+                                         unit, kg_unit[unit].DR, kg_unit[unit].DR, data, data, PC);
             break;
 
         default:
@@ -371,8 +448,7 @@ static t_stat kg_reset (DEVICE *dptr)
 {
     int i;
 
-    if (DEBUG_PRI(kg_dev, DBG_REG))
-        fprintf (sim_deb, ">>KG: reset PC %06o\n", PC);
+    sim_debug (DBG_REG, &kg_dev, ">>KG: reset PC %06o\n", PC);
     for (i = 0; i < KG_UNITS; i++) {
         kg_unit[i].SR = KGSR_M_DONE;
         kg_unit[i].BCC = 0;
@@ -386,9 +462,8 @@ static void cycleOneBit (int unit)
 {
     int quo;
 
-    if (DEBUG_PRI(kg_dev, DBG_CYCLE))
-        fprintf (sim_deb, ">>KG%d: cycle s BCC %06o DR %06o\n",
-           unit, kg_unit[unit].BCC, kg_unit[unit].DR);
+    sim_debug (DBG_CYCLE, &kg_dev, ">>KG%d: cycle s BCC %06o DR %06o\n",
+                                   unit, kg_unit[unit].BCC, kg_unit[unit].DR);
     if (kg_unit[unit].SR & KGSR_M_DONE)
         return;
     if ((kg_unit[unit].SR & KG_SR_POLYMASK) == 0)
@@ -413,9 +488,9 @@ static void cycleOneBit (int unit)
     kg_unit[unit].PULSCNT++;
     if (kg_unit[unit].PULSCNT >= config[kg_unit[unit].SR & 017].pulses)
         kg_unit[unit].SR |= KGSR_M_DONE;
-    if (DEBUG_PRI(kg_dev, DBG_CYCLE))
-        fprintf (sim_deb, ">>KG%d: cycle e BCC %06o DR %06o\n",
-            unit, kg_unit[unit].BCC, kg_unit[unit].DR);
+    sim_debug (DBG_CYCLE, &kg_dev, ">>KG%d: cycle e BCC %06o DR %06o PULSCNT %06o\n",
+                                    unit, kg_unit[unit].BCC, kg_unit[unit].DR,
+                                    kg_unit[unit].PULSCNT);
 }
 
 static void do_poly (int unit, t_bool step)

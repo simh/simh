@@ -1898,8 +1898,16 @@ static t_stat sim_set_rem_telnet (int32 flag, CONST char *cptr)
 t_stat r;
 
 if (flag) {
-    r = sim_parse_addr (cptr, NULL, 0, NULL, NULL, 0, NULL, NULL);
+    char gbuf[CBUFSIZE];
+    char *cp;
+
+    strlcpy (gbuf, cptr, sizeof (gbuf));
+    if ((cp = strchr (gbuf, ';')))
+        *cp = '\0';
+    r = sim_parse_addr (gbuf, NULL, 0, NULL, NULL, 0, NULL, NULL);
     if (r == SCPE_OK) {
+        if (cp != NULL)
+            *cp = ';';
         if (sim_rem_con_tmxr.master)                        /* already open? */
             sim_set_rem_telnet (0, NULL);                   /* close first */
         if (sim_rem_con_tmxr.lines == 0)                    /* if no connection limit set */
@@ -2473,6 +2481,8 @@ while (*cptr != 0) {                                    /* do all mods */
             return r;
         }
     else {
+        if (cvptr)                                      /* if we removed a = sign */
+            *(--cvptr) = '=';                           /* restore it */
         if (sim_con_tmxr.master)                        /* already open? */
             sim_set_notelnet (0, NULL);                 /* close first */
         r = tmxr_attach (&sim_con_tmxr, &sim_con_unit, gbuf);/* open master socket */
@@ -2897,8 +2907,10 @@ if (!sim_rem_master_mode) {
         }
     }
 tmxr_poll_rx (&sim_con_tmxr);                               /* poll for input */
-if ((c = (t_stat)tmxr_getc_ln (&sim_con_ldsc)))             /* any char? */ 
+if ((c = (t_stat)tmxr_getc_ln (&sim_con_ldsc))) {           /* any char? */ 
+    sim_debug (DBG_RCV, &sim_con_telnet, "sim_poll_kbd() tmxr_getc_ln() returning: '%c' (0x%02X)\n", sim_isprint (c & 0xFF) ? c & 0xFF : '.', c);
     return (c & (SCPE_BREAK | 0377)) | SCPE_KFLAG;
+    }
 return SCPE_OK;
 }
 

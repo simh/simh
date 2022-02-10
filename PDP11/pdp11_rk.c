@@ -105,6 +105,7 @@
 #define RK_NUMDR        8                               /* drives/controller */
 #define RK_M_NUMDR      07
 #define RK_SIZE         (RK_NUMCY * RK_NUMSF * RK_NUMSC * RK_NUMWD)
+#define RK_RSRVSEC      (3 * RK_NUMSF * RK_NUMSC)       /* reserved (unused) disk area */
                                                         /* words/drive */
 #define RK_CTLI         1                               /* controller int */
 #define RK_SCPI(x)      (2u << (x))                     /* drive int */
@@ -912,9 +913,9 @@ t_stat rk_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 
-r = sim_disk_attach_ex (uptr, cptr, RK_NUMWD * sizeof (uint16), 
-                        sizeof (uint16), TRUE, 0, 
-                        "RK05", 0, 0, NULL);
+r = sim_disk_attach_ex2 (uptr, cptr, RK_NUMWD * sizeof (uint16), 
+                         sizeof (uint16), TRUE, 0, 
+                         "RK05", 0, 0, NULL, RK_RSRVSEC);
 if (r != SCPE_OK)                                       /* error? */
     return r;
 return SCPE_OK;

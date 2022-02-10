@@ -1709,7 +1709,7 @@ switch (dev->devtype) {
         return sim_disk_attach_ex (uptr, cptr, dev->block_size, sizeof (uint16), (uptr->flags & SCSI_NOAUTO), SCSI_DBG_DSK, dev->name, 0, 0, drivetypes);
     case SCSI_CDROM:
         sim_switches |= SWMASK ('R');       /* Force Read Only Attach for CDROM */
-        return sim_disk_attach_ex (uptr, cptr, dev->block_size, sizeof (uint16), (uptr->flags & SCSI_NOAUTO), SCSI_DBG_DSK, dev->name, 0, 0, drivetypes);
+        return sim_disk_attach_ex (uptr, cptr, dev->block_size, sizeof (uint16), FALSE, SCSI_DBG_DSK, dev->name, 0, 0, drivetypes);
     case SCSI_TAPE:
         return sim_tape_attach_ex (uptr, cptr, SCSI_DBG_TAP, 0);
     default:
