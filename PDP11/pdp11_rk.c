@@ -129,8 +129,10 @@ static struct drvtyp drv_tab[] = {
 /* Flags in the unit flags word */
 
 #define UNIT_V_SWLK     (DKUF_V_UF + 0)                 /* swre write lock */
+#define UNIT_V_NOAUTO   (UNIT_V_SWLK + 1)               /* autosize */
 #define UNIT_HWLK       UNIT_WPRT
 #define UNIT_SWLK       (1u << UNIT_V_SWLK)
+#define UNIT_NOAUTO     (1u << UNIT_V_NOAUTO)
 #define GET_DTYPE(x)    (0)
 
 /* Parameters in the unit descriptor */
@@ -430,6 +432,10 @@ MTAB rk_mod[] = {
         &set_writelock, NULL,   NULL, "Write lock tape drive" },
     { MTAB_XTD|MTAB_VUN, 0, "TYPE", NULL,
       NULL, &rk_show_type, NULL, "Display device type" },
+    { UNIT_NOAUTO,           0, "autosize", "AUTOSIZE", 
+      NULL, NULL, NULL, "Set type based on file size at attach" },
+    { UNIT_NOAUTO, UNIT_NOAUTO, "noautosize",   "NOAUTOSIZE",   
+      NULL, NULL, NULL, "Disable disk autosize on attach" },
     { MTAB_XTD|MTAB_VUN|MTAB_VALR, 0, "FORMAT", "FORMAT={AUTO|SIMH|VHD|RAW}",
       &sim_disk_set_fmt, &sim_disk_show_fmt, NULL, "Set/Display disk format" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 010, "ADDRESS", "ADDRESS",
@@ -912,10 +918,13 @@ return auto_config (0, 0);
 t_stat rk_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
+static const char *drives[] = {"RK05", NULL};
 
 r = sim_disk_attach_ex2 (uptr, cptr, RK_NUMWD * sizeof (uint16), 
                          sizeof (uint16), TRUE, 0, 
-                         "RK05", 0, 0, NULL, RK_RSRVSEC);
+                         "RK05", 0, 0, 
+                         (uptr->flags & UNIT_NOAUTO) ? NULL: drives,
+                         RK_RSRVSEC);
 if (r != SCPE_OK)                                       /* error? */
     return r;
 return SCPE_OK;
