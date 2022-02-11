@@ -2796,7 +2796,7 @@ if ((DK_GET_FMT (uptr) == DKUF_F_VHD) || (ctx->footer)) {
                 }
             else { /* Type already matches, Need to confirm compatibility */
                 t_addr saved_capac = uptr->capac;
-                t_lba current_unit_sectors = (t_lba)((uptr->capac*ctx->capac_factor)/(ctx->sector_size/((dptr->flags & DEV_SECTORS) ? ctx->sector_size : 1)));
+                t_lba current_unit_sectors = (t_lba)((dptr->flags & DEV_SECTORS) ? uptr->capac : (uptr->capac*ctx->capac_factor)/ctx->sector_size);
 
                 if ((container_sector_size != 0) && (sector_size != container_sector_size))
                     r = sim_messagef (SCPE_OPENERR, "%s: Incompatible Container Sector Size %d\n", sim_uname (uptr), container_sector_size);
@@ -2804,10 +2804,17 @@ if ((DK_GET_FMT (uptr) == DKUF_F_VHD) || (ctx->footer)) {
                     if (dontchangecapac && 
                         ((((t_lba)(ctx->container_size/sector_size) > current_unit_sectors)) ||
                          ((container_sectors != 0) && (container_sectors != current_unit_sectors)))) {
+                         r = sim_messagef (SCPE_OK, "%s: Container has %u sectors, drive has: %u sectors\n", sim_uname (uptr), container_sectors, current_unit_sectors);
                          if (container_sectors != 0)
                              r = sim_messagef (SCPE_INCOMPDSK, "%s: %s container created by the %s simulator is incompatible with the %s device on the %s simulator\n", sim_uname (uptr), container_dtype, created_name, uptr->dptr->name, sim_name);
                          else
                              r = sim_messagef (SCPE_INCOMPDSK, "%s: disk container %s is incompatible with the %s device\n", sim_uname (uptr), uptr->filename, uptr->dptr->name);
+                         if ((uptr->flags & UNIT_RO) != 0)
+                             r = sim_messagef (SCPE_OK, "%s: Read Only access to incompatible %s container '%s' allowed\n", sim_uname (uptr), container_dtype, uptr->filename);
+                         if (container_sectors < current_unit_sectors) {
+                             r = sim_messagef (SCPE_BARE_STATUS (r), "%s: Since the container is smaller than the drive, this might be useful:\n", sim_uname (uptr));
+                             r = sim_messagef (SCPE_BARE_STATUS (r), "%s:   sim> ATTACH %s -C New-%s %s\n", sim_uname (uptr), sim_uname (uptr), uptr->filename, uptr->filename);
+                             }
                         }
                     }
                 if (r == SCPE_OK) {
