@@ -227,8 +227,11 @@
 #define RD54_FLGS       0
 
 #define UNIT_V_DTYPE    (DKUF_V_UF + 0)                 /* drive type */
-#define UNIT_M_DTYPE    0xF
+#define UNIT_W_DTYPE    3                               /* 3b drive type encode */
+#define UNIT_M_DTYPE    ((1u << UNIT_W_DTYPE) - 1)
+#define UNIT_V_NOAUTO   (UNIT_V_DTYPE + UNIT_W_DTYPE)   /* noautosize */
 #define UNIT_DTYPE      (UNIT_M_DTYPE << UNIT_V_DTYPE)
+#define UNIT_NOAUTO     (1 << UNIT_V_NOAUTO)
 
 struct drvtyp {
     int32       sect;                                   /* sectors */
@@ -367,6 +370,8 @@ MTAB rd_mod[] = {
       &rd_set_type, NULL, NULL, "Set RD54 Disk Type" },
     { MTAB_XTD|MTAB_VUN, 0, "TYPE", NULL,
       NULL, &rd_show_type, NULL, "Display device type" },
+    { UNIT_NOAUTO, UNIT_NOAUTO, "noautosize", "NOAUTOSIZE", NULL, NULL, NULL, "Disable disk autosize on attach" },
+    { UNIT_NOAUTO,           0, "autosize",   "AUTOSIZE",   NULL, NULL, NULL, "Enable disk autosize on attach" },
     { MTAB_XTD|MTAB_VUN | MTAB_VALR, 0, "FORMAT", "FORMAT={SIMH|VHD|RAW}",
       &sim_disk_set_fmt, &sim_disk_show_fmt, NULL, "Display disk format" },
     { 0 }
@@ -863,9 +868,12 @@ return SCPE_OK;
 
 t_stat rd_attach (UNIT *uptr, CONST char *cptr)
 {
-return sim_disk_attach (uptr, cptr, RD_NUMBY,
-                        sizeof (uint8), TRUE, DBG_DSK,
-                        drv_tab[GET_DTYPE (uptr->flags)].name, 0, 0);
+const char *drives[] = {"RX33", "RD31", "RD32", "RD53", "RD54", };
+
+return sim_disk_attach_ex (uptr, cptr, RD_NUMBY,
+                           sizeof (uint8), TRUE, DBG_DSK,
+                           drv_tab[GET_DTYPE (uptr->flags)].name, 0, 0,
+                           (uptr->flags & UNIT_NOAUTO) ? NULL: drives);
 }
 
 /* Detach routine */
