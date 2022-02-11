@@ -99,14 +99,13 @@ static struct drvtyp drv_tab[] = {
 /* Flags in the unit flags word */
 
 #define UNIT_V_DTYPE    (DKUF_V_UF + 0)                 /* disk type */
-#define UNIT_V_AUTO     (UNIT_V_DTYPE + 1)              /* autosize */
-#define UNIT_V_DUMMY    (UNIT_V_AUTO + 1)               /* dummy flag */
+#define UNIT_V_DUMMY    (UNIT_V_DTYPE + 1)               /* dummy flag */
 #define UNIT_DTYPE      (1 << UNIT_V_DTYPE)
 #define  UNIT_RK06      (0 << UNIT_V_DTYPE)
 #define  UNIT_RK07      (1 << UNIT_V_DTYPE)
-#define UNIT_AUTO       (1 << UNIT_V_AUTO)
 #define UNIT_DUMMY      (1 << UNIT_V_DUMMY)
 #define GET_DTYPE(x)    (((x) >> UNIT_V_DTYPE) & 1)
+#define UNIT_NOAUTO     DKUF_NOAUTOSIZE
 
 /* Parameters in the unit descriptor */
 
@@ -603,21 +602,21 @@ DIB hk_dib = {
     };
 
 UNIT hk_unit[] = {
-    { UDATA (&hk_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_AUTO+
+    { UDATA (&hk_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
              UNIT_ROABLE+UNIT_RK06, RK06_SIZE) },
-    { UDATA (&hk_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_AUTO+
+    { UDATA (&hk_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
              UNIT_ROABLE+UNIT_RK06, RK06_SIZE) },
-    { UDATA (&hk_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_AUTO+
+    { UDATA (&hk_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
              UNIT_ROABLE+UNIT_RK06, RK06_SIZE) },
-    { UDATA (&hk_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_AUTO+
+    { UDATA (&hk_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
              UNIT_ROABLE+UNIT_RK06, RK06_SIZE) },
-    { UDATA (&hk_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_AUTO+
+    { UDATA (&hk_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
              UNIT_ROABLE+UNIT_RK06, RK06_SIZE) },
-    { UDATA (&hk_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_AUTO+
+    { UDATA (&hk_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
              UNIT_ROABLE+UNIT_RK06, RK06_SIZE) },
-    { UDATA (&hk_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_AUTO+
+    { UDATA (&hk_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
              UNIT_ROABLE+UNIT_RK06, RK06_SIZE) },
-    { UDATA (&hk_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_AUTO+
+    { UDATA (&hk_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
              UNIT_ROABLE+UNIT_RK06, RK06_SIZE) }
     };
 
@@ -673,9 +672,9 @@ MTAB hk_mod[] = {
       &hk_set_type, NULL, NULL, "Set RK07 Disk Type" },
     { MTAB_XTD|MTAB_VUN, 0, "TYPE", NULL,
       NULL, &hk_show_type, NULL, "Display device type" },
-    { UNIT_AUTO, UNIT_AUTO, "autosize", "AUTOSIZE", 
+    { UNIT_NOAUTO,       0, "autosize", "AUTOSIZE", 
       NULL, NULL, NULL, "Set type based on file size at attach" },
-    { UNIT_AUTO,         0, "noautosize",   "NOAUTOSIZE",   
+    { UNIT_NOAUTO, UNIT_NOAUTO, "noautosize",   "NOAUTOSIZE",   
       NULL, NULL, NULL, "Disable disk autosize on attach" },
     { MTAB_XTD|MTAB_VUN|MTAB_VALR, 0, "FORMAT", "FORMAT={AUTO|SIMH|VHD|RAW}",
       &sim_disk_set_fmt, &sim_disk_show_fmt, NULL, "Set/Display disk format" },
@@ -1510,7 +1509,7 @@ uptr->capac = HK_SIZE (uptr);
 r = sim_disk_attach_ex (uptr, cptr, HK_NUMWD * sizeof (uint16), 
                         sizeof (uint16), TRUE, 0, 
                         (uptr->capac == RK06_SIZE) ? "RK06" : "RK07", HK_NUMSC, 0,
-                        (uptr->flags & UNIT_AUTO) ? drives : NULL);
+                        (uptr->flags & UNIT_NOAUTO) ? NULL : drives);
 if (r != SCPE_OK)                                       /* error? */
     return r;
 drv = (uint32) (uptr - hk_dev.units);                   /* get drv number */

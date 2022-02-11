@@ -160,10 +160,9 @@ extern int32 MMR2;
 #define UNIT_V_DTYPE    (UNIT_V_ATP + 1)                /* drive type */
 #define UNIT_W_DTYPE    5                               /* 5b drive type encode */
 #define UNIT_M_DTYPE    ((1u << UNIT_W_DTYPE) - 1)
-#define UNIT_V_NOAUTO   (UNIT_V_DTYPE + UNIT_W_DTYPE)   /* noautosize */
 #define UNIT_ONL        (1 << UNIT_V_ONL)
 #define UNIT_ATP        (1 << UNIT_V_ATP)
-#define UNIT_NOAUTO     (1 << UNIT_V_NOAUTO)
+#define UNIT_NOAUTO     DKUF_NOAUTOSIZE                 /* noautosize */
 #define UNIT_DTYPE      (UNIT_M_DTYPE << UNIT_V_DTYPE)
 #define GET_DTYPE(x)    (((x) >> UNIT_V_DTYPE) & UNIT_M_DTYPE)
 #define cpkt            us9                             /* current packet */

@@ -229,9 +229,8 @@
 #define UNIT_V_DTYPE    (DKUF_V_UF + 0)                 /* drive type */
 #define UNIT_W_DTYPE    3                               /* 3b drive type encode */
 #define UNIT_M_DTYPE    ((1u << UNIT_W_DTYPE) - 1)
-#define UNIT_V_NOAUTO   (UNIT_V_DTYPE + UNIT_W_DTYPE)   /* noautosize */
 #define UNIT_DTYPE      (UNIT_M_DTYPE << UNIT_V_DTYPE)
-#define UNIT_NOAUTO     (1 << UNIT_V_NOAUTO)
+#define UNIT_NOAUTO     DKUF_NOAUTOSIZE
 
 struct drvtyp {
     int32       sect;                                   /* sectors */

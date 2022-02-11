@@ -129,10 +129,9 @@ static struct drvtyp drv_tab[] = {
 /* Flags in the unit flags word */
 
 #define UNIT_V_SWLK     (DKUF_V_UF + 0)                 /* swre write lock */
-#define UNIT_V_NOAUTO   (UNIT_V_SWLK + 1)               /* autosize */
 #define UNIT_HWLK       UNIT_WPRT
 #define UNIT_SWLK       (1u << UNIT_V_SWLK)
-#define UNIT_NOAUTO     (1u << UNIT_V_NOAUTO)
+#define UNIT_NOAUTO     DKUF_NOAUTOSIZE                 /* autosize disabled */
 #define GET_DTYPE(x)    (0)
 
 /* Parameters in the unit descriptor */

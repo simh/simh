@@ -48,10 +48,12 @@ typedef uint32          t_lba;                          /* disk logical block ad
 #define DKUF_F_STD       1                              /* SIMH format */
 #define DKUF_F_RAW       2                              /* Raw Physical Disk Access */
 #define DKUF_F_VHD       3                              /* VHD format */
-#define DKUF_V_UF       (DKUF_V_FMT + DKUF_W_FMT)
+#define DKUF_V_NOAUTOSIZE (DKUF_V_FMT + DKUF_W_FMT)     /* Don't Autosize disk option */
+#define DKUF_V_UF       (DKUF_V_NOAUTOSIZE + 1)
 #define DKUF_WLK        UNIT_WLK
 #define DKUF_FMT        (DKUF_M_FMT << DKUF_V_FMT)
 #define DKUF_WRP        (DKUF_WLK | UNIT_RO)
+#define DKUF_NOAUTOSIZE (1 << DKUF_V_NOAUTOSIZE)
 
 #define DK_F_STD        (DKUF_F_STD << DKUF_V_FMT)
 #define DK_F_RAW        (DKUF_F_RAW << DKUF_V_FMT)
