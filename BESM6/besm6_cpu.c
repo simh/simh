@@ -274,6 +274,7 @@ DEVICE *sim_devices[] = {
     &reg_dev,
     &drum_dev,
     &disk_dev,
+    &mg_dev,
     &mmu_dev,
     &clock_dev,
     &printer_dev,
@@ -569,8 +570,11 @@ static void cmd_033 ()
          * с магнитными дисками */
         disk_io (Aex - 3, (uint32) ACC);
         break;
-    case 5: case 6: case 7:
-        /* TODO: управление обменом с магнитными лентами */
+    case 5: case 6:
+        /* управление обменом с магнитными лентами */
+        mg_io (Aex - 3, (uint32) ACC);
+        break;
+    case 7:
         longjmp (cpu_halt, STOP_UNIMPLEMENTED);
         break;
     case 010: case 011:
@@ -627,7 +631,7 @@ static void cmd_033 ()
         break;
     case 0141:
         /* TODO: formatting magnetic tape */
-        longjmp (cpu_halt, STOP_UNIMPLEMENTED);
+        mg_format ((uint32) ACC);
         break;
     case 0142:
         /* TODO: имитация сигналов прерывания ПРП */
@@ -720,7 +724,7 @@ static void cmd_033 ()
         break;
     case 04035:
         /* Опрос триггера ОШМi - наличие ошибок при внешнем обмене. */
-        ACC = drum_errors() | disk_errors();
+        ACC = drum_errors() | disk_errors() | mg_errors();
         break;
     case 04100:
         /* Опрос телеграфных каналов связи */
@@ -732,13 +736,12 @@ static void cmd_033 ()
         ACC = READY2;
         break;
     case 04103: case 04104: case 04105: case 04106:
-        /* Опрос состояния лентопротяжных механизмов.
-         * Все устройства не готовы. */
-        ACC = BITS(24);
+        /* Опрос состояния лентопротяжных механизмов. */
+        ACC = mg_state (Aex - 04103);
         break;
     case 04107:
-        /* TODO: опрос схемы контроля записи на МЛ */
-        longjmp (cpu_halt, STOP_UNIMPLEMENTED);
+        /* опрос схемы контроля записи на МЛ */
+        ACC = 0;
         break;
     case 04115:
         /* Неизвестное обращение. ДИСПАК выдаёт эту команду
@@ -772,7 +775,8 @@ static void cmd_033 ()
         if (0100 <= val && val <= 0137) {
             /* Управление лентопротяжными механизмами
              * и гашение разрядов регистров признаков
-             * окончания подвода зоны. Игнорируем. */
+             * окончания подвода зоны. */
+            mg_ctl(Aex - 0100, (uint32) ACC);
         } else if (04140 <= val && val <= 04157) {
             /* TODO: считывание строки перфокарты */
             longjmp (cpu_halt, STOP_UNIMPLEMENTED);
