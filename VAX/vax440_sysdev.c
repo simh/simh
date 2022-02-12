@@ -1077,14 +1077,18 @@ return SCPE_OK;
 
 t_stat cpu_print_model (FILE *st)
 {
+const char *model = "";
+
 fprintf (st, "%s", sim_name);
 #if defined (VAX_46)
-fprintf (st, "VAXstation 4000-60 (KA46)");
+model = "VAXstation 4000-60 (KA46)";
 #elif defined (VAX_47)
-fprintf (st, "MicroVAX 3100-80 (KA47)");
+model = "MicroVAX 3100-80 (KA47)";
 #elif defined (VAX_48)
-fprintf (st, "VAXstation 4000-VLC (KA48)");
+model = "VAXstation 4000-VLC (KA48)";
 #endif
+if (strcmp (sim_name, model) != 0)
+    fprintf (st, "%s", model);
 return SCPE_OK;
 }
 
