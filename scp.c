@@ -5821,37 +5821,43 @@ if ((dptr = find_dev (gbuf))) {                         /* device match? */
     lvl = MTAB_VDV;                                     /* device match */
     GET_SWITCHES (cptr);                                /* get more switches */
     }
-else if ((dptr = find_unit (gbuf, &uptr))) {            /* unit match? */
-    if (uptr == NULL)                                   /* invalid unit */
-        return SCPE_NXUN;
-    ctbr = set_unit_tab;                                /* global table */
-    lvl = MTAB_VUN;                                     /* unit match */
-    GET_SWITCHES (cptr);                                /* get more switches */
-    }
-else if ((gcmdp = find_ctab (set_glob_tab, gbuf))) {    /* global? */
-    GET_SWITCHES (cptr);                                /* get more switches */
-    return gcmdp->action (gcmdp->arg, cptr);            /* do the rest */
-    }
 else {
-    if (sim_dflt_dev->modifiers) {
-        if ((cvptr = strchr (gbuf, '=')))               /* = value? */
-            *cvptr++ = 0;
-        for (mptr = sim_dflt_dev->modifiers; mptr->mask != 0; mptr++) {
-            if (mptr->mstring && (MATCH_CMD (gbuf, mptr->mstring) == 0)) {
-                dptr = sim_dflt_dev;
-                cptr = svptr;
-                while (sim_isspace(*cptr))
-                    ++cptr;
-                break;
+    if ((dptr = find_unit (gbuf, &uptr))) {             /* unit match? */
+        if (uptr == NULL)                               /* invalid unit */
+            return SCPE_NXUN;
+        ctbr = set_unit_tab;                            /* global table */
+        lvl = MTAB_VUN;                                 /* unit match */
+        GET_SWITCHES (cptr);                            /* get more switches */
+        }
+    else {
+        if ((gcmdp = find_ctab (set_glob_tab, gbuf))) { /* global? */
+            GET_SWITCHES (cptr);                        /* get more switches */
+            return gcmdp->action (gcmdp->arg, cptr);    /* do the rest */
+            }
+        else {
+            if (sim_dflt_dev->modifiers) {
+                if ((cvptr = strchr (gbuf, '=')))       /* = value? */
+                    *cvptr++ = 0;
+                for (mptr = sim_dflt_dev->modifiers; mptr->mask != 0; mptr++) {
+                    if (mptr->mstring && (MATCH_CMD (gbuf, mptr->mstring) == 0)) {
+                        dptr = sim_dflt_dev;
+                        cptr = svptr;
+                        while (sim_isspace(*cptr))
+                            ++cptr;
+                        break;
+                        }
+                    }
                 }
+            if (!dptr)
+                return sim_messagef (SCPE_NXDEV, "Non-existent device: %s\n", gbuf);/* no match */
+            lvl = MTAB_VDV;                             /* device match */
+            uptr = dptr->units;                         /* first unit */
             }
         }
-    if (!dptr)
-        return sim_messagef (SCPE_NXDEV, "Non-existent device: %s\n", gbuf);/* no match */
-    lvl = MTAB_VDV;                                     /* device match */
-    uptr = dptr->units;                                 /* first unit */
     }
-if ((*cptr == 0) || (*cptr == ';') || (*cptr == '#'))   /* must be more */
+if ((*cptr == 0) ||                                     /* must be more */
+    (*cptr == ';') || 
+    (*cptr == '#'))
     return SCPE_2FARG;
 GET_SWITCHES (cptr);                                    /* get more switches */
 
@@ -6121,41 +6127,45 @@ if ((dptr = find_dev (gbuf))) {                         /* device match? */
     lvl = MTAB_VDV;                                     /* device match */
     GET_SWITCHES (cptr);                                /* get more switches */
     }
-else if ((dptr = find_unit (gbuf, &uptr))) {            /* unit match? */
-    if (uptr == NULL)                                   /* invalid unit */
-        return sim_messagef (SCPE_NXUN, "Non-existent unit: %s\n", gbuf);
-    if (uptr->flags & UNIT_DIS)                         /* disabled? */
-        return sim_messagef (SCPE_UDIS, "Unit disabled: %s\n", gbuf);
-    shtb = show_unit_tab;                               /* global table */
-    lvl = MTAB_VUN;                                     /* unit match */
-    GET_SWITCHES (cptr);                                /* get more switches */
-    }
-else if ((shptr = find_shtab (show_glob_tab, gbuf))) {  /* global? */
-    GET_SWITCHES (cptr);                                /* get more switches */
-    return shptr->action (ofile, NULL, NULL, shptr->arg, cptr);
-    }
 else {
-    if (sim_dflt_dev->modifiers) {
-        if ((cvptr = strchr (gbuf, '=')))               /* = value? */
-            *cvptr++ = 0;
-        for (mptr = sim_dflt_dev->modifiers; mptr && (mptr->mask != 0); mptr++) {
-            if ((((mptr->mask & MTAB_VDV) == MTAB_VDV) &&
-                 (mptr->pstring && (MATCH_CMD (gbuf, mptr->pstring) == 0))) ||
-                (!(mptr->mask & MTAB_VDV) && (mptr->mstring && (MATCH_CMD (gbuf, mptr->mstring) == 0)))) {
-                dptr = sim_dflt_dev;
-                lvl = MTAB_VDV;                         /* device match */
-                cptr = svptr;
-                while (sim_isspace(*cptr))
-                    ++cptr;
-                break;
+    if ((dptr = find_unit (gbuf, &uptr))) {             /* unit match? */
+        if (uptr == NULL)                               /* invalid unit */
+            return sim_messagef (SCPE_NXUN, "Non-existent unit: %s\n", gbuf);
+        if (uptr->flags & UNIT_DIS)                     /* disabled? */
+            return sim_messagef (SCPE_UDIS, "Unit disabled: %s\n", gbuf);
+        shtb = show_unit_tab;                           /* global table */
+        lvl = MTAB_VUN;                                 /* unit match */
+        GET_SWITCHES (cptr);                            /* get more switches */
+        }
+    else {
+        if ((shptr = find_shtab (show_glob_tab, gbuf))) {/* global? */
+            GET_SWITCHES (cptr);                        /* get more switches */
+            return shptr->action (ofile, NULL, NULL, shptr->arg, cptr);
+            }
+        else {
+            if (sim_dflt_dev->modifiers) {
+                if ((cvptr = strchr (gbuf, '=')))       /* = value? */
+                    *cvptr++ = 0;
+                for (mptr = sim_dflt_dev->modifiers; mptr && (mptr->mask != 0); mptr++) {
+                    if ((((mptr->mask & MTAB_VDV) == MTAB_VDV) &&
+                         (mptr->pstring && (MATCH_CMD (gbuf, mptr->pstring) == 0))) ||
+                        (!(mptr->mask & MTAB_VDV) && (mptr->mstring && (MATCH_CMD (gbuf, mptr->mstring) == 0)))) {
+                        dptr = sim_dflt_dev;
+                        lvl = MTAB_VDV;                 /* device match */
+                        cptr = svptr;
+                        while (sim_isspace(*cptr))
+                            ++cptr;
+                        break;
+                        }
+                    }
+                }
+            if (!dptr) {
+                if ((shptr = find_shtab (show_dev_tab, gbuf)))  /* global match? */
+                    return shptr->action (ofile, sim_dflt_dev, uptr, shptr->arg, cptr);
+                else
+                    return sim_messagef (SCPE_NXDEV, "Non-existent device: %s\n", gbuf);/* no match */
                 }
             }
-        }
-    if (!dptr) {
-        if ((shptr = find_shtab (show_dev_tab, gbuf)))  /* global match? */
-            return shptr->action (ofile, sim_dflt_dev, uptr, shptr->arg, cptr);
-        else
-            return sim_messagef (SCPE_NXDEV, "Non-existent device: %s\n", gbuf);/* no match */
         }
     }
 
@@ -6215,8 +6225,9 @@ return NULL;
 /* Show device and unit */
 
 static size_t dev_name_len;
+static size_t unit_name_len;
 
-const char *_sim_name_prefix (const char *name, const char *prefix)
+const char *_sim_name_prefix (const char *name, const char *prefix, size_t max_name_len)
 {
 static char nambuf[CBUFSIZE];
 size_t prefix_len = prefix ? strlen (prefix) : 0;
@@ -6224,20 +6235,20 @@ size_t name_len = name ? strlen (name) : 0;
 size_t string_len = prefix_len + name_len;
 
 snprintf (nambuf, sizeof (nambuf), "%s%*s", prefix ? prefix : "", 
-                                           ((string_len <= 6) && (dev_name_len <= 6)) ? -((int)(8 - prefix_len)) : 
-                                                                                        -((int)(dev_name_len + 2)), 
-                                           name ? name : "");
+                                            ((string_len <= 6) && (max_name_len <= 6)) ? -((int)(8 - prefix_len)) : 
+                                                                                        -((int)(max_name_len + 2)), 
+                                                                                        name ? name : "");
 return nambuf;
 }
 
 const char *_sim_dname_prefix (DEVICE *dptr, const char *prefix)
 {
-return _sim_name_prefix (sim_dname (dptr), prefix);
+return _sim_name_prefix (sim_dname (dptr), prefix, dev_name_len);
 }
 
 const char *_sim_uname_prefix (UNIT *uptr, const char *prefix)
 {
-return _sim_name_prefix (sim_uname (uptr), prefix);
+return _sim_name_prefix (sim_uname (uptr), prefix, unit_name_len);
 }
 
 const char *_sim_dname (DEVICE *dptr)
@@ -6255,12 +6266,32 @@ const char *_sim_dname_space (void)
 return _sim_dname_prefix (NULL, "");
 }
 
+void _set_dname_len (DEVICE *dptr)
+{
+uint32 i;
+
+if (dev_name_len < strlen (dptr->name))
+    dev_name_len = strlen (dptr->name);
+for (i = 0; i < dptr->numunits; i++) {
+    UNIT *uptr = &dptr->units[i];
+
+    if (((uptr->flags & UNIT_DIS) == 0) &&
+        (unit_name_len < strlen (sim_uname (uptr))))
+        unit_name_len = strlen (sim_uname (uptr));
+    }
+}
+
 t_stat show_device (FILE *st, DEVICE *dptr, int32 flag)
 {
 uint32 j, udbl, ucnt;
 UNIT *uptr;
 int32 toks = -1;
+t_bool did_set_dname_len = FALSE;
 
+if (dev_name_len == 0) {
+    _set_dname_len (dptr);
+    did_set_dname_len = TRUE;
+    }
 fprintf (st, "%s", _sim_dname (dptr));                   /* print dev name */
 if ((flag == 2) && dptr->description) {
     fprintf (st, "%s\n", dptr->description(dptr));
@@ -6309,6 +6340,8 @@ for (j = 0; j < dptr->numunits; j++) {                  /* loop thru units */
     if ((uptr->flags & UNIT_DIS) == 0)
         show_unit (st, dptr, uptr, ucnt + udbl);
     }
+if (did_set_dname_len)
+    dev_name_len = unit_name_len = 0;
 return SCPE_OK;
 }
 
@@ -6791,24 +6824,22 @@ t_bool only_enabled = (sim_switches & SWMASK ('E'));
 if (cptr && (*cptr != 0))
     return SCPE_2MARG;
 fprintf (st, "%s simulator configuration%s\n\n", sim_name, only_enabled ? " (enabled devices)" : "");
-for (i = dev_name_len = 0; (dptr = sim_devices[i]) != NULL; i++)
+for (i = dev_name_len = unit_name_len = 0; (dptr = sim_devices[i]) != NULL; i++)
     if (!only_enabled || !qdisable (dptr))
-        if (dev_name_len < strlen (dptr->name))
-            dev_name_len = strlen (dptr->name);
+        _set_dname_len (dptr);
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++)
     if (!only_enabled || !qdisable (dptr))
         show_device (st, dptr, flag);
 if (sim_switches & SWMASK ('I')) {
     for (i = dev_name_len = 0; sim_internal_device_count && (dptr = sim_internal_devices[i]); ++i)
         if (!only_enabled || !qdisable (dptr))
-            if (dev_name_len < strlen (dptr->name))
-                dev_name_len = strlen (dptr->name);
+            _set_dname_len (dptr);
     fprintf (st, "\nInternal Devices%s\n\n", only_enabled ? " (enabled devices)" : "");
     for (i = 0; sim_internal_device_count && (dptr = sim_internal_devices[i]); ++i)
         if (!only_enabled || !qdisable (dptr))
             show_device (st, dptr, flag);
     }
-dev_name_len = 0;
+dev_name_len = unit_name_len = 0;
 return SCPE_OK;
 }
 
