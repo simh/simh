@@ -579,13 +579,13 @@ struct UNIT {
     char                *filename;                      /* open file name */
     FILE                *fileref;                       /* file reference */
     void                *filebuf;                       /* memory buffer */
+    void                *filebuf2;                      /* copy of initial memory buffer */
     uint32              hwmark;                         /* high water mark */
     int32               time;                           /* time out */
     uint32              flags;                          /* flags */
     uint32              dynflags;                       /* dynamic flags */
     t_addr              capac;                          /* capacity */
     t_addr              pos;                            /* file position */
-    void                *filebuf2;                      /* copy of initial memory buffer */
     void                (*io_flush)(UNIT *up);          /* io flush routine */
     uint32              iostarttime;                    /* I/O start time */
     int32               buf;                            /* buffer */
@@ -900,7 +900,7 @@ struct MEMFILE {
 
  */
 
-#define UDATA(act,fl,cap) NULL,act,NULL,NULL,NULL,0,0,(fl),0,(cap),0,NULL,0,0
+#define UDATA(act,fl,cap) NULL,act,NULL,NULL,NULL,NULL,0,0,(fl),0,(cap),0,NULL,0,0
 
 /* Internal use ONLY (see below) Generic Register declaration for all fields */
 #define _REGDATANF(nm,loc,rdx,wd,off,dep,desc,flds,qptr,siz,elesiz,macro) \
