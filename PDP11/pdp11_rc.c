@@ -75,21 +75,22 @@
 #endif
 #include "pdp11_defs.h"
 #include <math.h>
+#include "sim_disk.h"
 
-#define UNIT_V_AUTO     (UNIT_V_UF + 0)                 /* autosize */
-#define UNIT_V_PLAT     (UNIT_V_UF + 1)                 /* #platters - 1 */
+#define UNIT_V_PLAT     (DKUF_V_UF + 0)                 /* #platters - 1 */
 #define UNIT_M_PLAT     03
 #define UNIT_GETP(x)    ((((x) >> UNIT_V_PLAT) & UNIT_M_PLAT) + 1)
-#define UNIT_AUTO       (1 << UNIT_V_AUTO)
+#define UNIT_NOAUTO     DKUF_NOAUTOSIZE
 #define UNIT_PLAT       (UNIT_M_PLAT << UNIT_V_PLAT)
 
 /* Constants */
 
-#define RC_NUMWD        (32*64)                         /* words/track */
+#define RC_NUMWD        32                              /* words/sector */
+#define RC_NUMSC        64                              /* sectors/track */
 #define RC_NUMTR        32                              /* tracks/disk */
-#define RC_DKSIZE       (RC_NUMTR * RC_NUMWD)           /* words/disk */
+#define RC_DKSIZE       (RC_NUMTR * RC_NUMWD * RC_NUMSC)/* words/disk */
 #define RC_NUMDK        4                               /* disks/controller */
-#define RC_WMASK        (RC_NUMWD - 1)                  /* word mask */
+#define RC_WMASK        (RC_NUMWD * RC_NUMSC - 1)       /* word mask */
 
 /* Parameters in the unit descriptor */
 
@@ -145,7 +146,7 @@
 /* extract memory extension address (bits 17,18) */
 #define GET_MEX(x)      (((x) & RCCS_MEX) << (16 - RCCS_V_MEX))
 #define GET_POS(x)      ((int) fmod (sim_gtime() / ((double) (x)), \
-                        ((double) RC_NUMWD)))
+                        ((double) (RC_NUMWD * RC_NUMSC))))
 
 extern int32 R[];
 
@@ -169,6 +170,7 @@ static t_stat rc_svc (UNIT *);
 static t_stat rc_reset (DEVICE *);
 static t_stat rc_attach (UNIT *, CONST char *);
 static t_stat rc_set_size (UNIT *, int32, CONST char *, void *);
+static t_stat rc_show_size (FILE *, UNIT *, int32, CONST void *);
 static uint32 update_rccs (uint32, uint32);
 static const char *rc_description (DEVICE *dptr);
 
@@ -224,8 +226,12 @@ static const MTAB rc_mod[] = {
         &rc_set_size, NULL, NULL, "Set to 3 platter device" },
     { UNIT_PLAT, (3 << UNIT_V_PLAT), NULL, "4P",
         &rc_set_size, NULL, NULL, "Set to 4 platter device" },
-    { UNIT_AUTO, UNIT_AUTO, "autosize", "AUTOSIZE", 
+    { MTAB_XTD|MTAB_VUN, 0, "PLATTERS", NULL,
+        NULL, &rc_show_size, NULL, "Display Platters" },
+    { UNIT_NOAUTO, 0, "autosize", "AUTOSIZE", 
         NULL, NULL, NULL, "set platters based on file size at ATTACH" },
+    { UNIT_NOAUTO, UNIT_NOAUTO, "noautosize", "NOAUTOSIZE", 
+        NULL, NULL, NULL, "set platters based explicit platter setting" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0020, "ADDRESS", "ADDRESS",
       &set_addr, &show_addr, NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR,    0, "VECTOR", "VECTOR",
@@ -241,9 +247,9 @@ DEVICE rc_dev = {
     &rc_reset,                                          /* reset */
     NULL,                                               /* boot */
     &rc_attach,                                         /* attach */
-    NULL,                                               /* detach */
+    &sim_disk_detach,                                   /* detach */
     &rc_dib,
-    DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG, 0,
+    DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG | DEV_DISK, 0,
     NULL, NULL, NULL, NULL, NULL, NULL, 
     &rc_description
 };
@@ -368,7 +374,7 @@ static t_stat rc_wr (int32 data, int32 PA, int32 access)
                 rc_unit.FUNC = GET_FUNC (data);         /* save function */
                 t = (rc_da & RC_WMASK) - GET_POS (rc_time); /* delta to new loc */
                 if (t <= 0)                             /* wrap around? */
-                    t = t + RC_NUMWD;
+                    t = t + (RC_NUMWD * RC_NUMSC);
                 sim_activate (&rc_unit, t * rc_time);   /* schedule op */
                 /* clear error indicators for new operation */
                 rc_cs &= ~(RCCS_ALLERR | RCCS_ERR | RCCS_DONE);
@@ -564,17 +570,13 @@ static t_stat rc_reset (DEVICE *dptr)
 
 static t_stat rc_attach (UNIT *uptr, CONST char *cptr)
 {
-    uint32 sz, p;
-    static const uint32 ds_bytes = RC_DKSIZE * sizeof (int16);
+    static const char *platters[] = {"1P", "2P", "3P", "4P", NULL};
+    char plat[32];
 
-    if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize_name (cptr))) {
-        p = (sz + ds_bytes - 1) / ds_bytes;
-        if (p >= RC_NUMDK)
-            p = RC_NUMDK - 1;
-        uptr->flags = (uptr->flags & ~UNIT_PLAT) | (p << UNIT_V_PLAT);
-    }
-    uptr->capac = UNIT_GETP (uptr->flags) * RC_DKSIZE;
-    return (attach_unit (uptr, cptr));
+    sprintf (plat, "%dP", UNIT_GETP (uptr->flags));
+
+    return sim_disk_attach_ex (uptr, cptr, RC_NUMWD * sizeof (uint16), sizeof (uint16), 
+                                    TRUE, 0, plat, FALSE, 0, (uptr->flags & UNIT_NOAUTO) ? NULL : platters);
 }
 
 /* Change disk size */
@@ -586,8 +588,14 @@ static t_stat rc_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
     if (uptr->flags & UNIT_ATT)
         return (SCPE_ALATT);
     uptr->capac = UNIT_GETP (val) * RC_DKSIZE;
-    uptr->flags = uptr->flags & ~UNIT_AUTO;
+    uptr->flags = uptr->flags | UNIT_NOAUTO;
     return (SCPE_OK);
+}
+
+static t_stat rc_show_size (FILE *st, UNIT *uptr, int32 flag, CONST void *desc)
+{
+fprintf (st, "%dP", UNIT_GETP (uptr->flags));
+return SCPE_OK;
 }
 
 static const char *rc_description (DEVICE *dptr)
