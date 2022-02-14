@@ -2983,6 +2983,9 @@ filesystem_size = get_filesystem_size (uptr);
 if (filesystem_size != (t_offset)-1)
     filesystem_size += reserved_sectors * sector_size;
 container_size = sim_disk_size (uptr);
+if ((filesystem_size == (t_offset)-1) &&
+    (ctx->footer != NULL))                      /* The presence of metadata means we already */
+    filesystem_size = ctx->container_size;      /* know the interesting disk size */
 current_unit_size = ((t_offset)uptr->capac)*ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? ctx->sector_size : 1);
 if (container_size && (container_size != (t_offset)-1)) {
     if (dontchangecapac) {  /* autosize by changing drive type */
@@ -3022,7 +3025,7 @@ if (container_size && (container_size != (t_offset)-1)) {
                 autosized = TRUE;
             }
             else {
-                if (!created) {
+                if (!created && (ctx->footer == NULL)) {
                     sim_messagef (SCPE_OK, "%s: Amount of data in use in disk container '%s' cannot be determined, skipping autosizing\n", sim_uname (uptr), cptr);
                     if (container_size > current_unit_size) {
                         t_stat r = SCPE_FSSIZE;
@@ -3127,6 +3130,30 @@ sim_disk_set_async (uptr, completion_delay);
 #endif
 uptr->io_flush = _sim_disk_io_flush;
 
+if (uptr->flags & UNIT_BUFABLE) {                       /* buffer in memory? */
+    t_seccnt sectsread;
+    t_stat r = SCPE_OK;
+
+    if (uptr->flags & UNIT_MUSTBUF) {                   /* dyn alloc? */
+        uptr->filebuf = calloc ((size_t)(ctx->container_size / ctx->xfer_element_size), 
+                                    ctx->xfer_element_size);       /* allocate */
+        uptr->filebuf2 = calloc ((size_t)(ctx->container_size / ctx->xfer_element_size), 
+                                    ctx->xfer_element_size);       /* allocate copy */
+        if ((uptr->filebuf == NULL) ||                  /* either failed? */
+            (uptr->filebuf2 == NULL)) {
+            sim_disk_detach (uptr);
+            return SCPE_MEM;                            /* memory allocation error */
+            }
+        }
+    sim_messagef (SCPE_OK, "%s: buffering file in memory\n", sim_uname (uptr));
+    r = sim_disk_rdsect (uptr, 0, uptr->filebuf, &sectsread, (t_seccnt)(ctx->container_size / ctx->sector_size));
+    if (r != SCPE_OK)
+        return sim_disk_detach (uptr);
+    uptr->hwmark = (sectsread * ctx->sector_size) / ctx->xfer_element_size;
+    memcpy (uptr->filebuf2, uptr->filebuf, (size_t)ctx->container_size);/* save initial contents */
+    uptr->flags |= UNIT_BUF;                            /* mark as buffered */
+    }
+
 return SCPE_OK;
 }
 
@@ -3167,6 +3194,21 @@ if (!(uptr->flags & UNIT_ATT))                          /* attached? */
 if (NULL == find_dev_from_unit (uptr))
     return SCPE_OK;
 
+if ((uptr->flags & UNIT_BUF) && (uptr->filebuf)) {
+    uint32 cap = (uptr->hwmark + uptr->dptr->aincr - 1) / uptr->dptr->aincr;
+
+    if (((uptr->flags & UNIT_RO) == 0) && 
+        (memcmp (uptr->filebuf, uptr->filebuf2, (size_t)ctx->container_size) != 0)) {
+        sim_messagef (SCPE_OK, "%s: writing buffer to file: %s\n", sim_uname (uptr), uptr->filename);
+        sim_disk_wrsect (uptr, 0, uptr->filebuf, NULL, (cap + ctx->sector_size - 1) / ctx->sector_size);
+        }
+    uptr->flags = uptr->flags & ~UNIT_BUF;
+    }
+free (uptr->filebuf);                                   /* free buffers */
+uptr->filebuf = NULL;
+free (uptr->filebuf2);
+uptr->filebuf2 = NULL;
+
 update_disk_footer (uptr);                              /* Update meta data if highwater has changed */
 
 auto_format = ctx->auto_format;
@@ -3187,6 +3229,7 @@ uptr->disk_ctx = NULL;
 uptr->io_flush = NULL;
 if (auto_format)
     sim_disk_set_fmt (uptr, 0, "AUTO", NULL);           /* restore file format */
+
 if (close_function (fileref) == EOF)
     return SCPE_IOERR;
 return SCPE_OK;
