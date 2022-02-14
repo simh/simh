@@ -1546,7 +1546,10 @@ static const char simh_help1[] =
       "+SET <unit> DISABLED         disable unit\n"
       "+SET <unit> arg{,arg...}     set unit parameters (see show modifiers)\n"
       "+HELP <dev> SET              displays the device specific set commands\n"
-      "++++++++                     available\n";
+      "++++++++                     available\n"
+#define HLP_NOAUTOSIZE  "*Commands SET NoAutosize"
+      "3NoAutosize\n"
+      "+SET NOAUTOSIZE              disables disk autosizing for all disks\n";
 static const char simh_help2[] =
       /***************** 80 character line width template *************************/
 #define HLP_SHOW        "*Commands SHOW"
@@ -2597,6 +2600,7 @@ static CTAB set_glob_tab[] = {
     { "PROMPT",     &set_prompt,                0, HLP_SET_PROMPT },
     { "RUNLIMIT",   &set_runlimit,              1, HLP_RUNLIMIT },
     { "NORUNLIMIT", &set_runlimit,              0, HLP_RUNLIMIT },
+    { "NOAUTOSIZE", &sim_disk_set_noautosize,   1, HLP_NOAUTOSIZE },
     { NULL,         NULL,                       0 }
     };
 

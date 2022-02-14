@@ -516,6 +516,37 @@ AIO_CALL(DOP_IAVL, 0, NULL, NULL, 0, callback);
 return r;
 }
 
+static t_bool sim_disk_no_autosize = FALSE;
+
+t_stat sim_disk_set_noautosize (int32 flag, CONST char *cptr)
+{
+DEVICE *dptr;
+uint32 dev, unit, count = 0;
+
+if (flag == sim_disk_no_autosize)
+    return sim_messagef (SCPE_ARG, "Autosizing is already %sabled!\n", 
+                                    sim_disk_no_autosize ? "dis" : "en");
+for (dev = 0; (dptr = sim_devices[dev]) != NULL; dev++) {
+    if ((DEV_TYPE (dptr) != DEV_DISK) ||
+        (dptr->flags & DEV_DIS))
+        continue;
+    ++count;
+    for (unit = 0; unit < dptr->numunits; unit++) {
+        char cmd[CBUFSIZE];
+        int32 saved_sim_show_message = sim_show_message;
+
+        sim_show_message = FALSE;
+        sprintf (cmd, "%s %sAUTOSIZE", sim_uname (&dptr->units[unit]), (flag != 0) ? "NO" : "");
+        set_cmd (0, cmd);
+        sim_show_message = saved_sim_show_message;
+        }
+    if (count == 0)
+        return sim_messagef (SCPE_ARG, "No disk devices support autosizing\n");
+    }
+sim_disk_no_autosize = flag;
+return SCPE_OK;
+}
+
 /* Test for write protect */
 
 t_bool sim_disk_wrp (UNIT *uptr)
@@ -2421,6 +2452,10 @@ t_bool auto_format = FALSE;
 t_offset container_size, filesystem_size, current_unit_size;
 size_t tmp_size = 1;
 
+if (sim_disk_no_autosize) {
+    dontchangecapac = TRUE;
+    drivetypes = NULL;
+    }
 if (uptr->flags & UNIT_DIS)                             /* disabled? */
     return SCPE_UDIS;
 if (!(uptr->flags & UNIT_ATTABLE))                      /* not attachable? */
@@ -6286,6 +6321,12 @@ return WriteVirtualDiskSectors(hVHD, buf, sects, sectswritten, ctx->sector_size,
 
 t_stat sim_disk_init (void)
 {
+int32 saved_sim_show_message = sim_show_message;
+
+sim_show_message = FALSE;
+sim_disk_no_autosize = TRUE;
+sim_disk_set_noautosize (FALSE, NULL);
+sim_show_message = saved_sim_show_message;
 return SCPE_OK;
 }
 
