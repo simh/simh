@@ -585,6 +585,7 @@ struct UNIT {
     uint32              dynflags;                       /* dynamic flags */
     t_addr              capac;                          /* capacity */
     t_addr              pos;                            /* file position */
+    void                *filebuf2;                      /* copy of initial memory buffer */
     void                (*io_flush)(UNIT *up);          /* io flush routine */
     uint32              iostarttime;                    /* I/O start time */
     int32               buf;                            /* buffer */
