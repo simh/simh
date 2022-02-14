@@ -2719,10 +2719,12 @@ if ((sim_switches & SWMASK ('R')) ||                    /* read only? */
     ((uptr->flags & UNIT_RO) != 0)) {
     if (((uptr->flags & UNIT_ROABLE) == 0) &&           /* allowed? */
         ((uptr->flags & UNIT_RO) == 0))
-        return _err_return (uptr, SCPE_NORO);           /* no, error */
+        return sim_messagef (_err_return (uptr, SCPE_NORO), "%s: Read Only operation not allowed\n", /* no, error */
+                                                        sim_uname (uptr));
     uptr->fileref = open_function (cptr, "rb");         /* open rd only */
     if (uptr->fileref == NULL)                          /* open fail? */
-        return _err_return (uptr, SCPE_OPENERR);        /* yes, error */
+        return sim_messagef (_err_return (uptr, SCPE_OPENERR), "%s: Can't open '%s': %s\n", /* yes, error */
+                                            sim_uname (uptr), cptr, strerror (errno));
     uptr->flags = uptr->flags | UNIT_RO;                /* set rd only */
     sim_messagef (SCPE_OK, "%s: Unit is read only\n", sim_uname (uptr));
     }
@@ -2731,10 +2733,12 @@ else {                                                  /* normal */
     if (uptr->fileref == NULL) {                        /* open fail? */
         if ((errno == EROFS) || (errno == EACCES)) {    /* read only? */
             if ((uptr->flags & UNIT_ROABLE) == 0)       /* allowed? */
-                return _err_return (uptr, SCPE_NORO);   /* no error */
+                return sim_messagef (_err_return (uptr, SCPE_NORO), "%s: Read Only operation not allowed\n", /* no, error */
+                                                                sim_uname (uptr));
             uptr->fileref = open_function (cptr, "rb"); /* open rd only */
             if (uptr->fileref == NULL)                  /* open fail? */
-                return _err_return (uptr, SCPE_OPENERR);/* yes, error */
+                return sim_messagef (_err_return (uptr, SCPE_OPENERR), "%s: Can't open '%s': %s\n", /* yes, error */
+                                                    sim_uname (uptr), cptr, strerror (errno));
             uptr->flags = uptr->flags | UNIT_RO;        /* set rd only */
             sim_messagef (SCPE_OK, "%s: Unit is read only\n", sim_uname (uptr));
             }

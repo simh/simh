@@ -8097,10 +8097,12 @@ if ((sim_switches & SWMASK ('R')) ||                    /* read only? */
     ((uptr->flags & UNIT_RO) != 0)) {
     if (((uptr->flags & UNIT_ROABLE) == 0) &&           /* allowed? */
         ((uptr->flags & UNIT_RO) == 0))
-        return attach_err (uptr, SCPE_NORO);            /* no, error */
+        return sim_messagef (attach_err (uptr, SCPE_NORO), "%s: Read Only operation not allowed\n", /* no, error */
+                                                        sim_uname (uptr));
     uptr->fileref = sim_fopen (cptr, "rb");             /* open rd only */
     if (uptr->fileref == NULL)                          /* open fail? */
-        return attach_err (uptr, SCPE_OPENERR);         /* yes, error */
+        return sim_messagef (attach_err (uptr, SCPE_OPENERR), "%s: Can't open '%s': %s\n", /* yes, error */
+                                            sim_uname (uptr), cptr, strerror (errno));
     if (!(uptr->flags & UNIT_RO))
         sim_messagef (SCPE_OK, "%s: unit is read only\n", sim_uname (uptr));
     uptr->flags = uptr->flags | UNIT_RO;                /* set rd only */
@@ -8109,7 +8111,8 @@ else {
     if (sim_switches & SWMASK ('N')) {                  /* new file only? */
         uptr->fileref = sim_fopen (cptr, "wb+");        /* open new file */
         if (uptr->fileref == NULL)                      /* open fail? */
-            return attach_err (uptr, SCPE_OPENERR);     /* yes, error */
+            return sim_messagef (attach_err (uptr, SCPE_OPENERR), "%s: Can't open '%s': %s\n", /* yes, error */
+                                                sim_uname (uptr), cptr, strerror (errno));
         sim_messagef (SCPE_OK, "%s: creating new file: %s\n", sim_uname (uptr), cptr);
         }
     else {                                              /* normal */
@@ -8121,19 +8124,23 @@ else {
             if ((errno == EROFS) || (errno == EACCES)) {/* read only? */
 #endif
                 if ((uptr->flags & UNIT_ROABLE) == 0)   /* allowed? */
-                    return attach_err (uptr, SCPE_NORO);/* no error */
+                    return sim_messagef (attach_err (uptr, SCPE_NORO), "%s: Read Only operation not allowed\n", /* no, error */
+                                                                    sim_uname (uptr));
                 uptr->fileref = sim_fopen (cptr, "rb"); /* open rd only */
                 if (uptr->fileref == NULL)              /* open fail? */
-                    return attach_err (uptr, SCPE_OPENERR); /* yes, error */
+                    return sim_messagef (attach_err (uptr, SCPE_OPENERR), "%s: Can't open '%s': %s\n", /* yes, error */
+                                                        sim_uname (uptr), cptr, strerror (errno));
                 uptr->flags = uptr->flags | UNIT_RO;    /* set rd only */
                 sim_messagef (SCPE_OK, "%s: unit is read only\n", sim_uname (uptr));
                 }
             else {                                      /* doesn't exist */
                 if (sim_switches & SWMASK ('E'))        /* must exist? */
-                    return attach_err (uptr, SCPE_OPENERR); /* yes, error */
+                    return sim_messagef (attach_err (uptr, SCPE_OPENERR), "%s: Can't open '%s': %s\n", /* yes, error */
+                                                        sim_uname (uptr), cptr, strerror (errno));
                 uptr->fileref = sim_fopen (cptr, "wb+");/* open new file */
                 if (uptr->fileref == NULL)              /* open fail? */
-                    return attach_err (uptr, SCPE_OPENERR); /* yes, error */
+                    return sim_messagef (attach_err (uptr, SCPE_OPENERR), "%s: Can't open '%s': %s\n", /* yes, error */
+                                                        sim_uname (uptr), cptr, strerror (errno));
                 sim_messagef (SCPE_OK, "%s: creating new file\n", sim_uname (uptr));
                 }
             }                                           /* end if null */
