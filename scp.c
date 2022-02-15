@@ -8154,16 +8154,18 @@ else {
     }
 if (uptr->flags & UNIT_BUFABLE) {                       /* buffer? */
     uint32 cap = ((uint32) uptr->capac) / dptr->aincr;  /* effective size */
+
+    uptr->filebuf2 = calloc (cap, SZ_D (dptr));         /* allocate copy */
+    if (uptr->filebuf2 == NULL)
+        return attach_err (uptr, SCPE_MEM);             /* error */
     if (uptr->flags & UNIT_MUSTBUF) {                   /* dyn alloc? */
         uptr->filebuf = calloc (cap, SZ_D (dptr));      /* allocate */
-        uptr->filebuf2 = calloc (cap, SZ_D (dptr));     /* allocate copy */
-        if ((uptr->filebuf == NULL) ||                  /* no buffer? */
-            (uptr->filebuf2 == NULL)) {
+        if (uptr->filebuf == NULL) {
             free (uptr->filebuf);
             uptr->filebuf = NULL;
             free (uptr->filebuf2);
             uptr->filebuf2 = NULL;
-            return attach_err (uptr, SCPE_MEM);             /* error */
+            return attach_err (uptr, SCPE_MEM);         /* error */
             }
         }
     sim_messagef (SCPE_OK, "%s: buffering file in memory\n", sim_uname (uptr));
