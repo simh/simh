@@ -149,7 +149,7 @@ extern DEVICE fs_dev;
 extern DEVICE pl_dev;
 extern DEVICE vu_dev;
 extern DEVICE pi_dev;
-extern DEVICE mg_dev;
+extern DEVICE mg_dev[4];
 extern jmp_buf cpu_halt;
 
 /*

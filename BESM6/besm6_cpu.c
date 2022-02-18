@@ -274,7 +274,7 @@ DEVICE *sim_devices[] = {
     &reg_dev,
     &drum_dev,
     &disk_dev,
-    &mg_dev,
+    mg_dev, mg_dev + 1, mg_dev + 2, mg_dev + 3,
     &mmu_dev,
     &clock_dev,
     &printer_dev,

@@ -64,8 +64,8 @@ typedef struct {
     t_value *sysdata;               /* Буфер системных данных */
 } KMT;
 
-static KMT controller [4];          /* Две стойки КМД */
-int mg_fail;                      /* Маска ошибок по направлениям */
+static KMT controller [4];          /* 4 channels, 8 tape devices on each */
+int mg_fail;                        /* Маска ошибок по направлениям */
 
 t_stat mg_event (UNIT *u);
 
@@ -76,6 +76,9 @@ t_stat mg_event (UNIT *u);
 #define MG_MOVE_DELAY (100*MSEC)
 #define MG_GAP_DELAY (10*MSEC)
 
+// Formatting is allowed only on channel 6 (controller 3)
+#define FMT_CTLR 3
+
 /*
  * MG data structures
  *
@@ -84,22 +87,22 @@ t_stat mg_event (UNIT *u);
  * mg_reg     DISK register list
  */
 UNIT mg_unit [32] = {
-    { UDATA (mg_event, UNIT_DIS, MG_SIZE) },
-    { UDATA (mg_event, UNIT_DIS, MG_SIZE) },
-    { UDATA (mg_event, UNIT_DIS, MG_SIZE) },
-    { UDATA (mg_event, UNIT_DIS, MG_SIZE) },
-    { UDATA (mg_event, UNIT_DIS, MG_SIZE) },
-    { UDATA (mg_event, UNIT_DIS, MG_SIZE) },
-    { UDATA (mg_event, UNIT_DIS, MG_SIZE) },
-    { UDATA (mg_event, UNIT_DIS, MG_SIZE) },
-    { UDATA (mg_event, UNIT_DIS, MG_SIZE) },
-    { UDATA (mg_event, UNIT_DIS, MG_SIZE) },
-    { UDATA (mg_event, UNIT_DIS, MG_SIZE) },
-    { UDATA (mg_event, UNIT_DIS, MG_SIZE) },
-    { UDATA (mg_event, UNIT_DIS, MG_SIZE) },
-    { UDATA (mg_event, UNIT_DIS, MG_SIZE) },
-    { UDATA (mg_event, UNIT_DIS, MG_SIZE) },
-    { UDATA (mg_event, UNIT_DIS, MG_SIZE) },
+    { UDATA (mg_event, UNIT_ATTABLE+UNIT_ROABLE, MG_SIZE) },
+    { UDATA (mg_event, UNIT_ATTABLE+UNIT_ROABLE, MG_SIZE) },
+    { UDATA (mg_event, UNIT_ATTABLE+UNIT_ROABLE, MG_SIZE) },
+    { UDATA (mg_event, UNIT_ATTABLE+UNIT_ROABLE, MG_SIZE) },
+    { UDATA (mg_event, UNIT_ATTABLE+UNIT_ROABLE, MG_SIZE) },
+    { UDATA (mg_event, UNIT_ATTABLE+UNIT_ROABLE, MG_SIZE) },
+    { UDATA (mg_event, UNIT_ATTABLE+UNIT_ROABLE, MG_SIZE) },
+    { UDATA (mg_event, UNIT_ATTABLE+UNIT_ROABLE, MG_SIZE) },
+    { UDATA (mg_event, UNIT_ATTABLE+UNIT_ROABLE, MG_SIZE) },
+    { UDATA (mg_event, UNIT_ATTABLE+UNIT_ROABLE, MG_SIZE) },
+    { UDATA (mg_event, UNIT_ATTABLE+UNIT_ROABLE, MG_SIZE) },
+    { UDATA (mg_event, UNIT_ATTABLE+UNIT_ROABLE, MG_SIZE) },
+    { UDATA (mg_event, UNIT_ATTABLE+UNIT_ROABLE, MG_SIZE) },
+    { UDATA (mg_event, UNIT_ATTABLE+UNIT_ROABLE, MG_SIZE) },
+    { UDATA (mg_event, UNIT_ATTABLE+UNIT_ROABLE, MG_SIZE) },
+    { UDATA (mg_event, UNIT_ATTABLE+UNIT_ROABLE, MG_SIZE) },
     { UDATA (mg_event, UNIT_ATTABLE+UNIT_ROABLE, MG_SIZE) },
     { UDATA (mg_event, UNIT_ATTABLE+UNIT_ROABLE, MG_SIZE) },
     { UDATA (mg_event, UNIT_ATTABLE+UNIT_ROABLE, MG_SIZE) },
@@ -126,19 +129,22 @@ REG mg_reg[] = {
     { ORDATA   (УСТР_0,     controller[0].dev,       3) },
     { ORDATA   (МОЗУ_0,     controller[0].memory,   20) },
     { ORDATA   (РС_0,       controller[0].status,   24) },
+    { 0 },
     { ORDATA   (КУС_1,      controller[1].op,       24) },
     { ORDATA   (УСТР_1,     controller[1].dev,       3) },
     { ORDATA   (МОЗУ_1,     controller[1].memory,   20) },
     { ORDATA   (РС_1,       controller[1].status,   24) },
+    { 0 },
     { ORDATA   (КУС_2,      controller[2].op,       24) },
     { ORDATA   (УСТР_2,     controller[2].dev,       3) },
     { ORDATA   (МОЗУ_2,     controller[2].memory,   20) },
     { ORDATA   (РС_2,       controller[2].status,   24) },
+    { 0 },
     { ORDATA   (КУС_3,      controller[3].op,       24) },
     { ORDATA   (УСТР_3,     controller[3].dev,       3) },
     { ORDATA   (МОЗУ_3,     controller[3].memory,   20) },
     { ORDATA   (РС_3,       controller[3].status,   24) },
-    { ORDATA   (ОШ,         mg_fail,               6) },
+    { ORDATA   (ОШ,         mg_fail,                 6) },
     { 0 }
 };
 
@@ -150,11 +156,31 @@ t_stat mg_reset (DEVICE *dptr);
 t_stat mg_attach (UNIT *uptr, CONST char *cptr);
 t_stat mg_detach (UNIT *uptr);
 
-DEVICE mg_dev = {
-    "MG", mg_unit, mg_reg, mg_mod,
-    32, 8, 21, 1, 8, 50,
-    NULL, NULL, &mg_reset, NULL, &mg_attach, &mg_detach,
-    NULL, DEV_DISABLE | DEV_DEBUG | DEV_TAPE
+DEVICE mg_dev[4] = {
+    {
+        "MG3", mg_unit, mg_reg, mg_mod,
+        8, 8, 21, 1, 8, 50,
+        NULL, NULL, &mg_reset, NULL, &mg_attach, &mg_detach,
+        NULL, DEV_DISABLE | DEV_DEBUG | DEV_TAPE
+    },
+    {
+        "MG4", mg_unit + 8, mg_reg + 5, mg_mod,
+        8, 8, 21, 1, 8, 50,
+        NULL, NULL, &mg_reset, NULL, &mg_attach, &mg_detach,
+        NULL, DEV_DISABLE | DEV_DEBUG | DEV_TAPE
+    },
+    {
+        "MG5", mg_unit + 16, mg_reg + 10, mg_mod,
+        8, 8, 21, 1, 8, 50,
+        NULL, NULL, &mg_reset, NULL, &mg_attach, &mg_detach,
+        NULL, DEV_DISABLE | DEV_DEBUG | DEV_TAPE
+    },
+    {
+        "MG6", mg_unit + 24, mg_reg + 15, mg_mod,
+        8, 8, 21, 1, 8, 50,
+        NULL, NULL, &mg_reset, NULL, &mg_attach, &mg_detach,
+        NULL, DEV_DISABLE | DEV_DEBUG | DEV_TAPE
+    },
 };
 
 /*
@@ -171,30 +197,47 @@ static KMT *unit_to_ctlr (UNIT *u)
 t_stat mg_reset (DEVICE *dptr)
 {
     int i;
+    int ctlr = dptr - mg_dev;
+    KMT *c = &controller[ctlr];
+    memset (c, 0, sizeof (*c));
+    /*
+     * The areas starting from words 030 and 040 are used for
+     * disks; the remaining locations are shared by two channels each.
+     */
+    c->sysdata = &memory [ctlr <= 1 ? 050 : 060];
 
-    memset (&controller, 0, sizeof (controller));
-    controller[2].sysdata = &memory [050];
-    controller[3].sysdata = &memory [060];
-    controller[2].mask_done = GRP_CHAN5_DONE;
-    controller[3].mask_done = GRP_CHAN6_DONE;
-    controller[2].mask_free = GRP_CHAN5_FREE;
-    controller[3].mask_free = GRP_CHAN6_FREE;
-    controller[2].mask_fail = 04;
-    controller[3].mask_fail = 02;
-    controller[2].status = BITS(8) << 8;  /* r/w, offline, not moving */
-    controller[3].status = BITS(8) << 8;
-    // Formatting is allowed only on controller 3
-    controller[3].last_moving = -1;
-    controller[3].format = 0;
-    for (i=16; i<32; ++i) {
-        if (mg_unit[i].flags & UNIT_ATT) {
-            controller[i/8].status &= ~(MG_OFFLINE << (i%8));
-            if (mg_unit[i].flags & UNIT_RO) {
-                controller[i/8].status |= MG_READONLY << (i%8);
+    /*
+     * The "end of tape movement" interrupts are not used by the disks
+     * and remain as per the initial spec.
+     */
+    c->mask_done = GRP_CHAN3_DONE >> ctlr;
+
+    /*
+     * The "end of I/O" interrupts go to channel 5 for all
+     * channels except the 6th, which is the only channel used for
+     * formatting tapes, requiring better responsiveness.
+     */
+    c->mask_free = ctlr == FMT_CTLR ? GRP_CHAN6_FREE : GRP_CHAN5_FREE;
+
+    /*
+     * Error masks follow the I/O interrupt scheme.
+     */
+    c->mask_fail = ctlr == FMT_CTLR ? 02 : 04;
+
+    c->status = BITS(8) << 8;  /* r/w, offline, not moving */
+    c->last_moving = -1;       /* used only by the FMT_CTLR */
+    c->format = 0;
+
+    for (i=0; i<8; ++i) {
+        if (mg_unit[ctlr*8+i].flags & UNIT_ATT) {
+            c->status &= ~(MG_OFFLINE << i);
+            if (mg_unit[ctlr*8+i].flags & UNIT_RO) {
+                c->status |= MG_READONLY << i;
             }
         }
-        mg_unit[i].in_io = 0;
-        sim_cancel (&mg_unit[i]);
+        mg_unit[ctlr*8+i].dptr = dptr;
+        mg_unit[ctlr*8+i].in_io = 0;
+        sim_cancel (&mg_unit[ctlr*8+i]);
     }
     return SCPE_OK;
 }
@@ -327,9 +370,8 @@ void mg_write (UNIT *u)
     int ret;
     t_value fullzone[8+1024];
     int page = (u->cmd & MG_PAGE) >> 2 | (u->cmd & MG_BLOCK) >> 8;
-    if (mg_dev.dctrl)
-        sim_printf ("::: writing MG%d mem %05o\n",
-                     unit, page);
+    if (u->dptr->dctrl)
+        sim_printf ("::: writing %s mem %05o\n", sim_uname(u), page);
     memcpy(fullzone, c->sysdata, 8*sizeof(t_value));
     memcpy(fullzone+8, &memory[page], 1024*sizeof(t_value));
     ret = sim_tape_wrrecf (u, (uint8*) fullzone, sizeof(fullzone));
@@ -344,16 +386,14 @@ void mg_write (UNIT *u)
  */
 void mg_format (uint32 op)
 {
-    KMT *c = &controller[3];
+    KMT *c = &controller[FMT_CTLR];
+    int prev = c->format;
     c->format = op & 3;
-    if (mg_dev.dctrl)
-        sim_printf("Format mode %d\n", op);
     switch (op & 3) {
     case 0:
-        if (c->last_moving != -1) {
-            sim_printf("Formatting off on MG%d\n", c->last_moving);
+        if (prev != 0 && c->last_moving != -1) {
+            sim_printf("Formatting off on MG6%d\n", c->last_moving);
         }
-        // c->last_moving = -1;
         break;
     case 1:
         sim_printf("Formatting mode 1 does not exist\n");
@@ -363,31 +403,33 @@ void mg_format (uint32 op)
         // nothing happens; if the tape is already moving, the movement ceases
         // to be self-sustaining; the runoff is 50 ms
         if (c->last_moving != -1) {
-            int num = c->last_moving & 7;
-            UNIT * u = mg_unit + c->last_moving;
+            int num = c->last_moving;
+            UNIT * u = mg_unit + 8*FMT_CTLR + num;
+            sim_printf("Formatting mode 2\n");
             if (c->status & (MG_MOVING << num)) {
                 sim_cancel(u);
                 sim_activate(u, MG_GAP_DELAY);
-                sim_printf("Block runoff on MG%d\n", c->last_moving);
+                sim_printf("Block runoff on MG6%d\n", c->last_moving);
             }
         }
         break;
     case 3:
+        sim_printf("Formatting mode 3\n");
         // A tape must already be moving
         if (c->last_moving == -1) {
             sim_printf("Enabling synchrotrack on a stationary tape?\n");
         } else {
-            UNIT * u = mg_unit + c->last_moving;
-            int num = c->last_moving & 7;
+            int num = c->last_moving;
+            UNIT * u = mg_unit + 8*FMT_CTLR + num;
             if (c->status & (MG_MOVING << num)) {
                 t_value fullzone[8+1024];
                 sim_cancel(u);
                 u->in_io = 0;
-                sim_printf("(in_io = 0) Extending block on MG%d\n", c->last_moving);
+                sim_printf("(in_io = 0) Extending block on %s\n", sim_uname(u));
                 // Writing the synchrotrack for a zone is like writing a zone of arbitrary values
                 sim_tape_wrrecf(u, (uint8*) fullzone, sizeof(fullzone));
                 // Writing the synchrotrack is self-sustaining, no end event requested.
-                sim_printf("Formatting block on MG%d\n", c->last_moving);
+                sim_printf("Formatting block on %s\n", sim_uname(u));
             }
         }
     }
@@ -402,19 +444,19 @@ void mg_read (UNIT *u)
     t_mtrlnt len;
     t_value fullzone[8+1024];
     int ret;
-    int unit = u - mg_unit;
+    int unit = (u - mg_unit) & 7;
     int page = (u->cmd & MG_PAGE) >> 2 | (u->cmd & MG_BLOCK) >> 8;
 
-    if (mg_dev.dctrl)
+    if (u->dptr->dctrl)
         sim_printf ((u->cmd & MG_READ_SYSDATA) ?
-                     "::: reading MG%d control words\n" :
-                     "::: reading MG%d mem %05o\n",
-                     unit, page);
+                     "::: reading %s control words\n" :
+                     "::: reading %s mem %05o\n",
+                    sim_uname(u), page);
     ret = sim_tape_rdrecf (u, (uint8*) fullzone, &len, sizeof(t_value)*(8+1024));
     if (ret != MTSE_OK || len != sizeof(t_value)*(8+1024)) {
         /* Bad tape format */
-            if (mg_dev.dctrl)
-                sim_printf("MG%d: Bad read: ret %d len %d\n", unit, ret, len);
+            if (u->dptr->dctrl)
+                sim_printf("%s: Bad read: ret %d len %d\n", sim_uname(u), ret, len);
             mg_fail |= c->mask_fail;
             return;
     }
@@ -427,27 +469,36 @@ void mg_read (UNIT *u)
 
 /*
  * Specifying the operation (read/write) and the memory location.
- * The actial I/O is initiated by a move command.
+ * The actual I/O is initiated by a move command.
+ * The I/O setting is taken by two controllers.
+ * Given 2 affects 0 and 1.
+ * Given 3 affects 2 and 3.
  */
 void mg_io (int ctlr, uint32 op)
 {
-    KMT *c = &controller [ctlr];
+    int i;
+    int dev = (op >> 7) & 7;
+    for (i = (ctlr & 1) * 2; i <= (ctlr & 1) * 2 + 1; ++i) {
+        KMT *c = &controller [i];
+        c->op = op;
+        c->dev = dev;
+        c->memory = (op & MG_PAGE) >> 2 | (op & MG_BLOCK) >> 8;
+    }
 
-    c->op = op;
-    c->dev = (op >> 7) & 7;
-    c->memory = (op & MG_PAGE) >> 2 | (op & MG_BLOCK) >> 8;
-
-    if (mg_dev.dctrl)
-        sim_printf ("::: MG%d: %s %s %08o\n",
-                    ctlr*8 + c->dev,
-                    (c->op & MG_READ) ? "read" : "write",
-                    (c->op & MG_READ_SYSDATA) ? "sysdata" : "",
+    if (mg_dev[ctlr].dctrl)
+        sim_printf ("::: MG%o/%o: %s %s %08o\n",
+                    (ctlr&1)*16 + 030 + dev, (ctlr&1)*16 + 040 + dev,
+                    (op & MG_READ) ? "read" : "write",
+                    (op & MG_READ_SYSDATA) ? "sysdata" : "",
                     op);
 
-    mg_fail &= ~c->mask_fail;
+    /*
+     * Error flags and interrupts, however, use the given controller number.
+     */
+    mg_fail &= ~controller[ctlr].mask_fail;
 
-    /* Гасим главный регистр прерываний. */
-    GRP &= ~c->mask_free;
+    /* Clearing the main interrupt register */
+    GRP &= ~controller[ctlr].mask_free;
 }
 
 /*
@@ -457,6 +508,7 @@ void mg_ctl (int unit, uint32 op)
 {
     UNIT *u = &mg_unit [unit];
     KMT *c = unit_to_ctlr (u);
+    int num = unit & 7;
     int move, back;
     if (op == MG_CLEARINTR) {
         // Only the controller number matters, unit is not used.
@@ -467,17 +519,18 @@ void mg_ctl (int unit, uint32 op)
         sim_printf("Clearing interrupts AND attempting to do something else (%08o)?\n", op);
         longjmp (cpu_halt, SCPE_IOERR);
     }
-    if ((mg_dev.flags & DEV_DIS) || ! (u->flags & UNIT_ATT)) {
+    if ((u->dptr->flags & DEV_DIS) || ! (u->flags & UNIT_ATT)) {
         /* Device not attached. */
-        if (op != 0 && mg_dev.dctrl)
-            sim_printf("::: MG%d: unattached, but control %08o issued\n", unit, op);
+        if (op != 0 && u->dptr->dctrl)
+            sim_printf("::: %s: unattached, but control %08o issued\n",
+                       sim_uname(u), op);
         mg_fail |= c->mask_fail;
         return;
     }
     mg_fail &= ~c->mask_fail;
-    c->last_moving = unit;
+    c->last_moving = num;
     if (c->format) {
-        c->status |= MG_MOVING << (unit & 7);
+        c->status |= MG_MOVING << num;
         if (c->format == 3) {
             // Must not be happening: starting from the stationary position
             // while writing the synchrotrack is bad.
@@ -485,10 +538,10 @@ void mg_ctl (int unit, uint32 op)
             // Moving with synchrotrack is self-sustaining, no activation needed.
         } else if (c->format == 2) {
             // Erasing, will sustain for about 50 ms
-            sim_printf("Erasing MG%d\n", unit);
+            sim_printf("Erasing %s\n", sim_uname(u));
             sim_activate (u, MG_GAP_DELAY);
         } else if (c->format == 1) {
-            if (mg_dev.dctrl)
+            if (u->dptr->dctrl)
                 sim_printf("WHAT IS FORMAT 1?\n");
         }
         return;
@@ -496,7 +549,7 @@ void mg_ctl (int unit, uint32 op)
     move = op & MG_MOVE;
     back = op & MG_BACK;
 
-    if ((unit & 7) == c->dev && move && !back) {
+    if (num == c->dev && move && !back) {
         /* Reading or writing */
 
         if (!(c->op & MG_READ) && u->flags & UNIT_RO) {
@@ -506,32 +559,35 @@ void mg_ctl (int unit, uint32 op)
         }
         u->cmd = c->op;
         u->in_io = 1;
-        sim_printf("MG%d: in_io = 1\n", unit);
-        c->status |= MG_MOVING << (unit & 7);
+        if (u->dptr->dctrl)
+            sim_printf("::: %s: in_io = 1\n", sim_uname(u));
+        c->status |= MG_MOVING << num;
         sim_activate (u, MG_IO_DELAY);
     } else if (move) {
         t_mtrlnt len;
         if (back) {
             if (sim_tape_bot (u)) {
-                if (mg_dev.dctrl)
-                    sim_printf("MG%d: at BOT, nowhere to step back\n", unit);
+                if (u->dptr->dctrl)
+                    sim_printf("%s: at BOT, nowhere to step back\n",
+                               sim_uname(u));
                 sim_activate (u, MG_GAP_DELAY);
             } else {
-                if (mg_dev.dctrl)
-                    sim_printf("MG%d: Step back\n", unit);
+                if (u->dptr->dctrl)
+                    sim_printf("%s: Step back\n", sim_uname(u));
                 sim_tape_sprecr (u, &len);
                 sim_activate (u, MG_MOVE_DELAY);
             }
         } else {
-            if (mg_dev.dctrl)
-                sim_printf("MG%d: Step forward\n", unit);
+            if (u->dptr->dctrl)
+                sim_printf("%s: Step forward\n", sim_uname(u));
             sim_tape_sprecf (u, &len);
             sim_activate (u, MG_MOVE_DELAY);
         }
-        c->status |= MG_MOVING << (unit & 7);
+        c->status |= MG_MOVING << num;
     } else {
-        if (mg_dev.dctrl)
-            sim_printf("Invalid command combination for MG%d: %08o\n", unit, op);
+        if (u->dptr->dctrl)
+            sim_printf("Invalid command combination for %s: %08o\n",
+                       sim_uname(u), op);
     }
 }
 
@@ -542,17 +598,19 @@ int mg_state (int ctlr)
 {
     KMT *c = &controller [ctlr];
     static uint32 prev[4];
-    if (mg_dev.dctrl && c->status != prev[ctlr]) {
+    if (mg_dev[ctlr].dctrl && c->status != prev[ctlr]) {
         char status[24];
         int i;
         // Some tapes are online
-        sim_printf("::: MG%02d-%02d: READONLY-ONLINE--MOVING-\n", ctlr*8+7, ctlr*8);
+        sim_printf("::: MG%02o-%02o: READONLY-ONLINE--MOVING-\n",
+                   ctlr*8+31, ctlr*8+24);
         for (i = 0; i < 8; ++i) {
             status[23-i] = c->status & (MG_MOVING << i) ? '0'+i : ' ';
             status[15-i] = c->status & (MG_OFFLINE << i) ? ' ': '0'+i;
             status[7-i] = c->status & (MG_READONLY << i) ? '0'+i : ' ';
         }
-        sim_printf("::: MG%02d-%02d: %.24s\n", ctlr*8+7, ctlr*8, status);
+        sim_printf("::: MG%02o-%02o: %.24s\n",
+                   ctlr*8+31, ctlr*8+24, status);
         prev[ctlr] = c->status;
     }
     return c->status;
@@ -566,6 +624,8 @@ t_stat mg_event (UNIT *u)
     KMT *c = unit_to_ctlr (u);
     int unit = u - mg_unit;
     int num = unit & 7;
+    if (u->dptr->dctrl)
+        sim_printf("::: %s: event\n", sim_uname(u));
     if (u->in_io) {
         if (u->cmd & MG_READ) {
             mg_read(u);
@@ -575,14 +635,14 @@ t_stat mg_event (UNIT *u)
         GRP |= c->mask_free;
         u->in_io = 0;
         sim_activate (u, MG_GAP_DELAY);
-        if (mg_dev.dctrl)
-            sim_printf("::: MG%d: (in_io = 0) end of I/O event\n", unit);
+        if (u->dptr->dctrl)
+            sim_printf("::: %s: (in_io = 0) end of I/O event\n", sim_uname(u));
     } else {
         c->status &= ~(MG_MOVING << num);
         c->status &= ~(MG_OFFLINE << num);
         GRP |= c->mask_done;
-        // if (mg_dev.dctrl)
-            sim_printf("::: MG%d: stopping event\n", unit);
+        if (u->dptr->dctrl)
+            sim_printf("::: %s: stopping event\n", sim_uname(u));
     }
     return SCPE_OK;
 }
@@ -593,7 +653,7 @@ t_stat mg_event (UNIT *u)
 int mg_errors ()
 {
 #if 0
-    if (mg_dev.dctrl)
+    if (mg_dev[0].dctrl)
         sim_printf ("::: КМД: опрос шкалы ошибок = %04o\n", mg_fail);
 #endif
     return mg_fail;
