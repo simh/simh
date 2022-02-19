@@ -1024,7 +1024,7 @@ con_srv(UNIT *uptr) {
         if(chan_read_char(chan, &ch, 0)) {
              sim_putchar('\r');
              sim_putchar('\n');
-             sim_debug(DEBUG_EXP, &con_dev, "\n\r");
+             sim_debug(DEBUG_EXP, &con_dev, "\n");
              uptr->CMD &= ~URCSTA_FILL;
              chan_set_end(chan);
        } else {
@@ -1041,7 +1041,7 @@ con_srv(UNIT *uptr) {
                 (con_data[0].inptr == con_data[0].outptr))) {
              sim_putchar('\r');
              sim_putchar('\n');
-             sim_debug(DEBUG_EXP, &con_dev, "\n\r");
+             sim_debug(DEBUG_EXP, &con_dev, "\n");
              uptr->CMD &= ~URCSTA_READ;
              chan_set_end(chan);
        }

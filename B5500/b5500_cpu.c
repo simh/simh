@@ -3073,7 +3073,7 @@ control:
                              }
                              break;
                         }
-                        sim_debug(DEBUG_DETAIL, &cpu_dev, "IAR=%05o Q=%03o\n\r",
+                        sim_debug(DEBUG_DETAIL, &cpu_dev, "IAR=%05o Q=%03o\n",
                                          IAR,Q);
                         L = 0;
                         S = 0100;
@@ -3149,7 +3149,7 @@ control:
                         if (P2_run == 0 || (cpu_unit[1].flags & UNIT_DIS)) {
                             break;
                         }
-                        sim_debug(DEBUG_DETAIL, &cpu_dev, "HALT P2\n\r");
+                        sim_debug(DEBUG_DETAIL, &cpu_dev, "HALT P2\n");
                         /* Flag P2 to stop */
                         hltf[1] = 1;
                         TROF = 1;       /* Reissue until CPU2 stopped */
@@ -3159,7 +3159,7 @@ control:
                         if (NCSF)
                            break;
                         A_valid();      /* Load ICW */
-                        sim_debug(DEBUG_DETAIL, &cpu_dev, "INIT P1\n\r");
+                        sim_debug(DEBUG_DETAIL, &cpu_dev, "INIT P1\n");
                         initiate();
                         break;
 
@@ -3180,7 +3180,7 @@ control:
                         cpu_index = 1;  /* To CPU 2 */
                         Ma = 010;
                         memory_cycle(4);
-                        sim_debug(DEBUG_DETAIL, &cpu_dev, "INIT P2\n\r");
+                        sim_debug(DEBUG_DETAIL, &cpu_dev, "INIT P2\n");
                         initiate();
                         break;
 
