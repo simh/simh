@@ -141,7 +141,8 @@ extern t_value ACC, RMR;
 extern uint32 BAZ[8], TABST, RZ;
 extern uint32 READY; /* read by ext 4031 */
 extern uint32 READY2; /* read by ext 4102 */
-extern DEVICE cpu_dev, drum_dev, mmu_dev, disk_dev;
+extern DEVICE cpu_dev, drum_dev, mmu_dev;
+extern DEVICE md_dev[8];
 extern DEVICE clock_dev;
 extern DEVICE printer_dev;
 extern DEVICE tty_dev;
