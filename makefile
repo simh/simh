@@ -126,7 +126,7 @@ ifneq (3,${SIM_MAJOR})
     VIDEO_USEFUL = true
   endif
 endif
-# building the KA10, KI10 or KL10 networking can be used.
+# building the KA10, KI10, KL10 or KS10 networking can be used.
 ifneq (,$(or $(findstring pdp10-ka,${MAKECMDGOALS}),$(findstring pdp10-ki,${MAKECMDGOALS},$(findstring pdp10-kl,${MAKECMDGOALS}))))
   NETWORK_USEFUL = true
 endif
@@ -2005,7 +2005,8 @@ KA10 = ${KA10D}/kx10_cpu.c ${KA10D}/kx10_sys.c ${KA10D}/kx10_df.c \
 	${KA10D}/pdp6_dtc.c ${KA10D}/pdp6_mtc.c ${KA10D}/pdp6_dsk.c \
 	${KA10D}/pdp6_dcs.c ${KA10D}/ka10_dpk.c ${KA10D}/kx10_dpy.c \
 	${KA10D}/ka10_ai.c ${KA10D}/ka10_iii.c ${KA10D}/kx10_disk.c \
-	${KA10D}//ka10_pclk.c ${DISPLAYL} ${DISPLAY340} ${DISPLAYIII}
+	${KA10D}/ka10_pclk.c ${KA10D}/ka10_tv.c \
+	${DISPLAYL} ${DISPLAY340} ${DISPLAYIII}
 KA10_OPT = -DKA=1 -DUSE_INT64 -I ${KA10D} -DUSE_SIM_CARD ${NETWORK_OPT} ${DISPLAY_OPT} ${KA10_DISPLAY_OPT}
 ifneq (${PANDA_LIGHTS},)
 # ONLY for Panda display.
@@ -2042,6 +2043,14 @@ KL10 = ${KL10D}/kx10_cpu.c ${KL10D}/kx10_sys.c ${KL10D}/kx10_df.c \
 	${KL10D}/ka10_ch10.c ${KL10D}/kx10_lp.c ${KL10D}/kl10_nia.c \
 	${KL10D}/kx10_disk.c
 KL10_OPT = -DKL=1 -DUSE_INT64 -I $(KL10D) -DUSE_SIM_CARD ${NETWORK_OPT} 
+
+KS10D = ${SIMHD}/PDP10
+KS10 = ${KS10D}/kx10_cpu.c ${KS10D}/kx10_sys.c ${KS10D}/kx10_disk.c \
+	${KS10D}/ks10_cty.c ${KS10D}/ks10_uba.c ${KS10D}/kx10_rh.c \
+	${KS10D}/kx10_rp.c ${KS10D}/kx10_tu.c ${KS10D}/ks10_dz.c \
+	${KS10D}/ks10_tcu.c ${KS10D}/ks10_lp.c ${KS10D}/ks10_ch11.c \
+	${KS10D}/ks10_kmc.c ${KS10D}/ks10_dup.c ${KS10D}/kx10_imp.c
+KS10_OPT = -DKS=1 -DUSE_INT64 -I $(KS10D) -I $(PDP11D) ${NETWORK_OPT}
 
 ATT3B2D = ${SIMHD}/3B2
 ATT3B2M400 = ${ATT3B2D}/3b2_cpu.c ${ATT3B2D}/3b2_sys.c \
@@ -2126,7 +2135,7 @@ ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	i7094 ibm1130 id16 id32 sds lgp h316 cdc1700 \
 	swtp6800mp-a swtp6800mp-a2 tx-0 ssem b5500 intel-mds \
 	scelbi 3b2 i701 i704 i7010 i7070 i7080 i7090 \
-	sigma uc15 pdp10-ka pdp10-ki pdp10-kl pdp6 i650
+	sigma uc15 pdp10-ka pdp10-ki pdp10-kl pdp10-ks pdp6 i650
 
 all : ${ALL}
 
@@ -2875,6 +2884,15 @@ ${BIN}pdp10-kl${EXE} : ${KL10} ${SIM}
 	${CC} ${KL10} ${SIM} ${KL10_OPT} ${CC_OUTSPEC} ${LDFLAGS}
 ifneq (,$(call find_test,${PDP10D},kl10))
 	$@ $(call find_test,${PDP10D},kl10) ${TEST_ARG}
+endif
+
+pdp10-ks : ${BIN}pdp10-ks${EXE}
+
+${BIN}pdp10-ks${EXE} : ${KS10} ${SIM}
+	${MKDIRBIN}
+	${CC} ${KS10} ${SIM} ${KS10_OPT} ${CC_OUTSPEC} ${LDFLAGS}
+ifneq (,$(call find_test,${PDP10D},ks10))
+	$@ $(call find_test,${PDP10D},ks10) ${TEST_ARG}
 endif
 
 # Front Panel API Demo/Test program
