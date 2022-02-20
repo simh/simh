@@ -44,6 +44,59 @@
 #define TYPE_BBN        1              /* BBN style interface TENEX */
 #define TYPE_WAITS      2              /* IMP connected to waits system. */
 
+#define TYPE_UNI        0              /* Unibus byte order */
+#define TYPE_SIMP       1              /* PDP10 string byte order */
+
+#if KS
+/* IMP11 interface */
+
+/* CSR values */
+#define CSR_GO    0000001  /* Go transfer */
+#define CSR_RST   0000002  /* Reset interface */
+#define CSR_UBA   0000060  /* Unibus upper address */
+#define CSR_IE    0000100  /* Interrupt enable */
+#define CSR_RDY   0000200  /* Device ready */
+#define CSR_MRE   0001000  /* Master error */
+#define CSR_NXM   0040000  /* Non existant memory */
+#define CSR_ERR   0100000  /* Error present */
+
+/* Input CSR  0767600 */
+#define CSR_HRC   0000004  /* Host Ready Relay Control */
+#define CSR_SE    0000010  /* Store enable */
+#define CSR_IBF   0000400  /* Input Buffer full */
+#define CSR_INR   0002000  /* IMP not ready */
+#define CSR_HR    0004000  /* Host Ready */
+#define CSR_EOM   0020000  /* End of Message */
+
+/* Input data buffer   0767602 */
+/* Input Bus Address   0767604 */
+/* Input Word Count    0767606 */
+
+/* Output CSR  07676010 */
+#define CSR_ELB   0000004  /* Send EOM indication to IMP */
+#define CSR_BB    0000010  /* Bus Back */
+#define CSR_OBE   0000400  /* OUtput Buffer Empty */
+#define CSR_WC0   0020000  /* Output Word Count 0 */
+
+/* Output data buffer  0767612 */
+/* Output Bus Address  0767614 */
+/* Output Word Count   0767616 */
+
+/* Bits in STATUS */
+#define IMPID       010 /* Input done. */
+#define IMPIB       040 /* Input busy. */
+#define IMPOD      0100 /* Output done. */
+#define IMPOB      0400 /* Output busy. */
+#define IMPERR    01000 /* IMP error. */
+#define IMPR      02000 /* IMP ready. */
+#define IMPIC     04000 /* IMP interrupt condition. */
+#define IMPHER   010000 /* Host error. */
+#define IMPHR    020000 /* Host ready. */
+#define IMPIHE   040000 /* Inhibit interrupt on host error. */
+#define IMPLW   0100000 /* Last IMP word. */
+#else
+
+
 /* ITS IMP Bits */
 
 /* CONI */
@@ -123,6 +176,7 @@
 /* CONI timeout.  If no CONI instruction is executed for 3-5 seconds,
    the interface will raise the host error signal. */
 #define CONI_TIMEOUT 3000000
+#endif
 
 #define STATUS     u3
 #define OPOS       u4    /* Output bit position */
@@ -435,8 +489,14 @@ static CONST ETH_MAC broadcast_ethaddr = {0xff,0xff,0xff,0xff,0xff,0xff};
 
 static CONST in_addr_T broadcast_ipaddr = {0xffffffff};
 
+#if KS
+int            imp_wr(DEVICE *dptr, t_addr addr, uint16 data, int32 access);
+int            imp_rd(DEVICE *dptr, t_addr addr, uint16 *data, int32 access);
+uint16         imp_vect(struct pdp_dib *dibp);
+#else
 t_stat         imp_devio(uint32 dev, uint64 *data);
 t_addr         imp_devirq(uint32 dev, t_addr addr);
+#endif
 t_stat         imp_srv(UNIT *);
 t_stat         imp_eth_srv(UNIT *);
 t_stat         imp_tim_srv(UNIT *);
@@ -480,22 +540,38 @@ const char     *imp_description (DEVICE *dptr);
 static char    *ipv4_inet_ntoa(struct in_addr ip);
 static int     ipv4_inet_aton(const char *str, struct in_addr *inp);
 
+#if KS
+uint16        imp_icsr;
+uint16        imp_idb;
+uint32        imp_iba;
+uint16        imp_iwcnt;
+uint16        imp_ocsr;
+uint16        imp_odb;
+uint32        imp_oba;
+uint16        imp_owcnt;
+#endif
+
 
 int       imp_mpx_lvl = 0;
 double    last_coni;
 
 UNIT imp_unit[] = {
     {UDATA(imp_srv,     UNIT_IDLE+UNIT_ATTABLE+UNIT_DHCP, 0)},  /* 0 */
-    {UDATA(imp_eth_srv, UNIT_IDLE+UNIT_DIS,     0)},  /* 0 */
-    {UDATA(imp_tim_srv, UNIT_IDLE+UNIT_DIS,     0)},  /* 0 */
+    {UDATA(imp_eth_srv, UNIT_IDLE+UNIT_DIS,     0)},  /* 1 */
+    {UDATA(imp_tim_srv, UNIT_IDLE+UNIT_DIS,     0)},  /* 2 */
 };
-DIB imp_dib = {IMP_DEVNUM, 1, &imp_devio, 
+
+#if KS
+DIB imp_dib = {0767600, 017, 0250, 6, 3, &imp_rd, &imp_wr, 0, 0, 0};
+#else
+DIB imp_dib = {IMP_DEVNUM, 1, &imp_devio,
 #if KL
         &imp_devirq,
 #else
         NULL
 #endif
 };
+#endif
 
 MTAB imp_mod[] = {
     { MTAB_XTD|MTAB_VDV|MTAB_VALR|MTAB_NC, 0, "MAC", "MAC=xx:xx:xx:xx:xx:xx",
@@ -516,16 +592,33 @@ MTAB imp_mod[] = {
            "Use DHCP to set IP address"},
     { MTAB_XTD|MTAB_VDV, 0, "DHCPIP", NULL,
       NULL, &imp_show_dhcpip, NULL, "DHCP info" },
+#if KS
+    { UNIT_DTYPE, (TYPE_UNI << UNIT_V_DTYPE), "UNI", "UNI", NULL, NULL,  NULL,
+           "Standard Unibus transfers"},
+    { UNIT_DTYPE, (TYPE_SIMP << UNIT_V_DTYPE), "SIMP", "SIMP", NULL, NULL,  NULL,
+           "PDP10 byte order transfers"},
+#else
     { UNIT_DTYPE, (TYPE_MIT << UNIT_V_DTYPE), "MIT", "MIT", NULL, NULL,  NULL,
            "ITS/MIT style interface"},
     { UNIT_DTYPE, (TYPE_BBN << UNIT_V_DTYPE), "BBN", "BBN", NULL, NULL,  NULL,
            "Tenex/BBN style interface"},
     { UNIT_DTYPE, (TYPE_WAITS << UNIT_V_DTYPE), "WAITS", "WAITS", NULL, NULL,  NULL,
            "WAITS style interface"},
+#endif
     { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "ARP", NULL,
       NULL, &imp_show_arp, NULL, "ARP IP address->MAC address table" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, NULL, "ARP=ddd.ddd.ddd.ddd=XX:XX:XX:XX:XX:XX",
       &imp_set_arp, NULL, NULL, "Create a static ARP Entry" },
+#if KS
+    {MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "addr", "addr",  &uba_set_addr, uba_show_addr,
+            NULL, "Sets address of CH11" },
+    {MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "vect", "vect",  &uba_set_vect, uba_show_vect,
+            NULL, "Sets vect of CH11" },
+    {MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "br", "br",  &uba_set_br, uba_show_br,
+            NULL, "Sets br of CH11" },
+    {MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "ctl", "ctl",  &uba_set_ctl, uba_show_ctl,
+            NULL, "Sets uba of CH11" },
+#endif
     { 0 }
     };
 
@@ -570,6 +663,180 @@ DEVICE imp_dev = {
 #define IMP_ICHN     0000070
 #define IMP_ECHN     0000700
 
+#if KS
+static void check_interrupts (UNIT *uptr)
+{
+    DEVICE *dptr = &imp_dev;
+    struct pdp_dib   *dibp = (DIB *)dptr->ctxt;
+
+    if ((uptr->STATUS & IMPID) != 0 && imp_icsr & CSR_IE) {
+       uba_set_irq(dibp, dibp->uba_vect);
+    }
+}
+
+int
+imp_wr(DEVICE *dptr, t_addr addr, uint16 data, int32 access)
+{
+    struct pdp_dib   *dibp = (DIB *)dptr->ctxt;
+    UNIT             *uptr = imp_unit;
+
+    addr &= dibp->uba_mask;
+    sim_debug(DEBUG_DETAIL, dptr, "IMP11 write %06o %06o %o\n",
+             addr, data, access);
+
+    switch (addr & 016) {
+    case 000:     /* Input CSR */
+            if (access == BYTE) {
+               if (addr & 1)
+                   data = data | (imp_icsr & 0377);
+               else
+                   data = (imp_icsr & 0177400) | data;
+            }
+            if (data & CSR_RST) {
+               imp_icsr = CSR_INR|CSR_RDY;
+               imp_iba = 0;
+               imp_iwcnt = 0;
+               uba_clr_irq(dibp, dibp->uba_vect);
+            }
+            data &= (CSR_GO|CSR_RST|CSR_UBA|CSR_IE|CSR_HRC|CSR_SE);
+            imp_icsr &= ~(CSR_GO|CSR_RST|CSR_UBA|CSR_IE|CSR_HRC|CSR_SE|CSR_ERR
+                         |CSR_NXM|CSR_MRE);
+            imp_icsr |= data;
+            if (data & CSR_HRC) {
+                imp_icsr |= CSR_HR;
+            } else {
+                imp_icsr &= ~CSR_HR;
+                imp_icsr |= CSR_INR;
+            }
+            if (data & CSR_GO) {
+                imp_icsr &= ~CSR_RDY;
+                uptr->STATUS &= ~(IMPID|IMPLW);
+                uba_clr_irq(dibp, dibp->uba_vect);
+            }
+            sim_debug(DEBUG_DETAIL, dptr, "IMP11 icsr %06o\n", imp_icsr);
+            break;
+
+    case 002:     /* Input Data Buffer */
+            if (access == BYTE) {
+               if (addr & 1)
+                   data = data | (imp_idb & 0377);
+               else
+                   data = (imp_idb & 0177400) | data;
+            }
+            imp_idb = data;
+            break;
+
+    case 004:     /* Input Bus Address */
+            imp_iba = (data & 0177777);
+            imp_icsr &= ~(CSR_ERR);
+            break;
+
+    case 006:     /* Input Word Count */
+            imp_iwcnt = (data & 0177777);
+            break;
+
+    case 010:     /* Output CSR */
+            if (access == BYTE) {
+               if (addr & 1)
+                   data = data | (imp_ocsr & 0377);
+               else
+                   data = (imp_ocsr & 0177400) | data;
+            }
+            if (data & CSR_RST) {
+               imp_ocsr |= CSR_RDY;
+               imp_oba = 0;
+               imp_owcnt = 0;
+               uba_clr_irq(dibp, dibp->uba_vect + 4);
+            }
+            data &= (CSR_GO|CSR_RST|CSR_UBA|CSR_IE|CSR_BB|CSR_ELB);
+            imp_ocsr &= ~(CSR_GO|CSR_RST|CSR_UBA|CSR_IE|CSR_BB|CSR_ELB|CSR_ERR
+                         |CSR_NXM|CSR_MRE);
+            imp_ocsr |= data;
+            if (data & CSR_GO) {
+                imp_ocsr &= ~CSR_RDY;
+                uptr->STATUS &= ~(IMPOD);
+                uba_clr_irq(dibp, dibp->uba_vect + 4);
+            }
+            sim_debug(DEBUG_DETAIL, dptr, "IMP11 ocsr %06o\n", imp_ocsr);
+            break;
+
+    case 012:     /* Output Data Buffer */
+            if (access == BYTE) {
+               if (addr & 1)
+                   data = data | (imp_odb & 0377);
+               else
+                   data = (imp_odb & 0177400) | data;
+            }
+            imp_odb = data;
+            break;
+
+    case 014:     /* Output Bus Address */
+            imp_oba = (data & 0177777);
+            imp_ocsr &= ~(CSR_ERR);
+            break;
+
+    case 016:     /* Output Word Count */
+            imp_owcnt = (data & 0177777);
+            break;
+    }
+    if (imp_ocsr & CSR_GO || imp_icsr & CSR_GO)
+        sim_activate(uptr, 100);
+    return 0;
+}
+
+int
+imp_rd(DEVICE *dptr, t_addr addr, uint16 *data, int32 access)
+{
+    struct pdp_dib   *dibp = (DIB *)dptr->ctxt;
+    UNIT             *uptr = imp_unit;
+
+    addr &= dibp->uba_mask;
+
+    switch (addr & 016) {
+    case 000:     /* Input CSR */
+            *data = imp_icsr;
+            if ((uptr->STATUS & (IMPID)) != 0)
+                *data |= CSR_IBF;
+            if ((uptr->STATUS & (IMPLW)) != 0)
+                *data |= CSR_EOM;
+            break;
+    case 002:     /* Input Data Buffer */
+            *data = imp_idb;
+            break;
+
+    case 004:     /* Input Bus Address */
+            *data = imp_iba;
+            break;
+
+    case 006:     /* Input Word Count */
+            *data = imp_iwcnt;
+            break;
+
+    case 010:     /* Output CSR */
+            *data = imp_ocsr;
+            if ((uptr->STATUS & (IMPOD)) != 0)
+                *data |= CSR_OBE;
+            break;
+
+    case 012:     /* Output Data Buffer */
+            *data = imp_odb;
+            break;
+
+    case 014:     /* Output Bus Address */
+            *data = imp_oba;
+            break;
+
+    case 016:     /* Output Word Count */
+            *data = imp_owcnt;
+            break;
+    }
+    sim_debug(DEBUG_DETAIL, dptr, "IMP11 read %06o %06o %o\n",
+             addr, *data, access);
+    return 0;
+
+}
+
+#else
 static void check_interrupts (UNIT *uptr)
 {
     clr_interrupt (DEVNUM);
@@ -660,7 +927,7 @@ t_stat imp_devio(uint32 dev, uint64 *data)
                      memset(imp_data.sbuffer, 0, ETH_FRAME_SIZE);
                      uptr->OPOS = 0;
                      uptr->STATUS &= ~(IMPLHW);
-                 } else 
+                 } else
                      uptr->STATUS |= IMPLHW;
              }
              if (*data & IMP_STROUT)
@@ -740,9 +1007,171 @@ imp_devirq(uint32 dev, t_addr addr) {
     return  addr;
 }
 #endif
+#endif
 
 t_stat imp_srv(UNIT * uptr)
 {
+#if KS
+    DEVICE         *dptr = find_dev_from_unit (uptr);
+    struct pdp_dib *dibp = (DIB *)dptr->ctxt;
+    t_addr          pa;
+    uint64          wd64;
+    uint16          wd;
+
+    if (imp_ocsr & CSR_GO && imp_data.sendq == NULL) {
+        pa = ((imp_ocsr & CSR_UBA) << 12) | imp_oba;
+        switch (GET_DTYPE(uptr->flags)) {
+        case TYPE_UNI:
+           if (uba_read_npr_word(pa, dibp->uba_ctl, &wd) == 0) {
+               imp_ocsr |= CSR_NXM;
+               imp_ocsr &= ~CSR_GO;
+               uptr->STATUS |= IMPOD;
+               if (imp_ocsr & CSR_IE) {
+                  uba_set_irq(dibp, dibp->uba_vect + 4);
+               }
+               sim_debug(DEBUG_DETAIL, &imp_dev, "IMP out npr failed\n");
+               return SCPE_OK;
+           }
+           imp_data.sbuffer[uptr->OPOS >> 3] = (wd & 0377);
+           uptr->OPOS += 8;
+           imp_data.sbuffer[uptr->OPOS >> 3] = ((wd >> 8) & 0377);
+           uptr->OPOS += 8;
+           sim_debug(DEBUG_DETAIL, &imp_dev, "IMP send %04x %07o %06o %06o\n",
+               wd, pa, imp_owcnt, imp_ocsr);
+           break;
+        case TYPE_SIMP:
+           if (uba_read_npr(pa, dibp->uba_ctl, &wd64) == 0) {
+               imp_ocsr |= CSR_NXM;
+               imp_ocsr &= ~CSR_GO;
+               uptr->STATUS |= IMPOD;
+               if (imp_ocsr & CSR_IE) {
+                  uba_set_irq(dibp, dibp->uba_vect + 4);
+               }
+               sim_debug(DEBUG_DETAIL, &imp_dev, "IMP out npr failed\n");
+               return SCPE_OK;
+           }
+           imp_data.sbuffer[uptr->OPOS >> 3] = (wd64 >> 28) & 0377;
+           uptr->OPOS += 8;
+           imp_data.sbuffer[uptr->OPOS >> 3] = (wd64 >> 20) & 0377;
+           uptr->OPOS += 8;
+           imp_data.sbuffer[uptr->OPOS >> 3] = (wd64 >> 12) & 0377;
+           uptr->OPOS += 8;
+           imp_data.sbuffer[uptr->OPOS >> 3] = (wd64 >> 4) & 0377;
+           uptr->OPOS += 8;
+           imp_oba += 2;
+           imp_owcnt++;
+           sim_debug(DEBUG_DETAIL, &imp_dev, "IMP send %08llx %07o %06o %06o\n",
+               (wd64 >> 4), pa, imp_owcnt, imp_ocsr);
+           break;
+        }
+        imp_oba += 2;
+        imp_owcnt++;
+        if (imp_oba == 0) {
+            imp_ocsr |= CSR_ERR;
+            imp_ocsr &= ~CSR_GO;
+            uptr->STATUS |= IMPOD;
+            if (imp_ocsr & CSR_IE) {
+               uba_set_irq(dibp, dibp->uba_vect + 4);
+            }
+            sim_debug(DEBUG_DETAIL, &imp_dev, "IMP oba overflow\n");
+            return SCPE_OK;
+        }
+        if (imp_owcnt == 0) {
+            imp_ocsr |= CSR_RDY;
+            imp_ocsr &= ~CSR_GO;
+            uptr->STATUS |= IMPOD;
+            if (imp_ocsr & CSR_IE) {
+               uba_set_irq(dibp, dibp->uba_vect + 4);
+            }
+            if (imp_ocsr & CSR_ELB) {
+                sim_debug(DEBUG_DETAIL, &imp_dev, "IMP send\n");
+
+                imp_send_packet (&imp_data, uptr->OPOS >> 3);
+                memset(imp_data.sbuffer, 0, ETH_FRAME_SIZE);
+                uptr->OPOS = 0;
+            }
+        }
+    }
+    if (uptr->STATUS & IMPIB && imp_icsr & CSR_GO) {
+        pa = ((imp_icsr & CSR_UBA) << 12) | imp_iba;
+        if (imp_iba == 0) {
+            imp_icsr |= CSR_ERR;
+            imp_icsr &= ~CSR_GO;
+            uptr->STATUS |= IMPID;
+            if (imp_icsr & CSR_IE) {
+               uba_set_irq(dibp, dibp->uba_vect);
+            }
+            sim_debug(DEBUG_DETAIL, &imp_dev, "IMP oba overflow\n");
+            return SCPE_OK;
+        }
+        switch (GET_DTYPE(uptr->flags)) {
+        case TYPE_UNI:
+           wd = imp_data.rbuffer[uptr->IPOS >> 3] << 8;
+           uptr->IPOS += 8;
+           wd |= imp_data.rbuffer[uptr->IPOS >> 3];
+           uptr->IPOS += 8;
+           if (uba_write_npr_word(pa, dibp->uba_ctl, wd) == 0) {
+               imp_icsr |= CSR_NXM;
+               imp_icsr &= ~CSR_GO;
+               uptr->STATUS |= IMPID;
+               if (imp_icsr & CSR_IE) {
+                  uba_set_irq(dibp, dibp->uba_vect);
+               }
+               sim_debug(DEBUG_DETAIL, &imp_dev, "IMP in npr failed\n");
+               return SCPE_OK;
+           }
+           sim_debug(DEBUG_DETAIL, &imp_dev, "IMP rec %04x %07o %06o %06o\n",
+               wd, pa, imp_owcnt, imp_ocsr);
+           break;
+        case TYPE_SIMP:
+           wd64 = (uint64)imp_data.rbuffer[uptr->IPOS >> 3] << 28;
+           uptr->IPOS += 8;
+           wd64 |= (uint64)imp_data.rbuffer[uptr->IPOS >> 3] << 20;
+           uptr->IPOS += 8;
+           wd64 |= (uint64)imp_data.rbuffer[uptr->IPOS >> 3] << 12;
+           uptr->IPOS += 8;
+           wd64 |= (uint64)imp_data.rbuffer[uptr->IPOS >> 3] << 4;
+           uptr->IPOS += 8;
+           if (uba_write_npr(pa, dibp->uba_ctl, wd64) == 0) {
+               imp_ocsr |= CSR_NXM;
+               imp_ocsr &= ~CSR_GO;
+               uptr->STATUS |= IMPID;
+               if (imp_icsr & CSR_IE) {
+                  uba_set_irq(dibp, dibp->uba_vect);
+               }
+               sim_debug(DEBUG_DETAIL, &imp_dev, "IMP out npr failed\n");
+               return SCPE_OK;
+           }
+           imp_iba += 2;
+           imp_iwcnt++;
+           sim_debug(DEBUG_DETAIL, &imp_dev, "IMP rec %08llx %07o %06o %06o\n",
+               (wd64 >> 4), pa, imp_owcnt, imp_ocsr);
+           break;
+        }
+        imp_iba += 2;
+        imp_iwcnt++;
+        if (uptr->IPOS > uptr->ILEN) {
+            imp_icsr |= CSR_EOM|CSR_RDY;
+            imp_icsr &= ~CSR_GO;
+            uptr->STATUS |= IMPID|IMPLW;
+            uptr->STATUS &= ~IMPIB;
+            if (imp_icsr & CSR_IE) {
+               uba_set_irq(dibp, dibp->uba_vect);
+            }
+            uptr->ILEN = 0;
+        }
+        if (imp_iwcnt == 0) {
+            imp_icsr |= CSR_RDY;
+            imp_icsr &= ~CSR_GO;
+            uptr->STATUS |= IMPID;
+            if (imp_icsr & CSR_IE) {
+               uba_set_irq(dibp, dibp->uba_vect);
+            }
+        }
+    }
+    if (imp_ocsr & CSR_GO || imp_icsr & CSR_GO)
+        sim_activate(uptr, 100);
+#else
     int     i;
     int     l;
 
@@ -782,6 +1211,7 @@ t_stat imp_srv(UNIT * uptr)
         uptr->STATUS |= IMPID;
         check_interrupts (uptr);
     }
+#endif
     if (uptr->ILEN == 0 && (uptr->STATUS & (IMPIB|IMPID)) == 0)
         imp_packet_in(&imp_data);
     return SCPE_OK;
@@ -870,8 +1300,8 @@ t_stat imp_eth_srv(UNIT * uptr)
         imp_packet_in(&imp_data);
 
     if (imp_data.init_state >= 3 && imp_data.init_state < 6) {
-       if (imp_unit[0].flags & UNIT_DHCP && 
-           imp_data.dhcp_state != DHCP_STATE_BOUND && 
+       if (imp_unit[0].flags & UNIT_DHCP &&
+           imp_data.dhcp_state != DHCP_STATE_BOUND &&
            imp_data.dhcp_state != DHCP_STATE_REBINDING &&
            imp_data.dhcp_state != DHCP_STATE_RENEWING)
            return SCPE_OK;
@@ -879,11 +1309,16 @@ t_stat imp_eth_srv(UNIT * uptr)
                  imp_data.init_state);
        if (imp_unit[0].ILEN == 0) {
               /* Queue up a nop packet */
-              imp_data.rbuffer[0] = 0x4;
-#if 0
+#if KS
               imp_data.rbuffer[0] = 0xf;
               imp_data.rbuffer[3] = 4;
+#else
+              imp_data.rbuffer[0] = 0x4;
 #endif
+              imp_data.rbuffer[1] = (ntohl(imp_data.ip) >> 24) & 0xff;
+              imp_data.rbuffer[5] = (ntohl(imp_data.ip) >> 16) & 0xff;
+              imp_data.rbuffer[6] = (ntohl(imp_data.ip) >> 8) & 0xff;
+              imp_data.rbuffer[7] = ntohl(imp_data.ip) & 0xff;
               imp_unit[0].STATUS |= IMPIB;
               imp_unit[0].IPOS = 0;
               imp_unit[0].ILEN = 12*8;
@@ -938,6 +1373,9 @@ t_stat imp_tim_srv(UNIT * uptr)
 
     imp_dhcp_timer(&imp_data);
     imp_arp_age(&imp_data);
+#if KS
+    imp_icsr &= ~CSR_HR;
+#endif
     return SCPE_OK;
 }
 
@@ -981,7 +1419,7 @@ imp_packet_in(struct imp_device *imp)
                                        (ip_hdr->ip_v_hl & 0xf) * 4]);
            struct udp *udp_hdr = (struct udp *)payload;
            /* Check for DHCP traffic */
-           if (ip_hdr->ip_p == UDP_PROTO && 
+           if (ip_hdr->ip_p == UDP_PROTO &&
                ntohs(udp_hdr->udp_dport) == DHCP_UDP_PORT_CLIENT &&
                ntohs(udp_hdr->udp_sport) == DHCP_UDP_PORT_SERVER) {
               imp_do_dhcp_client(imp, &read_buffer);
@@ -996,12 +1434,20 @@ imp_packet_in(struct imp_device *imp)
            memset(&imp->rbuffer[0], 0, 256);
            imp->rbuffer[0] = 0xf;
            imp->rbuffer[3] = 0;
+#if KS
+           imp->rbuffer[1] = (ntohl(ip_hdr->ip_src) >> 24) & 0xff;
            imp->rbuffer[5] = (ntohl(ip_hdr->ip_src) >> 16) & 0xff;
+           imp->rbuffer[6] = (ntohl(ip_hdr->ip_src) >> 8) & 0xff;
+           imp->rbuffer[7] = ntohl(ip_hdr->ip_src) & 0xff;
+#else
            imp->rbuffer[7] = 14;
+#endif
            imp->rbuffer[8] = 0233;
+#if !KS
            imp->rbuffer[18] = 0;
            imp->rbuffer[19] = 0x80;
            imp->rbuffer[21] = 0x30;
+#endif
 
            /* Copy message over */
            pad = 12 + (imp->padding / 8);
@@ -1144,6 +1590,12 @@ imp_packet_in(struct imp_device *imp)
                imp_unit[0].STATUS |= IMPIB;
                imp_unit[0].IPOS = 0;
                imp_unit[0].ILEN = n*8;
+               imp->rbuffer[1] = (ntohl(ip_hdr->ip_src) >> 24) & 0xff;
+               imp->rbuffer[5] = (ntohl(ip_hdr->ip_src) >> 16) & 0xff;
+               imp->rbuffer[6] = (ntohl(ip_hdr->ip_src) >> 8) & 0xff;
+               imp->rbuffer[7] = ntohl(ip_hdr->ip_src) & 0xff;
+               imp->rbuffer[10] = (n >> 8) & 0xff;
+               imp->rbuffer[11] = n & 0xff;
            }
            if (!sim_is_active(&imp_unit[0]))
                sim_activate(&imp_unit[0], 100);
@@ -1187,10 +1639,11 @@ imp_send_packet (struct imp_device *imp, int len)
        break;
     }
     sim_debug(DEBUG_DETAIL, &imp_dev,
-        "IMP packet Type=%d ht=%d dh=%d imp=%d lk=%d %d st=%d Len=%d\n",
+        "IMP packet H=%x Type=%d ht=%d dh=%d imp=%d lk=%d %d st=%d Len=%d mt=%d\n",
+       imp->sbuffer[0],
          imp->sbuffer[3], imp->sbuffer[4], imp->sbuffer[5],
          (imp->sbuffer[6] * 256) + imp->sbuffer[7],
-         lk, imp->sbuffer[9] >> 4, st, n);
+         lk, imp->sbuffer[9] >> 4, st, n, mt);
     switch(mt) {
     case 0:      /* Regular packet */
            switch(st) {
@@ -1205,6 +1658,15 @@ imp_send_packet (struct imp_device *imp, int len)
                      imp_packet_out(imp, &write_buffer);
                   }
                   break;
+           case 4:      /* Nop */
+                  if (imp->init_state < 3)
+                     imp->init_state++;
+                  imp->padding = 0;
+                  sim_debug(DEBUG_DETAIL, &imp_dev,
+                               "IMP recieve Nop %d padding= %d\n",
+                                imp->init_state, imp->padding);
+                  sim_activate(uptr, tmxr_poll); /* Start reciever task */
+                  break;
            case 2: /* Getting ready */
            case 3: /* Uncontrolled */
            default:
@@ -1214,7 +1676,6 @@ imp_send_packet (struct imp_device *imp, int len)
     case 1:      /* Error */
            break;
     case 2:      /* Host going down */
-fprintf(stderr, "IMP: Host shutdown\n\r");
            break;
     case 4:      /* Nop */
            if (imp->init_state < 3)
@@ -1499,7 +1960,7 @@ void imp_packet_debug(struct imp_device *imp, const char *action, ETH_PACK *pack
         memcpy(&in_addr, &arp->dipaddr, sizeof(in_addr));
         strlcpy(arp_dipaddr, ipv4_inet_ntoa(in_addr), sizeof(arp_dipaddr));
         sim_debug(DEBUG_ARP, &imp_dev,
-            "%s %s EthDst=%s EthSrc=%s shwaddr=%s sipaddr=%s dhwaddr=%s dipaddr=%s\n", 
+            "%s %s EthDst=%s EthSrc=%s shwaddr=%s sipaddr=%s dhwaddr=%s dipaddr=%s\n",
             action, arp_op, eth_dst, eth_src, arp_shwaddr, arp_sipaddr, arp_dhwaddr, arp_dipaddr);
         return;
     }
@@ -1519,17 +1980,17 @@ void imp_packet_debug(struct imp_device *imp, const char *action, ETH_PACK *pack
             snprintf(dst_port, sizeof(dst_port), "%d", ntohs(udp->udp_dport));
             sim_debug(DEBUG_UDP, &imp_dev, "%s %d byte packet from %s:%s to %s:%s\n", action,
                 ntohs(udp->len), src_ip, src_port, dst_ip, dst_port);
-            if ((imp_dev.dctrl & DEBUG_DHCP) && 
+            if ((imp_dev.dctrl & DEBUG_DHCP) &&
                 (((ntohs(udp->udp_sport) == DHCP_UDP_PORT_CLIENT) &&
-                  (ntohs(udp->udp_dport) == DHCP_UDP_PORT_SERVER)) || 
+                  (ntohs(udp->udp_dport) == DHCP_UDP_PORT_SERVER)) ||
                  ((ntohs(udp->udp_dport) == DHCP_UDP_PORT_CLIENT) &&
                   (ntohs(udp->udp_sport) == DHCP_UDP_PORT_SERVER)))) {
                 struct dhcp         *dhcp = (struct dhcp *)(payload + sizeof(struct udp));
                 uint8               *opt = &dhcp->options[0];
 
-                sim_debug(DEBUG_DHCP, &imp_dev, "%s XID=%08X", 
-                    (dhcp->op == DHCP_BOOTREQUEST) ? "REQUEST" : 
-                                                     (dhcp->op == DHCP_BOOTREPLY) ? "REPLY" : 
+                sim_debug(DEBUG_DHCP, &imp_dev, "%s XID=%08X",
+                    (dhcp->op == DHCP_BOOTREQUEST) ? "REQUEST" :
+                                                     (dhcp->op == DHCP_BOOTREPLY) ? "REPLY" :
                                                                                     "??????",
                     dhcp->xid);
                 if (dhcp->ciaddr) {
@@ -1619,7 +2080,7 @@ void imp_packet_debug(struct imp_device *imp, const char *action, ETH_PACK *pack
                 sim_debug(DEBUG_DHCP, &imp_dev, "\n");
             } else {
                 if (udp->len && (imp_dev.dctrl & DEBUG_UDP))
-                    sim_data_trace(&imp_dev, imp_unit, payload + sizeof(struct udp), "", 
+                    sim_data_trace(&imp_dev, imp_unit, payload + sizeof(struct udp), "",
                                                        ntohs(udp->len), "", DEBUG_DATA);
                 }
             break;
@@ -1678,7 +2139,7 @@ imp_arp_update(struct imp_device *imp, in_addr_T ipaddr, ETH_MAC *ethaddr, int a
                     memcpy(&tabptr->ethaddr, ethaddr, sizeof(ETH_MAC));
                     eth_mac_fmt(ethaddr, mac_buf);
                     sim_debug(DEBUG_ARP, &imp_dev,
-                              "updating entry for IP %s to %s\n", 
+                              "updating entry for IP %s to %s\n",
                               ipv4_inet_ntoa(*((struct in_addr *)&ipaddr)), mac_buf);
                     }
                 if (tabptr->age != ARP_DONT_AGE)
@@ -1716,7 +2177,7 @@ imp_arp_update(struct imp_device *imp, in_addr_T ipaddr, ETH_MAC *ethaddr, int a
     tabptr->age = age;
     eth_mac_fmt(ethaddr, mac_buf);
     sim_debug(DEBUG_ARP, &imp_dev,
-              "creating entry for IP %s to %s, initial age=%d\n", 
+              "creating entry for IP %s to %s, initial age=%d\n",
               ipv4_inet_ntoa(*((struct in_addr *)&ipaddr)), mac_buf, age);
 }
 
@@ -1738,8 +2199,8 @@ void imp_arp_age(struct imp_device *imp)
                 char mac_buf[20];
 
                 eth_mac_fmt(&tabptr->ethaddr, mac_buf);
-                sim_debug(DEBUG_ARP, &imp_dev, 
-                          "discarding ARP entry for IP %s %s after %d seconds\n", 
+                sim_debug(DEBUG_ARP, &imp_dev,
+                          "discarding ARP entry for IP %s %s after %d seconds\n",
                           ipv4_inet_ntoa(*((struct in_addr *)&tabptr->ipaddr)), mac_buf, IMP_ARP_MAX_AGE);
                 memset(tabptr, 0, sizeof(*tabptr));
             }
@@ -1993,7 +2454,7 @@ imp_do_send_dhcp(struct imp_device *imp,
     eth_mac_fmt (&pkt->ethhdr.dest, mac_buf);
     memcpy(&in_addr, &udp_hdr.ip_dst, sizeof(in_addr));
     sim_debug(DEBUG_DHCP, &imp_dev,
-        "client sent %s packet to: %s:%d(%s)\n", 
+        "client sent %s packet to: %s:%d(%s)\n",
         op, ipv4_inet_ntoa(in_addr), ntohs(udp->udp_dport), mac_buf);
 }
 
@@ -2027,7 +2488,7 @@ imp_do_dhcp_client(struct imp_device *imp, ETH_PACK *read_buffer)
 
     ip_checksum((uint8 *)&sum, (uint8 *)ip_hdr, hl);
     if (sum != 0) {
-       sim_printf("IP checksum error %x\n\r", sum);
+       sim_printf("IP checksum error %x\r\n", sum);
        return;
     }
     ip_checksum((uint8 *)(&sum), (uint8 *)(upkt), ntohs(upkt->len));
@@ -2038,7 +2499,7 @@ imp_do_dhcp_client(struct imp_device *imp, ETH_PACK *read_buffer)
     udp_hdr.hlen = upkt->len;
     checksumadjust((uint8 *)&sum, 0, 0, (uint8 *)(&udp_hdr), sizeof(udp_hdr));
     if (sum != 0) {
-       sim_printf("UDP checksum error %x\n\r", sum);
+       sim_printf("UDP checksum error %x\r\n", sum);
        return;
     }
 
@@ -2110,8 +2571,8 @@ imp_do_dhcp_client(struct imp_device *imp, ETH_PACK *read_buffer)
     eth_mac_fmt(&eth->src, mac_buf);
     memcpy(&in_addr, &udp_hdr.ip_src, sizeof(in_addr));
     sim_debug(DEBUG_DHCP, &imp_dev,
-        "client incoming %s packet: dhcp_state=%s - wait_time=%d from: %s:%d(%s)\n", 
-                   (opr == -1) ? "" : dhcp_opr_names[opr], 
+        "client incoming %s packet: dhcp_state=%s - wait_time=%d from: %s:%d(%s)\n",
+                   (opr == -1) ? "" : dhcp_opr_names[opr],
                     dhcp_state_names[imp->dhcp_state], imp->dhcp_wait_time,
                     ipv4_inet_ntoa(in_addr), ntohs(upkt->udp_sport), mac_buf);
 
@@ -2574,7 +3035,7 @@ t_stat imp_show_dhcpip (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
             fprintf (st, ", Lease Expires in %d seconds", imp_data.dhcp_lease);
         } else {
             fprintf (st, ", State:%s, Waited %d seconds", dhcp_state_names[imp_data.dhcp_state],
-                  imp_data.dhcp_wait_time);            
+                  imp_data.dhcp_wait_time);
         }
     }
    return SCPE_OK;
@@ -2647,6 +3108,10 @@ t_stat imp_reset (DEVICE *dptr)
     imp_data.freeq = p;
     imp_data.init_state = 0;
     last_coni = sim_gtime();
+#if KS
+    imp_icsr = CSR_RDY;
+    imp_ocsr = CSR_RDY;
+#endif
     if (imp_unit[0].flags & UNIT_ATT)
         sim_activate_after(&imp_unit[2], 1000000);    /* Start Timer service */
     return SCPE_OK;
@@ -2659,6 +3124,7 @@ t_stat imp_attach(UNIT* uptr, CONST char* cptr)
     char* tptr;
     char buf[32];
 
+#if !KS
     /* Set to correct device number */
     switch(GET_DTYPE(imp_unit[0].flags)) {
     case TYPE_MIT:
@@ -2669,8 +3135,9 @@ t_stat imp_attach(UNIT* uptr, CONST char* cptr)
                    imp_dib.dev_num = WA_IMP_DEVNUM;
                    break;
     }
+#endif
     if (!(uptr->flags & UNIT_DHCP) && imp_data.ip == 0)
-      return sim_messagef (SCPE_NOATT, "%s: An IP Address must be specified when DHCP is disabled\n", 
+      return sim_messagef (SCPE_NOATT, "%s: An IP Address must be specified when DHCP is disabled\n",
                imp_dev.name);
 
     tptr = (char *) malloc(strlen(cptr) + 1);
@@ -2710,7 +3177,7 @@ t_stat imp_attach(UNIT* uptr, CONST char* cptr)
       return sim_messagef (status, "%s: Can't initialize receive queue\n", imp_dev.name);
     }
 
-    /* Pick a relatively unique starting xid, presuming that the 
+    /* Pick a relatively unique starting xid, presuming that the
        MAC address has been verified unique on the LAN by eth_open */
     imp_data.dhcp_xid = (imp_data.mac[0] | (imp_data.mac[1] << 8) |
                         (imp_data.mac[2] << 16) | (imp_data.mac[3] << 24)) + (uint32)time(NULL);
@@ -2718,7 +3185,7 @@ t_stat imp_attach(UNIT* uptr, CONST char* cptr)
     memset(imp_data.arp_table, 0, sizeof(imp_data.arp_table));
 
     /* If we're not doing DHCP and a gateway is defined on the network
-       then define a static APR entry for the gateway to facilitate 
+       then define a static APR entry for the gateway to facilitate
        outbound routing */
     if (!(uptr->flags & UNIT_DHCP) && imp_data.gwip) {
       ETH_PACK                read_buffer;

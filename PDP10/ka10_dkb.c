@@ -54,7 +54,6 @@
 
 t_stat dkb_devio(uint32 dev, uint64 *data);
 int dkb_keyboard (SIM_KEY_EVENT *kev);
-t_stat dkb_svc(UNIT *uptr);
 t_stat dkb_reset(DEVICE *dptr);
 t_stat dkb_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 const char *dkb_description (DEVICE *dptr);
@@ -65,7 +64,7 @@ int dkb_kmod = 0;
 DIB dkb_dib = { DKB_DEVNUM, 1, dkb_devio, NULL};
 
 UNIT dkb_unit[] = {
-    {UDATA (&dkb_svc, UNIT_IDLE, 0) },
+    {UDATA (NULL, UNIT_IDLE, 0) },
     { 0 }
     };
 
@@ -416,11 +415,6 @@ int dkb_keyboard (SIM_KEY_EVENT *kev)
     return 1;
 }
 
-
-t_stat dkb_svc( UNIT *uptr)
-{
-    return SCPE_OK;
-}
 
 t_stat dkb_reset( DEVICE *dptr)
 {

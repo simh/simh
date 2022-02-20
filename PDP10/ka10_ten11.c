@@ -37,8 +37,12 @@
 /* Rubin 10-11 pager. */
 static uint64 ten11_pager[256];
 
+/* Physical address range of TEN11 moby. */
+t_addr ten11_base = 03000000;
+t_addr ten11_end  = 04000000;
+
 /* Physical address of 10-11 control page. */
-#define T11CPA          03776000
+#define T11CPA          0776000  //Offset inside TEN11 moby.
 
 /* Bits in a 10-11 page table entry. */
 #define T11VALID        (0400000000000LL)
@@ -64,6 +68,8 @@ static t_stat ten11_svc (UNIT *uptr);
 static t_stat ten11_reset (DEVICE *dptr);
 static t_stat ten11_attach (UNIT *uptr, CONST char *ptr);
 static t_stat ten11_detach (UNIT *uptr);
+static t_stat ten11_set_base (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+static t_stat ten11_show_base (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 static t_stat ten11_attach_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 static const char *ten11_description (DEVICE *dptr);
 
@@ -77,6 +83,8 @@ static REG ten11_reg[] = {
 };
 
 static MTAB ten11_mod[] = {
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "base address", "BASE",
+          &ten11_set_base, &ten11_show_base },
     { 0 }
 };
 
@@ -290,6 +298,8 @@ int ten11_read (t_addr addr, uint64 *data)
   int offset = addr & 01777;
   int word1, word2;
 
+  addr &= RMASK; //Address offset inside moby.
+
   if (addr >= T11CPA) {
     /* Accessing the control page. */
     if (offset >= 0400) {
@@ -370,6 +380,8 @@ int ten11_write (t_addr addr, uint64 data)
 {
   int offset = addr & 01777;
 
+  addr &= RMASK; //Address offset inside moby.
+
   if (addr >= T11CPA) {
     /* Accessing the control page. */
     if (offset >= 0400) {
@@ -412,5 +424,29 @@ int ten11_write (t_addr addr, uint64 data)
       write_word (uaddr + 2, (data >> 4) & 0177777);
   }
   return 0;
+}
+
+static t_stat ten11_set_base (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+    t_stat r;
+    t_value x;
+
+    if (cptr == NULL || *cptr == 0)
+        return SCPE_ARG;
+
+    x = get_uint (cptr, 8, 03777777, &r);
+    if (r != SCPE_OK)
+        return SCPE_ARG;
+
+    ten11_base = (t_addr)(x&03777777);
+    /* The end of the TEN11 range is the start of the next moby. */
+    ten11_end = (ten11_base + 01000000) & LMASK;
+    return SCPE_OK;
+}
+
+static t_stat ten11_show_base (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+    fprintf (st, "Base: %011o", ten11_base);
+    return SCPE_OK;
 }
 #endif

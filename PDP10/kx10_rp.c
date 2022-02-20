@@ -44,9 +44,8 @@
 #define GET_DTYPE(x)    (((x) >> UNIT_V_DTYPE) & UNIT_M_DTYPE)
 
 /* Parameters in the unit descriptor */
-#define CMD      u3
-/* u3  low */
-/* RPC - 00 - control */
+#define RPCS1             00
+/* RPCS1 - 00 - control */
 
 #define CS1_GO          1               /* go */
 #define CS1_V_FNC       1               /* function pos */
@@ -70,10 +69,12 @@
 #define  FNC_WRITEH     031             /* write w/ headers */
 #define  FNC_READ       034             /* read */
 #define  FNC_READH      035             /* read w/ headers */
+#define CS1_RDY         0000200         /* Drive ready */
 #define CS1_DVA         0004000         /* drive avail NI */
+#define CS1_SC          0100000         /* Set if TRE or ATTN */
 #define GET_FNC(x)      (((x) >> CS1_V_FNC) & CS1_M_FNC)
 
-/* u3  low */
+#define RPDS            01
 /* RPDS - 01 - drive status */
 
 #define DS_OFF          0000001         /* offset mode */
@@ -89,7 +90,7 @@
 #define DS_ATA          0100000         /* attention active */
 #define DS_MBZ          0000076
 
-/* u3 high */
+#define RPER1           02
 /* RPER1 - 02 - error status 1 */
 
 #define ER1_ILF         0000001         /* illegal func */
@@ -109,61 +110,62 @@
 #define ER1_UNS         0040000         /* drive unsafe */
 #define ER1_DCK         0100000         /* data check NI */
 
+#define RPMR            03
 /* RPMR - 03 - maintenace register */
 
+#define RPAS            04
 /* RPAS - 04 - attention summary */
 
 #define AS_U0           0000001         /* unit 0 flag */
 
-#define DA           u4
-/* u4 high */
-/* RPDC - 05 - desired sector */
+#define RPDA              05
+/* RPDA - 05 - desired sector */
 
-#define DA_V_SC         16              /* sector pos */
+#define DA_V_SC         0               /* sector pos */
 #define DA_M_SC         077             /* sector mask */
-#define DA_V_SF         24              /* track pos */
+#define DA_V_SF         8               /* track pos */
 #define DA_M_SF         077             /* track mask */
 #define DA_MBZ          0140300
 #define GET_SC(x)       (((x) >> DA_V_SC) & DA_M_SC)
 #define GET_SF(x)       (((x) >> DA_V_SF) & DA_M_SF)
 
+#define RPDT            06
 /* RPDT - 06 - drive type */
 
+#define RPLA            07
 /* RPLA - 07 - look ahead register */
-#define LA_REG         us9
 #define LA_V_SC         6                               /* sector pos */
 
+#define  RPER2          010
 /* RPER2 - 10 - error status 2 - drive unsafe conditions - unimplemented */
-/* us10 */
+#define  RPOF           011
 /* RPOF  - 11 - offset register */
-/* u4 low */
+#define  RPDC           012
 /* RPDC  - 12 - desired cylinder */
 #define DC_V_CY         0                               /* cylinder pos */
 #define DC_M_CY         01777                           /* cylinder mask */
 #define DC_MBZ          0176000
-#define GET_CY(x)       (((x) >> DC_V_CY) & DC_M_CY)
-#define GET_DA(c,d)     ((((GET_CY (c) * rp_drv_tab[d].surf) + GET_SF (c)) \
-                                       * rp_drv_tab[d].sect) + GET_SC (c))
-#define CCYL          u5
-/* u5 low */
+#define GET_CY          (((regs[RPDC]) >> DC_V_CY) & DC_M_CY)
+#define GET_DA(d)       ((((GET_CY * rp_drv_tab[d].surf) + GET_SF (regs[RPDA])) \
+                                   * rp_drv_tab[d].sect) + GET_SC (regs[RPDA]))
+#define CCYL           u4
 /* RPCC  - 13 - current cylinder */
 
+#define RPSN            014
 /* RPSN  - 14 - serial number */
+#define RPER3           015
 /* RPER3 - 15 - error status 3 - more unsafe conditions - unimplemented */
-#define ERR2          us9
-/* us9 */
-#define ERR3          us10
-
-/* RPDB - 176722 - data buffer */
-
 
 #define OF_HCI          0002000                         /* hdr cmp inh NI */
 #define OF_ECI          0004000                         /* ECC inhibit NI */
 #define OF_F22          0010000                         /* format NI */
 #define OF_MBZ          0161400
 
-#define DATAPTR       u6
+#define DATAPTR         u6
+
+#define RPEC1           016
 /* RPEC1 - 16 - ECC status 1 - unimplemented */
+#define RPEC2           017
 /* RPEC2 - 17 - ECC status 2 - unimplemented */
 
 
@@ -238,6 +240,10 @@ t_stat        rp_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag,
                     const char *cptr);
 const char    *rp_description (DEVICE *dptr);
 uint64        rp_buf[NUM_DEVS_RP][RP_NUMWD];
+#if KS
+extern DEVICE *rh_boot_dev;
+extern int     rh_boot_unit;
+#endif
 
 
 UNIT                rp_unit[] = {
@@ -317,6 +323,15 @@ UNIT                rp_unit[] = {
 #endif
 };
 
+#if KS
+struct rh_if   rp_rh[NUM_DEVS_RP] = {
+     { &rp_write, &rp_read, &rp_rst},
+};
+
+DIB rp_dib[] = {
+    {0776700, 077, 0254, 6, 1, &uba_rh_read, &uba_rh_write, 0, 0, &rp_rh[0]},
+};
+#else
 struct rh_if   rp_rh[NUM_DEVS_RP] = {
      { &rp_write, &rp_read, &rp_rst},
      { &rp_write, &rp_read, &rp_rst},
@@ -329,7 +344,7 @@ DIB rp_dib[] = {
     {RH10_DEV, 1, &rh_devio, &rh_devirq, &rp_rh[1]},
     {RH10_DEV, 1, &rh_devio, &rh_devirq, &rp_rh[2]},
     {RH10_DEV, 1, &rh_devio, &rh_devirq, &rp_rh[3]}};
-
+#endif
 
 MTAB                rp_mod[] = {
 #if KL
@@ -346,23 +361,35 @@ MTAB                rp_mod[] = {
     {UNIT_DTYPE, (RP06_DTYPE << UNIT_V_DTYPE), "RP06", "RP06", &rp_set_type },
     {UNIT_DTYPE, (RP04_DTYPE << UNIT_V_DTYPE), "RP04", "RP04", &rp_set_type },
     {MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT", NULL, &disk_show_fmt },
+#if KS
+    {MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "addr", "addr",  &uba_set_addr, uba_show_addr,
+              NULL, "Sets address of RH11" },
+    {MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "vect", "vect",  &uba_set_vect, uba_show_vect,
+              NULL, "Sets vect of RH11" },
+    {MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "br", "br",  &uba_set_br, uba_show_br,
+              NULL, "Sets br of RH11" },
+    {MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "ctl", "ctl",  &uba_set_ctl, uba_show_ctl,
+              NULL, "Sets uba of RH11" },
+#endif
     {0}
 };
 
 REG                 rpa_reg[] = {
+#if !KS
     {ORDATA(IVECT, rp_rh[0].ivect, 18)},
     {FLDATA(IMODE, rp_rh[0].imode, 0)},
     {ORDATA(XFER, rp_rh[0].xfer_drive, 3), REG_HRO},
-    {ORDATA(DRIVE, rp_rh[0].drive, 3), REG_HRO},
     {ORDATA(REG, rp_rh[0].reg, 6), REG_RO},
+    {ORDATA(CIA, rp_rh[0].cia, 18)},
+    {ORDATA(CCW, rp_rh[0].ccw, 18)},
+    {ORDATA(DEVNUM, rp_rh[0].devnum, 9), REG_HRO},
+#endif
+    {ORDATA(DRIVE, rp_rh[0].drive, 3), REG_HRO},
     {ORDATA(RAE, rp_rh[0].rae, 8), REG_RO},
     {ORDATA(ATTN, rp_rh[0].attn, 8), REG_RO},
     {ORDATA(STATUS, rp_rh[0].status, 18), REG_RO},
-    {ORDATA(CIA, rp_rh[0].cia, 18)},
-    {ORDATA(CCW, rp_rh[0].ccw, 18)},
     {ORDATA(WCR, rp_rh[0].wcr, 18)},
     {ORDATA(CDA, rp_rh[0].cda, 18)},
-    {ORDATA(DEVNUM, rp_rh[0].devnum, 9), REG_HRO},
     {ORDATA(BUF, rp_rh[0].buf, 36), REG_HRO},
     {BRDATA(BUFF, rp_buf[0], 16, 64, RP_NUMWD), REG_HRO},
     {0}
@@ -381,16 +408,16 @@ REG                 rpb_reg[] = {
     {ORDATA(IVECT, rp_rh[1].ivect, 18)},
     {FLDATA(IMODE, rp_rh[1].imode, 0)},
     {ORDATA(XFER, rp_rh[1].xfer_drive, 3), REG_HRO},
-    {ORDATA(DRIVE, rp_rh[1].drive, 3), REG_HRO},
     {ORDATA(REG, rp_rh[1].reg, 6), REG_RO},
+    {ORDATA(CIA, rp_rh[1].cia, 18)},
+    {ORDATA(CCW, rp_rh[1].ccw, 18)},
+    {ORDATA(DEVNUM, rp_rh[1].devnum, 9), REG_HRO},
+    {ORDATA(DRIVE, rp_rh[1].drive, 3), REG_HRO},
     {ORDATA(RAE, rp_rh[1].rae, 8), REG_RO},
     {ORDATA(ATTN, rp_rh[1].attn, 8), REG_RO},
     {ORDATA(STATUS, rp_rh[1].status, 18), REG_RO},
-    {ORDATA(CIA, rp_rh[1].cia, 18)},
-    {ORDATA(CCW, rp_rh[1].ccw, 18)},
     {ORDATA(WCR, rp_rh[1].wcr, 18)},
     {ORDATA(CDA, rp_rh[1].cda, 18)},
-    {ORDATA(DEVNUM, rp_rh[1].devnum, 9), REG_HRO},
     {ORDATA(BUF, rp_rh[1].buf, 36), REG_HRO},
     {BRDATA(BUFF, rp_buf[1], 16, 64, RP_NUMWD), REG_HRO},
     {0}
@@ -409,16 +436,16 @@ REG                 rpc_reg[] = {
     {ORDATA(IVECT, rp_rh[2].ivect, 18)},
     {FLDATA(IMODE, rp_rh[2].imode, 0)},
     {ORDATA(XFER, rp_rh[2].xfer_drive, 3), REG_HRO},
-    {ORDATA(DRIVE, rp_rh[2].drive, 3), REG_HRO},
+    {ORDATA(CIA, rp_rh[2].cia, 18)},
+    {ORDATA(CCW, rp_rh[2].ccw, 18)},
     {ORDATA(REG, rp_rh[2].reg, 6), REG_RO},
+    {ORDATA(DEVNUM, rp_rh[2].devnum, 9), REG_HRO},
+    {ORDATA(DRIVE, rp_rh[2].drive, 3), REG_HRO},
     {ORDATA(RAE, rp_rh[2].rae, 8), REG_RO},
     {ORDATA(ATTN, rp_rh[2].attn, 8), REG_RO},
     {ORDATA(STATUS, rp_rh[2].status, 18), REG_RO},
-    {ORDATA(CIA, rp_rh[2].cia, 18)},
-    {ORDATA(CCW, rp_rh[2].ccw, 18)},
     {ORDATA(WCR, rp_rh[2].wcr, 18)},
     {ORDATA(CDA, rp_rh[2].cda, 18)},
-    {ORDATA(DEVNUM, rp_rh[2].devnum, 9), REG_HRO},
     {ORDATA(BUF, rp_rh[2].buf, 36), REG_HRO},
     {BRDATA(BUFF, rp_buf[2], 16, 64, RP_NUMWD), REG_HRO},
     {0}
@@ -437,8 +464,8 @@ REG                 rpd_reg[] = {
     {ORDATA(IVECT, rp_rh[3].ivect, 18)},
     {FLDATA(IMODE, rp_rh[3].imode, 0)},
     {ORDATA(XFER, rp_rh[3].xfer_drive, 3), REG_HRO},
-    {ORDATA(DRIVE, rp_rh[3].drive, 3), REG_HRO},
     {ORDATA(REG, rp_rh[3].reg, 6), REG_RO},
+    {ORDATA(DRIVE, rp_rh[3].drive, 3), REG_HRO},
     {ORDATA(RAE, rp_rh[3].rae, 8), REG_RO},
     {ORDATA(ATTN, rp_rh[3].attn, 8), REG_RO},
     {ORDATA(STATUS, rp_rh[3].status, 18), REG_RO},
@@ -481,15 +508,26 @@ DEVICE *rp_devs[] = {
 void
 rp_rst(DEVICE *dptr)
 {
-   UNIT *uptr=dptr->units;
-   int   drive;
-   for(drive = 0; drive < NUM_UNITS_RP; drive++, uptr++) {
-       uptr->CMD &= DS_MOL|DS_WRL|DS_DPR|DS_DRY|DS_VV|076;
-       uptr->DA &= 003400177777;
-       uptr->CCYL &= 0177777;
-       uptr->ERR2 = 0;
-       uptr->ERR3 = 0;
-   }
+    UNIT     *uptr = dptr->units;
+    uint16   *regs;
+    int       ctlr = GET_CNTRL_RH(uptr->flags);
+    uint32    i;
+
+    rh_reset(dptr, &rp_rh[ctlr]);
+    for (i = 0; i < dptr->numunits; i++) {
+        regs = (uint16 *)(uptr->up7);
+        regs[RPDS] &= DS_VV;
+        if (regs[RPMR] & 1) {
+             uptr->CCYL = GET_CY;
+             regs[RPOF] &= OF_HCI|OF_ECI|OF_F22;
+        }
+        if ((uptr->flags & UNIT_ATT) != 0)                  /* attached? */
+           regs[RPDS] |= DS_DRY;
+        regs[RPER1] = 0;
+        regs[RPER2] = 0;
+        regs[RPER3] = 0;
+        uptr++;
+    }
 }
 
 int
@@ -498,47 +536,44 @@ rp_write(DEVICE *dptr, struct rh_if *rhc, int reg, uint32 data) {
     int            unit = rhc->drive;
     UNIT          *uptr = &dptr->units[unit];
     int            dtype = GET_DTYPE(uptr->flags);
+    uint16        *regs = (uint16 *)(uptr->up7);
 
     if ((uptr->flags & UNIT_DIS) != 0 && reg != 04)
         return 1;
-    if ((uptr->CMD & CS1_GO) && reg != 04) {
-        uptr->CMD |= (ER1_RMR << 16)|DS_ERR;
+    if ((regs[RPCS1] & CS1_GO) && reg != 04) {
+        regs[RPER1] |= ER1_RMR;
         return 0;
     }
     switch(reg) {
     case  000:  /* control */
-        sim_debug(DEBUG_DETAIL, dptr, "%s%o Status=%06o\n", dptr->name, unit, uptr->CMD);
-        /* Set if drive not writable */
-        if (uptr->flags & UNIT_WPRT)
-           uptr->CMD |= DS_WRL;
+        sim_debug(DEBUG_DETAIL, dptr, "%s%o Status=%06o\n", dptr->name, unit, regs[RPCS1]);
         /* If drive not ready don't do anything */
-        if ((uptr->CMD & DS_DRY) == 0) {
-           uptr->CMD |= (ER1_RMR << 16)|DS_ERR;
+        if ((regs[RPCS1] & CS1_GO) != 0) {
+           regs[RPER1] |= ER1_RMR;
            sim_debug(DEBUG_DETAIL, dptr, "%s%o not ready\n", dptr->name, unit);
            return 0;
         }
         /* Check if GO bit set */
         if ((data & 1) == 0) {
-           uptr->CMD &= ~076;
-           uptr->CMD |= data & 076;
-           sim_debug(DEBUG_DETAIL, dptr, "%s%o no go\n", dptr->name, unit);
+           regs[RPCS1] = data & 076;
+           sim_debug(DEBUG_DETAIL, dptr, "%s%o no go %06o\n", dptr->name, unit, data);
            return 0;                           /* No, nop */
         }
-        uptr->CMD &= DS_ATA|DS_VV|DS_DPR|DS_MOL|DS_WRL;
-        uptr->CMD |= data & 076;
+        regs[RPDS] &= DS_ATA|DS_VV|DS_OFF;
+        regs[RPCS1] = data & 076;
         switch (GET_FNC(data)) {
         case FNC_NOP:
-            uptr->CMD |= DS_DRY;
+            regs[RPDS] |= DS_DRY;
             break;
 
         case FNC_RECAL:                       /* recalibrate */
-            uptr->DA &= ~0177777;
+            regs[RPDC] = 0;
              /* Fall through */
 
         case FNC_RETURN:                      /* return to center */
         case FNC_OFFSET:                      /* offset */
         case FNC_UNLOAD:                      /* unload */
-            uptr->CMD &= ~DS_OFF;
+            regs[RPDS] &= ~DS_OFF;
              /* Fall through */
 
         case FNC_SEARCH:                      /* search */
@@ -548,101 +583,105 @@ rp_write(DEVICE *dptr, struct rh_if *rhc, int reg, uint32 data) {
         case FNC_WRITEH:                      /* write w/ headers */
         case FNC_READ:                        /* read */
         case FNC_READH:                       /* read w/ headers */
-            uptr->CMD |= DS_PIP;
 
-            if (GET_CY(uptr->DA) >= rp_drv_tab[dtype].cyl ||
-                GET_SC(uptr->DA) >= rp_drv_tab[dtype].sect ||
-                GET_SF(uptr->DA) >= rp_drv_tab[dtype].surf) {
+            if (GET_CY >= rp_drv_tab[dtype].cyl ||
+                GET_SC(regs[RPDA]) >= rp_drv_tab[dtype].sect ||
+                GET_SF(regs[RPDA]) >= rp_drv_tab[dtype].surf) {
                 rhc->attn &= ~(1<<unit);
-                uptr->CMD |= (ER1_IAE << 16)|DS_ERR|DS_DRY|DS_ATA;
-                uptr->CMD &= ~DS_PIP;
+                regs[RPDS] |= DS_ATA|DS_DRY;
+                regs[RPER1] |= ER1_IAE;
                 break;
             }
-
-            uptr->CMD |= CS1_GO;
+            regs[RPDS] |= DS_PIP;
+            regs[RPDS] &= ~DS_DRY;
+            regs[RPCS1] |= CS1_GO;
             CLR_BUF(uptr);
             uptr->DATAPTR = 0;
             break;
 
 
         case FNC_DCLR:                        /* drive clear */
-            uptr->CMD |= DS_DRY;
-            uptr->CMD &= ~(DS_ATA|CS1_GO);
-            uptr->DA &= 003400177777;
-            uptr->CCYL &= 0177777;
-            uptr->ERR2 = 0;
-            uptr->ERR3 = 0;
+            regs[RPDS] &= ~DS_ATA;
+            regs[RPDS] |= DS_DRY;
+            regs[RPOF] = 0;
+            regs[RPER1] = 0;
+            regs[RPER2] = 0;
+            regs[RPER3] = 0;
+#if KS
+            rhc->error = 0;
+#endif
             rhc->attn &= ~(1<<unit);
             break;
 
         case FNC_PRESET:                      /* read-in preset */
-            uptr->DA = 0;
-            uptr->CCYL &= 0177777;
-            uptr->CMD &= ~DS_OFF;
+            regs[RPDA] = 0;
+            regs[RPDC] = 0;
+            regs[RPDS] &= ~DS_OFF;
+            regs[RPDS] |= DS_DRY;
+            regs[RPOF] = 0;
              /* Fall through */
 
         case FNC_RELEASE:                     /* port release */
         case FNC_PACK:                        /* pack acknowledge */
             if ((uptr->flags & UNIT_ATT) != 0)
-                uptr->CMD |= DS_VV;
-            uptr->CMD |= DS_DRY;
+                regs[RPDS] |= DS_VV|DS_DRY;
             break;
 
         default:
-            uptr->CMD |= DS_DRY|DS_ERR|DS_ATA;
-            uptr->CMD |= (ER1_ILF << 16);
+            regs[RPDS] |= DS_ATA|DS_DRY;
+            regs[RPER1] |= ER1_ILF;
             rhc->attn |= (1<<unit);
         }
-        if (uptr->CMD & CS1_GO)
+        if (regs[RPCS1] & CS1_GO)
             sim_activate(uptr, 1000);
-        sim_debug(DEBUG_DETAIL, dptr, "%s%o AStatus=%06o\n", dptr->name, unit, uptr->CMD);
+        sim_debug(DEBUG_DETAIL, dptr, "%s%o AStatus=%06o\n", dptr->name, unit, regs[RPCS1]);
         return 0;
     case  001:  /* status */
         break;
     case  002:  /* error register 1 */
-        uptr->CMD &= 0177777;
-        uptr->CMD |= data << 16;
-        uptr->CMD &= ~DS_ERR;
-        if ((((uptr->CMD >> 16) & 0177777) | uptr->ERR2 | uptr->ERR3)  != 0)
-           uptr->CMD |= DS_ERR;
+        regs[RPER1] = data;
         break;
     case  003:  /* maintenance */
+        /* RPLA has 10 bits for position in sector */
+        if (data & 1) {
+            if ((data & 076) == 0) {
+                if (regs[RPMR] & 010)
+                   regs[RPLA] ++;
+                if (regs[RPMR] & 04)
+                   regs[RPLA] = 0;
+            }
+            regs[RPMR] = data;
+            fprintf(stderr, "Write %o MR=%06o\r\n", unit, data);
+        } else
+            regs[RPMR] = 0;
         break;
     case  004:  /* atten summary */
         for (i = 0; i < 8; i++) {
             if (data & (1<<i)) {
-                UNIT   *u = &dptr->units[i];
-                u->CMD &= ~DS_ATA;
+                UNIT      *u = &dptr->units[i];
+                uint16    *r = (uint16 *)(u->up7);
+                r[RPDS] &= ~DS_ATA;
                 rhc->attn &= ~(1<<i);
             }
         }
         break;
     case  005:  /* sector/track */
-        uptr->DA &= 0177777;
-        uptr->DA |= data << 16;
+        regs[RPDA] = data;
         break;
     case  014:  /* error register 2 */
-        uptr->ERR2 = data;
-        uptr->CMD &= ~DS_ERR;
-        if ((((uptr->CMD >> 16) & 0177777) | uptr->ERR2 | uptr->ERR3)  != 0)
-           uptr->CMD |= DS_ERR;
+        regs[RPER2] = data;
         break;
     case  006:  /* drive type */
     case  007:  /* look ahead */
         break;
     case  011:  /* offset */
-        uptr->CCYL &= 0177777;
-        uptr->CCYL |= data << 16;
+        regs[RPOF] = data & 0016277;
         break;
     case  012:  /* desired cylinder */
-        uptr->DA &= ~0177777;
-        uptr->DA |= data;
+        regs[RPDC] = (data & DC_M_CY) << DC_V_CY;
         break;
     case  015:  /* error register 3 */
-        uptr->ERR3 = data;
-        uptr->CMD &= ~DS_ERR;
-        if ((((uptr->CMD >> 16) & 0177777) | uptr->ERR2 | uptr->ERR3)  != 0)
-           uptr->CMD |= DS_ERR;
+        regs[RPER3] = data & 076210;
         break;
     case  013:  /* current cylinder */
     case  010:  /* serial no */
@@ -650,7 +689,7 @@ rp_write(DEVICE *dptr, struct rh_if *rhc, int reg, uint32 data) {
     case  017:  /* ecc pattern */
         break;
     default:
-        uptr->CMD |= (ER1_ILR<<16)|DS_ERR;
+        regs[RPER1] |= ER1_ILR;
         rhc->rae |= 1 << unit;
     }
     return 0;
@@ -660,6 +699,7 @@ int
 rp_read(DEVICE *dptr, struct rh_if *rhc, int reg, uint32 *data) {
     int           unit = rhc->drive;
     UNIT          *uptr = &dptr->units[unit];
+    uint16        *regs = (uint16 *)(uptr->up7);
     uint32        temp = 0;
     int           i;
 
@@ -671,63 +711,75 @@ rp_read(DEVICE *dptr, struct rh_if *rhc, int reg, uint32 *data) {
     }
     switch(reg) {
     case  000:  /* control */
-        temp = uptr->CMD & 076;
+        temp = regs[RPCS1];
         if (uptr->flags & UNIT_ATT)
            temp |= CS1_DVA;
-        if (uptr->CMD & CS1_GO)
-           temp |= CS1_GO;
         break;
     case  001:  /* status */
-        temp = uptr->CMD & 0177700;
+        temp = regs[RPDS];
+        if ((regs[RPER1] | regs[RPER2] | regs[RPER3]) != 0)
+           temp |= DS_ERR;
+        if ((uptr->flags & UNIT_DIS) == 0)
+           temp |= DS_DPR;
+        if ((uptr->flags & UNIT_ATT) != 0)
+           temp |= DS_MOL;
+        if ((uptr->flags & UNIT_WPRT) != 0)
+           temp |= DS_WRL;
         break;
     case  002:  /* error register 1 */
-        temp = (uptr->CMD >> 16) & 0177777;
+        temp = regs[RPER1];
         break;
     case  003:  /* maintenance */
+        if ((regs[RPMR] & 1) != 0)
+            temp = regs[RPMR];
         break;
     case  004:  /* atten summary */
         for (i = 0; i < 8; i++) {
-            UNIT   *u = &dptr->units[i];
-            if (u->CMD & DS_ATA) {
+            UNIT      *u = &dptr->units[i];
+            uint16    *r = (uint16 *)(u->up7);
+            if (r[RPDS] & DS_ATA) {
                 temp |= 1 << i;
             }
         }
         break;
     case  005:  /* sector/track */
-        temp = (uptr->DA >> 16) & 0177777;
+        temp = regs[RPDA];
         break;
     case  006:  /* drive type */
         temp = rp_drv_tab[GET_DTYPE(uptr->flags)].devtype;
         break;
     case  011:  /* offset */
-        temp = (uptr->CCYL >> 16) & 0177777;
+        temp = regs[RPOF];
         break;
     case  012:  /* desired cylinder */
-        temp = uptr->DA & 0177777;
+        temp = regs[RPDC];
         break;
     case  013:  /* current cylinder */
-        temp = uptr->CCYL & 0177777;
+        temp = uptr->CCYL;
         break;
     case  010:  /* serial no */
         i = GET_CNTRL_RH(uptr->flags);
         temp = (020 * i) + (unit + 1);
         break;
     case  014:  /* error register 2 */
-        temp = uptr->ERR2;
+        temp = regs[RPER2];
         break;
     case  015:  /* error register 3 */
-        temp = uptr->ERR3;
+        temp = regs[RPER3];
         break;
     case  007:  /* look ahead */
-        uptr->LA_REG += 0100;
-        uptr->LA_REG &= 07700;
-        temp = uptr->LA_REG;
+        if ((regs[RPLA] >> 10) >= 23)
+            regs[RPLA] = 0;
+        temp = GET_SC(regs[RPDA]) << 6;
+        temp ^= ((regs[RPLA] + 1) >> 4) & 07760;
+        if ((regs[RPMR] & 1) == 0)
+            regs[RPLA] += 1024; 
         break;
     case  016:  /* ecc position */
     case  017:  /* ecc pattern */
         break;
     default:
-        uptr->CMD |= (ER1_ILR<<16);
+        regs[RPER1] |= ER1_ILR;
         rhc->rae |= 1 << unit;
     }
     *data = temp;
@@ -739,7 +791,8 @@ t_stat rp_svc (UNIT *uptr)
 {
     int           dtype = GET_DTYPE(uptr->flags);
     int           ctlr = GET_CNTRL_RH(uptr->flags);
-    int           cyl = GET_CY(uptr->DA);
+    uint16        *regs = (uint16 *)(uptr->up7);
+    int           cyl = GET_CY;
     int           unit;
     DEVICE       *dptr;
     struct rh_if *rhc;
@@ -749,9 +802,11 @@ t_stat rp_svc (UNIT *uptr)
     dptr = rp_devs[ctlr];
     rhc = &rp_rh[ctlr];
     unit = uptr - dptr->units;
-    if ((uptr->flags & UNIT_ATT) == 0) {                 /* not attached? */
-        uptr->CMD |= (ER1_UNS << 16) | DS_ATA|DS_ERR;     /* set drive error */
-        if (GET_FNC(uptr->CMD) >= FNC_XFER) {             /* xfr? set done */
+    if ((uptr->flags & UNIT_ATT) == 0) {                  /* not attached? */
+        regs[RPDS] |= DS_ATA;                           /* set drive error */
+        regs[RPDS] &= ~DS_DRY;
+        regs[RPER1] |= ER1_UNS;                            /* set drive error */
+        if (GET_FNC(regs[RPCS1]) >= FNC_XFER) {             /* xfr? set done */
            rh_setirq(rhc);
         } else {
            rh_setattn(rhc, unit);
@@ -760,11 +815,13 @@ t_stat rp_svc (UNIT *uptr)
     }
 
     /* Check if seeking */
-    if (uptr->CMD & DS_PIP) {
+    if (regs[RPDS] & DS_PIP) {
         sim_debug(DEBUG_DETAIL, dptr, "%s%o seek %d %d\n", dptr->name, unit, cyl, uptr->CCYL);
         if (cyl >= rp_drv_tab[dtype].cyl) {
-            uptr->CMD &= ~DS_PIP;
-            uptr->CMD |= (ER1_IAE << 16)|DS_ERR|DS_DRY|DS_ATA;
+            regs[RPDS] &= ~DS_PIP;
+            regs[RPDS] |= (DS_ATA|DS_DRY);
+            regs[RPCS1] &= ~CS1_GO;
+            regs[RPER1] |= ER1_IAE;
             rh_setattn(rhc, unit);
         }
         diff = cyl - (uptr->CCYL & 01777);
@@ -793,12 +850,12 @@ t_stat rp_svc (UNIT *uptr)
             }
             return SCPE_OK;
         } else {
-            uptr->CMD &= ~DS_PIP;
+            regs[RPDS] &= ~DS_PIP;
             uptr->DATAPTR = 0;
         }
     }
 
-    switch (GET_FNC(uptr->CMD)) {
+    switch (GET_FNC(regs[RPCS1])) {
     case FNC_NOP:
     case FNC_DCLR:                       /* drive clear */
     case FNC_RELEASE:                    /* port release */
@@ -806,60 +863,65 @@ t_stat rp_svc (UNIT *uptr)
         break;
     case FNC_UNLOAD:                     /* unload */
         rp_detach(uptr);
-        /* Fall through */
+        regs[RPDS] |= DS_ATA|DS_DRY;
+        regs[RPCS1] &= ~CS1_GO;
+        rh_setattn(rhc, unit);
+        sim_debug(DEBUG_DETAIL, dptr, "%s%o unload %d %o\n", dptr->name, unit, cyl, regs[RPCS1]);
+        break;
     case FNC_OFFSET:                     /* offset */
-        uptr->CMD |= DS_OFF;
+        regs[RPDS] |= DS_OFF;
         /* Fall through */
     case FNC_RETURN:                     /* return to center */
     case FNC_PRESET:                     /* read-in preset */
     case FNC_RECAL:                      /* recalibrate */
     case FNC_SEEK:                       /* seek */
-        if (GET_SC(uptr->DA) >= rp_drv_tab[dtype].sect ||
-            GET_SF(uptr->DA) >= rp_drv_tab[dtype].surf)
-            uptr->CMD |= (ER1_IAE << 16)|DS_ERR;
-        uptr->CMD |= DS_DRY|DS_ATA;
-        uptr->CMD &= ~CS1_GO;
+        if (GET_SC(regs[RPDA]) >= rp_drv_tab[dtype].sect ||
+            GET_SF(regs[RPDA]) >= rp_drv_tab[dtype].surf)
+            regs[RPER1] |= ER1_IAE;
+        regs[RPDS] |= DS_ATA|DS_DRY;
+        regs[RPCS1] &= ~CS1_GO;
         rh_setattn(rhc, unit);
-        sim_debug(DEBUG_DETAIL, dptr, "%s%o seekdone %d %o\n", dptr->name, unit, cyl, uptr->CMD);
+        sim_debug(DEBUG_DETAIL, dptr, "%s%o seekdone %d %o\n", dptr->name, unit, cyl, regs[RPCS1]);
         break;
 
     case FNC_SEARCH:                     /* search */
-        if (GET_SC(uptr->DA) >= rp_drv_tab[dtype].sect ||
-            GET_SF(uptr->DA) >= rp_drv_tab[dtype].surf)
-            uptr->CMD |= (ER1_IAE << 16)|DS_ERR;
-        uptr->CMD |= DS_DRY|DS_ATA;
-        uptr->CMD &= ~CS1_GO;
+        if (GET_SC(regs[RPDA]) >= rp_drv_tab[dtype].sect ||
+            GET_SF(regs[RPDA]) >= rp_drv_tab[dtype].surf)
+            regs[RPER1] |= ER1_IAE;
+        regs[RPDS] |= DS_ATA|DS_DRY;
+        regs[RPCS1] &= ~CS1_GO;
         rh_setattn(rhc, unit);
-        sim_debug(DEBUG_DETAIL, dptr, "%s%o searchdone %d %o\n", dptr->name, unit, cyl, uptr->CMD);
+        sim_debug(DEBUG_DETAIL, dptr, "%s%o searchdone %d %o\n", dptr->name, unit, cyl, regs[RPCS1]);
         break;
 
     case FNC_READ:                       /* read */
     case FNC_READH:                      /* read w/ headers */
     case FNC_WCHK:                       /* write check */
-        if (uptr->CMD & DS_ERR) {
+        if (regs[RPER1] != 0) {
             sim_debug(DEBUG_DETAIL, dptr, "%s%o read error\n", dptr->name, unit);
             goto rd_end;
         }
 
         if (BUF_EMPTY(uptr)) {
-            if (GET_SC(uptr->DA) >= rp_drv_tab[dtype].sect ||
-                GET_SF(uptr->DA) >= rp_drv_tab[dtype].surf) {
-                uptr->CMD |= (ER1_IAE << 16)|DS_ERR|DS_DRY|DS_ATA;
-                uptr->CMD &= ~CS1_GO;
+            if (GET_SC(regs[RPDA]) >= rp_drv_tab[dtype].sect ||
+                GET_SF(regs[RPDA]) >= rp_drv_tab[dtype].surf) {
+                regs[RPER1] |= ER1_IAE;
+                regs[RPDS] |= DS_ATA|DS_DRY;
+                regs[RPCS1] &= ~CS1_GO;
                 rh_finish_op(rhc, 0);
                 sim_debug(DEBUG_DETAIL, dptr, "%s%o readx done\n", dptr->name, unit);
                 return SCPE_OK;
             }
             sim_debug(DEBUG_DETAIL, dptr, "%s%o read (%d,%d,%d)\n", dptr->name, unit, cyl,
-                   GET_SF(uptr->DA), GET_SC(uptr->DA));
-            da = GET_DA(uptr->DA, dtype);
+                   GET_SF(regs[RPDA]), GET_SC(regs[RPDA]));
+            da = GET_DA(dtype);
             (void)disk_read(uptr, &rp_buf[ctlr][0], da, RP_NUMWD);
             uptr->hwmark = RP_NUMWD;
             uptr->DATAPTR = 0;
             /* On read headers, transfer 2 words to start */
-            if (GET_FNC(uptr->CMD) == FNC_READH) {
+            if (GET_FNC(regs[RPCS1]) == FNC_READH) {
                 rhc->buf = (((uint64)cyl) << 18) | 
-                         ((uint64)((GET_SF(uptr->DA) << 8) | GET_SF(uptr->DA)));
+                         ((uint64)((GET_SF(regs[RPDA]) << 8) | GET_SF(regs[RPDA])));
                 sim_debug(DEBUG_DATA, dptr, "%s%o read word h1 %012llo %09o %06o\n",
                    dptr->name, unit, rhc->buf, rhc->cda, rhc->wcr);
                 if (rh_write(rhc) == 0)
@@ -880,14 +942,14 @@ t_stat rp_svc (UNIT *uptr)
                 /* Increment to next sector. Set Last Sector */
                 uptr->DATAPTR = 0;
                 CLR_BUF(uptr);
-                uptr->DA += 1 << DA_V_SC;
-                if (GET_SC(uptr->DA) >= rp_drv_tab[dtype].sect) {
-                    uptr->DA &= (DA_M_SF << DA_V_SF) | (DC_M_CY << DC_V_CY);
-                    uptr->DA += 1 << DA_V_SF;
-                    if (GET_SF(uptr->DA) >= rp_drv_tab[dtype].surf) {
-                         uptr->DA &= (DC_M_CY << DC_V_CY);
-                         uptr->DA += 1 << DC_V_CY;
-                         uptr->CMD |= DS_PIP;
+                regs[RPDA] += 1 << DA_V_SC;
+                if (GET_SC(regs[RPDA]) >= rp_drv_tab[dtype].sect) {
+                    regs[RPDA] &= (DA_M_SF << DA_V_SF);
+                    regs[RPDA] += 1 << DA_V_SF;
+                    if (GET_SF(regs[RPDA]) >= rp_drv_tab[dtype].surf) {
+                         regs[RPDA] = 0;
+                         regs[RPDC] += 1 << DC_V_CY;
+                         regs[RPDS] |= DS_PIP;
                     }
                 }
                 if (rh_blkend(rhc))
@@ -897,8 +959,9 @@ t_stat rp_svc (UNIT *uptr)
         } else {
 rd_end:
             sim_debug(DEBUG_DETAIL, dptr, "%s%o read done\n", dptr->name, unit);
-            uptr->CMD |= DS_DRY;
-            uptr->CMD &= ~CS1_GO;
+            regs[RPCS1] &= ~CS1_GO;
+            regs[RPDS] &= ~DS_PIP;
+            regs[RPDS] |= DS_DRY;
             if (uptr->DATAPTR == RP_NUMWD) 
                (void)rh_blkend(rhc);
             rh_finish_op(rhc, 0);
@@ -908,22 +971,23 @@ rd_end:
 
     case FNC_WRITE:                      /* write */
     case FNC_WRITEH:                     /* write w/ headers */
-        if (uptr->CMD & DS_ERR) {
+        if (regs[RPER1] != 0) {
             sim_debug(DEBUG_DETAIL, dptr, "%s%o read error\n", dptr->name, unit);
             goto wr_end;
         }
 
         if (BUF_EMPTY(uptr)) {
-            if (GET_SC(uptr->DA) >= rp_drv_tab[dtype].sect ||
-                GET_SF(uptr->DA) >= rp_drv_tab[dtype].surf) {
-                uptr->CMD |= (ER1_IAE << 16)|DS_ERR|DS_DRY|DS_ATA;
-                uptr->CMD &= ~CS1_GO;
+            if (GET_SC(regs[RPDA]) >= rp_drv_tab[dtype].sect ||
+                GET_SF(regs[RPDA]) >= rp_drv_tab[dtype].surf) {
+                regs[RPER1] |= ER1_IAE;
+                regs[RPDS] |= DS_ATA|DS_DRY;
+                regs[RPCS1] &= ~CS1_GO;
                 rh_finish_op(rhc, 0);
                 sim_debug(DEBUG_DETAIL, dptr, "%s%o writex done\n", dptr->name, unit);
                 return SCPE_OK;
             }
             /* On Write headers, transfer 2 words to start */
-            if (GET_FNC(uptr->CMD) == FNC_WRITEH) {
+            if (GET_FNC(regs[RPCS1]) == FNC_WRITEH) {
                 if (rh_read(rhc) == 0)
                     goto wr_end;
                 sim_debug(DEBUG_DATA, dptr, "%s%o write word h1 %012llo %06o\n",
@@ -946,20 +1010,20 @@ rd_end:
         }
         if (uptr->DATAPTR == RP_NUMWD) {
             sim_debug(DEBUG_DETAIL, dptr, "%s%o write (%d,%d,%d)\n", dptr->name,
-                   unit, cyl, GET_SF(uptr->DA), GET_SC(uptr->DA));
-            da = GET_DA(uptr->DA, dtype);
+                   unit, cyl, GET_SF(regs[RPDA]), GET_SC(regs[RPDA]));
+            da = GET_DA(dtype);
             (void)disk_write(uptr, &rp_buf[ctlr][0], da, RP_NUMWD);
             uptr->DATAPTR = 0;
             CLR_BUF(uptr);
             if (sts) {
-                uptr->DA += 1 << DA_V_SC;
-                if (GET_SC(uptr->DA) >= rp_drv_tab[dtype].sect) {
-                    uptr->DA &= (DA_M_SF << DA_V_SF) | (DC_M_CY << DC_V_CY);
-                    uptr->DA += 1 << DA_V_SF;
-                    if (GET_SF(uptr->DA) >= rp_drv_tab[dtype].surf) {
-                         uptr->DA &= (DC_M_CY << DC_V_CY);
-                         uptr->DA += 1 << DC_V_CY;
-                         uptr->CMD |= DS_PIP;
+                regs[RPDA] += 1 << DA_V_SC;
+                if (GET_SC(regs[RPDA]) >= rp_drv_tab[dtype].sect) {
+                    regs[RPDA] &= (DA_M_SF << DA_V_SF);
+                    regs[RPDA] += 1 << DA_V_SF;
+                    if (GET_SF(regs[RPDA]) >= rp_drv_tab[dtype].surf) {
+                         regs[RPDA] = 0;
+                         regs[RPDC] += 1 << DC_V_CY;
+                         regs[RPDS] |= DS_PIP;
                     }
                 }
             }
@@ -971,8 +1035,8 @@ rd_end:
         } else {
 wr_end:
             sim_debug(DEBUG_DETAIL, dptr, "RP%o write done\n", unit);
-            uptr->CMD |= DS_DRY;
-            uptr->CMD &= ~CS1_GO;
+            regs[RPCS1] &= ~CS1_GO;
+            regs[RPDS] |= DS_DRY;
             rh_finish_op(rhc, 0);
             return SCPE_OK;
         }
@@ -999,11 +1063,27 @@ rp_set_type(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 t_stat
 rp_reset(DEVICE * rptr)
 {
-    int ctlr;
-    for (ctlr = 0; ctlr < NUM_DEVS_RP; ctlr++) {
-        rp_rh[ctlr].status = 0;
-        rp_rh[ctlr].attn = 0;
-        rp_rh[ctlr].rae = 0;
+    UNIT     *uptr = rptr->units;
+    uint16   *regs;
+    int       ctlr = GET_CNTRL_RH(uptr->flags);
+    uint32    i;
+
+    rh_reset(rptr, &rp_rh[ctlr]);
+    for (i = 0; i < rptr->numunits; i++) {
+        if (uptr->up7 == 0 && (uptr->up7 = calloc(16, sizeof(uint16))) == 0)
+            return SCPE_IERR;
+        regs = (uint16 *)(uptr->up7);
+        regs[RPDS] &= DS_VV;
+        if ((uptr->flags & UNIT_ATT) != 0)                  /* attached? */
+           regs[RPDS] |= DS_DRY;
+        if (regs[RPMR] & 1)
+            uptr->CCYL = GET_CY;
+        regs[RPER1] = 0;
+        regs[RPER2] = 0;
+        regs[RPER3] = 0;
+        regs[RPDC] = 0;
+        regs[RPMR] = 0;
+        uptr++;
     }
     return SCPE_OK;
 }
@@ -1014,13 +1094,87 @@ rp_boot(int32 unit_num, DEVICE * rptr)
 {
     UNIT         *uptr = &rptr->units[unit_num];
     int           ctlr = GET_CNTRL_RH(uptr->flags);
+    int           dtype = GET_DTYPE(uptr->flags);
+    uint16        *regs = (uint16 *)(uptr->up7);
     struct rh_if *rhc = &rp_rh[ctlr];
-    DEVICE       *dptr = rp_devs[ctlr];
+    DEVICE       *dptr = uptr->dptr;
     uint32        addr;
     uint32        ptr = 0;
-    int           wc;
     uint64        word;
-#if KL
+#if !KS
+    int           wc;
+#endif
+
+#if KS
+    int           da;
+    t_stat        r;
+    uint64        len;
+
+    if ((r = rp_reset(dptr)) != SCPE_OK)
+        return r;
+    if ((r = cty_reset(&cty_dev)) != SCPE_OK)
+        return r;
+    /* Read in block 1 and see if it is a home block */
+    disk_read(uptr, &rp_buf[0][0], 1, RP_NUMWD);
+    if (rp_buf[0][0] != 0505755000000LL) {
+        /* Try blocks 10 and 12 if fail */
+        disk_read(uptr, &rp_buf[0][0], 010, RP_NUMWD);
+        if (rp_buf[0][0] != 0505755000000LL) {
+           disk_read(uptr, &rp_buf[0][0], 012, RP_NUMWD);
+           if (rp_buf[0][0] != 0505755000000LL)
+              return SCPE_IERR;
+        }
+    }
+
+    /* Word 103 and 102 contain pointer to SMFILE block */
+    regs[RPDA] = (int32)((rp_buf[0][0103] & 077) << DA_V_SC) |
+               (int32)(((rp_buf[0][0103] >> 8) & 077) << DA_V_SF);
+    regs[RPDC] =  (int32)((rp_buf[0][0103] >> 24) << DC_V_CY);
+    len = (int)(rp_buf[0][0102] & RMASK);
+    da = GET_DA(dtype);
+    disk_read(uptr, &rp_buf[0][0], da, RP_NUMWD);
+    /* For diagnostics use locations 6 and 7 */
+    if (sim_switches & SWMASK ('D')) {
+       sim_messagef(SCPE_OK, "Diags boot\n");
+       regs[RPDA] = (int32)((rp_buf[0][06] & 077) << DA_V_SC) |
+                  (int32)(((rp_buf[0][06] >> 8) & 077) << DA_V_SF);
+       regs[RPDC] = (int32)((rp_buf[0][06] >> 24) << DC_V_CY);
+       len = (int)(((rp_buf[0][07] & 077) * 4) & RMASK);
+    } else {
+    /* Normal is at 4 and 5*/
+       regs[RPDA] = (int32)((rp_buf[0][04] & 077) << DA_V_SC) |
+                  (int32)(((rp_buf[0][04] >> 8) & 077) << DA_V_SF);
+       regs[RPDC] =  (int32)((rp_buf[0][04] >> 24) << DC_V_CY);
+       len = (int)(((rp_buf[0][05] & 077) * 4) & RMASK);
+    }
+if (len == 0)
+    len = 4;
+    /* Read len sectors into address 1000 */
+    addr = 01000;
+    for (; len > 0; len--) {
+        int           i;
+
+        da = GET_DA(dtype);
+        disk_read(uptr, &rp_buf[0][0], da, RP_NUMWD);
+        for (i = 0; i < RP_NUMWD; i++) {
+            M[addr++] = rp_buf[0][i];
+        }
+        regs[RPDA] += 1 << DA_V_SC;
+        if (GET_SC(regs[RPDA]) >= rp_drv_tab[dtype].sect) {
+            regs[RPDA] &= (DA_M_SF << DA_V_SF);
+            regs[RPDA] += 1 << DA_V_SF;
+            if (GET_SF(regs[RPDA]) >= rp_drv_tab[dtype].surf) {
+                 regs[RPDC] += 1 << DC_V_CY;
+            }
+        }
+    }
+    /* Start location, and set up load info */
+    word = 01000;
+    M[036] = rhc->dib->uba_addr | (rhc->dib->uba_ctl << 18);
+    M[037] =  unit_num;
+    rh_boot_dev = rptr;
+    rh_boot_unit = unit_num;
+#elif KL
     int           sect;
     /* KL does not support readin, so fake it by reading in sectors 4 to 7 */
     /* Possible in future find boot loader in FE file system */
@@ -1051,11 +1205,13 @@ rp_boot(int32 unit_num, DEVICE * rptr)
     wc = (rp_buf[0][ptr++] >> 18) & RMASK;
     word = rp_buf[0][ptr++];
 #endif
-    PC = word & RMASK;
-    uptr->CMD |= DS_VV;
+#if !KS
     rhc->reg = 040;
-    rhc->drive = uptr - dptr->units;
     rhc->status |= CCW_COMP_1|PI_ENABLE;
+#endif
+    rhc->drive = uptr - dptr->units;
+    PC = word & RMASK;
+    regs[RPDS] |= DS_VV;
     return SCPE_OK;
 }
 
@@ -1063,10 +1219,10 @@ rp_boot(int32 unit_num, DEVICE * rptr)
 
 t_stat rp_attach (UNIT *uptr, CONST char *cptr)
 {
-    t_stat r;
-    DEVICE *rptr;
-    DIB *dib;
-    int ctlr;
+    t_stat         r;
+    DEVICE        *rptr;
+    int            ctlr;
+    uint16        *regs = (uint16 *)(uptr->up7);
 
     uptr->capac = rp_drv_tab[GET_DTYPE (uptr->flags)].size;
     r = disk_attach (uptr, cptr);
@@ -1075,20 +1231,20 @@ t_stat rp_attach (UNIT *uptr, CONST char *cptr)
     rptr = find_dev_from_unit(uptr);
     if (rptr == 0)
         return SCPE_OK;
-    dib = (DIB *) rptr->ctxt;
+#if KS
+    ctlr = 0;
+#else
     for (ctlr = 0; rh[ctlr].dev_num != 0; ctlr++) {
         if (rh[ctlr].dev == rptr)
             break;
     }
-    if (uptr->flags & UNIT_WPRT)
-         uptr->CMD |= DS_WRL;
+#endif
     if (sim_switches & SIM_SW_REST)
         return SCPE_OK;
-    uptr->DA = 0;
-    uptr->CMD &= ~DS_VV;
-    uptr->CMD |= DS_DPR|DS_MOL|DS_DRY;
-    rp_rh[ctlr].status |= PI_ENABLE;
-    set_interrupt(dib->dev_num, rp_rh[ctlr].status);
+    regs[RPDA] = 0;
+    regs[RPDS] &= ~DS_VV;
+    regs[RPDS] |= DS_DRY;
+    rh_setirq(&rp_rh[ctlr]);
     return SCPE_OK;
 }
 
@@ -1096,11 +1252,13 @@ t_stat rp_attach (UNIT *uptr, CONST char *cptr)
 
 t_stat rp_detach (UNIT *uptr)
 {
+    uint16        *regs = (uint16 *)(uptr->up7);
+
     if (!(uptr->flags & UNIT_ATT))                          /* attached? */
         return SCPE_OK;
     if (sim_is_active (uptr))                              /* unit active? */
         sim_cancel (uptr);                                  /* cancel operation */
-    uptr->CMD &= ~(DS_VV|DS_WRL|DS_DPR|DS_DRY);
+    regs[RPDS] &= ~(DS_VV|DS_DRY);
     return disk_detach (uptr);
 }
 
@@ -1116,6 +1274,17 @@ fprint_set_help (st, dptr);
 fprint_show_help (st, dptr);
 fprintf (st, "\nThe type options can be used only when a unit is not attached to a file.\n");
 fprintf (st, "The RP device supports the BOOT command.\n");
+#if KS
+fprintf (st, "The RH11 is a unibus device, various parameters can be changed on these devices\n");
+fprintf (st, "\n The address of the device can be set with: \n");
+fprintf (st, "      sim> SET RPA ADDR=octal   default address= 776700\n");
+fprintf (st, "\n The interrupt vector can be set with: \n");
+fprintf (st, "      sim> SET RPA VECT=octal   default 254\n");
+fprintf (st, "\n The interrupt level can be set with: \n");
+fprintf (st, "      sim> SET RPA BR=#     # should be between 4 and 7.\n");
+fprintf (st, "\n The unibus addaptor that the DZ is on can be set with:\n");
+fprintf (st, "      sim> SET RPA CTL=#    # can be either 1 or 3\n");
+#endif
 fprint_reg_help (st, dptr);
 return SCPE_OK;
 }

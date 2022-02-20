@@ -171,6 +171,9 @@ static t_stat mty_input_svc (UNIT *uptr)
 
     tmxr_poll_rx (&mty_desc);
 
+    if (status & MTY_DONE)
+        return SCPE_OK;
+
     for (i = 0; i < MTY_LINES; i++) {
         /* Round robin scan 32 lines. */
         scan = (scan + 1) & 037;
@@ -199,6 +202,9 @@ static t_stat mty_output_svc (UNIT *uptr)
     uint64 word;
     int i, ch;
     int32 txdone;
+
+    if (status & MTY_DONE)
+        return SCPE_OK;
 
     for (i = 0; i < MTY_LINES; i++) {
         /* Round robin scan 32 lines. */
@@ -232,9 +238,11 @@ static t_stat mty_output_svc (UNIT *uptr)
 
     tmxr_poll_tx (&mty_desc);
 
-    /* SIMH will actually schedule this UNIT when output is due
-       according to the line speed. */
-    sim_activate_after (uptr, 1000000);
+    if ((status & MTY_ODONE) == 0) {
+      /* SIMH will actually schedule this UNIT when output is due
+         according to the line speed. */
+      sim_activate_after (uptr, 1000000);
+    }
 
     return SCPE_OK;
 }
@@ -245,7 +253,7 @@ static t_stat mty_reset (DEVICE *dptr)
 
     sim_debug(DEBUG_CMD, &mty_dev, "Reset\n");
     if (mty_unit->flags & UNIT_ATT) {
-        sim_activate (mty_unit, tmxr_poll);
+        sim_activate (&mty_unit[0], tmxr_poll);
         sim_activate_after (&mty_unit[1], 100);
     } else {
         sim_cancel (&mty_unit[0]);

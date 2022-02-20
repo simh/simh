@@ -50,11 +50,15 @@
 #define KL 0
 #endif
 
+#ifndef KS
+#define KS 0
+#endif
+
 #if KL
 #define EPT440 0              /* Force KL10 to use as 440 section address */
 #endif
 
-#if (PDP6 + KA + KI + KL) != 1
+#if (PDP6 + KA + KI + KL + KS) != 1
 #error "Please define only one type of CPU"
 #endif
 
@@ -80,6 +84,11 @@
 /* Support for ITS on KL */
 #ifndef KL_ITS
 #define KL_ITS KL
+#endif
+
+/* Support for ITS on KS */
+#ifndef KS_ITS
+#define KS_ITS KS
 #endif
 
 #ifndef PDP6_DEV       /* Include PDP6 devices */
@@ -195,6 +204,30 @@ extern DEBTAB crd_debug[];
 #define FPMMASK  00000000000077777777777LL
 #define FPRBIT2  00000000000100000000000LL
 #define FPRBIT1  00000000000200000000000LL
+#if KS
+#define IOCTL    00000017000000LL
+#endif
+
+/* IRQ Flags in APR */
+#if KL
+#define SWP_DONE        0000020         /* Cache sweep done */
+#define PFAIL           0000040         /* Power failure */
+#define ADDR_PAR        0000100         /* Address Parity error */
+#define CACHE_DIR       0000200         /* Cache Parity error */
+#define MB_PAR          0000400         /* Memory parity error */
+#define INOUT_FAIL      0001000         /* Fault during IRQ */
+#define NXM_MEM         0002000         /* Non-existent memory */
+#define SBUS_ERR        0004000         /* SBus Error */
+#endif
+#if KS
+#define CON_IRQ         0000020         /* Interrupt from Console */
+#define INT_DONE        0000040         /* Interval timer complete */
+#define COR_MEM         0000100         /* Corrected memory error */
+#define MB_ERR          0000200         /* Uncorrectable memory error */
+#define NXM_MEM         0000400         /* No memory */
+#define PFAIL           0001000         /* Power Failure */
+#define FLAG_24         0004000         /* Spare */
+#endif
 
 #define CM(x)   (FMASK ^ (x))
 #define CCM(x)  ((CMASK ^ (x)) & CMASK)
@@ -231,11 +264,15 @@ extern DEBTAB crd_debug[];
 #define NODIV   000001        /* 000040 */
 #define FLTUND  000002        /* 000100 */
 #endif
-#if KI|KL
+#if KI|KL|KS
 #define TRP1    000004        /* 000200 */
 #define TRP2    000010        /* 000400 */
 #define ADRFLT  000020        /* 001000 */
+#if KI | KL
 #define PUBLIC  000040        /* 002000 */
+#else
+#define PUBLIC  000000        /* 000000 */
+#endif
 #else
 #define TRP1    000000
 #define TRP2    000000
@@ -261,7 +298,7 @@ extern DEBTAB crd_debug[];
 #if KI|KL
 #define PRV_PUB 020000        /* Overflow in excutive mode */
 #else
-#define PRV_PUB 000000        /* Not on KA or PDP6 */
+#define PRV_PUB 000000        /* Not on KA, KS or PDP6 */
 #endif
 #ifdef ITS
 #ifdef PURE
@@ -280,12 +317,12 @@ extern DEBTAB crd_debug[];
 
 #if KI_22BIT|KI
 #define MAXMEMSIZE      4096 * 1024
-#else
-#if PDP6
+#elif PDP6
 #define MAXMEMSIZE      256 * 1024
+#elif KS
+#define MAXMEMSIZE      1024 * 1024
 #else
 #define MAXMEMSIZE      1024 * 1024
-#endif
 #endif
 #define MEMSIZE         (cpu_unit[0].capac)
 
@@ -323,6 +360,10 @@ extern DEBTAB crd_debug[];
 #define DEF_SERIAL      1025            /* Default DEC test machine */
 #endif
 
+#if KS
+#define DEF_SERIAL      4097            /* Default DEC test machine */
+#endif
+
 #if BBN
 #define BBN_PAGE        0000017777777LL
 #define BBN_TRPPG       0000017000000LL
@@ -339,7 +380,7 @@ extern DEBTAB crd_debug[];
 #define BBN_MERGE       0161740000000LL
 #endif
 
-#if KL
+#if KL|KS
 /* KL10 TLB paging bits */
 #define KL_PAG_A        0400000    /* Access */
 #define KL_PAG_P        0200000    /* Public */
@@ -367,7 +408,11 @@ extern DEBTAB crd_debug[];
 #define UNIT_KL10B      (1 << UNIT_V_PAGE)
 #define UNIT_TWOSEG     (0)
 #else
+#if KA
 #define UNIT_TWOSEG     (1 << UNIT_V_PAGE)
+#else
+#define UNIT_TWOSEG     (0)
+#endif
 #endif
 #define UNIT_ITSPAGE    (2 << UNIT_V_PAGE)
 #define UNIT_BBNPAGE    (4 << UNIT_V_PAGE)
@@ -415,6 +460,10 @@ extern void     restore_pi_hold();
 extern void     set_pi_hold();
 extern UNIT     cpu_unit[];
 extern UNIT     ten11_unit[];
+#if KS
+extern DEVICE   lp20_dev;
+extern DEVICE   ch11_dev;
+#endif
 #if KL
 extern DEVICE   dte_dev;
 extern DEVICE   lp20_dev;
@@ -462,15 +511,104 @@ extern DEVICE   dkb_dev;
 extern DEVICE   auxcpu_dev;
 extern DEVICE   slave_dev;
 extern DEVICE   dpk_dev;
+extern DEVICE   tv_dev;
 extern DEVICE   wcnsls_dev;             /* MIT Spacewar Consoles */
 extern DEVICE   ocnsls_dev;             /* Old MIT Spacewar Consoles */
 extern DEVICE   ai_dev;
+extern DEVICE   dn_dev;
 extern DEVICE   dct_dev;                /* PDP6 devices. */
 extern DEVICE   dtc_dev;
 extern DEVICE   mtc_dev;
 extern DEVICE   dsk_dev;
 extern DEVICE   dcs_dev;
+extern DEVICE   dz_dev;
+extern DEVICE   kmc_dev;
+extern DEVICE   dup_dev;
+extern DEVICE   tcu_dev;
 
+#if KS
+
+struct rh_if {
+      int            (*dev_write)(DEVICE *dptr, struct rh_if *rh, int reg, uint32 data);
+      int            (*dev_read)(DEVICE *dptr, struct rh_if *rh, int reg, uint32 *data);
+      void           (*dev_reset)(DEVICE *dptr);
+      struct pdp_dib *dib;       /* Pointer back to DIB */
+      int            drive;      /* Last drive selected */
+      t_uint64       buf;        /* Data buffer */
+      uint32         status;     /* Status word */
+      uint16         cs1;        /* Control register 1 */
+      uint16         cs2;        /* Control register 1 */
+      uint16         error;      /* Controller Error register */
+      uint32         wcr;        /* Current word count */
+      uint32         cda;        /* Current bus address */
+      uint16         dba;        /* Input data buffer */
+      uint16         dbb;        /* Output data buffer*/
+      int            rae;        /* Access register error */
+      int            attn;       /* Attention bits */
+      int            xfer_drive; /* Current transfering drive */
+      uint16         regs[16];   /* Space for TM03 formater */
+};
+
+/* Device context block */
+struct pdp_dib {
+    uint32              uba_addr;                       /* device address, includes adaptor */
+    uint32              uba_mask;                       /* Compare mask */
+    uint16              uba_vect;                       /* Floating IRQ vector */
+    uint16              uba_br;                         /* Unibus IRQ level */
+    uint16              uba_ctl;                        /* Unibus controller number */
+    t_stat              (*rd_io)(DEVICE *dptr, t_addr addr, uint16 *data, int32 access);
+    t_stat              (*wr_io)(DEVICE *dptr, t_addr addr, uint16 data, int32 access);
+    uint16              (*irqv)(struct pdp_dib *dibp);
+    uint8               uba_irq_pend;                   /* Device has pending */
+    struct rh_if       *rh11_if;
+};
+typedef struct pdp_dib DIB;
+
+void    cty_wakeup();
+void    cty_interrupt();
+void    cty_execute(int addr);
+t_stat  cty_reset (DEVICE *dptr);
+
+
+#define WORD     0
+#define BYTE     1
+int     uba_read(t_addr addr, int ctl, uint64 *data, int access);
+int     uba_write(t_addr addr, int ctl, uint64 data, int access);
+int     uba_read_npr(t_addr addr, uint16 ctl, uint64 *data);
+int     uba_write_npr(t_addr addr, uint16 ctl, uint64 data);
+int     uba_read_npr_byte(t_addr addr, uint16 ctl, uint8 *data);
+int     uba_write_npr_byte(t_addr addr, uint16 ctl, uint8 data);
+int     uba_read_npr_word(t_addr addr, uint16 ctl, uint16 *data);
+int     uba_write_npr_word(t_addr addr, uint16 ctl, uint16 data);
+void    uba_set_irq(DIB *dibp, int vect);
+void    uba_clr_irq(DIB *dibp, int vect);
+t_addr  uba_get_vect(t_addr addr, int lvl, int dev);
+void    uba_set_parity(uint16 ctl);
+uint16  uba_rh_vect(struct pdp_dib *dibp);
+int     uba_rh_read(DEVICE *dptr, t_addr addr, uint16 *data, int32 access);
+int     uba_rh_write(DEVICE *dptr, t_addr addr, uint16 data, int32 access);
+void    uba_reset();
+
+t_stat  uba_set_addr(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat  uba_show_addr (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat  uba_set_br(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat  uba_show_br (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat  uba_set_vect(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat  uba_show_vect (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat  uba_set_ctl(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat  uba_show_ctl (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+
+void    rh_reset(DEVICE *dptr, struct rh_if *rh);
+void    rh_setup(struct rh_if *rh, uint32 addr);
+void    rh_setattn(struct rh_if *rh, int unit);
+void    rh_error(struct rh_if *rh);
+int     rh_blkend(struct rh_if *rh);
+void    rh_setirq(struct rh_if *rh);
+void    rh_writecw(struct rh_if *rh, int nxm);
+void    rh_finish_op(struct rh_if *rh, int flags);
+int     rh_read(struct rh_if *rh);
+int     rh_write(struct rh_if *rh);
+#else
 extern t_stat (*dev_tab[128])(uint32 dev, t_uint64 *data);
 
 #define VEC_DEVMAX      8                               /* max device vec */
@@ -512,6 +650,7 @@ struct rh_if {
       int            rae;        /* Access register error */
       int            attn;       /* Attention bits */
       int            xfer_drive; /* Current transfering drive */
+      uint16         regs[16];   /* Space for TM03 formater */
 };
 
 /* Device context block */
@@ -551,6 +690,7 @@ t_stat  rh_set_type(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat  rh_show_type (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat  rh_devio(uint32 dev, t_uint64 *data);
 t_addr  rh_devirq(uint32 dev, t_addr addr);
+void    rh_reset(DEVICE *dptr, struct rh_if *rh);
 #if KL
 void    rh20_setup(struct rh_if *rhc);
 #endif
@@ -565,23 +705,18 @@ int     rh_read(struct rh_if *rh);
 int     rh_write(struct rh_if *rh);
 
 
-int ten11_read (t_addr addr, t_uint64 *data);
-int ten11_write (t_addr addr, t_uint64 data);
-
 /* Console lights. */
 extern void ka10_lights_init (void);
 extern void ka10_lights_main (t_uint64);
 extern void ka10_lights_set_aux (int);
 extern void ka10_lights_clear_aux (int);
-
+#endif
 
 /* I/O system parameters */
+#if !(PDP6 | KS)
 #define NUM_DEVS_LP     1
-#if KL
-#define NUM_DEVS_PT     0
-#define NUM_DEVS_CR     0
-#define NUM_DEVS_CP     0
-#else
+#endif
+#if !(KL | KS)
 #define NUM_DEVS_PT     1
 #define NUM_DEVS_CR     1
 #define NUM_DEVS_CP     1
@@ -597,34 +732,48 @@ extern void ka10_lights_clear_aux (int);
 #define NUM_DEVS_DCS    1
 #define NUM_DEVS_SLAVE  PDP6
 #endif
-#if !PDP6
+#if !(PDP6 | KS)
 #define NUM_DEVS_DC     1
 #define NUM_DEVS_MT     1
+#endif
 #if KL
-#define NUM_DEVS_RC     0
-#define NUM_DEVS_DT     0
-#define NUM_DEVS_DK     0
-#define NUM_DEVS_DP     0
 #define NUM_DEVS_LP20   1
 #define NUM_DEVS_TTY    1
 #define NUM_LINES_TTY   64
 #define NUM_DEVS_NIA    1
-#else
+#define NUM_DEVS_DN     0
+#elif KS
+#define NUM_DEVS_LP20   1
+#define NUM_DEVS_DZ     4
+#define NUM_DEVS_TCU    1
+#define NUM_DEVS_DUP    2
+#define NUM_DEVS_KMC    2
+#if KS_ITS
+#define NUM_DEVS_IMP    KS_ITS
+#define NUM_DEVS_CH11   KS_ITS
+#endif
+#endif
+#if KA | KI
 #define NUM_DEVS_RC     1
 #define NUM_DEVS_DT     1
 #define NUM_DEVS_DK     1
 #define NUM_DEVS_DP     2
-#define NUM_DEVS_LP20   0
-#define NUM_DEVS_TTY    0
-#define NUM_DEVS_NIA    0
 #endif
+#if KS
+#define NUM_DEVS_RP     1
+#elif KA | KI | KL
 #define NUM_DEVS_RP     4
 #define NUM_DEVS_RS     1
+#endif
+#if !(PDP6)
 #define NUM_DEVS_TU     1
+#endif
+#if KA
 #define NUM_DEVS_PMP    WAITS
 #define NUM_DEVS_DKB    (WAITS * USE_DISPLAY)
 #define NUM_DEVS_III    (WAITS * USE_DISPLAY)
-#define NUM_DEVS_PD     ITS | KL_ITS
+#define NUM_DEVS_TV     (WAITS * USE_DISPLAY)
+#define NUM_DEVS_PD     ITS
 #define NUM_DEVS_PCLK   WAITS
 #define NUM_DEVS_IMX    ITS
 #define NUM_DEVS_STK    ITS
@@ -632,10 +781,15 @@ extern void ka10_lights_clear_aux (int);
 #define NUM_DEVS_MTY    ITS
 #define NUM_DEVS_TEN11  ITS
 #define NUM_DEVS_AUXCPU ITS
-#define NUM_DEVS_IMP    1
-#define NUM_DEVS_CH10   ITS | KL_ITS
+#define NUM_DEVS_IMP    ITS
+#define NUM_DEVS_CH10   ITS
 #define NUM_DEVS_DPK    ITS
 #define NUM_DEVS_AI     ITS
+#endif
+#if KL_ITS
+#define NUM_DEVS_PD     KL_ITS
+#define NUM_DEVS_IMP    KL_ITS
+#define NUM_DEVS_CH10   KL_ITS
 #endif
 #if MAGIC_SWITCH && !KA && !ITS
 #error "Magic switch only valid on KA10 with ITS mods"
@@ -645,12 +799,20 @@ extern void ka10_lights_clear_aux (int);
 
 
 extern t_bool sim_idle_enab;
+#if !KS
 extern struct rh_dev rh[];
+#endif
 extern t_uint64   M[MAXMEMSIZE];
 extern t_uint64   FM[];
 extern uint32   PC;
 extern uint32   FLAGS;
 
+#if NUM_DEVS_TEN11
+int ten11_read (t_addr addr, t_uint64 *data);
+int ten11_write (t_addr addr, t_uint64 data);
+extern t_addr ten11_base;
+extern t_addr ten11_end;
+#endif
 #if NUM_DEVS_AUXCPU
 extern t_addr   auxcpu_base;
 int auxcpu_read (t_addr addr, uint64 *);

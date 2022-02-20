@@ -1,4 +1,4 @@
-/* ka10_iii.c: Triple III display processor.
+/* ka10_iii.c: Triple-I display processor.
 
    Copyright (c) 2019-2020, Richard Cornwell
 
@@ -32,7 +32,6 @@
 
 #if NUM_DEVS_III > 0
 #include "display/display.h"
-#include "display/iii.h"
 
 #define III_DEVNUM        0430
 
@@ -97,6 +96,11 @@
 #define POS_Y_V    6
 #define CBRT_V     3
 #define CSIZE_V    0
+
+#define MIN_X   -512
+#define MAX_X    512
+#define MIN_Y   -501
+#define MAX_Y    522
 
 /*
  * Character map.
@@ -380,7 +384,8 @@ t_stat iii_devio(uint32 dev, uint64 *data) {
              uptr->STATUS |= DATA_FLG;
          else {
              iii_instr = *data;
-             sim_activate(uptr, 10);
+             /* Process instruction right away to ensure MAR is updated. */
+             iii_svc(iii_unit);
          }
          sim_debug(DEBUG_DATAIO, &iii_dev, "III %03o DATAO %06o\n", dev, (uint32)*data);
          break;
@@ -398,7 +403,7 @@ iii_svc (UNIT *uptr)
      float     ch_sz;
 
      if (uptr->CYCLE > 20) {
-         iii_cycle(300, 0);
+         display_age(300, 0);
          uptr->CYCLE = 0;
      } else {
          uptr->CYCLE++;
@@ -448,7 +453,7 @@ iii_svc (UNIT *uptr)
                    if (ch == '\t' || ch == 0)
                       continue;
                    if (ch == '\r') {
-                      ox = -512;
+                      ox = MIN_X;
                       continue;
                    }
                    if (ch == '\n') {
@@ -493,7 +498,7 @@ iii_svc (UNIT *uptr)
                           nx, ny, sz, br);
                nx += ox;
                ny += oy;
-               if (nx < -512 || nx > 512 || ny < -512 || ny > 512)
+               if (nx < MIN_X || nx > MAX_X || ny < MIN_Y || ny > MAX_Y)
                    uptr->STATUS |= EDG_FBIT;
                i = (int)((iii_instr >> 18) & 3);
                if ((i & 02) == 0 && (iii_sel & 04000) != 0) { /* Check if visible */
@@ -516,7 +521,7 @@ iii_svc (UNIT *uptr)
                /* Compute relative position. */
                nx += ox;
                ny += oy;
-               if (nx < -512 || nx > 512 || ny < -512 || ny > 512)
+               if (nx < MIN_X || nx > MAX_X || ny < MIN_Y || ny > MAX_Y)
                    uptr->STATUS |= EDG_FBIT;
                /* Check if visible */
                if ((iii_instr & 040) == 0 && (iii_sel & 04000) != 0) {
@@ -561,7 +566,7 @@ iii_svc (UNIT *uptr)
                if ((iii_instr & 0100) == 0) { /* Relative mode */
                    nx += ox;
                    ny += oy;
-                   if (nx < -512 || nx > 512 || ny < -512 || ny > 512)
+                   if (nx < MIN_X || nx > MAX_X || ny < MIN_Y || ny > MAX_Y)
                        uptr->STATUS |= EDG_FBIT;
                }
                /* Check if visible */
@@ -637,7 +642,7 @@ t_stat iii_reset (DEVICE *dptr)
     } else {
         display_reset();
         dptr->units[0].POS = 0;
-        iii_init(dptr, 1);
+        display_init(DIS_III, 1, dptr);
     }
     return SCPE_OK;
 }
@@ -647,20 +652,20 @@ t_stat iii_reset (DEVICE *dptr)
 static void
 draw_point(int x, int y, int b, UNIT *uptr)
 {
-   if (x < -512 || x > 512 || y < -512 || y > 512)
+   if (x < MIN_X || x > MAX_X || y < MIN_Y || y > MAX_X)
        uptr->STATUS |= WRP_FBIT;
-   iii_point(x, y, b);
+   display_point(x - MIN_X, y - MIN_Y, b, 0);
 }
 
 /* Draw a line between two points */
 static void
 draw_line(int x1, int y1, int x2, int y2, int b, UNIT *uptr)
 {
-    if (x1 < -512 || x1 > 512 || y1 < -512 || y1 > 512)
+    if (x1 < MIN_X || x1 > MAX_X || y1 < MIN_Y || y1 > MAX_Y)
        uptr->STATUS |= WRP_FBIT;
-    if (x2 < -512 || x2 > 512 || y2 < -512 || y2 > 512)
+    if (x2 < MIN_X || x2 > MAX_X || y2 < MIN_Y || y2 > MAX_Y)
        uptr->STATUS |= WRP_FBIT;
-    iii_draw_line(x1, y1, x2, y2, b);
+    display_line(x1 - MIN_X, y1 - MIN_Y, x2 - MIN_X, y2 - MIN_Y, b);
 }
 
 t_stat iii_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
@@ -670,6 +675,6 @@ return SCPE_OK;
 
 const char *iii_description (DEVICE *dptr)
 {
-    return "Triple III Display";
+    return "Triple-I Display";
 }
 #endif

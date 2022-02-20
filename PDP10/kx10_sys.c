@@ -42,6 +42,9 @@
    sim_load             binary loader
 */
 
+#if KS
+char sim_name[] = "KS-10";
+#endif
 #if KL
 char sim_name[] = "KL-10";
 #endif
@@ -62,7 +65,7 @@ int32 sim_emax = 1;
 
 DEVICE *sim_devices[] = {
     &cpu_dev,
-#if PDP6 | KA | KI
+#if PDP6 | KA | KI | KS
     &cty_dev,
 #endif
 #if KL
@@ -171,6 +174,9 @@ DEVICE *sim_devices[] = {
 #if (NUM_DEVS_III > 0)
     &iii_dev,
 #endif
+#if (NUM_DEVS_TV > 0)
+    &tv_dev,
+#endif
 #if NUM_DEVS_IMP > 0
     &imp_dev,
 #endif
@@ -179,6 +185,9 @@ DEVICE *sim_devices[] = {
 #endif
 #if NUM_DEVS_CH10 > 0
     &ch10_dev,
+#endif
+#if NUM_DEVS_CH11 > 0
+    &ch11_dev,
 #endif
 #if NUM_DEVS_IMX > 0
     &imx_dev,
@@ -211,6 +220,21 @@ DEVICE *sim_devices[] = {
 #endif
 #if NUM_DEVS_AI > 0
     &ai_dev,
+#endif
+#if NUM_DEVS_DZ > 0
+    &dz_dev,
+#endif
+#if NUM_DEVS_TCU > 0
+    &tcu_dev,
+#endif
+#if NUM_DEVS_KMC > 0
+    &kmc_dev,
+#endif
+#if NUM_DEVS_DUP > 0
+    &dup_dev,
+#endif
+#if NUM_DEVS_DN > 0
+    &dn_dev,
 #endif
     NULL
     };
@@ -279,24 +303,20 @@ t_stat load_dmp (FILE *fileref)
    uint64  data;
    uint32  high = 0;
 
-   while (fgets((char *)buffer, 80, fileref) != 0) {
-        p = (char *)buffer;
-        while (*p >= '0' && *p <= '7') {
-           data = 0;
-           while (*p >= '0' && *p <= '7') {
-               data = (data << 3) + *p - '0';
-               p++;
-           }
-           if (addr == 0135 && data != 0)
-               high = (uint32)(data & RMASK);
-           if (high != 0 && high == addr) {
-               addr = 0400000;
-               high = 0;
-           }
-           M[addr++] = data;
-           if (*p == ' ' || *p == '\t')
-               p++;
-        }
+   while (fgets(&buffer[0], 80, fileref) != 0) {
+      data = 0;
+      p = &buffer[0];
+      if (*p >= '0' && *p <= '7') {
+          for (; *p >= '0' && *p <= '7'; p++)
+              data = (data << 3) + *p - '0';
+          if (addr == 0135 && data != 0)
+             high = (uint32)(data & RMASK);
+          if (high != 0 && high == addr) {
+             addr = 0400000;
+             high = 0;
+          }
+          M[addr++] = data;
+      }
    }
    return SCPE_OK;
 }
@@ -585,7 +605,7 @@ t_stat load_sav (FILE *fileref, int ftype)
         wc = (int32)(data >> 18);
         pa = (uint32) (data & RMASK);
         if (wc == (OP_JRST << 9)) {
-            printf("Start addr=%06o\n", pa);
+            sim_printf("Start addr=%06o\n", pa);
             PC = pa;
             return SCPE_OK;
         }
@@ -769,6 +789,8 @@ t_stat load_exb (FILE *fileref, int ftype)
             return SCPE_FMT;
         addr |= byt << 24;
         /* Empty record gives start address */
+        if (addr > MEMSIZE)
+            return SCPE_FMT;
         if (wc == 0) {
             PC = addr;
             return SCPE_OK;
@@ -784,6 +806,8 @@ t_stat load_exb (FILE *fileref, int ftype)
             case 2: word |= ((uint64)byt) << 16; break;
             case 3: word |= ((uint64)byt) << 24; break;
             case 4: word |= ((uint64)(byt & 017)) << 32;
+                    if (addr > MEMSIZE)
+                        return SCPE_FMT;
                     M[addr++] = word;
                     pos = -1;
                     break;
@@ -902,7 +926,7 @@ static const char *opcode[] = {
 "SETSTS", "STATO",  "STATUS", "GETSTS", "INBUF",  "OUTBUF", "INPUT",  "OUTPUT",
 "CLOSE",  "RELEAS", "MTAPE",  "UGETF",  "USETI", "USETO",  "LOOKUP",  "ENTER",
 
-#if KL
+#if KL | KS
 "UJEN",         "GFAD", "GFSB", "JSYS", "ADJSP", "GFMP", "GFDV ",
 "DFAD", "DFSB", "DFMP", "DFDV", "DADD", "DSUB", "DMUL", "DDIV",
 #else
@@ -961,6 +985,19 @@ static const char *opcode[] = {
 "TRO", "TLO", "TROE", "TLOE", "TROA", "TLOA", "TRON", "TLON",
 "TDO", "TSO", "TDOE", "TSOE", "TDOA", "TSOA", "TDON", "TSON",
 
+#if KS
+ "APRID", "CLRSCH", "RDUBR", "CLRPT",
+ "WRUBR", "WREBR", "RDEBR",
+ "RDSPB", "RDCSB", "RDPUR", "RDCSTM",
+ "RDTIME", "RDINT", "RDHSB", "SPM",
+ "WRSPB", "WRCSB", "WRPUR", "WRCSTM",
+ "WRTIME", "WRINT", "WRHSB", "LPMR",
+ "UMOVE", "UMOVEM",
+ "TIOE", "TION", "RDIO", "WRIO",
+ "BSIO", "BCIO",
+ "TIOEB", "TIONB", "RDIOB", "WRIOB",
+ "BSIOB", "BCIOB",
+#endif
 
 "BLKI", "DATAI", "BLKO", "DATAO",                       /* classic I/O */
 "CONO",  "CONI", "CONSZ", "CONSO",
@@ -1095,9 +1132,21 @@ static const t_int64 opc_val[] = {
  0670000000000+I_AC, 0671000000000+I_AC, 0672000000000+I_AC, 0673000000000+I_AC,
  0674000000000+I_AC, 0675000000000+I_AC, 0676000000000+I_AC, 0677000000000+I_AC,
 
+#if KS
+ 0700000000000+I_OP, 0701000000000+I_OP, 0701040000000+I_OP, 0701100000000+I_OP,
+ 0701140000000+I_OP, 0701200000000+I_OP, 0701240000000+I_OP,
+ 0702000000000+I_OP, 0702040000000+I_OP, 0702100000000+I_OP, 0702140000000+I_OP,
+ 0702200000000+I_OP, 0702240000000+I_OP, 0702300000000+I_OP, 0702340000000+I_OP,
+ 0702400000000+I_OP, 0702440000000+I_OP, 0702500000000+I_OP, 0702540000000+I_OP,
+ 0702600000000+I_OP, 0702640000000+I_OP, 0702700000000+I_OP, 0702740000000+I_OP,
+ 0704000000000+I_AC, 0705000000000+I_AC,
+ 0710000000000+I_AC, 0711000000000+I_AC, 0712000000000+I_AC, 0713000000000+I_AC,
+ 0714000000000+I_AC, 0715000000000+I_AC,
+ 0720000000000+I_AC, 0721000000000+I_AC, 0722000000000+I_AC, 0723000000000+I_AC,
+ 0724000000000+I_AC, 0725000000000+I_AC,
+#endif
  0700000000000+I_IO, 0700040000000+I_IO, 0700100000000+I_IO, 0700140000000+I_IO,
  0700200000000+I_IO, 0700240000000+I_IO, 0700300000000+I_IO, 0700340000000+I_IO,
-
  -1
  };
 

@@ -148,6 +148,11 @@ static int stk_modifiers (SIM_KEY_EVENT *kev)
 
 static int stk_keys (SIM_KEY_EVENT *kev)
 {
+  if (kev->state == SIM_KEYPRESS_UP && kev->key == SIM_KEY_F11) {
+    vid_set_fullscreen (!vid_is_fullscreen ());
+    return 1;
+  }
+
   if (kev->state == SIM_KEYPRESS_UP)
     return 0;
 

@@ -24,7 +24,7 @@
 
 /* Flags in the unit flags word */
 
-#define UNIT_V_FMT      (UNIT_V_UF + 8)
+#define UNIT_V_FMT      (UNIT_V_UF + 7)
 #define UNIT_M_FMT      7
 #define GET_FMT(x)      (((x) >> UNIT_V_FMT) & UNIT_M_FMT)
 #define SET_FMT(x)      (((x) & UNIT_M_FMT) << UNIT_V_FMT)
