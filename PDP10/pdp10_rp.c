@@ -87,7 +87,7 @@
 #define UNIT_V_DTYPE    (DKUF_V_UF + 0)                 /* disk type */
 #define UNIT_W_DTYPE    3                               /* 3b disk type */
 #define UNIT_M_DTYPE    7
-#define UNIT_V_UTS      (UNIT_V_DTYPE + 1)              /* Up to speed */
+#define UNIT_V_UTS      (UNIT_V_DTYPE + UNIT_W_DTYPE)   /* Up to speed */
 #define UNIT_V_NOAUTO   DKUF_V_NOAUTOSIZE               /* noautosize */
 #define UNIT_UTS        (1u << UNIT_V_UTS)
 #define UNIT_DTYPE      (UNIT_M_DTYPE << UNIT_V_DTYPE)
