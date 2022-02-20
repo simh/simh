@@ -126,16 +126,12 @@ ifneq (3,${SIM_MAJOR})
     VIDEO_USEFUL = true
   endif
 endif
-# building the KA10, KI10, KL10 or KS10 networking can be used.
-ifneq (,$(or $(findstring pdp10-ka,${MAKECMDGOALS}),$(findstring pdp10-ki,${MAKECMDGOALS},$(findstring pdp10-kl,${MAKECMDGOALS}))))
-  NETWORK_USEFUL = true
-endif
 # building the PDP-7 needs video support
 ifneq (,$(findstring pdp7,${MAKECMDGOALS}))
   VIDEO_USEFUL = true
 endif
-# building the pdp11, pdp10, or any vax simulator could use networking support
-ifneq (,$(or $(findstring pdp11,${MAKECMDGOALS}),$(findstring pdp10,${MAKECMDGOALS}),$(findstring vax,${MAKECMDGOALS}),$(findstring infoserver,${MAKECMDGOALS}),$(findstring 3b2,${MAKECMDGOALS})$(findstring all,${MAKECMDGOALS})))
+# building the pdp11, any pdp10, any 3b2, or any vax simulator could use networking support
+ifneq (,$(findstring pdp11,${MAKECMDGOALS})$(findstring pdp10,${MAKECMDGOALS})$(findstring vax,${MAKECMDGOALS})$(findstring infoserver,${MAKECMDGOALS})$(findstring 3b2,${MAKECMDGOALS})$(findstring all,${MAKECMDGOALS}))
   NETWORK_USEFUL = true
   ifneq (,$(findstring all,${MAKECMDGOALS}))
     BUILD_MULTIPLE = s
