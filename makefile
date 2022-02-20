@@ -100,28 +100,31 @@ ifeq (old,$(shell gmake --version /dev/null 2>&1 | grep 'GNU Make' | awk '{ if (
   $(warning *** Warning *** GNU Make Version $(GMAKE_VERSION) is too old to)
   $(warning *** Warning *** fully process this makefile)
 endif
+SIM_MAJOR=$(shell grep SIM_MAJOR sim_rev.h | awk '{ print $$3 }')
 BUILD_SINGLE := ${MAKECMDGOALS} $(BLANK_SUFFIX)
 BUILD_MULTIPLE_VERB = is
 # building the pdp1, pdp11, tx-0, or any microvax simulator could use video support
-ifneq (,$(or $(findstring XXpdp1XX,$(addsuffix XX,$(addprefix XX,${MAKECMDGOALS}))),$(findstring pdp11,${MAKECMDGOALS}),$(findstring tx-0,${MAKECMDGOALS}),$(findstring microvax1,${MAKECMDGOALS}),$(findstring microvax2,${MAKECMDGOALS}),$(findstring microvax3900,${MAKECMDGOALS}),$(findstring microvax2000,${MAKECMDGOALS}),$(findstring vaxstation3100,${MAKECMDGOALS}),$(findstring XXvaxXX,$(addsuffix XX,$(addprefix XX,${MAKECMDGOALS})))))
-  VIDEO_USEFUL = true
-endif
-# building the besm6 needs both video support and fontfile support
-ifneq (,$(findstring besm6,${MAKECMDGOALS}))
-  VIDEO_USEFUL = true
-  BESM6_BUILD = true
-endif
-# building the Imlac needs video support
-ifneq (,$(findstring imlac,${MAKECMDGOALS}))
-  VIDEO_USEFUL = true
-endif
-# building the TT2500 needs video support
-ifneq (,$(findstring tt2500,${MAKECMDGOALS}))
-  VIDEO_USEFUL = true
-endif
-# building the PDP6, KA10 or KI10 needs video support
-ifneq (,$(or $(findstring pdp6,${MAKECMDGOALS}),$(findstring pdp10-ka,${MAKECMDGOALS}),$(findstring pdp10-ki,${MAKECMDGOALS})))
-  VIDEO_USEFUL = true
+ifneq (3,${SIM_MAJOR})
+  ifneq (,$(or $(findstring XXpdp1XX,$(addsuffix XX,$(addprefix XX,${MAKECMDGOALS}))),$(findstring pdp11,${MAKECMDGOALS}),$(findstring tx-0,${MAKECMDGOALS}),$(findstring microvax1,${MAKECMDGOALS}),$(findstring microvax2,${MAKECMDGOALS}),$(findstring microvax3900,${MAKECMDGOALS}),$(findstring microvax2000,${MAKECMDGOALS}),$(findstring vaxstation3100,${MAKECMDGOALS}),$(findstring XXvaxXX,$(addsuffix XX,$(addprefix XX,${MAKECMDGOALS})))))
+    VIDEO_USEFUL = true
+  endif
+  # building the besm6 needs both video support and fontfile support
+  ifneq (,$(findstring besm6,${MAKECMDGOALS}))
+    VIDEO_USEFUL = true
+    BESM6_BUILD = true
+  endif
+  # building the Imlac needs video support
+  ifneq (,$(findstring imlac,${MAKECMDGOALS}))
+    VIDEO_USEFUL = true
+  endif
+  # building the TT2500 needs video support
+  ifneq (,$(findstring tt2500,${MAKECMDGOALS}))
+    VIDEO_USEFUL = true
+  endif
+  # building the PDP6, KA10 or KI10 needs video support
+  ifneq (,$(or $(findstring pdp6,${MAKECMDGOALS}),$(findstring pdp10-ka,${MAKECMDGOALS}),$(findstring pdp10-ki,${MAKECMDGOALS})))
+    VIDEO_USEFUL = true
+  endif
 endif
 # building the KA10, KI10 or KL10 networking can be used.
 ifneq (,$(or $(findstring pdp10-ka,${MAKECMDGOALS}),$(findstring pdp10-ki,${MAKECMDGOALS},$(findstring pdp10-kl,${MAKECMDGOALS}))))
@@ -180,11 +183,13 @@ endif
 find_exe = $(abspath $(strip $(firstword $(foreach dir,$(strip $(subst :, ,${PATH})),$(wildcard $(dir)/$(1))))))
 find_lib = $(firstword $(abspath $(strip $(firstword $(foreach dir,$(strip ${LIBPATH}),$(foreach ext,$(strip ${LIBEXT}),$(wildcard $(dir)/lib$(1).$(ext))))))))
 find_include = $(abspath $(strip $(firstword $(foreach dir,$(strip ${INCPATH}),$(wildcard $(dir)/$(1).h)))))
-ifneq (0,$(TESTS))
-  find_test = RegisterSanityCheck $(abspath $(wildcard $(1)/tests/$(2)_test.ini)) </dev/null
-  TESTING_FEATURES = - Per simulator tests will be run
-else
-  TESTING_FEATURES = - Per simulator tests will be skipped
+ifneq (3,${SIM_MAJOR})
+  ifneq (0,$(TESTS))
+    find_test = RegisterSanityCheck $(abspath $(wildcard $(1)/tests/$(2)_test.ini)) </dev/null
+    TESTING_FEATURES = - Per simulator tests will be run
+  else
+    TESTING_FEATURES = - Per simulator tests will be skipped
+  endif
 endif
 ifeq (${WIN32},)  #*nix Environments (&& cygwin)
   ifeq (${GCC},)
