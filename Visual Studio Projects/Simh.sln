@@ -378,6 +378,11 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "3B2-600", "3B2-600.vcproj",
 		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PDP10-KS", "PDP10-KS.vcproj", "{7F4EB115-2027-4582-A6EB-6A7DD9BA6F11}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -688,6 +693,10 @@ Global
 		{A7AE7747-DFA0-49F5-9D6C-9094657A8EE3}.Debug|Win32.Build.0 = Debug|Win32
 		{A7AE7747-DFA0-49F5-9D6C-9094657A8EE3}.Release|Win32.ActiveCfg = Release|Win32
 		{A7AE7747-DFA0-49F5-9D6C-9094657A8EE3}.Release|Win32.Build.0 = Release|Win32
+		{7F4EB115-2027-4582-A6EB-6A7DD9BA6F11}.Debug|Win32.ActiveCfg = Debug|Win32
+		{7F4EB115-2027-4582-A6EB-6A7DD9BA6F11}.Debug|Win32.Build.0 = Debug|Win32
+		{7F4EB115-2027-4582-A6EB-6A7DD9BA6F11}.Release|Win32.ActiveCfg = Release|Win32
+		{7F4EB115-2027-4582-A6EB-6A7DD9BA6F11}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

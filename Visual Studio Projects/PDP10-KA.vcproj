@@ -226,11 +226,11 @@
 				>
 			</File>
 			<File
-				RelativePath="..\PDP10\ka10_pd.c"
+				RelativePath="..\PDP10\ka10_pclk.c"
 				>
 			</File>
 			<File
-				RelativePath="..\PDP10\ka10_pclk.c"
+				RelativePath="..\PDP10\ka10_pd.c"
 				>
 			</File>
 			<File
@@ -247,6 +247,10 @@
 			</File>
 			<File
 				RelativePath="..\PDP10\ka10_tk10.c"
+				>
+			</File>
+			<File
+				RelativePath="..\PDP10\ka10_tv.c"
 				>
 			</File>
 			<File
@@ -291,6 +295,10 @@
 			</File>
 			<File
 				RelativePath="..\PDP10\kx10_dt.c"
+				>
+			</File>
+			<File
+				RelativePath="..\PDP10\kx10_imp.c"
 				>
 			</File>
 			<File
@@ -433,10 +441,6 @@
 				</File>
 				<File
 					RelativePath="..\display\display.h"
-					>
-				</File>
-				<File
-					RelativePath="..\display\iii.c"
 					>
 				</File>
 				<File
@@ -621,10 +625,6 @@
 			Name="Header Files"
 			Filter="h;hpp;hxx;hm;inl;inc"
 			>
-			<File
-				RelativePath="..\display\iii.h"
-				>
-			</File>
 			<File
 				RelativePath="..\PDP10\kx10_defs.h"
 				>
