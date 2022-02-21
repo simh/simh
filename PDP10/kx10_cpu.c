@@ -10735,7 +10735,7 @@ skip_op:
                            /* 7000 */
                            case 000:            /* APRID */
                                  /* APRID */
-                                 MB = SMASK | BIT4 | BIT5 | (270LL << 18);   /* MC level 270 */
+                                 MB = SMASK | BIT3 | BIT4 | BIT5 | (270LL << 18);   /* MC level 270 */
                                  /* Bit 0 Inhibit CST Update available */
                                  /* Bit 1 No CST at all */
                                  /* Bit 2 Exotic microcode */
@@ -11399,13 +11399,13 @@ its_wr:
                                if (IR & 1) {
                                    MB = ((MB << 10) & BMASK1) |
                                         ((MB >>  6) & BMASK2) |
-                                        ((MB << 12) & BMASK4) |
-                                        ((MB >>  4) & BMASK3);
+                                        ((MB << 12) & BMASK3) |
+                                        ((MB >>  4) & BMASK4);
                                } else {
                                    MB = ((MB & BMASK1) >> 10) |
                                         ((MB & BMASK2) <<  6) |
-                                        ((MB & BMASK4) >> 12) |
-                                        ((MB & BMASK3) <<  4);
+                                        ((MB & BMASK3) >> 12) |
+                                        ((MB & BMASK4) <<  4);
                                }
                                AB = (AR & RMASK);
                                BYF5 = 0;
