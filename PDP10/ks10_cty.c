@@ -127,8 +127,10 @@ t_stat ctyi_svc (UNIT *uptr)
     if (Mem_read_word(CTY_IN, &buffer, 0))
         return SCPE_OK;
     sim_debug(DEBUG_DETAIL, &cty_dev, "CTY Read %012llo\n", buffer);
-    if (buffer & CTY_CHAR)
+    if (buffer & CTY_CHAR) {
+        cty_interrupt();
         return SCPE_OK;
+    }
     ch = sim_poll_kbd ();
     if (ch & SCPE_KFLAG) {
         ch = 0177 & sim_tt_inpcvt(ch, TT_GET_MODE (cty_unit[0].flags));

@@ -331,6 +331,8 @@ uba_rh_write(DEVICE *dptr, t_addr addr, uint16 data, int32 access) {
         rhc->cs2 |= CS2_NED;
         r = 0;
     }
+    if ((data & CS1_GO) == 0 && (rhc->cs1 & CS1_IE) != 0 && rhc->attn != 0)
+       uba_set_irq(rhc->dib, rhc->dib->uba_vect);
     sim_debug(DEBUG_DETAIL, dptr, "RH%o write %06o %06o %o\n", rhc->drive,
              addr, data, access);
     return r;
@@ -409,12 +411,6 @@ uba_rh_read(DEVICE *dptr, t_addr addr, uint16 *data, int32 access) {
        rhc->error |= ER1_PAR;
     }
     return r;
-}
-
-uint16
-uba_rh_vect(struct pdp_dib *dibp)
-{
-    return dibp->uba_vect;
 }
 
 #else
@@ -812,7 +808,6 @@ void rh_reset(DEVICE *dptr, struct rh_if *rhc)
     rhc->wcr = 0;
     rhc->cda = 0;
     rhc->drive = 0;
-//    rhc->xfer_drive = -1;
 #if KS
     rhc->dib = (DIB *)dptr->ctxt;
     rhc->cs1 = 0;
@@ -820,6 +815,7 @@ void rh_reset(DEVICE *dptr, struct rh_if *rhc)
     rhc->dba = 0;
     rhc->dbb = 0;
     rhc->error = 0;
+    uba_clr_irq(rhc->dib, rhc->dib->uba_vect);
 #endif
 }
 
@@ -828,10 +824,10 @@ void rh_setattn(struct rh_if *rhc, int unit)
 {
     rhc->attn |= 1<<unit;
 #if KS
-    if ((rhc->status & BUSY) == 0 && (rhc->cs1 & CS1_IE) != 0)
+    if ((rhc->cs1 & CS1_IE) != 0)
         uba_set_irq(rhc->dib, rhc->dib->uba_vect);
 #else
-    if ((rhc->status & BUSY) == 0 && (rhc->status & IADR_ATTN) != 0)
+    if ((rhc->status & IADR_ATTN) != 0)
         set_interrupt(rhc->devnum, rhc->status);
 #endif
 }

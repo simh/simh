@@ -644,10 +644,11 @@ MTAB cpu_mod[] = {
 /* Simulator debug controls */
 DEBTAB              cpu_debug[] = {
     {"IRQ", DEBUG_IRQ, "Debug IRQ requests"},
+#if !KS
     {"CONI", DEBUG_CONI, "Show coni instructions"},
     {"CONO", DEBUG_CONO, "Show cono instructions"},
     {"DATAIO", DEBUG_DATAIO, "Show datai and datao instructions"},
-#if KS
+#else
     {"DATA", DEBUG_DATA, "Show data transfers"},
     {"DETAIL", DEBUG_DETAIL, "Show details about device"},
     {"EXP", DEBUG_EXP, "Show exception information"},
@@ -4644,10 +4645,10 @@ st_pi:
                     dev_irq[f] = 0;
                     break;
                 }
-#if DEBUG
-                sim_debug(DEBUG_IRQ, &cpu_dev, "vect irq %o %06o\n", pi_enc, AB);
-#endif
             }
+#if DEBUG
+            sim_debug(DEBUG_IRQ, &cpu_dev, "vect irq %o %06o\n", pi_enc, AB);
+#endif
         }
 #if KS_ITS
         pi_act |= pi_mask;
@@ -6509,7 +6510,7 @@ ld_exe:
                       AR |= BR & MQ;
                       MB = AR & FMASK;
                       if (Mem_write(0, 0))
-                         goto last;
+                          goto last;
                   }
                   FLAGS &= ~BYTI;
                   BYF5 = 0;
@@ -8167,8 +8168,6 @@ mul_done:
                   if (sim_interval <= 0) {
                       if ((reason = sim_process_event()) != SCPE_OK) {
                           f_pc_inh = 1;
-                          f_load_pc = 0;
-                          f_inst_fetch = 0;
                           set_reg(AC, AR);
                           break;
                       }
@@ -8177,8 +8176,6 @@ mul_done:
                           pi_rq = check_irq_level();
                           if (pi_rq) {
                               f_pc_inh = 1;
-                              f_load_pc = 0;
-                              f_inst_fetch = 0;
                               set_reg(AC, AR);
                               break;
                           }
@@ -11367,8 +11364,6 @@ its_wr:
                                if (sim_interval <= 0) {
                                    if ((reason = sim_process_event()) != SCPE_OK) {
                                        f_pc_inh = 1;
-                                       f_load_pc = 0;
-                                       f_inst_fetch = 0;
                                        set_reg(AC, AR);
                                        break;
                                    }
@@ -11377,8 +11372,6 @@ its_wr:
                                        pi_rq = check_irq_level();
                                        if (pi_rq) {
                                            f_pc_inh = 1;
-                                           f_load_pc = 0;
-                                           f_inst_fetch = 0;
                                            set_reg(AC, AR);
                                            break;
                                        }
@@ -11879,6 +11872,7 @@ last:
         PC = MB & RMASK;
         xct_flag = 0;
         f_load_pc = 1;
+        f_inst_fetch = 1;
         f_pc_inh = 1;
     }
 #endif
@@ -11944,6 +11938,7 @@ last:
         xct_flag = 0;
         f_load_pc = 1;
         f_pc_inh = 1;
+        f_inst_fetch = 1;
         if (pi_cycle) {
             pi_cycle = 0;
             FM[(7 << 4) | 2] = fault_data;

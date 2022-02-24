@@ -584,7 +584,6 @@ void    uba_set_irq(DIB *dibp, int vect);
 void    uba_clr_irq(DIB *dibp, int vect);
 t_addr  uba_get_vect(t_addr addr, int lvl, int dev);
 void    uba_set_parity(uint16 ctl);
-uint16  uba_rh_vect(struct pdp_dib *dibp);
 int     uba_rh_read(DEVICE *dptr, t_addr addr, uint16 *data, int32 access);
 int     uba_rh_write(DEVICE *dptr, t_addr addr, uint16 data, int32 access);
 void    uba_reset();

@@ -627,7 +627,7 @@ DEVICE kmc_dev = {
     NULL,                                       /* attach routine */
     NULL,                                       /* detach routine */
     &kmc_dib,                                   /* context */
-    KMC_DIS                                     /* Flags */
+    DEV_DIS                                     /* Flags */
              | DEV_DISABLE
              | DEV_DEBUG,
     0,                                          /* debug control */
