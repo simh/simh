@@ -319,7 +319,7 @@ int dkb_keys (SIM_KEY_EVENT *kev, UNIT *uptr)
     return 1;
   case SIM_KEY_EQUALS:                    /* = + */
     if ((dkb_kmod & (TOP|SHFT)) == TOP)
-	uptr->DATA = dkb_kmod | 053;
+        uptr->DATA = dkb_kmod | 053;
     else
         uptr->DATA = (dkb_kmod | 010) & ~TOP;
     return 1;
