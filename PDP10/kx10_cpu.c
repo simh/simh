@@ -2072,12 +2072,18 @@ int page_lookup(t_addr addr, int flag, t_addr *loc, int wr, int cur_context, int
         }
     }
 
+#if KS_ITS
+    if (!QITS) {     /* Do not do this on ITS */
+#endif
     /* Handle KI paging odditiy */
     if (!uf && !t20_page && (page & 0740) == 0340) {
         /* Pages 340-377 via UBT */
         page += 01000 - 0340;
         upmp = 1;
     }
+#if KS_ITS
+    }
+#endif
 
     /* Map the page */
     if (uf || upmp)
@@ -2160,8 +2166,7 @@ int page_lookup(t_addr addr, int flag, t_addr *loc, int wr, int cur_context, int
             if ((data & KL_PAG_A) != 0) {
                if ((data & KL_PAG_S) != 0) {
                   fault_data |= 004000LL << 18;        /* PF2.9 */
-               }
-               if ((data & KL_PAG_W) != 0) {
+               } else if ((data & KL_PAG_W) == 0) {
                   fault_data |= 002000LL << 18;        /* PF2.8 */
                }
             }
@@ -2595,12 +2600,18 @@ int page_lookup(t_addr addr, int flag, t_addr *loc, int wr, int cur_context, int
         return 0;
     }
 
+#if KL_ITS
+    if (!QITS) {     /* Do not do this on ITS */
+#endif
     /* Handle KI paging odditiy */
     if (!uf && !t20_page && (page & 0740) == 0340) {
         /* Pages 340-377 via UBT */
         page += 01000 - 0340;
         upmp = 1;
     }
+#if KL_ITS
+    }
+#endif
 
     /* Map the page */
     if (uf || upmp)
