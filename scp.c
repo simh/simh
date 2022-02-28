@@ -4277,6 +4277,76 @@ if (cmdp && (cmdp->action == &return_cmd) && (0 != *cptr)) { /* return command w
 return stat | SCPE_NOMESSAGE;                           /* suppress message since we've already done that here */
 }
 
+
+/* sim_call_argv - call a routine with C style argc, argv parsed arguments
+
+   Inputs:
+
+   main_like_routine =  the routine that is to be called with parsed arguments
+   cptr              =  the command argument string to be broken down into argc, argv
+
+   When the main_like_routine is called, argc and argv are populated.  
+   
+      argc is the number of tokens parsed from the input string plus 1
+      argv is an array of parsed tokens where argv[0] is the unparsed input string
+
+*/
+
+
+t_stat sim_call_argv (int (*main_like_routine)(int argc, char *argv[]), const char *cptr)
+{
+int argc = 1;
+char **argv = (char **)calloc ((1 + argc), sizeof (*argv));
+size_t cptr_len = strlen (cptr);
+char *argline = (char *)malloc (2 + 2 * cptr_len);
+char *cp, quote;
+int result;
+t_stat r = SCPE_OK;
+
+if ((argv == NULL) || (argline == NULL)) {
+    free (argv);
+    free (argline);
+    return SCPE_MEM;
+    }
+if (cptr == NULL) {
+    free (argv);
+    free (argline);
+    return SCPE_ARG;
+    }
+strcpy (argline, cptr);
+cp = argline + cptr_len + 1;
+strcpy (cp, cptr);
+argv[0] = argline;                  /* argv[0] points to unparsed arguments */
+argv[argc + 1] = NULL;              /* make sure the argument list always ends with a NULL */
+while (*cp) {
+    while (sim_isspace (*cp))       /* skip blanks */
+        cp++;
+    if (*cp == '\0')                /* all done? */
+        break;
+    if (*cp == '\'' || *cp == '"')  /* quoted string? */
+        quote = *cp++;
+    else
+        quote = 0;
+    ++argc;
+    argv = (char **)realloc (argv, (1 + argc) * sizeof (*argv));
+    if (argv == NULL) {
+        result = SCPE_MEM;
+        break;
+        }
+    argv[argc - 1] = cp;            /* save start */
+    argv[argc] = NULL;              /* make sure the argument list always ends with a NULL */
+    while (*cp && (quote ? (*cp != quote) : !sim_isspace (*cp)))
+        cp++;
+    if (*cp)                        /* term at quote/spc */
+        *cp++ = '\0';
+    }
+if (argv != NULL)
+    result = main_like_routine (argc, argv);
+free (argline);
+free (argv);
+return result;
+}
+
 /* Substitute_args - replace %n tokens in 'instr' with the do command's arguments
                      and other enviroment variables
 
@@ -16250,6 +16320,73 @@ if (sim_switches & SWMASK ('T'))
 return result;
 }
 
+struct arg_test_result {
+    int expected_argc;
+    const char *expected_argv[12];
+    };
+static struct parse_arg_function_test {
+    const char *input;
+    struct arg_test_result result;
+    } parse_arg_function_tests[] = {
+        {"1 2 3 4",
+                 {5, {"", "1", "2", "3", "4", NULL}}},
+        {"'1 2 3 4'",  
+                 {2, {"", "1 2 3 4", NULL}}},
+        {"1 \"2\" 3 4",  
+                 {5, {"", "1", "2", "3", "4", NULL}}},
+        {NULL}
+    };
+static int arg_test_index;
+
+static int arg_check (int argc, char **argv)
+{
+struct parse_arg_function_test *t = &parse_arg_function_tests[arg_test_index];
+struct arg_test_result *r = &t->result;
+int i;
+
+sim_printf ("Arg test for input: %s\n", t->input);
+if (r->expected_argc != argc) {
+    sim_printf ("Unexpected argc.  Expected: %d, Got: %d\n", r->expected_argc, argc);
+    return -1;
+    }
+if (0 != strcmp (argv[0], t->input)) {
+    sim_printf ("Unexpected argv[%d].  Expected: '%s', Got: '%s'\n", 0, t->input, argv[0]);
+    return -1;
+    }
+for (i = 1; i >= 0;i++) {
+    if ((argv[i] == NULL) && (r->expected_argv[i] != NULL)) {
+        sim_printf ("Unexpected argv[%d].  Expected: '%s', Got: NULL\n", i, r->expected_argv[i]);
+        return -1;
+        }
+    if ((argv[i] != NULL) && (r->expected_argv[i] == NULL)) {
+        sim_printf ("Unexpected argv[%d].  Expected: NULL, Got: '%s'\n", i, argv[i]);
+        return -1;
+        }
+    if (argv[i] == NULL)
+        break;
+    if (strcmp (r->expected_argv[i], argv[i])) {
+        sim_printf ("Unexpected argv[%d].  Expected: '%s', Got: '%s'\n", i, r->expected_argv[i], argv[i]);
+        return -1;
+        }
+    }
+sim_printf ("Good Result\n");
+return 0;
+}
+
+static t_stat test_arg_parsing (void)
+{
+t_stat result = SCPE_OK;
+
+if (sim_switches & SWMASK ('T'))
+    sim_messagef (SCPE_OK, "test_arg_parsing - starting\n");
+for (arg_test_index = 0; parse_arg_function_tests[arg_test_index].input && (result == SCPE_OK); arg_test_index++) {
+    result = sim_call_argv (&arg_check, parse_arg_function_tests[arg_test_index].input);
+    }
+if (sim_switches & SWMASK ('T'))
+    sim_messagef (SCPE_OK, "test_arg_parsing - done\n");
+return result;
+}
+
 static t_stat sim_scp_svc (UNIT *uptr)
 {
 sim_printf ("Unit %s fired at %.0f\n", sim_uname (uptr), sim_gtime ());
@@ -16392,6 +16529,8 @@ if ((strcmp (gbuf, "ALL") == 0) || (strcmp (gbuf, "SCP") == 0)) {
         return sim_messagef (SCPE_IERR, "SCP register validation test failed\n");
     if (test_scp_parsing () != SCPE_OK)
         return sim_messagef (SCPE_IERR, "SCP parsing test failed\n");
+    if (test_arg_parsing () != SCPE_OK)
+        return sim_messagef (SCPE_IERR, "SCP argument parsing test failed\n");
     if (test_scp_event_sequencing () != SCPE_OK)
         return sim_messagef (SCPE_IERR, "SCP event sequencing test failed\n");
 }
