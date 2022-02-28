@@ -4300,8 +4300,7 @@ char **argv = (char **)calloc ((1 + argc), sizeof (*argv));
 size_t cptr_len = strlen (cptr);
 char *argline = (char *)malloc (2 + 2 * cptr_len);
 char *cp, quote;
-int result;
-t_stat r = SCPE_OK;
+t_stat result = SCPE_OK;
 
 if ((argv == NULL) || (argline == NULL)) {
     free (argv);
@@ -4341,7 +4340,7 @@ while (*cp) {
         *cp++ = '\0';
     }
 if (argv != NULL)
-    result = main_like_routine (argc, argv);
+    result = (t_stat)main_like_routine (argc, argv);
 free (argline);
 free (argv);
 return result;
