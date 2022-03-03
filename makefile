@@ -126,6 +126,10 @@ ifneq (3,${SIM_MAJOR})
     VIDEO_USEFUL = true
   endif
 endif
+# building the SEL32 networking can be used
+ifneq (,$(findstring sel32,${MAKECMDGOALS}))
+  NETWORK_USEFUL = true
+endif
 # building the PDP-7 needs video support
 ifneq (,$(findstring pdp7,${MAKECMDGOALS}))
   VIDEO_USEFUL = true
@@ -2075,8 +2079,17 @@ SIGMA = ${SIGMAD}/sigma_cpu.c ${SIGMAD}/sigma_sys.c ${SIGMAD}/sigma_cis.c \
 	${SIGMAD}/sigma_coc.c ${SIGMAD}/sigma_dk.c ${SIGMAD}/sigma_dp.c \
 	${SIGMAD}/sigma_fp.c ${SIGMAD}/sigma_io.c ${SIGMAD}/sigma_lp.c \
 	${SIGMAD}/sigma_map.c ${SIGMAD}/sigma_mt.c ${SIGMAD}/sigma_pt.c \
-    ${SIGMAD}/sigma_rad.c ${SIGMAD}/sigma_rtc.c ${SIGMAD}/sigma_tt.c
+	${SIGMAD}/sigma_rad.c ${SIGMAD}/sigma_rtc.c ${SIGMAD}/sigma_tt.c
 SIGMA_OPT = -I ${SIGMAD}
+
+SEL32D = ${SIMHD}/SEL32
+SEL32 = ${SEL32D}/sel32_cpu.c ${SEL32D}/sel32_sys.c ${SEL32D}/sel32_chan.c \
+	${SEL32D}/sel32_iop.c ${SEL32D}/sel32_com.c ${SEL32D}/sel32_con.c \
+	${SEL32D}/sel32_clk.c ${SEL32D}/sel32_mt.c ${SEL32D}/sel32_lpr.c \
+	${SEL32D}/sel32_scfi.c ${SEL32D}/sel32_fltpt.c ${SEL32D}/sel32_disk.c \
+	${SEL32D}/sel32_hsdp.c ${SEL32D}/sel32_mfp.c ${SEL32D}/sel32_scsi.c \
+	${SEL32D}/sel32_ec.c ${SEL32D}/sel32_defs.h
+SEL32_OPT = -I $(SEL32D) -DUSE_INT32 -DSEL32  ${NETWORK_OPT}
 
 ###
 ### Experimental simulators
@@ -2131,7 +2144,7 @@ ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	i7094 ibm1130 id16 id32 sds lgp h316 cdc1700 \
 	swtp6800mp-a swtp6800mp-a2 tx-0 ssem b5500 intel-mds \
 	scelbi 3b2 i701 i704 i7010 i7070 i7080 i7090 \
-	sigma uc15 pdp10-ka pdp10-ki pdp10-kl pdp10-ks pdp6 i650
+	sigma uc15 pdp10-ka pdp10-ki pdp10-kl pdp10-ks pdp6 i650 sel32
 
 all : ${ALL}
 
@@ -2559,6 +2572,15 @@ ${BIN}s3${EXE} : ${S3} ${SIM}
 	${CC} ${S3} ${SIM} ${S3_OPT} ${CC_OUTSPEC} ${LDFLAGS}
 ifneq (,$(call find_test,${S3D},s3))
 	$@ $(call find_test,${S3D},s3) ${TEST_ARG}
+endif
+
+sel32: $(BIN)sel32$(EXE)
+
+${BIN}sel32${EXE}: ${SEL32} ${SIM}
+	${MKDIRBIN}
+	${CC} ${SEL32} ${SIM} ${SEL32_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${SEL32D},sel32))
+	$@ $(call find_test,${SEL32D},sel32) $(TEST_ARG)
 endif
 
 altair : ${BIN}altair${EXE}
