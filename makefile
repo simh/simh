@@ -2092,7 +2092,7 @@ SEL32 = ${SEL32D}/sel32_cpu.c ${SEL32D}/sel32_sys.c ${SEL32D}/sel32_chan.c \
 	${SEL32D}/sel32_clk.c ${SEL32D}/sel32_mt.c ${SEL32D}/sel32_lpr.c \
 	${SEL32D}/sel32_scfi.c ${SEL32D}/sel32_fltpt.c ${SEL32D}/sel32_disk.c \
 	${SEL32D}/sel32_hsdp.c ${SEL32D}/sel32_mfp.c ${SEL32D}/sel32_scsi.c \
-	${SEL32D}/sel32_ec.c ${SEL32D}/sel32_defs.h
+	${SEL32D}/sel32_ec.c
 SEL32_OPT = -I $(SEL32D) -DUSE_INT32 -DSEL32  ${NETWORK_OPT}
 
 ###
