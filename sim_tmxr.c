@@ -1326,7 +1326,7 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
                         tmxr_debug_connect_line (lp, msg);
                         free (sockname);
                         free (peername);
-                        ++mp->sessions;                             /* count the new session */
+                        ++lp->sessions;                             /* count the new session */
 
                         if (lp->acl) {                              /* Restrict connection with ACL rules? */
                             if (sim_addr_acl_check (address, lp->acl) != 0) {
