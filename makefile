@@ -186,7 +186,11 @@ find_include = $(abspath $(strip $(firstword $(foreach dir,$(strip ${INCPATH}),$
 ifneq (3,${SIM_MAJOR})
   ifneq (0,$(TESTS))
     find_test = RegisterSanityCheck $(abspath $(wildcard $(1)/tests/$(2)_test.ini)) </dev/null
-    TESTING_FEATURES = - Per simulator tests will be run
+    ifneq (,${TEST_ARG})
+      TESTING_FEATURES = - Per simulator tests will be run with argument: ${TEST_ARG}
+    else
+      TESTING_FEATURES = - Per simulator tests will be run
+    endif
   else
     TESTING_FEATURES = - Per simulator tests will be skipped
   endif
