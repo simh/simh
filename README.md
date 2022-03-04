@@ -103,6 +103,8 @@
 
 #### IBM 650 simulator from Roberto Sancho Villa
 
+#### Jim Bevier has implemented a SEL32 simulator.
+
 ### New Host Platform support - HP-UX and AIX
 
 ### Simulator Front Panel API
