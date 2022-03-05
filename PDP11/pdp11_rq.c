@@ -3029,9 +3029,13 @@ if (!plugs_inited ) {
         rq_devmap[i]->units[RQ_QUEUE].flags = UNIT_DIS;
         sprintf (uname, "%s-QUESVC", rq_devmap[i]->name);
         sim_set_uname (&rq_devmap[i]->units[RQ_QUEUE], uname);
+        free (rq_devmap[i]->units[0].uname);    /* We're going to use unit 0 as a template for extended units */
+        rq_devmap[i]->units[0].uname = NULL;    /* free the only potentially allocated pointer in the structure */
         for (d = 0; d < rq_devmap[i]->numunits - 2; d++) {
             if (d >= RQ_NUMDR) {
-                rq_devmap[i]->units[d] = rq_devmap[i]->units[0];
+                free (rq_devmap[i]->units[d].uname);    /* Make sure to not lose a populated uname pointer */
+                rq_devmap[i]->units[d].uname = NULL;
+                rq_devmap[i]->units[d] = rq_devmap[i]->units[0]; /* Overwrite additional unit with unit0 as a template */
                 rq_devmap[i]->units[d].flags |= UNIT_DIS;
                 rq_devmap[i]->units[d].flags &= ~UNIT_DISABLE;
                 }
