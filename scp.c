@@ -8011,14 +8011,17 @@ t_stat set_writelock (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (((uptr->flags & UNIT_WPRT) != 0) == val)        /* Already set as desired? */
     return SCPE_OK;                                 /* Do nothing */
-if (val)                                            /* Lock? */
+if (val) {                                          /* Lock? */
     uptr->flags |= UNIT_WLK;                        /* Do it. */
+    if ((uptr->flags & UNIT_ATT) == 0)
+        uptr->flags |= UNIT_RO;                     /* Next attach will be Read-Only. */
+    }
 else                                                /* Unlock */
     if (((uptr->flags & UNIT_ATT) != 0) &&          /* Transition from Locked to Unlock while attached read-only? */
         ((uptr->flags & UNIT_RO) != 0))
         return sim_messagef (SCPE_ALATT, "%s: Can't enable write when attached read only\n", sim_uname (uptr));
     else
-        uptr->flags &= ~UNIT_WLK;
+        uptr->flags &= ~UNIT_WPRT;
 return SCPE_OK;
 }
 
