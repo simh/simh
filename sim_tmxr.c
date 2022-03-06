@@ -1144,13 +1144,15 @@ if (mp->master) {
             if (sim_addr_acl_check (address, mp->acl) != 0) {
                 tmxr_debug_connect (mp, "tmxr_poll_conn() - Connection Specifically rejected by ACL");
                 sim_close_sock (newsock);
+                newsock = INVALID_SOCKET;
                 free (address);
                 ++mp->acl_rejected_sessions;
                 }
             else
                 ++mp->acl_accepted_sessions;
             }
-        else {
+
+        if (newsock != INVALID_SOCKET) {
             for (j = 0; j < mp->lines; j++, i++) {          /* find next avail line */
                 if (op && (*op >= 0) && (*op < mp->lines))  /* order list present and valid? */
                     i = *op++;                              /* get next line in list to try */
