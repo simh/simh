@@ -4930,7 +4930,7 @@ unasign:
                   MB = SMASK|BIT2|
                        ((uint64)(fm_sel & 0160) << 23) |
                        ((uint64)(prev_ctx & 0160) << 20) |
-                       ub_ptr & 03777777;
+                       (ub_ptr & 03777777);
                   Mem_write_nopage();
 #endif
               }
