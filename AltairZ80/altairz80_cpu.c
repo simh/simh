@@ -6732,6 +6732,7 @@ static int32 bankseldev(const int32 port, const int32 io, const int32 data) {
                         sim_printf("Invalid bank select 0x%02x for CRAM\n", data);
                         break;
                 }
+                break;
             case RAM_TYPE_B810:
                 if (data < 16) {
                     setBankSelect(data);
