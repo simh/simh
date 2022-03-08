@@ -2791,18 +2791,22 @@ sim_tape_init ();                                       /* init tape package */
 for (i = 0; cmd_table[i].name; i++) {
     size_t alias_len = strlen (cmd_table[i].name);
     char *cmd_name = (char *)calloc (1 + alias_len, sizeof (*cmd_name));
+    char *env_cmd_val;
+    size_t env_cmd_val_len;
 
     strcpy (cmd_name, cmd_table[i].name);
     while (alias_len > 1) {
         cmd_name[alias_len] = '\0';                 /* Possible short form command name */
         --alias_len;
-        if (getenv (cmd_name)) {                    /* Externally defined command alias? */
+        env_cmd_val = getenv (cmd_name);
+        if (env_cmd_val) {                          /* Externally defined command alias? */
+            env_cmd_val_len = strlen (env_cmd_val);
             ++sim_external_env_count;
             sim_external_env = (struct deleted_env_var *)realloc (sim_external_env, sim_external_env_count * sizeof (*sim_external_env));
             sim_external_env[sim_external_env_count - 1].name = (char *)malloc (1 + strlen (cmd_name));
             strcpy (sim_external_env[sim_external_env_count - 1].name, cmd_name);
-            sim_external_env[sim_external_env_count - 1].value = (char *)malloc (1 + strlen (getenv (cmd_name)));
-            strcpy (sim_external_env[sim_external_env_count - 1].value, getenv (cmd_name));
+            sim_external_env[sim_external_env_count - 1].value = (char *)malloc (1 + env_cmd_val_len);
+            strlcpy (sim_external_env[sim_external_env_count - 1].value, env_cmd_val, 1 + env_cmd_val_len);
             unsetenv (cmd_name);                    /* Remove it to protect against possibly malicious aliases */
             }
         }
@@ -2907,9 +2911,9 @@ if (cptr == NULL) {
 else
     cptr2 = NULL;
 docmdp = find_cmd ("DO");
-if (cptr && (sizeof (nbuf) > strlen (cptr) + strlen ("/simh.ini") + 3)) {
+if (docmdp && cptr && (sizeof (nbuf) > strlen (cptr) + strlen ("/simh.ini") + 3)) {
     snprintf(nbuf, sizeof (nbuf), "\"%s%s%ssimh.ini\"", cptr2 ? cptr2 : "", cptr, strchr (cptr, '/') ? "/" : "\\");
-    stat = docmdp->action (-1, nbuf) & ~SCPE_NOMESSAGE; /* simh.ini proc cmd file */
+    stat = docmdp->action (-1, nbuf);                   /* simh.ini proc cmd file */
     }
 if (SCPE_BARE_STATUS(stat) == SCPE_OPENERR)
     stat = docmdp->action (-1, "simh.ini");             /* simh.ini proc cmd file */
