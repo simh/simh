@@ -584,6 +584,7 @@ static t_stat HDC1001_doCommand(void)
 {
     HDC1001_DRIVE_INFO* pDrive;
     uint8 cmd;
+    t_stat r = SCPE_OK;
 
     cmd = hdc1001_info->taskfile[TF_CMD] & 0x70;
 
@@ -648,7 +649,8 @@ static t_stat HDC1001_doCommand(void)
 
                 xfr_len = pDrive->xfr_nsects * pDrive->sectsize;
 
-                sim_fseek((pDrive->uptr)->fileref, file_offset, SEEK_SET);
+                if(0 != (r = sim_fseek((pDrive->uptr)->fileref, file_offset, SEEK_SET)))
+                    break;
 
                 if(cmd == HDC1001_CMD_READ_SECT) { /* Read */
                     if (rwopts & HDC1001_RWOPT_DMA) {
@@ -661,7 +663,9 @@ static t_stat HDC1001_doCommand(void)
                         (cmd == HDC1001_CMD_READ_SECT) ? "READ" : "WRITE",
                         pDrive->cur_cyl, pDrive->cur_head,
                         pDrive->cur_sect, pDrive->xfr_nsects, file_offset, xfr_len);
-                    sim_fread(hdc1001_info->sectbuf, 1, xfr_len, (pDrive->uptr)->fileref);
+                    if (sim_fread(hdc1001_info->sectbuf, 1, xfr_len, (pDrive->uptr)->fileref) != xfr_len) {
+                        r = SCPE_IOERR;
+                    }
                 } else { /* Write */
                     sim_debug(WR_DATA_MSG, &hdc1001_dev, DEV_NAME "%d: " ADDRESS_FORMAT
                         " %s SECTOR  C:%04d/H:%d/S:%04d/#:%d, offset=%5x, len=%d\n",
@@ -669,7 +673,9 @@ static t_stat HDC1001_doCommand(void)
                         (cmd == HDC1001_CMD_READ_SECT) ? "READ" : "WRITE",
                         pDrive->cur_cyl, pDrive->cur_head,
                         pDrive->cur_sect, pDrive->xfr_nsects, file_offset, xfr_len);
-                    sim_fwrite(hdc1001_info->sectbuf, 1, xfr_len, (pDrive->uptr)->fileref);
+                    if (sim_fwrite(hdc1001_info->sectbuf, 1, xfr_len, (pDrive->uptr)->fileref) != xfr_len) {
+                        r = SCPE_IOERR;
+                    }
                 }
                 hdc1001_info->status_reg |= HDC1001_STATUS_DRQ;
                 break;
@@ -711,9 +717,11 @@ static t_stat HDC1001_doCommand(void)
                     memset(fmtBuffer, HDC1001_FORMAT_FILL_BYTE, data_len);
                 }
 
-                sim_fseek((pDrive->uptr)->fileref, file_offset, SEEK_SET);
-                sim_fwrite(fmtBuffer, 1, data_len, (pDrive->uptr)->fileref);
-
+                if (0 != (r = sim_fseek((pDrive->uptr)->fileref, file_offset, SEEK_SET))) {
+                    if (sim_fwrite(fmtBuffer, 1, data_len, (pDrive->uptr)->fileref) != data_len) {
+                        r = SCPE_IOERR;
+                    }
+                }
                 free(fmtBuffer);
                 hdc1001_info->status_reg |= HDC1001_STATUS_DRQ;
 
@@ -727,5 +735,5 @@ static t_stat HDC1001_doCommand(void)
         }
     }
 
-    return SCPE_OK;
+    return r;
 }
