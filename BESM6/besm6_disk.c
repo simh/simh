@@ -385,7 +385,7 @@ t_stat disk_attach (UNIT *u, CONST char *cptr)
 
             /* Unlike the O/S routine, does not format the (useless) reserve tracks */
             for (blkno = 0; blkno < (IS_29MB(u) ? 4000 : 1000); ++blkno) {
-                uint val = IS_29MB(u) ? blkno : 2 * blkno;
+                uint32 val = IS_29MB(u) ? blkno : 2 * blkno;
                 control[0] = SET_PARITY((t_value)val << 36, PARITY_NUMBER);
                 sim_fwrite(control, sizeof(t_value), 4, u->fileref);
                 control[0] = SET_PARITY((t_value)(val+1) << 36, PARITY_NUMBER);
