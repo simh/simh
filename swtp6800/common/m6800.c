@@ -1378,6 +1378,7 @@ t_stat sim_instr (void)
                 break;
             case 0xC2:                  /* SBC B imm */
                 lo = fetch_byte() & 0xFF + get_flag(CF);
+                op1 = B;
                 B = B - lo;
                 COND_SET_FLAG_C(B);
                 B &= 0xFF;
