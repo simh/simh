@@ -379,10 +379,13 @@ filelist[listcount + 1] = NULL;
 
 char **sim_get_filelist (const char *filename)
 {
+t_stat r;
 char **filelist = NULL;
 
-sim_dir_scan (filename, _sim_filelist_entry, &filelist);
-return filelist;
+r = sim_dir_scan (filename, _sim_filelist_entry, &filelist);
+if (r == SCPE_OK)
+    return filelist;
+return NULL;
 }
 
 void sim_free_filelist (char ***pfilelist)

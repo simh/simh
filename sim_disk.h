@@ -48,10 +48,12 @@ typedef uint32          t_lba;                          /* disk logical block ad
 #define DKUF_F_STD       1                              /* SIMH format */
 #define DKUF_F_RAW       2                              /* Raw Physical Disk Access */
 #define DKUF_F_VHD       3                              /* VHD format */
-#define DKUF_V_UF       (DKUF_V_FMT + DKUF_W_FMT)
+#define DKUF_V_NOAUTOSIZE (DKUF_V_FMT + DKUF_W_FMT)     /* Don't Autosize disk option */
+#define DKUF_V_UF       (DKUF_V_NOAUTOSIZE + 1)
 #define DKUF_WLK        UNIT_WLK
 #define DKUF_FMT        (DKUF_M_FMT << DKUF_V_FMT)
 #define DKUF_WRP        (DKUF_WLK | UNIT_RO)
+#define DKUF_NOAUTOSIZE (1 << DKUF_V_NOAUTOSIZE)
 
 #define DK_F_STD        (DKUF_F_STD << DKUF_V_FMT)
 #define DK_F_RAW        (DKUF_F_RAW << DKUF_V_FMT)
@@ -126,6 +128,7 @@ t_bool sim_disk_vhd_support (void);
 t_bool sim_disk_raw_support (void);
 void sim_disk_data_trace (UNIT *uptr, const uint8 *data, size_t lba, size_t len, const char* txt, int detail, uint32 reason);
 t_stat sim_disk_info_cmd (int32 flag, CONST char *ptr);
+t_stat sim_disk_set_noautosize (int32 flag, CONST char *cptr);
 t_stat sim_disk_test (DEVICE *dptr, const char *cptr);
 
 #ifdef  __cplusplus

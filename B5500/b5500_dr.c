@@ -91,7 +91,7 @@ t_stat drm_cmd(uint16 cmd, uint16 dev, uint8 chan, uint16 *wc, uint8 rd_flg)
     }
 
     if ((uptr->flags & (UNIT_BUF)) == 0) {
-        sim_debug(DEBUG_CMD, &drm_dev, "Drum not buffered\n\r");
+        sim_debug(DEBUG_CMD, &drm_dev, "Drum not buffered\n");
         return SCPE_UNATT;
     }
 
@@ -105,7 +105,7 @@ t_stat drm_cmd(uint16 cmd, uint16 dev, uint8 chan, uint16 *wc, uint8 rd_flg)
     else
         uptr->CMD |= DR_WR;
     uptr->ADDR = cmd << 3;
-    sim_debug(DEBUG_CMD, &drm_dev, "Drum access %s %06o\n\r",
+    sim_debug(DEBUG_CMD, &drm_dev, "Drum access %s %06o\n",
                 (uptr->CMD & DR_RD) ? "read" : "write", uptr->ADDR);
     sim_activate(uptr, 100);
     return SCPE_OK;
@@ -129,7 +129,7 @@ t_stat drm_srv(UNIT * uptr)
         }
         uptr->ADDR++;
         if (uptr->ADDR > ((int32)uptr->capac << 3)) {
-                sim_debug(DEBUG_CMD, &drm_dev, "Drum overrun\n\r");
+                sim_debug(DEBUG_CMD, &drm_dev, "Drum overrun\n");
                 uptr->CMD = DR_RDY;
                 chan_set_error(chan);
                 chan_set_end(chan);
@@ -148,7 +148,7 @@ t_stat drm_srv(UNIT * uptr)
         }
         uptr->ADDR++;
         if (uptr->ADDR > ((int32)uptr->capac << 3)) {
-                sim_debug(DEBUG_CMD, &drm_dev, "Drum overrun\n\r");
+                sim_debug(DEBUG_CMD, &drm_dev, "Drum overrun\n");
                 uptr->CMD = DR_RDY;
                 chan_set_error(chan);
                 chan_set_end(chan);

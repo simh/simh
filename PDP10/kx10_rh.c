@@ -24,7 +24,66 @@
 #include "kx10_defs.h"
 
 
+#if KS
+#define CS1_GO          1               /* go */
+#define CS1_V_FNC       1               /* function pos */
+#define CS1_M_FNC       037             /* function mask */
+#define GET_FNC(x)      (((x) >> CS1_V_FNC) & CS1_M_FNC)
+#define CS1_IE          0000100         /* Enable interrupts */
+#define CS1_RDY         0000200         /* Drive ready */
+#define CS1_UBA         0001400         /* High order UBA bits */
+#define CS1_PSEL        0002000         /* */
+#define CS1_DVA         0004000         /* drive avail */
+#define CS1_MCPE        0020000         /* */
+#define CS1_TRE         0040000         /* Set if CS2 0177400 */
+#define CS1_SC          0100000         /* Set if TRE or ATTN */
 
+#define CS2_V_UNIT      0               /* unit pos */
+#define CS2_M_UNIT      07              /* unit mask */
+#define CS2_UNIT        (CS2_M_UNIT << CS2_V_UNIT)
+#define CS2_UAI         0000010         /* addr inhibit */
+#define CS2_PAT         0000020         /* parity test NI */
+#define CS2_CLR         0000040         /* controller clear */
+#define CS2_IR          0000100         /* input ready */
+#define CS2_OR          0000200         /* output ready */
+#define CS2_MDPE        0000400         /* Mbus par err NI */
+#define CS2_MXF         0001000         /* missed xfer NI */
+#define CS2_PGE         0002000         /* program err */
+#define CS2_NEM         0004000         /* nx mem err */
+#define CS2_NED         0010000         /* nx drive err */
+#define CS2_PE          0020000         /* parity err NI */
+#define CS2_WCE         0040000         /* write check err */
+#define CS2_DLT         0100000         /* data late NI */
+
+/* Controller error bits, saved in error register */
+#define ER1_ILF         0000001         /* illegal func */
+#define ER1_ILR         0000002         /* illegal register */
+#define ER1_RMR         0000004         /* reg mod refused */
+#define ER1_PAR         0000010         /* parity err */
+
+/* Map addresses into RH registers */
+int rh_map[] = { 0,   /* 776700 */
+                -1,   /* 776702 */
+                -1,   /* 776704 */
+                05,   /* 776706 */
+                -1,   /* 776710 */
+                01,   /* 776712 */
+                02,   /* 776714 */
+                04,   /* 776716 */
+                07,   /* 776720 */
+                -1,   /* 776722 */
+                03,   /* 776724 */
+                06,   /* 776726 */
+                010,  /* 776730 */
+                011,  /* 776732 */
+                012,  /* 776734 */
+                013,  /* 776736 */
+                014,  /* 776740 */
+                015,  /* 776742 */
+                016,  /* 776744 */
+                017   /* 776746 */
+};
+#else
 /* CONI Flags */
 #define IADR_ATTN       0000000000040LL   /* Interrupt on attention */
 #define IARD_RAE        0000000000100LL   /* Interrupt on register access error */
@@ -103,6 +162,19 @@
 #define IRQ_VECT        0000000000777LL   /* Interupt vector */
 #define IRQ_KI10        0000002000000LL
 #define IRQ_KA10        0000001000000LL
+
+/* RH20 channel status flags */
+#define RH20_MEM_PAR    00200000000000LL  /* Memory parity error */
+#define RH20_NADR_PAR   00100000000000LL  /* Address parity error */
+#define RH20_NOT_WC0    00040000000000LL  /* Word count not zero */
+#define RH20_NXM_ERR    00020000000000LL  /* Non existent memory */
+#define RH20_LAST_ERR   00000400000000LL  /* Last transfer error */
+#define RH20_ERROR      00000200000000LL  /* RH20 error */
+#define RH20_LONG_STS   00000100000000LL  /* Did not reach wc */
+#define RH20_SHRT_STS   00000040000000LL  /* WC reached zero */
+#define RH20_OVER       00000020000000LL  /* Overrun error */
+
+#endif
 #define FNC_XFER        024             /* >=? data xfr */
 
 /* Status register settings */
@@ -118,17 +190,230 @@
 #define DS_ERR          0040000         /* error */
 #define DS_ATA          0100000         /* attention active */
 
-/* RH20 channel status flags */
-#define RH20_MEM_PAR    00200000000000LL  /* Memory parity error */
-#define RH20_NADR_PAR   00100000000000LL  /* Address parity error */
-#define RH20_NOT_WC0    00040000000000LL  /* Word count not zero */
-#define RH20_NXM_ERR    00020000000000LL  /* Non existent memory */
-#define RH20_LAST_ERR   00000400000000LL  /* Last transfer error */
-#define RH20_ERROR      00000200000000LL  /* RH20 error */
-#define RH20_LONG_STS   00000100000000LL  /* Did not reach wc */
-#define RH20_SHRT_STS   00000040000000LL  /* WC reached zero */
-#define RH20_OVER       00000020000000LL  /* Overrun error */
+#if KS
 
+DEVICE  *rh_boot_dev = NULL;
+int      rh_boot_unit = 0;
+
+
+int
+uba_rh_write(DEVICE *dptr, t_addr addr, uint16 data, int32 access) {
+    int             r = 0;
+    struct pdp_dib  *dibp = (DIB *) dptr->ctxt;
+    struct rh_if    *rhc;
+    int             reg;
+    uint32          temp;
+
+    if (dibp == NULL)
+        return 1;
+    rhc = dibp->rh11_if;
+    /* Check for parity error during access */
+    if (rhc->cs2 & CS2_PAT) {
+       uba_set_parity(dibp->uba_ctl);
+       rhc->error |= ER1_PAR;
+    }
+    addr &= dibp->uba_mask;
+    reg = rh_map[addr >> 1];
+
+    switch(addr & 076) {
+    case  000: /* CS1 */
+        if (access == BYTE) {
+            if (addr & 1) {
+                rhc->dev_read(dptr, rhc, 0, &temp);
+                data = data | (rhc->cs1 & 0300) | (temp & 076);
+            } else {
+                data = data | (rhc->cs1 & CS1_UBA);
+            }
+        }
+        rhc->cs1 &= ~(CS1_IE);
+        rhc->cs1 |= data & (CS1_IE);
+        if ((rhc->status & BUSY) == 0)
+           rhc->cda = ((data << 8) & 0600000) | (rhc->cda & 0177777);
+        if ((data & CS1_GO) != 0 || (rhc->cs1 & CS1_IE) == 0)
+           uba_clr_irq(rhc->dib, rhc->dib->uba_vect);
+        if ((data & CS1_GO) != 0 && (rhc->status & BUSY) != 0 && GET_FNC(data) >= FNC_XFER) {
+           rhc->cs2 |= CS2_PGE;
+           break;
+        }
+        r = rhc->dev_write(dptr, rhc, 0, data);
+        /* Check if we had a go with a data transfer command */
+        if (r == 0 && (data & CS1_GO) != 0 && GET_FNC(data) >= FNC_XFER) {
+            rhc->cs2 = ((CS2_UAI|CS2_OR|CS2_IR|CS2_PAT|CS2_UNIT) & rhc->cs2);
+            rhc->xfer_drive = rhc->drive;
+            rhc->status |= BUSY;
+        }
+        break;
+     case 002: /* RPWC  - 176702 - word count */ /* 1 */
+        if (access == BYTE) {
+            if (addr & 1)
+                data = data | (rhc->wcr & 0377);
+            else
+                data = (rhc->wcr & 0177400) | data;
+        }
+        rhc->wcr = data;
+        break;
+     case 004: /* RPBA  - 176704 - base address */ /* 2 */
+        if (access == BYTE) {
+            if (addr & 1)
+                data = data | (rhc->cda & 0377);
+            else
+                data = (rhc->cda & 0177400) | data;
+        }
+        rhc->cda = (rhc->cda & 0600000) | (data & 0177776);
+        break;
+
+    case  010: /* RPCS2 - 176710 - Control and Status register 2 */ /* 4 */
+        if (access == BYTE) {
+            if (addr & 1)
+               data = data | (rhc->cs2 & 0377);
+            else
+               data = (rhc->cs2 & 0177400) | data;
+        }
+        if (data & CS2_CLR) {
+            rh_reset(dptr, rhc);
+            if (rhc->dev_reset != NULL)
+                rhc->dev_reset(dptr);
+            else
+                dptr->reset(dptr);
+            rhc->cs2 |= CS2_CLR; /* Hack for tops 10 7.04 */
+            break;
+        }
+        /* Don't allow UAI to be set just after reset */
+        if (rhc->cs2 & CS2_CLR) {
+            data &= ~CS2_UAI;
+            rhc->cs2 &= ~CS2_CLR;
+        }
+
+        rhc->cs2 &= ~(CS2_PE|CS2_MXF|CS2_PAT|CS2_UNIT);
+        if ((rhc->status & BUSY) == 0) {
+            rhc->cs2 &= ~(CS2_UAI);
+            if( data & CS2_UAI)
+            sim_debug(DEBUG_DETAIL, dptr, "RH%o set no UAI %06o\n", rhc->drive, PC);
+            rhc->cs2 |= CS2_UAI & data;
+        }
+        rhc->cs2 |= (CS2_PE|CS2_MXF|CS2_PAT|CS2_UNIT) & data;
+        rhc->cs2 |= CS2_IR;
+        rhc->drive = rhc->cs2 & CS2_UNIT;
+        /* Try reading the command register */
+        r = rhc->dev_read(dptr, rhc, 0, &temp);
+        if (r < 0)
+            rhc->cs2 |= CS2_NED;
+        break;
+
+    case  022: /* RPDB  - 176722 - data buffer */  /* 11 */
+        if ((rhc->cs2 & CS2_IR) == 0) {
+            rhc->cs2 |= CS2_DLT;
+            break;
+        }
+        rhc->dba = rhc->dbb;
+        rhc->dbb = data;
+        if (rhc->cs2 & CS2_IR)
+            rhc->dba = rhc->dbb;
+        rhc->cs2 |= CS2_OR;
+        rhc->cs2 &= ~CS2_IR;
+        break;
+
+    case  014: /* RPER1 - 176714 - error status 1 */ /* 6 */
+        rhc->error = data;
+        /* Fall through */
+
+    default:
+        if (access == BYTE) {
+            rhc->dev_read(dptr, rhc, reg, &temp);
+            if (addr & 1)
+                data = data | (temp & 0377);
+            else
+                data = (temp & 0177400) | data;
+        }
+        r = rhc->dev_write(dptr, rhc, reg, data);
+    }
+    if (r < 0) {
+        rhc->cs2 |= CS2_NED;
+        r = 0;
+    }
+    if ((data & CS1_GO) == 0 && (rhc->cs1 & CS1_IE) != 0 && rhc->attn != 0)
+       uba_set_irq(rhc->dib, rhc->dib->uba_vect);
+    sim_debug(DEBUG_DETAIL, dptr, "RH%o write %06o %06o %o\n", rhc->drive,
+             addr, data, access);
+    return r;
+}
+
+int
+uba_rh_read(DEVICE *dptr, t_addr addr, uint16 *data, int32 access) {
+    int             r = 1;
+    struct pdp_dib  *dibp = (DIB *) dptr->ctxt;
+    struct rh_if    *rhc;
+    int             reg;
+    uint32          temp = 0;
+
+    if (dibp == NULL)
+        return 1;
+    rhc = dibp->rh11_if;
+    addr &= dibp->uba_mask;
+    reg = rh_map[addr >> 1];
+
+    if (reg >= 0) {
+        r = rhc->dev_read(dptr, rhc, reg, &temp);
+        if (r < 0) {
+            rhc->cs2 |= CS2_NED;
+            return 0;
+        }
+    }
+
+    switch(addr & 076) {
+    case  000:  /* RPC   - 176700 - control */
+        temp |= (uint16)(rhc->cs1 & (CS1_IE));
+        temp |= (rhc->cda & 0600000) >> 8;
+        if ((rhc->status & BUSY) == 0)
+           temp |= CS1_RDY;
+        if (rhc->cs2 & (CS2_MDPE|CS2_MXF|CS2_PGE|CS2_NEM|CS2_NED|CS2_PE|CS2_WCE|CS2_DLT))
+           temp |= CS1_TRE;
+        if (rhc->attn || (temp & CS1_TRE) != 0)
+           temp |= CS1_SC;
+        r = 0;
+        break;
+    case  002:  /* RPWC  - 176702 - word count */
+        temp = rhc->wcr;
+        r = 0;
+        break;
+    case  004:  /* RPBA  - 176704 - base address */
+        temp = (uint16)(rhc->cda & 0177776);
+        r = 0;
+        break;
+    case  010:  /* RPCS2 - 176710 - control/status 2 */
+        temp = rhc->cs2 & ~CS2_CLR;
+        r = 0;
+        break;
+    case  014:  /* RPER1 - 176714 - error status 1 */
+        temp |= rhc->error;
+        r = 0;
+        break;
+    case  022: /* RPDB   - 176722 - data buffer */
+        r = 0;
+        if ((rhc->cs2 & CS2_OR) == 0) {
+            rhc->cs2 |= CS2_DLT;
+            break;
+        }
+        temp = rhc->dba;
+        rhc->dba = rhc->dbb;
+        rhc->cs2 &= ~CS2_OR;
+        rhc->cs2 |= CS2_IR;
+        break;
+    default:
+        break;
+    }
+    *data = temp;
+    sim_debug(DEBUG_DETAIL, dptr, "RH%o read %o %d %06o %06o %06o\n", rhc->drive, r, reg,
+             addr, temp, PC);
+    /* Check for parity error during access */
+    if (rhc->cs2 & CS2_PAT) {
+       uba_set_parity(dibp->uba_ctl);
+       rhc->error |= ER1_PAR;
+    }
+    return r;
+}
+
+#else
 /* 0-37 mass bus register.
    70   SBAR, block address.
    71   STCR, neg block count, func
@@ -446,14 +731,16 @@ t_stat rh_devio(uint32 dev, uint64 *data) {
                        dptr->name, dev, *data, rhc->drive, PC, rhc->status);
                    return SCPE_OK;
                 }
+                rhc->drive = (int)(*data >> 18) & 07;
                 /* Check if access error */
                 if (rhc->rae & (1 << rhc->drive))
                     return SCPE_OK;
                 /* Start command */
-                rh_setup(rhc, (uint32)(*data >> 6));
-                rhc->xfer_drive = (int)(*data >> 18) & 07;
                 if (rhc->dev_write(dptr, rhc, 0, (uint32)(*data & 077))) {
                     rhc->status |= CR_DRE;
+                } else {
+                   rh_setup(rhc, (uint32)(*data >> 6));
+                   rhc->xfer_drive = rhc->drive;
                 }
                 sim_debug(DEBUG_DATAIO, dptr,
                     "%s %03o command %012llo, %d PC=%06o %06o\n",
@@ -506,23 +793,51 @@ rh_devirq(uint32 dev, t_addr addr) {
         else if (rhc->imode == 2) /* RH20 style */
            addr = rhc->ivect;
     } else {
-       sim_printf("Unable to find device %03o\n\r", dev);
+       sim_printf("Unable to find device %03o\r\n", dev);
     }
     return  addr;
+}
+#endif
+
+/* Reset the RH to a known clear condiguration */
+void rh_reset(DEVICE *dptr, struct rh_if *rhc)
+{
+    rhc->status = 0;
+    rhc->attn = 0;
+    rhc->rae = 0;
+    rhc->wcr = 0;
+    rhc->cda = 0;
+    rhc->drive = 0;
+#if KS
+    rhc->dib = (DIB *)dptr->ctxt;
+    rhc->cs1 = 0;
+    rhc->cs2 = CS2_IR;
+    rhc->dba = 0;
+    rhc->dbb = 0;
+    rhc->error = 0;
+    uba_clr_irq(rhc->dib, rhc->dib->uba_vect);
+#endif
 }
 
 /* Set the attention flag for a unit */
 void rh_setattn(struct rh_if *rhc, int unit)
 {
     rhc->attn |= 1<<unit;
-    if ((rhc->status & BUSY) == 0 && (rhc->status & IADR_ATTN) != 0) 
+#if KS
+    if ((rhc->cs1 & CS1_IE) != 0)
+        uba_set_irq(rhc->dib, rhc->dib->uba_vect);
+#else
+    if ((rhc->status & IADR_ATTN) != 0)
         set_interrupt(rhc->devnum, rhc->status);
+#endif
 }
 
 void rh_error(struct rh_if *rhc)
 {
+#if !KS
     if (rhc->imode == 2)
        rhc->status |= RH20_DR_EXC;
+#endif
 }
 
 /* Decrement block count for RH20, nop for RH10 */
@@ -542,12 +857,18 @@ int rh_blkend(struct rh_if *rhc)
 
 /* Set an IRQ for a DF10 device */
 void rh_setirq(struct rh_if *rhc) {
-      rhc->status |= PI_ENABLE;
-      set_interrupt(rhc->devnum, rhc->status);
+   rhc->status |= PI_ENABLE;
+#if KS
+   if ((rhc->status & BUSY) == 0 && (rhc->cs1 & CS1_IE) != 0)
+       uba_set_irq(rhc->dib, rhc->dib->uba_vect);
+#else
+   set_interrupt(rhc->devnum, rhc->status);
+#endif
 }
 
 /* Generate the DF10 complete word */
 void rh_writecw(struct rh_if *rhc, int nxm) {
+#if !KS
      uint64       wrd1;
 #if KL
      if (rhc->imode == 2) {
@@ -564,7 +885,7 @@ void rh_writecw(struct rh_if *rhc, int nxm) {
              if (nxm) {
                  wrd1 |= RH20_NXM_ERR;
                  rhc->status |= RH20_CHAN_ERR;
-             }  
+             }
              if (wc != 0) {
                  wrd1 |= RH20_NOT_WC0;
                  if (rhc->status & RH20_XEND) {
@@ -598,14 +919,16 @@ void rh_writecw(struct rh_if *rhc, int nxm) {
          rhc->cda++;
      wrd1 = ((uint64)(rhc->ccw & WMASK) << CSHIFT) | ((uint64)(rhc->cda) & AMASK);
      (void)Mem_write_word(rhc->cia|1, &wrd1, 0);
+#endif
 }
 
 /* Finish off a DF10 transfer */
 void rh_finish_op(struct rh_if *rhc, int nxm) {
 #if KL
+     rhc->status &= ~(CC_CHAN_ACT);
      if (rhc->imode != 2)
 #endif
-     rhc->status &= ~BUSY;
+     rhc->status &= ~(BUSY);
      rh_writecw(rhc, nxm);
      rh_setirq(rhc);
 #if KL
@@ -621,7 +944,9 @@ void rh_finish_op(struct rh_if *rhc, int nxm) {
 void rh20_setup(struct rh_if *rhc)
 {
      DEVICE        *dptr = NULL;
+     uint32        data;
      int           reg;
+     int           drv;
 
      for (reg = 0; rh[reg].dev_num != 0; reg++) {
         if (rh[reg].rh == rhc) {
@@ -631,15 +956,24 @@ void rh20_setup(struct rh_if *rhc)
      }
      if (dptr == 0)
          return;
-     rhc->pbar = rhc->sbar;
+     /* Check to see if drive currently doing something */
+     drv = rhc->drive;
+     rhc->drive = (rhc->stcr >> 18) & 07;
+     if (rhc->dev_read != NULL) {
+        (void)rhc->dev_read(dptr, rhc, 0, &data);
+        if (data & 1) {
+            rhc->drive = drv;
+            return;
+        }
+     }
      rhc->ptcr = rhc->stcr;
-     /* Read drive status */
+     rhc->pbar = rhc->sbar;
      rhc->drive = (rhc->ptcr >> 18) & 07;
+     /* Read drive status */
      rhc->status &= ~(RH20_DATA_OVR|RH20_CHAN_RDY|RH20_DR_RESP|RH20_CHAN_ERR|RH20_SHRT_WC|\
                       RH20_LONG_WC|RH20_DR_EXC|RH20_SCR_FULL|PI_ENABLE|RH20_XEND);
      rhc->status |= RH20_PCR_FULL;
      if (rhc->status & RH20_SBAR) {
-         rhc->drive = (rhc->pbar >> 18) & 07;
          if (rhc->dev_write != NULL)
              (void)rhc->dev_write(dptr, rhc, 5, (rhc->pbar & 0177777));
          rhc->status &= ~RH20_SBAR;
@@ -649,28 +983,33 @@ void rh20_setup(struct rh_if *rhc)
          rhc->wcr = 0;
      }
      /* Hold block count in cia */
-     rhc->drive = (rhc->ptcr >> 18) & 07;
      rhc->cia = (rhc->ptcr >> 6) & 01777;
      if (rhc->dev_write != NULL)
          (void)rhc->dev_write(dptr, rhc, 0, (rhc->ptcr & 077));
      rhc->cop = 0;
      rhc->wcr = 0;
+     rhc->xfer_drive = rhc->drive;
      rhc->status &= ~RH20_CHAN_RDY;
+     rhc->status |= BUSY;
+     rhc->drive = drv;
 }
 #endif
 
 /* Setup for a DF10 transfer */
 void rh_setup(struct rh_if *rhc, uint32 addr)
 {
+#if !KS
      rhc->cia = addr & ICWA;
      rhc->ccw = rhc->cia;
      rhc->wcr = 0;
+#endif
      rhc->status |= BUSY;
 }
 
 
 /* Fetch the next IO control word */
 int rh_fetch(struct rh_if *rhc) {
+#if !KS
      uint64      data;
      int         reg;
      DEVICE      *dptr = NULL;
@@ -727,12 +1066,30 @@ int rh_fetch(struct rh_if *rhc) {
      rhc->wcr = (uint32)((data >> CSHIFT) & WMASK);
      rhc->cda = (uint32)(data & AMASK);
      rhc->ccw = (uint32)((rhc->ccw + 1) & AMASK);
+#endif
      return 1;
 }
 
 /* Read next word */
 int rh_read(struct rh_if *rhc) {
+#if KS
+     if ((rhc->status & BUSY) == 0)
+        return 0;
+     if (uba_read_npr(rhc->cda, rhc->dib->uba_ctl, &rhc->buf) == 0) {
+        rhc->cs2 |= CS2_NEM;
+        rhc->status &= ~BUSY;
+        return 0;
+     }
+     if ((rhc->cs2 & CS2_UAI) == 0)
+        rhc->cda += 4;
+     rhc->wcr = (rhc->wcr + 2) & 0177777;
+     if (rhc->wcr == 0) {
+        rhc->status &= ~BUSY;
+        return 0;
+     }
+#else
      uint64 data;
+
      if (rhc->wcr == 0) {
          if (!rh_fetch(rhc))
              return 0;
@@ -774,11 +1131,28 @@ int rh_read(struct rh_if *rhc) {
      if (rhc->wcr == 0) {
         return rh_fetch(rhc);
      }
+#endif
      return 1;
 }
 
 /* Write next word */
 int rh_write(struct rh_if *rhc) {
+#if KS
+     if ((rhc->status & BUSY) == 0)
+        return 0;
+     if (uba_write_npr(rhc->cda, rhc->dib->uba_ctl, rhc->buf) == 0) {
+        rhc->cs2 |= CS2_NEM;
+        rhc->status &= ~BUSY;
+        return 0;
+     }
+     if ((rhc->cs2 & CS2_UAI) == 0)
+        rhc->cda += 4;
+     rhc->wcr = (rhc->wcr + 2) & 0177777;
+     if (rhc->wcr == 0) {
+        rhc->status &= ~BUSY;
+        return 0;
+     }
+#else
      if (rhc->wcr == 0) {
          if (!rh_fetch(rhc))
              return 0;
@@ -817,6 +1191,7 @@ int rh_write(struct rh_if *rhc) {
      if (rhc->wcr == 0) {
         return rh_fetch(rhc);
      }
+#endif
      return 1;
 }
 

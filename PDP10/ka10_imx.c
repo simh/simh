@@ -291,7 +291,7 @@ t_stat imx_set_channel (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
     return r;
 
   if (*tptr != 0) {
-    if (strcasecmp (tptr, "negate") != 0)
+    if (MATCH_CMD (tptr, "NEGATE"))
       return SCPE_ARG;
     negate = 1;
   }

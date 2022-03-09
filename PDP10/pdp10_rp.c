@@ -87,11 +87,11 @@
 #define UNIT_V_DTYPE    (DKUF_V_UF + 0)                 /* disk type */
 #define UNIT_W_DTYPE    3                               /* 3b disk type */
 #define UNIT_M_DTYPE    7
-#define UNIT_V_AUTO     (UNIT_V_DTYPE + UNIT_W_DTYPE)   /* autosize */
-#define UNIT_V_UTS      (UNIT_V_AUTO + 1)               /* Up to speed */
+#define UNIT_V_UTS      (UNIT_V_DTYPE + UNIT_W_DTYPE)   /* Up to speed */
+#define UNIT_V_NOAUTO   DKUF_V_NOAUTOSIZE               /* noautosize */
 #define UNIT_UTS        (1u << UNIT_V_UTS)
 #define UNIT_DTYPE      (UNIT_M_DTYPE << UNIT_V_DTYPE)
-#define UNIT_AUTO       (1 << UNIT_V_AUTO)
+#define UNIT_NOAUTO     (1 << UNIT_V_NOAUTO)
 #define GET_DTYPE(x)    (((x) >> UNIT_V_DTYPE) & UNIT_M_DTYPE)
 
 /* Parameters in the unit descriptor */
@@ -395,21 +395,21 @@ DIB rp_dib = {
     };
 
 UNIT rp_unit[] = {
-    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_AUTO+
+    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
              UNIT_ROABLE+(RP06_DTYPE << UNIT_V_DTYPE), RP06_SIZE) },
-    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_AUTO+
+    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
              UNIT_ROABLE+(RP06_DTYPE << UNIT_V_DTYPE), RP06_SIZE) },
-    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_AUTO+
+    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
              UNIT_ROABLE+(RP06_DTYPE << UNIT_V_DTYPE), RP06_SIZE) },
-    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_AUTO+
+    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
              UNIT_ROABLE+(RP06_DTYPE << UNIT_V_DTYPE), RP06_SIZE) },
-    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_AUTO+
+    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
              UNIT_ROABLE+(RP06_DTYPE << UNIT_V_DTYPE), RP06_SIZE) },
-    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_AUTO+
+    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
              UNIT_ROABLE+(RP06_DTYPE << UNIT_V_DTYPE), RP06_SIZE) },
-    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_AUTO+
+    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
              UNIT_ROABLE+(RP06_DTYPE << UNIT_V_DTYPE), RP06_SIZE) },
-    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_AUTO+
+    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
              UNIT_ROABLE+(RP06_DTYPE << UNIT_V_DTYPE), RP06_SIZE) }
     };
 
@@ -464,9 +464,9 @@ MTAB rp_mod[] = {
       &rp_set_type, NULL, NULL, "Set RP07 Disk Type" },
     { MTAB_XTD|MTAB_VUN, 0, "TYPE", NULL,
       NULL, &rp_show_type, NULL, "Display device type" },
-    { UNIT_AUTO, UNIT_AUTO, "autosize", "AUTOSIZE", 
+    { UNIT_NOAUTO, 0, "autosize", "AUTOSIZE", 
       NULL, NULL, NULL, "Set type based on file size at attach" },
-    { UNIT_AUTO,         0, "noautosize",   "NOAUTOSIZE",   
+    { UNIT_NOAUTO, UNIT_NOAUTO, "noautosize",   "NOAUTOSIZE",   
       NULL, NULL, NULL, "Disable disk autosize on attach" },
     { MTAB_XTD|MTAB_VUN|MTAB_VALR, 0, "FORMAT", "FORMAT={AUTO|SIMH|VHD|RAW}",
       &sim_disk_set_fmt, &sim_disk_show_fmt, NULL, "Display disk format" },
@@ -1152,7 +1152,7 @@ static const char *drives[] = {"RM03", "RP04", "RM80", "RP06", "RM05", "RP07", N
 uptr->capac = drv_tab[GET_DTYPE (uptr->flags)].size;
 r = sim_disk_attach_ex (uptr, cptr, RP_NUMWD * sizeof (d10), sizeof (d10), TRUE, DBG_DSK,
                            drv_tab[GET_DTYPE (uptr->flags)].name,
-                           0, 0, (uptr->flags & UNIT_AUTO) ? drives : NULL);
+                           0, 0, (uptr->flags & UNIT_NOAUTO) ? NULL : drives);
 if (r != SCPE_OK)
     return r;
 sim_cancel (uptr);

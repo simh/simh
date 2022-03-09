@@ -118,7 +118,7 @@ dct_devio(uint32 dev, uint64 *data) {
           clr_interrupt(dev);
           if (uptr->STATUS & DB_RQ) {
               *data = dct_buf[u];
-              uptr->STATUS &= ~(DB_RQ);
+              uptr->STATUS &= ~(NUM_CHARS|DB_RQ);
               uptr->STATUS |= DB_MV;
               sim_activate(uptr, 10);
           }
@@ -132,7 +132,7 @@ dct_devio(uint32 dev, uint64 *data) {
                   dev, *data, u, PC);
           if (uptr->STATUS & DB_RQ) {
               dct_buf[u] = *data;
-              uptr->STATUS &= ~(DB_RQ);
+              uptr->STATUS &= ~(NUM_CHARS|DB_RQ);
               uptr->STATUS |= DB_MV;
               sim_activate(uptr, 10);
           }

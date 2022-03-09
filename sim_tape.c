@@ -1051,6 +1051,8 @@ fprintf (st, "Attach command switches\n");
 fprintf (st, "    -R          Attach Read Only.\n");
 fprintf (st, "    -E          Must Exist (if not specified, the default behavior is to\n");
 fprintf (st, "                attempt to create the indicated virtual tape file).\n");
+fprintf (st, "    -N          Create a new empty tape container file.\n");
+fprintf (st, "    -Q          Suppress informative messages during attach activities.\n");
 fprintf (st, "    -F          Open the indicated tape container in a specific format\n");
 fprintf (st, "                (default is SIMH, alternatives are E11, TPC, P7B, AWS, TAR,\n");
 fprintf (st, "                ANSI-VMS, ANSI-RT11, ANSI-RSX11, ANSI-RSTS, ANSI-VAR, FIXED,\n");

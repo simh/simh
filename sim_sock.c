@@ -750,7 +750,7 @@ while ((*acl != '\0') && !done) {
         rule[cc - (acl + 1)] = '\0';
         }
     else {
-        if (strlen (acl) > sizeof (rule))
+        if (strlen (acl) >= sizeof (rule))
             break;                  /* Too big - error */
         strcpy (rule, acl + 1);
         }

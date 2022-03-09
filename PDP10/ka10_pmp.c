@@ -409,7 +409,7 @@ DEVICE              pmp_dev = {
     "PMP", pmp_unit, NULL, pmp_mod,
     NUM_UNITS_PMP, 8, 15, 1, 8, 8,
     NULL, NULL, &pmp_reset, NULL, &pmp_attach, &pmp_detach,
-    &pmp_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG | DEV_DISK, 0, dev_debug,
+    &pmp_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG, 0, dev_debug,
     NULL, NULL, &pmp_help, NULL, NULL, &pmp_description
 };
 
@@ -2212,8 +2212,8 @@ pmp_format(UNIT * uptr, int flag) {
         uptr->CMD |= DK_ATTN;
         pmp_statusb |= REQ_CH;
         sim_activate(uptr, 100);
-        fputc('\n', stderr);
         fputc('\r', stderr);
+        fputc('\n', stderr);
         return 0;
     } else
         return 1;
@@ -2243,7 +2243,7 @@ pmp_attach(UNIT * uptr, CONST char *file)
         return SCPE_OK;
     }
 
-    sim_messagef(SCPE_OK, "Drive %03x=%d %d %02x %d\n\r",  addr,
+    sim_messagef(SCPE_OK, "Drive %03x=%d %d %02x %d\r\n",  addr,
              hdr.heads, hdr.tracksize, hdr.devtype, hdr.highcyl);
     for (i = 0; disk_type[i].name != 0; i++) {
          tsize = (uint32)((disk_type[i].bpt | 0x1ff) + 1);
@@ -2251,7 +2251,7 @@ pmp_attach(UNIT * uptr, CONST char *file)
              hdr.heads == disk_type[i].heads && hdr.highcyl == disk_type[i].cyl) {
              if (GET_TYPE(uptr->flags) != i) {
                   /* Ask if we should change */
-                  fprintf(stderr, "Wrong type %s\n\r", disk_type[i].name);
+                  fprintf(stderr, "Wrong type %s\r\n", disk_type[i].name);
                   if (!get_yn("Update dasd type? [N] ", FALSE)) {
                       detach_unit(uptr);
                       return SCPE_FMT;
@@ -2367,7 +2367,7 @@ pmp_set_dev_addr(UNIT * uptr, int32 val, CONST char *cptr, void *desc)
     /* Update device entry */
     uptr->flags &= ~UNIT_ADDR(0xff);
     uptr->flags |= UNIT_ADDR(newdev);
-    fprintf(stderr, "Set dev %x\n\r", GET_UADDR(uptr->flags));
+    fprintf(stderr, "Set dev %x\r\n", GET_UADDR(uptr->flags));
     return r;
 }
 

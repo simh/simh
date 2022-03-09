@@ -100,39 +100,42 @@ ifeq (old,$(shell gmake --version /dev/null 2>&1 | grep 'GNU Make' | awk '{ if (
   $(warning *** Warning *** GNU Make Version $(GMAKE_VERSION) is too old to)
   $(warning *** Warning *** fully process this makefile)
 endif
+SIM_MAJOR=$(shell grep SIM_MAJOR sim_rev.h | awk '{ print $$3 }')
 BUILD_SINGLE := ${MAKECMDGOALS} $(BLANK_SUFFIX)
 BUILD_MULTIPLE_VERB = is
 # building the pdp1, pdp11, tx-0, or any microvax simulator could use video support
-ifneq (,$(or $(findstring XXpdp1XX,$(addsuffix XX,$(addprefix XX,${MAKECMDGOALS}))),$(findstring pdp11,${MAKECMDGOALS}),$(findstring tx-0,${MAKECMDGOALS}),$(findstring microvax1,${MAKECMDGOALS}),$(findstring microvax2,${MAKECMDGOALS}),$(findstring microvax3900,${MAKECMDGOALS}),$(findstring microvax2000,${MAKECMDGOALS}),$(findstring vaxstation3100,${MAKECMDGOALS}),$(findstring XXvaxXX,$(addsuffix XX,$(addprefix XX,${MAKECMDGOALS})))))
-  VIDEO_USEFUL = true
+ifneq (3,${SIM_MAJOR})
+  ifneq (,$(or $(findstring XXpdp1XX,$(addsuffix XX,$(addprefix XX,${MAKECMDGOALS}))),$(findstring pdp11,${MAKECMDGOALS}),$(findstring tx-0,${MAKECMDGOALS}),$(findstring microvax1,${MAKECMDGOALS}),$(findstring microvax2,${MAKECMDGOALS}),$(findstring microvax3900,${MAKECMDGOALS}),$(findstring microvax2000,${MAKECMDGOALS}),$(findstring vaxstation3100,${MAKECMDGOALS}),$(findstring XXvaxXX,$(addsuffix XX,$(addprefix XX,${MAKECMDGOALS})))))
+    VIDEO_USEFUL = true
+  endif
+  # building the besm6 needs both video support and fontfile support
+  ifneq (,$(findstring besm6,${MAKECMDGOALS}))
+    VIDEO_USEFUL = true
+    BESM6_BUILD = true
+  endif
+  # building the Imlac needs video support
+  ifneq (,$(findstring imlac,${MAKECMDGOALS}))
+    VIDEO_USEFUL = true
+  endif
+  # building the TT2500 needs video support
+  ifneq (,$(findstring tt2500,${MAKECMDGOALS}))
+    VIDEO_USEFUL = true
+  endif
+  # building the PDP6, KA10 or KI10 needs video support
+  ifneq (,$(or $(findstring pdp6,${MAKECMDGOALS}),$(findstring pdp10-ka,${MAKECMDGOALS}),$(findstring pdp10-ki,${MAKECMDGOALS})))
+    VIDEO_USEFUL = true
+  endif
 endif
-# building the besm6 needs both video support and fontfile support
-ifneq (,$(findstring besm6,${MAKECMDGOALS}))
-  VIDEO_USEFUL = true
-  BESM6_BUILD = true
-endif
-# building the Imlac needs video support
-ifneq (,$(findstring imlac,${MAKECMDGOALS}))
-  VIDEO_USEFUL = true
-endif
-# building the TT2500 needs video support
-ifneq (,$(findstring tt2500,${MAKECMDGOALS}))
-  VIDEO_USEFUL = true
-endif
-# building the PDP6, KA10 or KI10 needs video support
-ifneq (,$(or $(findstring pdp6,${MAKECMDGOALS}),$(findstring pdp10-ka,${MAKECMDGOALS}),$(findstring pdp10-ki,${MAKECMDGOALS})))
-  VIDEO_USEFUL = true
-endif
-# building the KA10, KI10 or KL10 networking can be used.
-ifneq (,$(or $(findstring pdp10-ka,${MAKECMDGOALS}),$(findstring pdp10-ki,${MAKECMDGOALS},$(findstring pdp10-kl,${MAKECMDGOALS}))))
+# building the SEL32 networking can be used
+ifneq (,$(findstring sel32,${MAKECMDGOALS}))
   NETWORK_USEFUL = true
 endif
 # building the PDP-7 needs video support
 ifneq (,$(findstring pdp7,${MAKECMDGOALS}))
   VIDEO_USEFUL = true
 endif
-# building the pdp11, pdp10, or any vax simulator could use networking support
-ifneq (,$(or $(findstring pdp11,${MAKECMDGOALS}),$(findstring pdp10,${MAKECMDGOALS}),$(findstring vax,${MAKECMDGOALS}),$(findstring infoserver,${MAKECMDGOALS}),$(findstring 3b2,${MAKECMDGOALS})$(findstring all,${MAKECMDGOALS})))
+# building the pdp11, any pdp10, any 3b2, or any vax simulator could use networking support
+ifneq (,$(findstring pdp11,${MAKECMDGOALS})$(findstring pdp10,${MAKECMDGOALS})$(findstring vax,${MAKECMDGOALS})$(findstring infoserver,${MAKECMDGOALS})$(findstring 3b2,${MAKECMDGOALS})$(findstring all,${MAKECMDGOALS}))
   NETWORK_USEFUL = true
   ifneq (,$(findstring all,${MAKECMDGOALS}))
     BUILD_MULTIPLE = s
@@ -180,11 +183,17 @@ endif
 find_exe = $(abspath $(strip $(firstword $(foreach dir,$(strip $(subst :, ,${PATH})),$(wildcard $(dir)/$(1))))))
 find_lib = $(firstword $(abspath $(strip $(firstword $(foreach dir,$(strip ${LIBPATH}),$(foreach ext,$(strip ${LIBEXT}),$(wildcard $(dir)/lib$(1).$(ext))))))))
 find_include = $(abspath $(strip $(firstword $(foreach dir,$(strip ${INCPATH}),$(wildcard $(dir)/$(1).h)))))
-ifneq (0,$(TESTS))
-  find_test = RegisterSanityCheck $(abspath $(wildcard $(1)/tests/$(2)_test.ini)) </dev/null
-  TESTING_FEATURES = - Per simulator tests will be run
-else
-  TESTING_FEATURES = - Per simulator tests will be skipped
+ifneq (3,${SIM_MAJOR})
+  ifneq (0,$(TESTS))
+    find_test = RegisterSanityCheck $(abspath $(wildcard $(1)/tests/$(2)_test.ini)) </dev/null
+    ifneq (,${TEST_ARG})
+      TESTING_FEATURES = - Per simulator tests will be run with argument: ${TEST_ARG}
+    else
+      TESTING_FEATURES = - Per simulator tests will be run
+    endif
+  else
+    TESTING_FEATURES = - Per simulator tests will be skipped
+  endif
 endif
 ifeq (${WIN32},)  #*nix Environments (&& cygwin)
   ifeq (${GCC},)
@@ -1883,7 +1892,7 @@ BESM6D = ${SIMHD}/BESM6
 BESM6 = ${BESM6D}/besm6_cpu.c ${BESM6D}/besm6_sys.c ${BESM6D}/besm6_mmu.c \
         ${BESM6D}/besm6_arith.c ${BESM6D}/besm6_disk.c ${BESM6D}/besm6_drum.c \
         ${BESM6D}/besm6_tty.c ${BESM6D}/besm6_panel.c ${BESM6D}/besm6_printer.c \
-        ${BESM6D}/besm6_pl.c \
+        ${BESM6D}/besm6_pl.c ${BESM6D}/besm6_mg.c \
         ${BESM6D}/besm6_punch.c ${BESM6D}/besm6_punchcard.c ${BESM6D}/besm6_vu.c
 
 ifneq (,$(BESM6_BUILD))
@@ -2000,7 +2009,8 @@ KA10 = ${KA10D}/kx10_cpu.c ${KA10D}/kx10_sys.c ${KA10D}/kx10_df.c \
 	${KA10D}/pdp6_dtc.c ${KA10D}/pdp6_mtc.c ${KA10D}/pdp6_dsk.c \
 	${KA10D}/pdp6_dcs.c ${KA10D}/ka10_dpk.c ${KA10D}/kx10_dpy.c \
 	${KA10D}/ka10_ai.c ${KA10D}/ka10_iii.c ${KA10D}/kx10_disk.c \
-	${KA10D}//ka10_pclk.c ${DISPLAYL} ${DISPLAY340} ${DISPLAYIII}
+	${KA10D}/ka10_pclk.c ${KA10D}/ka10_tv.c \
+	${DISPLAYL} ${DISPLAY340} ${DISPLAYIII}
 KA10_OPT = -DKA=1 -DUSE_INT64 -I ${KA10D} -DUSE_SIM_CARD ${NETWORK_OPT} ${DISPLAY_OPT} ${KA10_DISPLAY_OPT}
 ifneq (${PANDA_LIGHTS},)
 # ONLY for Panda display.
@@ -2038,6 +2048,14 @@ KL10 = ${KL10D}/kx10_cpu.c ${KL10D}/kx10_sys.c ${KL10D}/kx10_df.c \
 	${KL10D}/kx10_disk.c
 KL10_OPT = -DKL=1 -DUSE_INT64 -I $(KL10D) -DUSE_SIM_CARD ${NETWORK_OPT} 
 
+KS10D = ${SIMHD}/PDP10
+KS10 = ${KS10D}/kx10_cpu.c ${KS10D}/kx10_sys.c ${KS10D}/kx10_disk.c \
+	${KS10D}/ks10_cty.c ${KS10D}/ks10_uba.c ${KS10D}/kx10_rh.c \
+	${KS10D}/kx10_rp.c ${KS10D}/kx10_tu.c ${KS10D}/ks10_dz.c \
+	${KS10D}/ks10_tcu.c ${KS10D}/ks10_lp.c ${KS10D}/ks10_ch11.c \
+	${KS10D}/ks10_kmc.c ${KS10D}/ks10_dup.c ${KS10D}/kx10_imp.c
+KS10_OPT = -DKS=1 -DUSE_INT64 -I $(KS10D) -I $(PDP11D) ${NETWORK_OPT}
+
 ATT3B2D = ${SIMHD}/3B2
 ATT3B2M400 = ${ATT3B2D}/3b2_cpu.c ${ATT3B2D}/3b2_sys.c \
 	${ATT3B2D}/3b2_rev2_sys.c ${ATT3B2D}/3b2_rev2_mmu.c \
@@ -2065,8 +2083,17 @@ SIGMA = ${SIGMAD}/sigma_cpu.c ${SIGMAD}/sigma_sys.c ${SIGMAD}/sigma_cis.c \
 	${SIGMAD}/sigma_coc.c ${SIGMAD}/sigma_dk.c ${SIGMAD}/sigma_dp.c \
 	${SIGMAD}/sigma_fp.c ${SIGMAD}/sigma_io.c ${SIGMAD}/sigma_lp.c \
 	${SIGMAD}/sigma_map.c ${SIGMAD}/sigma_mt.c ${SIGMAD}/sigma_pt.c \
-    ${SIGMAD}/sigma_rad.c ${SIGMAD}/sigma_rtc.c ${SIGMAD}/sigma_tt.c
+	${SIGMAD}/sigma_rad.c ${SIGMAD}/sigma_rtc.c ${SIGMAD}/sigma_tt.c
 SIGMA_OPT = -I ${SIGMAD}
+
+SEL32D = ${SIMHD}/SEL32
+SEL32 = ${SEL32D}/sel32_cpu.c ${SEL32D}/sel32_sys.c ${SEL32D}/sel32_chan.c \
+	${SEL32D}/sel32_iop.c ${SEL32D}/sel32_com.c ${SEL32D}/sel32_con.c \
+	${SEL32D}/sel32_clk.c ${SEL32D}/sel32_mt.c ${SEL32D}/sel32_lpr.c \
+	${SEL32D}/sel32_scfi.c ${SEL32D}/sel32_fltpt.c ${SEL32D}/sel32_disk.c \
+	${SEL32D}/sel32_hsdp.c ${SEL32D}/sel32_mfp.c ${SEL32D}/sel32_scsi.c \
+	${SEL32D}/sel32_ec.c
+SEL32_OPT = -I $(SEL32D) -DUSE_INT32 -DSEL32  ${NETWORK_OPT}
 
 ###
 ### Experimental simulators
@@ -2121,7 +2148,8 @@ ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	i7094 ibm1130 id16 id32 sds lgp h316 cdc1700 \
 	swtp6800mp-a swtp6800mp-a2 tx-0 ssem b5500 intel-mds \
 	scelbi 3b2 i701 i704 i7010 i7070 i7080 i7090 \
-	sigma uc15 pdp10-ka pdp10-ki pdp10-kl pdp6 i650
+	sigma uc15 pdp10-ka pdp10-ki pdp10-kl pdp10-ks pdp6 i650 \
+	imlac tt2500 sel32 
 
 all : ${ALL}
 
@@ -2551,6 +2579,15 @@ ifneq (,$(call find_test,${S3D},s3))
 	$@ $(call find_test,${S3D},s3) ${TEST_ARG}
 endif
 
+sel32: $(BIN)sel32$(EXE)
+
+${BIN}sel32${EXE}: ${SEL32} ${SIM}
+	${MKDIRBIN}
+	${CC} ${SEL32} ${SIM} ${SEL32_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${SEL32D},sel32))
+	$@ $(call find_test,${SEL32D},sel32) $(TEST_ARG)
+endif
+
 altair : ${BIN}altair${EXE}
 
 ${BIN}altair${EXE} : ${ALTAIR} ${SIM}
@@ -2870,6 +2907,15 @@ ${BIN}pdp10-kl${EXE} : ${KL10} ${SIM}
 	${CC} ${KL10} ${SIM} ${KL10_OPT} ${CC_OUTSPEC} ${LDFLAGS}
 ifneq (,$(call find_test,${PDP10D},kl10))
 	$@ $(call find_test,${PDP10D},kl10) ${TEST_ARG}
+endif
+
+pdp10-ks : ${BIN}pdp10-ks${EXE}
+
+${BIN}pdp10-ks${EXE} : ${KS10} ${SIM}
+	${MKDIRBIN}
+	${CC} ${KS10} ${SIM} ${KS10_OPT} ${CC_OUTSPEC} ${LDFLAGS}
+ifneq (,$(call find_test,${PDP10D},ks10))
+	$@ $(call find_test,${PDP10D},ks10) ${TEST_ARG}
 endif
 
 # Front Panel API Demo/Test program

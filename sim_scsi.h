@@ -70,7 +70,7 @@
 #define SCSI_V_NOAUTO   ((DKUF_V_UF > MTUF_V_UF) ? DKUF_V_UF : MTUF_V_UF)/* noautosize */
 #define SCSI_V_UF       (SCSI_V_NOAUTO + 1)
 #define SCSI_WLK        (UNIT_WLK|UNIT_RO)              /* hwre write lock */
-#define SCSI_NOAUTO     (1 << SCSI_V_NOAUTO)
+#define SCSI_NOAUTO     DKUF_NOAUTOSIZE
 
 
 struct scsi_dev_t {

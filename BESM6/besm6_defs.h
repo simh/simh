@@ -141,7 +141,8 @@ extern t_value ACC, RMR;
 extern uint32 BAZ[8], TABST, RZ;
 extern uint32 READY; /* read by ext 4031 */
 extern uint32 READY2; /* read by ext 4102 */
-extern DEVICE cpu_dev, drum_dev, mmu_dev, disk_dev;
+extern DEVICE cpu_dev, drum_dev, mmu_dev;
+extern DEVICE md_dev[8];
 extern DEVICE clock_dev;
 extern DEVICE printer_dev;
 extern DEVICE tty_dev;
@@ -149,6 +150,7 @@ extern DEVICE fs_dev;
 extern DEVICE pl_dev;
 extern DEVICE vu_dev;
 extern DEVICE pi_dev;
+extern DEVICE mg_dev[4];
 extern jmp_buf cpu_halt;
 
 /*
@@ -332,6 +334,15 @@ void disk_io (int ctlr, uint32 cmd);
 void disk_ctl (int ctlr, uint32 cmd);
 int disk_state (int ctlr);
 int disk_errors (void);
+
+/*
+ * Magnetic tapes.
+ */
+void mg_io (int ctlr, uint32 cmd);
+void mg_ctl (int ctlr, uint32 cmd);
+int mg_state (int ctlr);
+void mg_format(uint32 cmd);
+int mg_errors (void);
 
 /*
  * Печать на АЦПУ.

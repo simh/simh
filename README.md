@@ -83,7 +83,7 @@
 
 #### Richard Cornwell has implemented the IBM 701, IBM 704, IBM 7010/1410, IBM 7070/7074, IBM 7080/702/705/7053 and IBM 7090/7094/709/704 simulators.
 
-#### Richard Cornwell has implemented the PDP6, PDP10-KA, PDP10-KI and PDP10-KL simulators.
+#### Richard Cornwell has implemented the PDP6, PDP10-KA, PDP10-KI, PDP10-KL and PDP10-KS simulators.  With the differences merely being some device name changes, the PDP10-KS should be compatible with Bob Supnik's original PDP10 simulator.
 
 #### Dave Bryan has implemented an HP-3000 Series III simulator.
 
@@ -102,6 +102,8 @@
 #### Hans-Åke Lund has implemented an SCELBI (SCientic-ELectronics-BIology) simulator.
 
 #### IBM 650 simulator from Roberto Sancho Villa
+
+#### Jim Bevier has implemented a SEL32 simulator.
 
 ### New Host Platform support - HP-UX and AIX
 

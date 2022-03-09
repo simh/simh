@@ -250,6 +250,7 @@ t_stat sim_cancel_step (void);
 const char *sim_get_tool_path (const char *tool);
 void sim_printf (const char *fmt, ...) GCC_FMT_ATTR(1, 2);
 void sim_perror (const char *msg);
+t_stat sim_call_argv (int (*main_like)(int argc, char *argv[]), const char *cptr);
 t_stat sim_messagef (t_stat stat, const char *fmt, ...) GCC_FMT_ATTR(2, 3);
 void sim_data_trace(DEVICE *dptr, UNIT *uptr, const uint8 *data, const char *position, size_t len, const char *txt, uint32 reason);
 void sim_debug_bits_hdr (uint32 dbits, DEVICE* dptr, const char *header, 

@@ -1233,7 +1233,6 @@ void dt_flush (UNIT* uptr)
     uint32 ba, k, *fbuf;
 
     if (uptr->WRITTEN && uptr->hwmark && ((uptr->flags & UNIT_RO) == 0)) {   /* any data? */
-        sim_printf ("%s: writing buffer to file: %s\n", sim_uname (uptr), uptr->filename);
         rewind (uptr->fileref);                             /* start of file */
         fbuf = (uint32 *) uptr->filebuf;                    /* file buffer */
         if (uptr->flags & UNIT_8FMT) {                      /* 12b? */
@@ -1285,8 +1284,10 @@ t_stat dt_detach (UNIT* uptr)
         sim_cancel (uptr);
         uptr->CMD = uptr->pos = 0;
     }
-    if (uptr->hwmark && ((uptr->flags & UNIT_RO) == 0))     /* any data? */
-        dt_flush(uptr);                                     /* end if hwmark */
+    if (uptr->hwmark && ((uptr->flags & UNIT_RO) == 0)) {   /* any data? */
+        sim_printf ("%s%d: writing buffer to file\n", sim_dname (&dt_dev), u);
+        dt_flush(uptr);
+    }                                                       /* end if hwmark */
     free (uptr->filebuf);                                   /* release buf */
     uptr->flags = uptr->flags & ~UNIT_BUF;                  /* clear buf flag */
     uptr->filebuf = NULL;                                   /* clear buf ptr */

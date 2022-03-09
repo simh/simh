@@ -874,7 +874,7 @@ void nia_load_ptt()
             nia_error(EBSERR);
             return;
         }
-        sim_debug(DEBUG_DETAIL, &nia_dev, "NIA load ptt%d: %012llo %012llo\n\r",
+        sim_debug(DEBUG_DETAIL, &nia_dev, "NIA load ptt%d: %012llo %012llo\n",
               n,  word1, word2);
         if (word1 & SMASK) {
            uint16 type;
@@ -887,7 +887,7 @@ void nia_load_ptt()
         addr++;
     }
     for (i = 0; i < n; i++)
-       sim_debug(DEBUG_DETAIL, &nia_dev, "NIA load ptt%d: %04x %010o\n\r",
+       sim_debug(DEBUG_DETAIL, &nia_dev, "NIA load ptt%d: %04x %010o\n",
               n,  nia_data.ptt_proto[i], nia_data.ptt_head[i]);
     nia_data.ptt_n = n;
 }
@@ -925,7 +925,7 @@ void nia_load_mcast()
      }
      for(i = 0; i< n; i++) {
          eth_mac_fmt(&nia_data.macs[i], buffer);
-         sim_debug(DEBUG_DETAIL, &nia_dev, "NIA load mcast%d: %s\n\r",i,buffer);
+         sim_debug(DEBUG_DETAIL, &nia_dev, "NIA load mcast%d: %s\n",i,buffer);
      }
      nia_data.macs_n = n - 2;
      if (nia_recv_uptr->flags & UNIT_ATT)

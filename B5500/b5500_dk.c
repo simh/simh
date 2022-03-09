@@ -233,7 +233,7 @@ t_stat dsk_srv(UNIT * uptr)
         /* Map to ESU */
         if (u && (dsk_unit[u].flags & DFX) == 0) 
            esu += 10;
-        sim_debug(DEBUG_DETAIL, dptr, "Disk access %d %s %02o %d,%d\n\r", u,
+        sim_debug(DEBUG_DETAIL, dptr, "Disk access %d %s %02o %d,%d\n", u,
                 (uptr->CMD & DK_RDCK) ? "rcheck" : 
                 (uptr->CMD & DK_RD) ? "read" :
                 (uptr->CMD & DK_WR)? "write" : "nop", (uptr->CMD >> 9) & 077,
@@ -255,11 +255,11 @@ t_stat dsk_srv(UNIT * uptr)
                 chan_set_eof(chan);
             
             if (uptr->CMD & DK_WR) {
-                sim_debug(DEBUG_DETAIL, dptr, "Disk write int %d %d %o\n\r", 
+                sim_debug(DEBUG_DETAIL, dptr, "Disk write int %d %d %o\n", 
                       uptr->ESU, uptr->ADDR, uptr->CMD);
             }
             if (uptr->CMD & DK_RD) {
-                sim_debug(DEBUG_DETAIL, dptr, "Disk read int %d %d %o\n\r", 
+                sim_debug(DEBUG_DETAIL, dptr, "Disk read int %d %d %o\n", 
                       uptr->ESU, uptr->ADDR, uptr->CMD);
                 if (eptr->flags & MODIB) 
                    chan_set_error(chan);
@@ -302,7 +302,7 @@ void esu_set_end(UNIT *uptr, int err) {
         int             dsk = ((uptr->CMD & DK_CTRL) != 0);
         DEVICE          *dptr = find_dev_from_unit(uptr);
 
-        sim_debug(DEBUG_DETAIL, dptr, "Disk done %d %d %o\n\r", uptr->POS,
+        sim_debug(DEBUG_DETAIL, dptr, "Disk done %d %d %o\n", uptr->POS,
                  uptr->ADDR, uptr->CMD);
         if (err)
             chan_set_error(chan);
@@ -335,13 +335,13 @@ t_stat esu_srv(UNIT * uptr)
 
             /* Check if over end of disk */
             if (uptr->ADDR >= uptr->wait) {
-                sim_debug(DEBUG_DETAIL, dptr, "Disk read over %d %d %o\n\r",
+                sim_debug(DEBUG_DETAIL, dptr, "Disk read over %d %d %o\n",
                                  uptr->POS, uptr->ADDR, uptr->CMD);
                 chan_set_eof(chan);
                 esu_set_end(uptr, 0);
                 return SCPE_OK;
             }
-            sim_debug(DEBUG_DETAIL, dptr, "Disk read %d %d %d %o %d\n\r",
+            sim_debug(DEBUG_DETAIL, dptr, "Disk read %d %d %d %o %d\n",
                                  u,uptr->POS, uptr->ADDR, uptr->CMD, da);
         
             if (sim_fseek(uptr->fileref, da, SEEK_SET) < 0) {
@@ -369,13 +369,13 @@ t_stat esu_srv(UNIT * uptr)
 
             /* Check if over end of disk */
             if (uptr->ADDR >= uptr->wait) {
-                sim_debug(DEBUG_DETAIL, dptr, "Disk rdchk over %d %d %o\n\r",
+                sim_debug(DEBUG_DETAIL, dptr, "Disk rdchk over %d %d %o\n",
                          uptr->POS, uptr->ADDR, uptr->CMD);
                 uptr->CMD = 0;
                 IAR |= IRQ_14 << dsk;
                 return SCPE_OK;
             }
-            sim_debug(DEBUG_DETAIL, dptr, "Disk rdchk %d %d %d %o\n\r", u,
+            sim_debug(DEBUG_DETAIL, dptr, "Disk rdchk %d %d %d %o\n", u,
                          uptr->POS, uptr->ADDR, uptr->CMD);
         
             uptr->ADDR++; /* Advance disk address */
@@ -416,14 +416,14 @@ t_stat esu_srv(UNIT * uptr)
 
            /* Check if over end of disk */
            if (uptr->ADDR >= uptr->wait) {
-               sim_debug(DEBUG_DETAIL, dptr, "Disk write over %d %d %o\n\r", 
+               sim_debug(DEBUG_DETAIL, dptr, "Disk write over %d %d %o\n", 
                            uptr->POS, uptr->ADDR, uptr->CMD);
                chan_set_eof(chan);
                esu_set_end(uptr, 0);
                return SCPE_OK;
            }
         
-           sim_debug(DEBUG_DETAIL, dptr, "Disk write %d %d %d %o %d\n\r",
+           sim_debug(DEBUG_DETAIL, dptr, "Disk write %d %d %d %o %d\n",
                             u, uptr->POS, uptr->ADDR, uptr->CMD, da);
            if (sim_fseek(uptr->fileref, da, SEEK_SET) < 0) {
                esu_set_end(uptr, 1);

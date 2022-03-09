@@ -178,10 +178,8 @@ UNIT                mt_unit[] = {
 DIB mt_dib = {MT_DEVNUM, 2, &mt_devio, NULL};
 
 MTAB                mt_mod[] = {
-    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
-        &set_writelock, &show_writelock,   NULL, "Write ring in place" },
-    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
-        &set_writelock, NULL,   NULL, "no Write ring in place" },
+    {MTUF_WLK, 0, "write enabled", "WRITEENABLED", NULL},
+    {MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL},
     {MTAB_XTD|MTAB_VDV|MTAB_VALR, MTDF_TYPEB, "TYPE", "TYPE", &mt_set_mta, &mt_show_mta},
     {MTUF_7TRK, 0, "9T", "9T", NULL, NULL},
     {MTUF_7TRK, MTUF_7TRK, "7T", "7T", NULL, NULL},
@@ -297,7 +295,7 @@ t_stat mt_devio(uint32 dev, uint64 *data) {
                      break;
 
               case WRITE:
-                     if ((uptr->flags & MTUF_WRP) != 0) {
+                     if ((uptr->flags & MTUF_WLK) != 0) {
                         mt_status |= IDLE_UNIT|ILL_OPR|EOF_FLAG;
                         break;
                      }
@@ -372,7 +370,7 @@ t_stat mt_devio(uint32 dev, uint64 *data) {
               res |= SEVEN_CHAN;
           if ((uptr->flags & UNIT_ATT) != 0 && (uptr->CNTRL & MT_MOTION) == 0)
               res |= IDLE_UNIT;
-          if ((uptr->flags & MTUF_WRP) != 0)
+          if ((uptr->flags & MTUF_WLK) != 0)
               res |= WRITE_LOCK;
           if (sim_tape_bot(uptr))
               res |= BOT_FLAG;
@@ -534,8 +532,8 @@ t_stat mt_error(UNIT * uptr, t_stat r, DEVICE * dptr)
 /* Handle processing of tape requests. */
 t_stat mt_srv(UNIT * uptr)
 {
-    DEVICE             *dptr = find_dev_from_unit(uptr);
-    int                 unit = (uptr - dptr->units) & 7;
+    DEVICE             *dptr = uptr->dptr;
+    int                 unit;
     int                 cmd = (uptr->CNTRL & FUNCTION) >> 9;
     t_mtrlnt            reclen;
     t_stat              r = SCPE_ARG;   /* Force error if not set */
@@ -559,6 +557,10 @@ t_stat mt_srv(UNIT * uptr)
        cc_max = (4 + ((uptr->CNTRL & CORE_DUMP) != 0));
     }
 
+    if (dptr == NULL)
+        dptr = find_dev_from_unit(uptr);
+
+    unit = (uptr - dptr->units) & 7;
     switch(cmd) {
     case NOP_IDLE:
         sim_debug(DEBUG_DETAIL, dptr, "MT%o Idle\n", unit);
@@ -802,7 +804,7 @@ t_stat mt_srv(UNIT * uptr)
          break;
 
     case WTM:
-        if ((uptr->flags & MTUF_WRP) != 0)
+        if ((uptr->flags & MTUF_WLK) != 0)
             return mt_error(uptr, MTSE_WRP, dptr);
         if (uptr->CPOS == 0) {
             mt_status &= ~(IDLE_UNIT|BOT_FLAG|EOT_FLAG);
@@ -821,7 +823,7 @@ t_stat mt_srv(UNIT * uptr)
          break;
 
     case ERG:
-        if ((uptr->flags & MTUF_WRP) != 0)
+        if ((uptr->flags & MTUF_WLK) != 0)
             return mt_error(uptr, MTSE_WRP, dptr);
         uptr->CNTRL &= ~MT_MOTION;
         mt_status &= ~(IDLE_UNIT|BOT_FLAG|EOT_FLAG);

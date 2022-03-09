@@ -1,0 +1,6 @@
+#tape files are dynamically downloaded from github.com/AZBevier/SEL32-installs as they are needed.
+/tape
+#disk files are created by the simh installation command files.  These are SEL32 bootable disks.
+/dsk
+#ignore lp output from MPX-1X install.
+lprout

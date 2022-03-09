@@ -133,15 +133,14 @@ static struct drvtyp drv_tab[] = {
 /* Flags in the unit flags word */
 
 #define UNIT_V_RL02     (DKUF_V_UF + 0)                 /* RL01 vs RL02 */
-#define UNIT_V_AUTO     (UNIT_V_RL02 + 1)               /* autosize enable */
-#define UNIT_V_DUMMY    (UNIT_V_AUTO + 1)               /* dummy flag, for SET BADBLOCK */
+#define UNIT_V_DUMMY    (UNIT_V_RL02 + 1)               /* dummy flag, for SET BADBLOCK */
 #define UNIT_V_OFFL     (UNIT_V_DUMMY + 1)              /* unit off line */
 #define UNIT_V_BRUSH    (UNIT_V_OFFL + 1)               /* unit has brushes */
 #define UNIT_BRUSH      (1u << UNIT_V_BRUSH)
 #define UNIT_OFFL       (1u << UNIT_V_OFFL)
 #define UNIT_DUMMY      (1u << UNIT_V_DUMMY)
 #define UNIT_RL02       (1u << UNIT_V_RL02)
-#define UNIT_AUTO       (1u << UNIT_V_AUTO)
+#define UNIT_NOAUTO     DKUF_NOAUTOSIZE                 /* autosize disable */
 #define GET_DTYPE(x)    (((x) >> UNIT_V_RL02) & 1)
 
 /* Parameters in the unit descriptor */
@@ -313,14 +312,10 @@ static DIB rl_dib = {
     1, IVCL (RL), VEC_AUTO, { NULL }, IOLN_RL };
 
 static UNIT rl_unit[] = {
-    { UDATA (&rl_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-            UNIT_ROABLE+UNIT_AUTO, RL01_SIZE) },
-    { UDATA (&rl_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-            UNIT_ROABLE+UNIT_AUTO, RL01_SIZE) },
-    { UDATA (&rl_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-            UNIT_ROABLE+UNIT_AUTO, RL01_SIZE) },
-    { UDATA (&rl_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-            UNIT_ROABLE+UNIT_AUTO, RL01_SIZE) }
+    { UDATA (&rl_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE, RL01_SIZE) },
+    { UDATA (&rl_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE, RL01_SIZE) },
+    { UDATA (&rl_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE, RL01_SIZE) },
+    { UDATA (&rl_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE, RL01_SIZE) }
     };
 
 static const REG rl_reg[] = {
@@ -383,9 +378,9 @@ static const MTAB rl_mod[] = {
       &rl_set_type, NULL, NULL, "Set RL02 Disk Type" },
     { MTAB_XTD|MTAB_VUN, 0, "TYPE", NULL,
       NULL, &rl_show_type, NULL, "Display device type" },
-    { UNIT_AUTO, UNIT_AUTO, "autosize", "AUTOSIZE", 
+    { UNIT_NOAUTO,           0, "autosize", "AUTOSIZE", 
       NULL, NULL, NULL, "Set type based on file size at attach" },
-    { UNIT_AUTO,         0, "noautosize",   "NOAUTOSIZE",   
+    { UNIT_NOAUTO, UNIT_NOAUTO, "noautosize",   "NOAUTOSIZE",   
       NULL, NULL, NULL, "Disable disk autosize on attach" },
     { MTAB_XTD|MTAB_VUN|MTAB_VALR, 0, "FORMAT", "FORMAT={AUTO|SIMH|VHD|RAW}",
       &sim_disk_set_fmt, &sim_disk_show_fmt, NULL, "Set/Display disk format" },
@@ -1033,7 +1028,7 @@ uptr->capac = (uptr->flags & UNIT_RL02)? RL02_SIZE: RL01_SIZE;
 r = sim_disk_attach_ex (uptr, cptr, RL_NUMWD * sizeof (uint16), 
                         sizeof (uint16), TRUE, 0, 
                         (uptr->capac == RL02_SIZE) ? "RL02" : "RL01", RL_NUMSC, 0,
-                        (uptr->flags & UNIT_AUTO) ? drives : NULL);
+                        (uptr->flags & UNIT_NOAUTO) ? NULL : drives);
 if (r != SCPE_OK)                                       /* error? */
     return r;
 /*
