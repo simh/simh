@@ -2911,32 +2911,34 @@ if (cptr == NULL) {
 else
     cptr2 = NULL;
 docmdp = find_cmd ("DO");
-if (docmdp && cptr && (sizeof (nbuf) > strlen (cptr) + strlen ("/simh.ini") + 3)) {
-    snprintf(nbuf, sizeof (nbuf), "\"%s%s%ssimh.ini\"", cptr2 ? cptr2 : "", cptr, strchr (cptr, '/') ? "/" : "\\");
-    stat = docmdp->action (-1, nbuf);                   /* simh.ini proc cmd file */
-    }
-if (SCPE_BARE_STATUS(stat) == SCPE_OPENERR)
-    stat = docmdp->action (-1, "simh.ini");             /* simh.ini proc cmd file */
-if (*cbuf)                                              /* cmd file arg? */
-    stat = docmdp->action (0, cbuf);                    /* proc cmd file */
-else {
-    if (*argv[0]) {                                    /* sim name arg? */
-        char *np;                                      /* "path.ini" */
-        nbuf[0] = '"';                                 /* starting " */
-        strlcpy (nbuf + 1, argv[0], PATH_MAX + 2);     /* copy sim name */
-        if ((np = (char *)match_ext (nbuf, "EXE")))    /* remove .exe */
-            *np = 0;
-        strlcat (nbuf, ".ini\"", sizeof (nbuf));       /* add .ini" */
-        stat = docmdp->action (-1, nbuf) & ~SCPE_NOMESSAGE; /* proc default cmd file */
-        if (stat == SCPE_OPENERR) {                    /* didn't exist/can't open? */
-            np = strrchr (nbuf, '/');                  /* stript path and try again in cwd */
-            if (np == NULL)
-                np = strrchr (nbuf, '\\');             /* windows path separator */
-            if (np == NULL)
-                np = strrchr (nbuf, ']');              /* VMS path separator */
-            if (np != NULL) {
-                *np = '"';
-                stat = docmdp->action (-1, np) & ~SCPE_NOMESSAGE;/* proc default cmd file */
+if (docmdp) {
+    if (cptr && (sizeof (nbuf) > strlen (cptr) + strlen ("/simh.ini") + 3)) {
+        snprintf(nbuf, sizeof (nbuf), "\"%s%s%ssimh.ini\"", cptr2 ? cptr2 : "", cptr, strchr (cptr, '/') ? "/" : "\\");
+        stat = docmdp->action (-1, nbuf);                   /* simh.ini proc cmd file */
+        }
+    if (SCPE_BARE_STATUS(stat) == SCPE_OPENERR)
+        stat = docmdp->action (-1, "simh.ini");             /* simh.ini proc cmd file */
+    if (*cbuf)                                              /* cmd file arg? */
+        stat = docmdp->action (0, cbuf);                    /* proc cmd file */
+    else {
+        if (*argv[0]) {                                    /* sim name arg? */
+            char *np;                                      /* "path.ini" */
+            nbuf[0] = '"';                                 /* starting " */
+            strlcpy (nbuf + 1, argv[0], PATH_MAX + 2);     /* copy sim name */
+            if ((np = (char *)match_ext (nbuf, "EXE")))    /* remove .exe */
+                *np = 0;
+            strlcat (nbuf, ".ini\"", sizeof (nbuf));       /* add .ini" */
+            stat = docmdp->action (-1, nbuf) & ~SCPE_NOMESSAGE; /* proc default cmd file */
+            if (stat == SCPE_OPENERR) {                    /* didn't exist/can't open? */
+                np = strrchr (nbuf, '/');                  /* stript path and try again in cwd */
+                if (np == NULL)
+                    np = strrchr (nbuf, '\\');             /* windows path separator */
+                if (np == NULL)
+                    np = strrchr (nbuf, ']');              /* VMS path separator */
+                if (np != NULL) {
+                    *np = '"';
+                    stat = docmdp->action (-1, np) & ~SCPE_NOMESSAGE;/* proc default cmd file */
+                    }
                 }
             }
         }
@@ -4301,24 +4303,26 @@ t_stat sim_call_argv (int (*main_like_routine)(int argc, char *argv[]), const ch
 {
 int argc = 1;
 char **argv = (char **)calloc ((1 + argc), sizeof (*argv));
-size_t cptr_len = strlen (cptr);
-char *argline = (char *)malloc (2 + 2 * cptr_len);
+size_t arg_size;
+char *argline = NULL;
 char *cp, quote;
 t_stat result = SCPE_OK;
 
-if ((argv == NULL) || (argline == NULL)) {
-    free (argv);
-    free (argline);
-    return SCPE_MEM;
-    }
 if (cptr == NULL) {
     free (argv);
     free (argline);
     return SCPE_ARG;
     }
-strcpy (argline, cptr);
-cp = argline + cptr_len + 1;
-strcpy (cp, cptr);
+arg_size = 2 + (2 * strlen (cptr));
+argline = (char *)malloc (arg_size);
+if ((argv == NULL) || (argline == NULL)) {
+    free (argv);
+    free (argline);
+    return SCPE_MEM;
+    }
+strlcpy (argline, cptr, arg_size);
+cp = argline + (arg_size / 2);
+strlcpy (cp, cptr, arg_size / 2);
 argv[0] = argline;                  /* argv[0] points to unparsed arguments */
 argv[argc + 1] = NULL;              /* make sure the argument list always ends with a NULL */
 while (*cp) {
