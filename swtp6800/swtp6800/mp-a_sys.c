@@ -43,6 +43,15 @@ extern DEVICE ptp_dev;
 extern DEVICE mp_8m_dev;
 extern DEVICE dsk_dev;
 
+/* external routines */
+
+extern void CPU_BD_put_mbyte(int32 addr, int32 val);
+extern void CPU_BD_put_mword(int32 addr, int32 val);
+extern int32 CPU_BD_get_mbyte(int32 addr);
+extern int32 CPU_BD_get_mword(int32 addr);
+
+extern int32 saved_PC;                     /* Program counter */
+
 /* SCP data structures
 
    sim_name             simulator name string

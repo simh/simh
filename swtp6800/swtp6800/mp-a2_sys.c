@@ -1,4 +1,4 @@
-/*  mp-a_sys.c: SWTP 6800 system interface
+/*  mp-a2_sys.c: SWTP 6800 system interface
 
     Copyright (c) 2005-2012, William Beech
 
@@ -44,6 +44,15 @@ extern DEVICE ptp_dev;
 extern DEVICE mp_8m_dev;
 extern DEVICE dsk_dev;
 
+/* external routines */
+
+extern void CPU_BD_put_mbyte(int32 addr, int32 val);
+extern void CPU_BD_put_mword(int32 addr, int32 val);
+extern int32 CPU_BD_get_mbyte(int32 addr);
+extern int32 CPU_BD_get_mword(int32 addr);
+
+extern int32 saved_PC;                     /* Program counter */
+
 /* SCP data structures
 
    sim_name             simulator name string
@@ -84,4 +93,4 @@ const char *sim_stop_messages[SCPE_BASE] = {
     "Invalid Memory" 
 };
 
-/* end of mp-a_sys.c */
+/* end of mp-a2_sys.c */

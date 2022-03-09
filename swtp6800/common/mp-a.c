@@ -55,6 +55,8 @@ int32 CPU_BD_get_mbyte(int32 addr);
 int32 CPU_BD_get_mword(int32 addr);
 void CPU_BD_put_mbyte(int32 addr, int32 val);
 void CPU_BD_put_mword(int32 addr, int32 val);
+t_stat mpa_examine(t_value *eval_array, t_addr addr, UNIT *uptr, int32 switches);
+t_stat mpa_deposit(t_value value, t_addr addr, UNIT *uptr, int32 switches);
 
 /* external routines */
 
@@ -94,12 +96,10 @@ MTAB CPU_BD_mod[] = {
 };
 
 DEBTAB CPU_BD_debug[] = {
-    { "ALL", DEBUG_all },
-    { "FLOW", DEBUG_flow },
-    { "READ", DEBUG_read },
-    { "WRITE", DEBUG_write },
-    { "LEV1", DEBUG_level1 },
-    { "LEV2", DEBUG_level2 },
+    { "ALL", DEBUG_all, "All debug bits" },
+    { "FLOW", DEBUG_flow, "Flow control" },
+    { "READ", DEBUG_read, "Read Command" },
+    { "WRITE", DEBUG_write, "Write Command"},
     { NULL }
 };
 
@@ -114,8 +114,8 @@ DEVICE CPU_BD_dev = {
     1,                                  //aincr
     16,                                 //dradix
     8,                                  //dwidth
-    NULL,                               //examine
-    NULL,                               //deposit
+    mpa_examine,                        //examine
+    mpa_deposit,                        //deposit
     NULL,                               //reset
     NULL,                               //boot
     NULL,                               //attach
@@ -200,6 +200,21 @@ void CPU_BD_put_mword(int32 addr, int32 val)
         addr, val);
     CPU_BD_put_mbyte(addr, val >> 8);
     CPU_BD_put_mbyte(addr+1, val);
+}
+
+t_stat mpa_examine(t_value *eval_array, t_addr addr, UNIT *uptr, int32 switches)
+{
+    int32 i;
+
+    for (i=0; i<sim_emax; ++i)
+        *eval_array++ = CPU_BD_get_mbyte(addr++);
+    return SCPE_OK;
+}
+
+t_stat mpa_deposit(t_value value, t_addr addr, UNIT *uptr, int32 switches)
+{
+    CPU_BD_put_mbyte(addr,value);
+    return SCPE_OK;
 }
 
 /* end of mp-a.c */

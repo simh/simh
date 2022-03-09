@@ -223,8 +223,6 @@
 #include <stdio.h>
 #include "swtp_defs.h"
 
-#define DEBUG   0
-
 #define UNIT_V_ENABLE   (UNIT_V_UF + 0) /* Write Enable */
 #define UNIT_ENABLE     (1 << UNIT_V_ENABLE)
 
@@ -242,12 +240,27 @@
 #define MAXCYL          0x26            /* last cylinder # */
 #define MAXSEC          0x27            /* last sector # */
 
-/* 1797 status bits */
+/* 1797 status bits type I commands*/
 
-#define BUSY            0x01
-#define DRQ             0x02
-#define WRPROT          0x40
 #define NOTRDY          0x80
+#define WRPROT          0x40
+#define HEDLOD          0x20
+#define SEEKERR         0x10
+#define CRCERR          0x08
+#define LOST            0x04
+#define DRQ             0x02
+#define BUSY            0x01
+
+/* 1797 status bits type II/III commands*/
+
+#define NOTRDY          0x80
+#define WRPROT          0x40
+#define WRTFALT         0x20
+#define RECNF           0x10
+#define CRCERR          0x08
+#define LOST            0x04
+#define DRQ             0x02
+#define BUSY            0x01
 
 /* function prototypes */
 
@@ -276,10 +289,10 @@ int32   dsksiz;                         /* dsk size (bytes) */
 
 /* Floppy Disk Controller data structures
 
-       dsk_dev        Mother Board device descriptor
-       dsk_unit       Mother Board unit descriptor
-       dsk_reg        Mother Board register list
-       dsk_mod        Mother Board modifiers list
+       dsk_dev        Disk Controller device descriptor
+       dsk_unit       Disk Controller unit descriptor
+       dsk_reg        Disk Controller register list
+       dsk_mod        Disk Controller modifiers list
 */
 
 UNIT dsk_unit[] = {
@@ -301,12 +314,10 @@ MTAB dsk_mod[] = {
 };
 
 DEBTAB dsk_debug[] = {
-    { "ALL", DEBUG_all },
-    { "FLOW", DEBUG_flow },
-    { "READ", DEBUG_read },
-    { "WRITE", DEBUG_write },
-    { "LEV1", DEBUG_level1 },
-    { "LEV2", DEBUG_level2 },
+    { "ALL", DEBUG_all, "All debug bits" },
+    { "FLOW", DEBUG_flow, "Flow control" },
+    { "READ", DEBUG_read, "Read Command" },
+    { "WRITE", DEBUG_write, "Write Command"},
     { NULL }
 };
 
@@ -330,7 +341,7 @@ DEVICE dsk_dev = {
     NULL,                               //ctxt
     DEV_DEBUG,                          //flags
     0,                                  //dctrl
-    dsk_debug,                          /* debflags */
+    dsk_debug,                          //debflags
     NULL,                               //msize
     NULL                                //lname
 };
@@ -381,6 +392,7 @@ int32 fdcdrv(int32 io, int32 data)
             return 0;                   /* already selected */
         cur_dsk = data & 0x03;          /* only 2 drive select bits */
         sim_debug (DEBUG_flow, &dsk_dev, "\nfdcdrv: Drive set to %d", cur_dsk);
+        dsk_unit[cur_dsk].flags &= ~LOST;
         if ((dsk_unit[cur_dsk].flags & UNIT_ENABLE) == 0) {
             dsk_unit[cur_dsk].u3 |= WRPROT; /* set 1797 WPROT */
             sim_debug (DEBUG_flow, &dsk_dev, "\nfdcdrv: Drive write protected");
@@ -424,20 +436,21 @@ int32 fdccmd(int32 io, int32 data)
     static int32 val = 0, val1 = NOTRDY;
     static long pos;
     static int32 err;
- 
+
     if ((dsk_unit[cur_dsk].flags & UNIT_ATT) == 0) { /* not attached */
         dsk_unit[cur_dsk].u3 |= NOTRDY; /* set not ready flag */
         sim_debug (DEBUG_flow, &dsk_dev, "\nfdccmd: Drive %d is not attached", cur_dsk);
         return 0;
     } else {
-        dsk_unit[cur_dsk].u3 &= ~NOTRDY; /* clear not ready flag */
+        dsk_unit[cur_dsk].u3 &= ~(NOTRDY); /* clear not ready flag */
     }
     if (io) {                           /* write command to fdc */
         switch(data) {
-            case 0x8C:                  /* read command */
-            case 0x9C:
+            case 0x8C:                  //read sector command type II
+            case 0x9C:                  //read multiple sectors command type II
                 sim_debug (DEBUG_flow, &dsk_dev, "\nfdccmd: Read of disk %d, track %d, sector %d", 
                     cur_dsk, dsk_unit[cur_dsk].u4, dsk_unit[cur_dsk].u5);
+                dsk_unit[cur_dsk].u3 |= BUSY; /* set BUSY */
                 pos = trksiz * dsk_unit[cur_dsk].u4; /* calculate file offset */
                 pos += SECT_SIZE * (dsk_unit[cur_dsk].u5 - 1);
                 sim_debug (DEBUG_flow, &dsk_dev, "\nfdccmd: Read pos = %ld ($%08X)",
@@ -452,15 +465,17 @@ int32 fdccmd(int32 io, int32 data)
                     sim_printf("\nfdccmd: File error in read command\n");
                     return SCPE_IOERR;
                 }
-                dsk_unit[cur_dsk].u3 |= BUSY | DRQ; /* set DRQ & BUSY */
+                dsk_unit[cur_dsk].u3 |= DRQ; /* set DRQ */
                 dsk_unit[cur_dsk].pos = 0; /* clear counter */
                 break;
-            case 0xAC:                  /* write command */
+            case 0xAC:                  //write command type II
+            case 0xBC:                  //write multiple sectors command type II
                 sim_debug (DEBUG_flow, &dsk_dev, "\nfdccmd: Write of disk %d, track %d, sector %d",
                     cur_dsk, dsk_unit[cur_dsk].u4, dsk_unit[cur_dsk].u5);
                 if (dsk_unit[cur_dsk].u3 & WRPROT) {
                     printf("\nfdccmd: Drive %d is write-protected", cur_dsk);
                 } else {
+                    dsk_unit[cur_dsk].u3 |= BUSY;/* set BUSY */
                     pos = trksiz * dsk_unit[cur_dsk].u4; /* calculate file offset */
                     pos += SECT_SIZE * (dsk_unit[cur_dsk].u5 - 1);
                     sim_debug (DEBUG_flow, &dsk_dev, "\nfdccmd: Write pos = %ld ($%08X)",
@@ -470,24 +485,25 @@ int32 fdccmd(int32 io, int32 data)
                         sim_printf("\nfdccmd: Seek error in write command\n");
                         return SCPE_IOERR;
                     } 
+                    dsk_unit[cur_dsk].u3 |= DRQ;/* set DRQ */
                     wrt_flag = 1;           /* set write flag */
-                    dsk_unit[cur_dsk].u3 |= BUSY | DRQ;/* set DRQ & BUSY */
                     dsk_unit[cur_dsk].pos = 0; /* clear counter */
                 }
                 break;
-            case 0x18:                  /* seek command */
-            case 0x1B:
+            case 0x18:                  //seek command type I
+            case 0x1B:                  //seek command type I
                 dsk_unit[cur_dsk].u4 = fdcbyte; /* set track */
                 dsk_unit[cur_dsk].u3 &= ~(BUSY | DRQ); /* clear flags */
                 sim_debug (DEBUG_flow, &dsk_dev, "\nfdccmd: Seek of disk %d, track %d",
                     cur_dsk, fdcbyte);
                 break;
-            case 0x0B:                  /* restore command */
+            case 0x0B:                  //restore command type I
                 dsk_unit[cur_dsk].u4 = 0;   /* home the drive */
                 dsk_unit[cur_dsk].u3 &= ~(BUSY | DRQ); /* clear flags */
                 sim_debug (DEBUG_flow, &dsk_dev, "\nfdccmd: Drive %d homed", cur_dsk);
                 break;
-            case 0xF0:                  /* write track command */
+            case 0xF0:                  //write track command type III
+            case 0xF4:                  //write track command type III
                 sim_debug (DEBUG_flow, &dsk_dev, "\nfdccmd: Write track command for drive %d",
                     cur_dsk);
                 break;
@@ -499,12 +515,6 @@ int32 fdccmd(int32 io, int32 data)
         sim_debug (DEBUG_flow, &dsk_dev, "\nfdccmd: Exit Drive %d status=%02X",
             cur_dsk, val);
         sim_debug (DEBUG_flow, &dsk_dev, "\n%02X", val); //even this short fails it!
-        if (val1 == 0 && ((val & (BUSY + DRQ)) == (BUSY + DRQ)))   /* delay BUSY going high */
-            val &= ~BUSY;
-        if (val != val1)                /* now allow BUSY after one read */
-            val1 = val;
-        sim_debug (DEBUG_flow, &dsk_dev, "\nfdccmd: Exit Drive %d status=%02X",
-            cur_dsk, val);
     }
     return val;
 }

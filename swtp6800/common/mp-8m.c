@@ -66,12 +66,10 @@ MTAB mp_8m_mod[] = {
 };
 
 DEBTAB mp_8m_debug[] = {
-    { "ALL", DEBUG_all },
-    { "FLOW", DEBUG_flow },
-    { "READ", DEBUG_read },
-    { "WRITE", DEBUG_write },
-    { "LEV1", DEBUG_level1 },
-    { "LEV2", DEBUG_level2 },
+    { "ALL", DEBUG_all, "All debug bits" },
+    { "FLOW", DEBUG_flow, "Flow control" },
+    { "READ", DEBUG_read, "Read Command" },
+    { "WRITE", DEBUG_write, "Write Command"},
     { NULL }
 };
 
@@ -104,7 +102,7 @@ DEVICE mp_8m_dev = {
 
 t_stat mp_8m_reset (DEVICE *dptr)
 {
-    int32 i, j, val;
+    int32 i;
     UNIT *uptr;
 
     sim_debug (DEBUG_flow, &mp_8m_dev, "mp_8m_reset: \n");
@@ -118,15 +116,15 @@ t_stat mp_8m_reset (DEVICE *dptr)
         else
             uptr->u3 = 0x2000 * (i + 1);
         if (uptr->filebuf == NULL) {
-            uptr->filebuf = malloc(0x2000);
+            uptr->filebuf = calloc(0x2000, sizeof(uint8));
             if (uptr->filebuf == NULL) {
-                printf("mp_8m_reset: Malloc error\n");
+                printf("mp_8m_reset: Calloc error\n");
                 return SCPE_MEM;
             }
-            for (j=0; j<8192; j++) {    /* fill pattern for testing */
-                val = (0xA0 |  i);
-                *((uint8 *)(uptr->filebuf) + j) = val & 0xFF;
-            }
+//            for (j=0; j<8192; j++) {    /* fill pattern for testing */
+//                val = (0xA0 |  i);
+//                *((uint8 *)(uptr->filebuf) + j) = val & 0xFF;
+//            }
         }
         sim_debug (DEBUG_flow, &mp_8m_dev, "MP-8M %d initialized at [%04X-%04XH]\n",
             i, uptr->u3, uptr->u3 + uptr->capac - 1);

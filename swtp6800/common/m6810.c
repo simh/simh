@@ -43,6 +43,8 @@
 t_stat m6810_reset (DEVICE *dptr);
 int32 m6810_get_mbyte(int32 offset);
 void m6810_put_mbyte(int32 offset, int32 val);
+t_stat m6810_examine(t_value *eval_array, t_addr addr, UNIT *uptr, int32 switches);
+t_stat m6810_deposit(t_value value, t_addr addr, UNIT *uptr, int32 switches);
 
 /* SIMH RAM Standard I/O Data Structures */
 
@@ -54,12 +56,10 @@ MTAB m6810_mod[] = {
 };
 
 DEBTAB m6810_debug[] = {
-    { "ALL", DEBUG_all },
-    { "FLOW", DEBUG_flow },
-    { "READ", DEBUG_read },
-    { "WRITE", DEBUG_write },
-    { "LEV1", DEBUG_level1 },
-    { "LEV2", DEBUG_level2 },
+    { "ALL", DEBUG_all, "All debug bits" },
+    { "FLOW", DEBUG_flow, "Flow control" },
+    { "READ", DEBUG_read, "Read Command" },
+    { "WRITE", DEBUG_write, "Write Command"},
     { NULL }
 };
 
@@ -74,8 +74,8 @@ DEVICE m6810_dev = {
     1,                              //aincr
     16,                             //dradix
     8,                              //dwidth
-    NULL,                           //examine
-    NULL,                           //deposit
+    &m6810_examine,                 //examine
+    &m6810_deposit,                 //deposit
     &m6810_reset,                   //reset
     NULL,                           //boot
     NULL,                           //attach
@@ -144,3 +144,18 @@ void m6810_put_mbyte(int32 offset, int32 val)
 }
 
 /* end of m6810.c */
+
+t_stat m6810_examine(t_value *eval_array, t_addr addr, UNIT *uptr, int32 switches)
+{
+    int32 i;
+
+    for (i=0; i<sim_emax; ++i)
+        *eval_array++ = m6810_get_mbyte(addr++);
+    return SCPE_OK;
+}
+
+t_stat m6810_deposit(t_value value, t_addr addr, UNIT *uptr, int32 switches)
+{
+    m6810_put_mbyte(addr,value);
+    return SCPE_OK;
+}
