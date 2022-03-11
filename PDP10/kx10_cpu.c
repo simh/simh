@@ -1028,7 +1028,7 @@ t_stat dev_pi(uint32 dev, uint64 *data) {
         res |= ((uint64)(PIR) << 18);
 #endif
 #if !KL
-        res |= (parity_irq << 15);
+        res |= ((uint64)parity_irq << 15);
 #endif
         *data = res;
         sim_debug(DEBUG_CONI, &cpu_dev, "CONI PI %012llo\n", *data);
@@ -4058,7 +4058,7 @@ t_stat dev_apr(uint32 dev, uint64 *data) {
         res |= (((FLAGS & PCHNG) != 0) << 6) | (pcchg_irq << 7) ;
         res |= (clk_flg << 9) | (((uint64)clk_en) << 10) | (nxm_flag << 12);
         res |= (mem_prot << 13) | (((FLAGS & USER) != 0) << 14) | (user_io << 15);
-        res |= (push_ovf << 16);
+        res |= ((uint64)push_ovf << 16);
         *data = res;
         sim_debug(DEBUG_CONI, &cpu_dev, "CONI APR %012llo\n", *data);
         break;

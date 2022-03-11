@@ -1508,6 +1508,8 @@ imp_packet_in(struct imp_device *imp)
                         int     i;
                         char    port_buffer[100];
                         struct udp_hdr     udp_hdr;
+                       if (l > 1500)
+                           l = 1500;
                        /* Count out 4 commas */
                        for (i = nlen = 0; i < l && nlen < 4; i++) {
                           if (tcp_payload[i] == ',')
@@ -2098,6 +2100,8 @@ void imp_packet_debug(struct imp_device *imp, const char *action, ETH_PACK *pack
 
             }
             len = ntohs(ip->ip_len) - ((ip->ip_v_hl & 0xf) * 4 + (ntohs(tcp->flags) >> 12) * 4);
+            if (len > 1500)
+                len = 1500;
             sim_debug(DEBUG_TCP, &imp_dev, "%s %s%s %d byte packet from %s:%s to %s:%s\n", action,
                         flags, *flags ? ":" : "", (int)len, src_ip, src_port, dst_ip, dst_port);
             if (len && (imp_dev.dctrl & DEBUG_TCP))
