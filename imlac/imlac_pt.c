@@ -144,7 +144,7 @@ ptp_iot (uint16 insn, uint16 AC)
   if ((insn & 0771) == 0271) { /* PUN */
     ;
   }
-  if ((insn & 0772) == 0274) { /* PSF */
+  if ((insn & 0774) == 0274) { /* PSF */
     ;
   }
   return SCPE_OK;
