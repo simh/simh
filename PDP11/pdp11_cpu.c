@@ -3675,7 +3675,7 @@ for (i = 0; i < MOD_MAX; i++) {
 
     fprintf (st, "    %-6s  %s   %-7s %-3s   %-3s    %-3s   %-3s   %-3s   %-3s   %-3s\n", 
                      cpu->name, 
-                     (cpu->std & BUS_Q) ? "Q" : "U",
+                     (cpu->std & BUS_U) ? "U" : "Q",
                      (cpu->maxm == MEMSIZE64K) ? "64K" : ((cpu->maxm == MAXMEMSIZE) ? "4M" : ((cpu->maxm == UNIMEMSIZE) ? "256K" : "UNK")),
                      _OPT(OPT_MMU), _OPT(OPT_UBM), _OPT(OPT_EIS), _OPT(OPT_FIS),
                      _OPT(OPT_FPP), _OPT(OPT_CIS), _OPT(OPT_BVT));
