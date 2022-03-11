@@ -2257,7 +2257,7 @@ switch (DK_GET_FMT (uptr)) {                            /* case on format */
             memset (f->CreationTime, 0, sizeof (f->CreationTime));
             strlcpy ((char*)f->CreationTime, ctime (&creation_time), sizeof (f->CreationTime));
             container_size = sim_vhd_disk_size (uptr->fileref);
-            if ((f->SectorCount != 0) && (NtoHl (f->SectorSize) <= 65536)) /* Range check for Coverity sake */
+            if ((f->SectorSize != 0) && (NtoHl (f->SectorSize) <= 65536)) /* Range check for Coverity sake */
                 f->SectorCount = NtoHl ((uint32)(container_size / NtoHl (f->SectorSize)));
             container_size += sizeof (*f);      /* Adjust since it is removed below */
             f->AccessFormat = DKUF_F_VHD;
@@ -6165,7 +6165,7 @@ while (BytesToWrite && (r == SCPE_OK)) {
     if (BlockNumber >= NtoHl(hVHD->Dynamic.MaxTableEntries)) {
         return SCPE_EOF;
         }
-    if (BlockNumber != (Offset + BytesToWrite) / NtoHl (hVHD->Dynamic.BlockSize))
+    if (BlockNumber != (Offset + BytesToWrite) / DynamicBlockSize)
         BytesInWrite = (uint32)(((BlockNumber + 1) * DynamicBlockSize) - Offset);
     if (hVHD->BAT[BlockNumber] == VHD_BAT_FREE_ENTRY) {
         uint8 *BitMap = NULL;
@@ -6528,7 +6528,7 @@ if (info->flag == 0) {
         get_disk_footer (uptr);
         f = ctx->footer;
         if (f) {
-            t_offset highwater_sector = ((((t_offset)NtoHl (f->Highwater[0])) << 32) | ((t_offset)NtoHl (f->Highwater[1]))) / NtoHl(f->SectorSize);
+            t_offset highwater_sector = (f->SectorSize == 0) ? (t_offset)-1 : ((((t_offset)NtoHl (f->Highwater[0])) << 32) | ((t_offset)NtoHl (f->Highwater[1]))) / NtoHl(f->SectorSize);
 
             sim_printf ("Container:              %s\n"
                         "   Simulator:           %s\n"
