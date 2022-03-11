@@ -1940,7 +1940,9 @@ t_stat xq_process_turbo_xbdl(CTLR* xq)
       xq->var->xring[i].tmd2 = XQ_TMD2_RON | XQ_TMD2_TON;
     }
 
-    Map_ReadW (tdra+(uint32)(((char *)(&xq->var->xring[xq->var->tbindx].tmd3))-((char *)&xq->var->xring)), sizeof(xq->var->xring[xq->var->tbindx].tmd3), (uint16 *)&xq->var->xring[xq->var->tbindx].tmd3);
+    status = Map_ReadW (tdra+(uint32)(((char *)(&xq->var->xring[xq->var->tbindx].tmd3))-((char *)&xq->var->xring)), sizeof(xq->var->xring[xq->var->tbindx].tmd3), (uint16 *)&xq->var->xring[xq->var->tbindx].tmd3);
+    if (status != SCPE_OK)
+      return xq_nxm_error(xq);
     if (xq->var->xring[xq->var->tbindx].tmd3 & XQ_TMD3_OWN)
       xq->var->xring[i].tmd2 |= XQ_TMD2_EOR;
 
@@ -2024,7 +2026,7 @@ t_stat xq_process_loopback(CTLR* xq, ETH_PACK* pack)
   ++xq->var->stats.loop;
 
   if (DBG_PCK & xq->dev->dctrl)
-      eth_packet_trace_ex(xq->var->etherface, response.msg, response.len, ((function == 1) ? "xq-loopbackreply" : "xq-loopbackforward"), DBG_DAT & xq->dev->dctrl, DBG_PCK);
+      eth_packet_trace_ex(xq->var->etherface, response.msg, response.len, "xq-loopbackforward", DBG_DAT & xq->dev->dctrl, DBG_PCK);
 
   return status;
 }

@@ -593,7 +593,7 @@ t_stat xu_process_loopback(CTLR* xu, ETH_PACK* pack)
   ++xu->var->stats.loopf;
 
   if (DBG_PCK & xu->dev->dctrl)
-      eth_packet_trace_ex(xu->var->etherface, response.msg, response.len, ((function == 1) ? "xu-loopbackreply" : "xu-loopbackforward"), DBG_DAT & xu->dev->dctrl, DBG_PCK);
+      eth_packet_trace_ex(xu->var->etherface, response.msg, response.len, "xu-loopbackforward", DBG_DAT & xu->dev->dctrl, DBG_PCK);
 
   return status;
 }

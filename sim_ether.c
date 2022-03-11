@@ -3116,6 +3116,9 @@ int write_queue_size = 1;
 /* make sure device exists */
 if ((!dev) || (dev->eth_api == ETH_API_NONE)) return SCPE_UNATT;
 
+if (packet->len > sizeof (packet->msg)) /* packet ovesized? */
+    return SCPE_IERR;                   /* that's no good! */
+
 /* Get a buffer */
 pthread_mutex_lock (&dev->writer_lock);
 if (NULL != (request = dev->write_buffers))
