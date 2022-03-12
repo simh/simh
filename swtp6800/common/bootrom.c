@@ -131,20 +131,21 @@ DEVICE BOOTROM_dev = {
 t_stat BOOTROM_attach (UNIT *uptr, CONST char *cptr)
 {
     t_stat r;
-    t_addr image_size, capac;
+    t_offset image_size;
+    t_addr capac;
     int i;
 
     sim_debug (DEBUG_flow, &BOOTROM_dev, "BOOTROM_attach: cptr=%s\n", cptr);
     if ((r = attach_unit (uptr, cptr)) != SCPE_OK) {
         sim_debug (DEBUG_flow, &BOOTROM_dev, "BOOTROM_attach: Error\n");
-        return r;
+        return sim_messagef (r, "BOOTROM_attach: Failure\n");
     }
     image_size = (t_addr)sim_fsize_ex (BOOTROM_unit.fileref);
     if (image_size <= 0) {
-        sim_printf("BOOTROM_attach: File error\n");
-        return SCPE_IOERR;
-    } 
-    for (capac = 0x200, i=1; capac < image_size; capac <<= 1, i++);
+        detach_unit (uptr);
+        return sim_messagef(SCPE_IOERR,"BOOTROM_attach: File empty\n");
+    }
+    for (capac = 0x200, i=1; capac < (t_addr)image_size; capac <<= 1, i++);
     if (i > (UNIT_2764>>UNIT_V_MSIZE)) {
         detach_unit (uptr);
         return SCPE_ARG;
