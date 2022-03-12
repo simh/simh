@@ -2704,7 +2704,7 @@ if (!version[0]) {
     while (*c && !isdigit (*c))
       ++c;
     get_glyph (c, maj_min, ',');
-    if (strcmp ("0.9990", maj_min) < 0)
+    if (strcmp ("0.9990", maj_min) > 0)
       snprintf(version, sizeof(version), "Unsupported - %s", pcap_lib_version());
     }
   }
