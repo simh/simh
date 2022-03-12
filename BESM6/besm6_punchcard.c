@@ -355,7 +355,7 @@ void pi_control (int num, uint32 cmd)
     cmd &= 011;
     if (! IS_RDY2(pi_ready_mask[num])) {
         if (pi_dev.dctrl)
-            besm6_debug("<<< PI-%d not ready", num, cmd);
+            besm6_debug("<<< PI-%d not ready", num);
         return;
     }
     switch (cmd) {

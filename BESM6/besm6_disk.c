@@ -222,9 +222,15 @@ t_stat disk_set_type (UNIT *up, int32 v, CONST char *cp, void *dp) {
     return SCPE_OK;
 }
 
+t_stat disk_show_type (FILE *f, UNIT *up, int32 v, CONST void *dp) {
+    fprintf(f, IS_29MB(up) ? "EC-5061" : "EC-5052");
+    return SCPE_OK;
+}
+
 
 MTAB disk_mod[] = {
-    { MTAB_VDV, DISK_TYPE_7_25M, NULL, "EC-5052", &disk_set_type, NULL, NULL, "EC-5052 drive (7.25 Mb)"},
+    { MTAB_VDV, DISK_TYPE_7_25M, "", "EC-5052", &disk_set_type, &disk_show_type, NULL,
+      "EC-5052 drive (7.25 Mb)"},
     { MTAB_VDV, DISK_TYPE_29M, NULL, "EC-5061", &disk_set_type, NULL, NULL, "EC-5061 drive (29 Mb)"},
     { MTAB_XTD | MTAB_VDV | MTAB_VALR, 1, NULL,
       "SYSLOG", &disk_setsyslog, NULL, NULL, "file name (always appending) or OFF" },
@@ -543,7 +549,7 @@ void disk_format (UNIT *u)
                          (int) (fmtbuf[2] >> 14 & BITS(30)));
         else
             besm6_debug ("::: формат МД %02o полузона %04o.%d память %05o skip %02o и-а-кса %010o %010o",
-                         c->dev, c->zone, c->track, c->memory, ptr - memory -c ->memory,
+                         c->dev, c->zone, c->track, c->memory, (uint32) (ptr - memory -c ->memory),
                          (int) (fmtbuf[0] >> 8 & BITS(30)),
                          (int) (fmtbuf[2] >> 14 & BITS(30)));
 }
@@ -694,7 +700,7 @@ void disk_io (int ctlr, uint32 cmd)
         c->memory = (cmd & (DISK_PAGE | DISK_HALFPAGE)) >> 2 | (cmd & DISK_BLOCK) >> 8;
     }
     if (md_dev[ctlr * 4].dctrl & DEB_RWR)
-        besm6_debug ("::: КМД %c: задание на %s %016llo RAM @%05o", ctlr + '3',
+        besm6_debug ("::: КМД %c: задание на %s %08o RAM @%05o", ctlr + '3',
                      (c->op & DISK_READ) ? "чтение" : "запись", cmd, c->memory);
     disk_fail &= ~c->mask_fail;
 
@@ -708,7 +714,7 @@ void disk_io (int ctlr, uint32 cmd)
 void disk_ctl (int ctlr, uint32 cmd)
 {
     KMD *c = &controller [ctlr];
-    UNIT *u = &md_unit [c->dev];
+    UNIT *u = c->dev < 0 ? &md_unit[0] : &md_unit [c->dev];
 
     if ((md_dev[ctlr].dctrl & DEB_OPS || c->dev != -1 && u->dptr->dctrl & DEB_OPS) && cmd & BBIT(13)) {
         besm6_debug ("::: КМД %c: bit 13 + %04o",
@@ -893,7 +899,7 @@ void disk_ctl (int ctlr, uint32 cmd)
             break;
         case 031: /* опрос 13÷24 разрядов РС */
             c->status = 0;
-            if (md_unit[c->dev].flags & UNIT_DISABLE)
+            if (c->dev < 0 || md_unit[c->dev].flags & UNIT_DISABLE)
                 c->status |= STATUS_ABSENT;
             else if (md_unit[c->dev].flags & UNIT_ATT)
                 c->status |= STATUS_POWERUP;
