@@ -1306,7 +1306,7 @@ t_stat dev_mtr(uint32 dev, uint64 *data) {
         *data = mtr_irq;
         if (mtr_enable)
             *data |= 02000;
-        *data |= (uint64)(mtr_flags << 12);
+        *data |= (uint64)mtr_flags << 12;
         sim_debug(DEBUG_CONI, &cpu_dev, "CONI MTR %012llo\n", *data);
         break;
 
@@ -4474,23 +4474,18 @@ no_fetch:
     if (QKLB && t20_page) {
         if (xct_flag != 0) {
             if (((xct_flag & 8) != 0 && !ptr_flg) ||
-                ((xct_flag & 2) != 0 && ptr_flg)
-/* The following two lines are needed for Tops20 V3 */
-#if 1
-                || ((xct_flag & 014) == 04 && !ptr_flg && prev_sect == 0) ||
-                ((xct_flag & 03)  == 01 && ptr_flg  && prev_sect == 0)
-#endif
-            )
+                ((xct_flag & 2) != 0 && ptr_flg))
             sect = cur_sect = prev_sect;
-        }
-        /* Short cut for extended pointer address */
-        if (ptr_flg && (glb_sect || cur_sect != 0) && (AR & BIT12) != 0) { /* Full pointer */
-            ind = 1;  /* Allow us to read word, xDB has already bumped AB */
-            goto in_loop;
+#if 0
+         /* The following lines are needed to run Tops 20 V3 on KL/B */
+         if (((xct_flag & 014) == 04 && !ptr_flg && prev_sect == 0)
+             || ((xct_flag & 03)  == 01 && ptr_flg  && prev_sect == 0))
+             sect = cur_sect = prev_sect;
+#endif
         }
     }
-
 #endif
+
     /* Handle indirection repeat until no longer indirect */
     do {
         ind = TST_IND(MB) != 0;
@@ -4539,7 +4534,7 @@ in_loop:
                  if (MB & SMASK || cur_sect == 0) {    /* Instruction format IFIW */
                      if (MB & BIT1 && cur_sect != 0) { /* Illegal index word */
                          fault_data = 024LL << 30 | (((FLAGS & USER) != 0)?SMASK:0) |
-                                      (MB & RMASK) | ((uint64)cur_sect << 18);
+                                      BIT8 | (AB & RMASK) | ((uint64)cur_sect << 18);
                          page_fault = 1;
                          goto last;
                      }
@@ -4581,9 +4576,10 @@ in_loop:
                          else
                             AR = get_reg(ix);
                          if ((AR & SMASK) != 0 || (AR & SECTM) == 0) { /* Local index word */
-                              AR = AB + (((AR & RSIGN) ? 0: 0)|(AR & RMASK));
+                              AR = AB + (AR & RMASK);
                          } else
-                              AR = AR + AB;
+                              AR = (AR & ~(SECTM|RMASK)) |
+                                     ((AR + AB) & (SECTM|RMASK));
                          AR &= FMASK;
                          MB = AR;
                      } else
@@ -5787,8 +5783,12 @@ dpnorm:
                   goto last;
               AR = MB;
               AB = (AB + 1) & RMASK;
+#if KI
+              FLAGS |= BYTI;
+#endif
               if (Mem_read(0, 0, 0, 0))
                    goto last;
+              FLAGS &= ~BYTI;
               MQ = MB;
               set_reg(AC, AR);
               set_reg(AC+1, MQ);
@@ -5799,8 +5799,12 @@ dpnorm:
                   goto last;
               AR = MB;
               AB = (AB + 1) & RMASK;
+#if KI
+              FLAGS |= BYTI;
+#endif
               if (Mem_read(0, 0, 0, 0))
                    goto last;
+              FLAGS &= ~BYTI;
               MQ = CCM(MB) + 1;   /* Low */
               /* High */
 #if KL | KS
@@ -5878,6 +5882,9 @@ dpnorm:
               if ((FLAGS & BYTI)) {
                   AB = (AB + 1) & RMASK;
                   MB = MQ;
+#if KL
+                  FLAGS &= ~BYTI;
+#endif
                   if (Mem_write(0, 0))
                      goto last;
                   FLAGS &= ~BYTI;
@@ -6404,6 +6411,14 @@ unasign:
                           if (Mem_write(0,0))
                               goto last;
                           AB = (AB - 1) & RMASK;
+                          AR &= PMASK;
+                          AR |= (uint64)(SCAD & 077) << 30;
+                          MB = AR;
+                          if (Mem_write(0, 0))
+                              goto last;
+                          if ((IR & 04) == 0)
+                              break;
+                          goto ldb_ptr;
                       } else
                           AR = (AR & LMASK) | ((AR + 1) & RMASK);
 #elif KI | KS
@@ -6475,10 +6490,11 @@ ldb_ptr:
 #endif
 #if KL
                   if (QKLB && t20_page && (SC < 36) &&
-                       pc_sect != 0 && (glb_sect || cur_sect != 0) &&
-                       (AR & BIT12) != 0) {
+                       pc_sect != 0 && (AR & BIT12) != 0) {
                       /* Full pointer */
                       AB = (AB + 1) & RMASK;
+                      ind = 1;
+                      goto in_loop;
                   } else
                       glb_sect = 0;
 #endif
@@ -12222,7 +12238,7 @@ do_byte_setup(int n, int wr, int *pos, int *sz)
        temp = MB = (MB + temp) & FMASK;
        AB = MB & RMASK;
     }
-    while (ind && pi_pending && !check_irq_level()) {
+    if (ind) {
          if (Mem_read(0, 1, 0, 0)) {
              return 1;
          }
@@ -12262,7 +12278,7 @@ do_byte_setup(int n, int wr, int *pos, int *sz)
                  if (ix) {
                      temp = get_reg(ix);
                      if ((temp & SMASK) != 0 || (temp & SECTM) == 0) { /* Local index word */
-                          temp = AB + (((temp & RSIGN) ? 0: 0)|(temp & RMASK));
+                          temp = AB + (temp & RMASK);
                      } else
                           temp = temp + AB;
                      temp &= FMASK;
@@ -12307,10 +12323,13 @@ do_byte_setup(int n, int wr, int *pos, int *sz)
     set_reg(n+2, val2);
 
     /* Read final value */
+    ptr_flg = 1;
+    BYF5 = wr;
     if (Mem_read(0, 0, 0, wr)) {
         ptr_flg = BYF5 = 0;
         return 1;
     }
+    ptr_flg = BYF5 = 0;
     return 0;
 }
 
@@ -12329,11 +12348,9 @@ load_byte(int n, uint64 *data, uint64 fill, int cnt)
     }
 
     /* Fetch Pointer word */
-    ptr_flg = 1;
     if (do_byte_setup(n, 0, &p, &s))
         goto back;
 
-ptr_flg = 0;
     /* Generate mask for given size */
     msk = (uint64)(1) << s;
     msk--;
@@ -12348,7 +12365,6 @@ ptr_flg = 0;
     return 1;
 
 back:
-ptr_flg = 0;
     val1 = get_reg(n+1);
     val1 &= PMASK;
     val1 |= (uint64)(p + s) << 30;
@@ -12364,7 +12380,6 @@ store_byte(int n, uint64 data, int cnt)
     int       s, p;
 
     /* Fetch Pointer word */
-    BYF5 = 1;
     if (do_byte_setup(n, 1, &p, &s))
         goto back;
 
@@ -12374,10 +12389,11 @@ store_byte(int n, uint64 data, int cnt)
     msk <<= p;
     MB &= CM(msk);
     MB |= msk & ((uint64)(data) << p);
+    ptr_flg = BYF5 = 1;
     if (Mem_write(0, 0))
         goto back;
 
-    BYF5 = 0;
+    ptr_flg = BYF5 = 0;
     if (cnt) {
        /* Decrement count */
        val1 = get_reg(n);
@@ -12388,7 +12404,7 @@ store_byte(int n, uint64 data, int cnt)
     return 1;
 
 back:
-    BYF5 = 0;
+    ptr_flg = BYF5 = 0;
     val1 = get_reg(n+1);
     val1 &= PMASK;
     val1 |= (uint64)(p + s) << 30;
