@@ -952,10 +952,6 @@ t_stat reason;
 
 sim_switches |= SWMASK ('A');                           /* position to EOF */
 reason = attach_unit (uptr, cptr);                      /* attach file */
-if (reason == SCPE_OK) {
-    sim_fseek (uptr->fileref, 0, SEEK_END);
-    uptr->pos = (t_addr)sim_ftell (uptr->fileref);
-    }
 if (lpcsa & CSA_DVON) {
     int i;
     for (i = 0; i < dvlnt; i++) {                       /* Align VFU with new file */
