@@ -443,6 +443,9 @@ switch (st) {
 
     case MTSE_WRP:                                      /* write protect */
         return STOP_MTL;
+
+    default:                                            /* shouldn't happen */
+        return SCPE_IERR;
         }
 
 return SCPE_OK;

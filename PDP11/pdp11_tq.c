@@ -1585,6 +1585,9 @@ switch (st) {
 
     case MTSE_LEOT:
         return ST_LED;
+
+    default:                                            /* shouldn't happen */
+        return SCPE_IERR;
         }
 
 return ST_SUC;

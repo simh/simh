@@ -500,6 +500,9 @@ switch (st) {
     case MTSE_WRP:                                      /* write protect */
         msgxs0 = msgxs0 | XS0_WLE | XS0_NEF;            /* can't execute */
         return (XTC (XS0_WLE | XS0_NEF, TC3));
+
+    default:                                            /* shouldn't happen */
+        return SCPE_IERR;
         }
 
 return 0;

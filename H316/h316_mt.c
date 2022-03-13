@@ -551,6 +551,9 @@ switch (st) {
     case MTSE_WRP:                                      /* write protect */
         mt_err = 1;                                     /* error */
         return STOP_MTWRP;
+
+    default:                                            /* shouldn't happen */
+        return SCPE_IERR;
         }
 
 return SCPE_OK;

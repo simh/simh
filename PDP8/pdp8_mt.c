@@ -590,6 +590,9 @@ switch (st) {
     case MTSE_WRP:                                      /* write protect */
         mt_sta = mt_sta | STA_ILL | STA_ERR;            /* illegal operation */
         break;
+
+    default:                                            /* shouldn't happen */
+        return SCPE_IERR;
         }
 
 return SCPE_OK;

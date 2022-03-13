@@ -454,6 +454,9 @@ switch (st) {
     case MTSE_BOT:                                      /* reverse into BOT */
         uptr->UST = uptr->UST | STA_EOT;                /* set err */
         break;
+
+    default:                                            /* shouldn't happen */
+        return SCPE_IERR;
         }                                               /* end switch */
 
 return SCPE_OK;

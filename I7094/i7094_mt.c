@@ -797,6 +797,9 @@ switch (st) {
 
     case MTSE_OK:                                       /* no error */
         break;
+
+    default:                                            /* shouldn't happen */
+        return SCPE_IERR;
         }
 
 return SCPE_OK;

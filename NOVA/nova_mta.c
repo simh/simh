@@ -552,6 +552,9 @@ switch (st) {
         mta_upddsta (uptr, uptr->USTAT | STA_WLK | STA_RDY);
         mta_sta = mta_sta | STA_ILL;                    /* illegal operation */
         break;
+
+    default:                                            /* shouldn't happen */
+        return SCPE_IERR;
         }
 
 return SCPE_OK;
