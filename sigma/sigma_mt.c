@@ -508,6 +508,9 @@ switch (st) {
         uptr->UST |= MTDV_BOT;                          /* set BOT */
         chan_uen (mt_dib.dva);                          /* uend */
         return CHS_INACTV;
+
+    default:                                            /* shouldn't happen */
+        return SCPE_IERR;
         }                                               /* end switch */
 
 return SCPE_OK;
