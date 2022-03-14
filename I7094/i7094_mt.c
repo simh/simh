@@ -64,11 +64,6 @@ static const uint8 odd_par[64] = {
     0, 1, 1, 0, 1, 0, 0, 1
     };
 
-static const char *tape_stat[] = {
-    "OK", "TMK", "UNATT", "IOERR", "INVRECLNT",
-    "FMT", "BOT", "EOM", "RECERR", "WRPROT"
-    };
-
 extern uint32 PC;
 extern uint32 cpu_model;
 extern uint32 ind_ioc;
@@ -756,7 +751,7 @@ uint32 up = uptr - mt_dev[ch].units;
 
 if ((st != MTSE_OK) && DEBUG_PRS (mt_dev[ch]))
     fprintf (sim_deb, ">>%s%d status = %s, pos = %d\n",
-             mt_dev[ch].name, up, tape_stat[st], uptr->pos);
+             mt_dev[ch].name, up, sim_tape_error_text (st), uptr->pos);
 
 switch (st) {
 
