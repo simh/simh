@@ -12849,7 +12849,7 @@ if (spc < SIM_BKPT_N_SPC) {
 const char *sim_brk_message(void)
 {
 static char msg[256];
-char addr[MAX_WIDTH];
+char addr[MAX_WIDTH + 1];
 char buf[32];
 
 msg[0] = '\0';
@@ -13773,7 +13773,7 @@ static const char *sim_debug_prefix (uint32 dbits, DEVICE* dptr, UNIT* uptr)
 const char* debug_type = _get_dbg_verb (dbits, dptr, uptr);
 char tim_t[32] = "";
 char tim_a[32] = "";
-char pc_s[MAX_WIDTH] = "";
+char pc_s[MAX_WIDTH + 1] = "";
 struct timespec time_now;
 
 if (sim_deb_switches & (SWMASK ('T') | SWMASK ('R') | SWMASK ('A'))) {
