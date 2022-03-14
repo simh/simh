@@ -86,6 +86,7 @@
    sim_tape_show_capac  show tape capacity
    sim_tape_set_dens    set tape density
    sim_tape_show_dens   show tape density
+   sim_tape_error_text  the textual description of a tape status
    sim_tape_set_async   enable asynchronous operation
    sim_tape_clr_async   disable asynchronous operation
    aim_tape_test        unit test routine
@@ -3442,7 +3443,6 @@ free (recbuf);
 return objc;
 }
 
-static 
 const char *sim_tape_error_text (t_stat stat)
 {
 const char *mtse_errors[] = {
