@@ -428,7 +428,12 @@ static uint8 HDC1001_Write(const uint32 Addr, uint8 cData)
         sim_debug(VERBOSE_MSG, &hdc1001_dev,DEV_NAME ": " ADDRESS_FORMAT
             " WR TF[DATA 0x%03x]=0x%02x\n", PCX, hdc1001_info->secbuf_index, cData);
         hdc1001_info->secbuf_index++;
-        if (hdc1001_info->secbuf_index == (pDrive->xfr_nsects * pDrive->sectsize)) HDC1001_doCommand();
+        if (hdc1001_info->secbuf_index == (pDrive->xfr_nsects * pDrive->sectsize)) {
+            if (SCPE_OK != HDC1001_doCommand()) {
+                sim_debug(ERROR_MSG, &hdc1001_dev,DEV_NAME ": " ADDRESS_FORMAT
+                    " HDC1001_doCommand() failed.\n", PCX);
+            }
+        }
         break;
         case TF_SDH:
             hdc1001_info->sel_drive = (cData >> 3) & 0x03;
@@ -489,7 +494,10 @@ static uint8 HDC1001_Write(const uint32 Addr, uint8 cData)
 
             /* Everything except Write commands are executed immediately. */
             if (cmd != HDC1001_CMD_WRITE_SECT) {
-                HDC1001_doCommand();
+                if (SCPE_OK != HDC1001_doCommand()) {
+                    sim_debug(ERROR_MSG, &hdc1001_dev,DEV_NAME ": " ADDRESS_FORMAT
+                        " HDC1001_doCommand() failed.\n", PCX);
+                }
             }
             else {
                 /* Writes will be executed once the proper number of bytes
