@@ -423,9 +423,9 @@ if (ferror (cdr_unit.fileref)) {                        /* error? */
     }
 cdr_unit.pos = ftell (cdr_unit.fileref);                /* update position */
 if (ssa) {                                              /* if last cd on */
-    getc (cdr_unit.fileref);                            /* see if more */
-    if (feof (cdr_unit.fileref))                        /* eof? set flag */
-        ind[IN_LST] = 1;
+    if (getc (cdr_unit.fileref) == EOF)                 /* eof? */
+        ind[IN_LST] = 1;                                /* set flag */
+    clearerr (cdr_unit.fileref);
     fseek (cdr_unit.fileref, cdr_unit.pos, SEEK_SET);
     }
 return SCPE_OK;

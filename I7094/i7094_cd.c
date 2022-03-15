@@ -201,7 +201,7 @@ return SCPE_OK;
 t_stat cdr_svc (UNIT *uptr)
 {
 uint32 i, col, row, bufw, colbin;
-char cdr_cbuf[(2 * CD_CHRLNT) + 2];
+char cdr_cbuf[(2 * CD_CHRLNT) + 2 + 1];
 t_uint64 dat = 0;
 
 if ((uptr->flags & UNIT_ATT) == 0)                      /* not attached? */
