@@ -372,7 +372,7 @@ if ((i = strlen (cdr_buf)) > 0) {                       /* anything at all? */
     }
 cdr_unit.pos = ftell (cdr_unit.fileref);                /* update position */
 if (getc (cdr_unit.fileref) == EOF)                     /* eof? */
-    ind[IN_LST] = 1;                                    /* set flag */
+    ind[IN_LAST] = 1;                                   /* set flag */
 clearerr (cdr_unit.fileref);
 fseek (cdr_unit.fileref, cdr_unit.pos, SEEK_SET);       /* "backspace" */
 return SCPE_OK;
