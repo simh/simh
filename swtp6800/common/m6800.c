@@ -1464,6 +1464,7 @@ t_stat sim_instr (void)
                 break;
             case 0xD2:                  /* SBC B dir */
                 lo = get_dir_val() + get_flag(CF);
+                op1 = B;
                 B = B - lo;
                 COND_SET_FLAG_C(B);
                 B &= 0xFF;
