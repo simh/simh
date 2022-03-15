@@ -395,7 +395,7 @@ void hi_poll_rx (uint16 line)
   // a packet is waiting AND a receive is pending then we'll store it and finish
   // the receive operation.  If a packet is waiting but no receive is pending
   // then the packet is discarded...
-  uint16 next, last, maxbuf;  uint16 *pdata;  int16 count;
+  uint16 next, last, maxbuf;  uint16 *pdata;  int16 count=0;
   uint16 i;
 
   // If the modem isn't attached, then the read never completes!
@@ -566,7 +566,6 @@ int32 hi_io (uint16 host, int32 inst, int32 fnc, int32 dat, int32 dev)
         // HnEOM - skip on end of message ...
         sim_debug(IMP_DBG_IOT, PDEVICE(host), "skip on end of message (PC=%06o %s)\n", PC-1, PHIDB(host)->eom ? "SKIP" : "NOSKIP");
         return  PHIDB(host)->eom ? IOSKIP(dat) : dat;
-        return dat;
       case 005:
         // HnFULL - skip on host buffer full ...
         sim_printf("HnFULL unimp.\n");
