@@ -324,8 +324,8 @@ dibp->dptr = dptr;                                      /* save back pointer */
 if (dibp->vnum > VEC_DEVMAX)
     return SCPE_IERR;
 vec = dibp->vec;
-ilvl = dibp->vloc / 32;
 #if (VEC_SET != 0)
+ilvl = dibp->vloc / 32;
 ibit = dibp->vloc % 32;
 if (vec)
     vec |= (int_vec_set[ilvl][ibit] & ~3);
@@ -346,8 +346,8 @@ if (vec && !(sim_switches & SWMASK ('P'))) {
             continue;
             }
         cdvec = cdibp->vec;
-        ilvl = cdibp->vloc / 32;
 #if (VEC_SET != 0)
+        ilvl = cdibp->vloc / 32;
         ibit = cdibp->vloc % 32;
         if (cdvec)
             cdvec |= (int_vec_set[ilvl][ibit] & ~3);
