@@ -243,7 +243,8 @@ void hi_get_dmc (uint16 dmc, uint16 *pnext, uint16 *plast, uint16 *pcount)
 {
   uint16 dmcad;
   if ((dmc<DMC1) || (dmc>(DMC1+DMC_MAX-1))) {
-    *pnext = *plast = *pcount = 0;  return;
+    *pnext = *plast = *pcount = 0;
+    return;
   }
   dmcad = DMC_BASE + (dmc-DMC1)*2;
   *pnext = M[dmcad] & X_AMASK;  *plast = M[dmcad+1] & X_AMASK;
@@ -514,16 +515,17 @@ int32 hi_io (uint16 host, int32 inst, int32 fnc, int32 dat, int32 dev)
       case 000:
         // HnROUT - start regular host output ...
         hi_debug_hio(host, PDIB(host)->txdmc, "output");
-        hi_start_tx(host, 0);  return dat;
+        hi_start_tx(host, 0);
+        return dat;
       case 001:
         // HnIN - start host input ...
         hi_debug_hio(host, PDIB(host)->rxdmc, "input");
-        hi_start_rx(host);  return dat;
+        hi_start_rx(host);
         return dat;
       case 002:
         // HnFOUT - start final host output ...
         sim_debug(IMP_DBG_IOT, PDEVICE(host), "start final output (PC=%06o)\n", PC-1);
-        hi_start_tx(host, PFLG_FINAL);  return dat;
+        hi_start_tx(host, PFLG_FINAL);
         return dat;
       case 003:
         // HnXP - cross patch ...
