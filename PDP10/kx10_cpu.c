@@ -2934,7 +2934,8 @@ int Mem_read_byte(int n, uint16 *data, int byte) {
            need -= 16;
         else
            need -= 8;
-        *data |= val << need;
+        if (need >= 0)
+           *data |= val << need;
     }
     return s;
 }
