@@ -1055,6 +1055,7 @@ t_stat sim_instr (void)
                 break;
             case 0x92:                  /* SBC A dir */
                 lo = get_dir_val() + get_flag(CF);
+                op1 = A;
                 A = A - lo;
                 COND_SET_FLAG_C(A);
                 A &= 0xFF;
@@ -1159,6 +1160,7 @@ t_stat sim_instr (void)
                 break;
             case 0xA2:                  /* SBC A ind */
                 lo = get_indir_val() + get_flag(CF);
+                op1 = A;
                 A = A - lo;
                 COND_SET_FLAG_C(A);
                 A &= 0xFF;
@@ -1412,6 +1414,7 @@ t_stat sim_instr (void)
                 break;
             case 0xC9:                  /* ADC B imm */
                 lo = fetch_byte() & 0xFF + get_flag(CF);
+                op1 = B;
                 B = B + lo;
                 COND_SET_FLAG_C(B);
                 B &= 0xFF;
@@ -1662,6 +1665,7 @@ t_stat sim_instr (void)
                 break;
             case 0xF2:                  /* SBC B ext */
                 lo = get_ext_val() + get_flag(CF);
+                op1 = B;
                 B = B - lo;
                 COND_SET_FLAG_C(B);
                 B &= 0xFF;
