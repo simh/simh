@@ -889,7 +889,7 @@ void disk_ctl (int ctlr, uint32 cmd)
             break;
         case 011: /* опрос 1÷12 разрядов PC */
             c->status = 0;
-            if (md_unit[c->dev].flags & UNIT_ATT)
+            if (c->dev != -1 && md_unit[c->dev].flags & UNIT_ATT)
                 c->status = STATUS_READY;
 #if 1
             if (u->dptr->dctrl & DEB_STA)
