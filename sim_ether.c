@@ -407,7 +407,7 @@ t_stat eth_mac_scan_ex (ETH_MAC* mac, const char* strmac, UNIT *uptr)
   ETH_MAC newmac;
   struct {
       uint32 bits;
-      char system_id[37];
+      char system_id[64];
       char cwd[PATH_MAX];
       char file[PATH_MAX];
       ETH_MAC base_mac;
