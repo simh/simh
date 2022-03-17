@@ -2526,6 +2526,7 @@ if (sim_switches & SWMASK ('C')) {                      /* create new disk conta
     source_capac = uptr->capac;
     sim_messagef (SCPE_OK, "%s: Creating new %s '%s' disk container copied from '%s'\n", sim_uname (uptr), dest_fmt, gbuf, cptr);
     capac_factor = ((dptr->dwidth / dptr->aincr) >= 32) ? 8 : ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* capacity units (quadword: 8, word: 2, byte: 1) */
+    uptr->capac = target_capac;
     if (strcmp ("VHD", dest_fmt) == 0)
         dest = sim_vhd_disk_create (gbuf, ((t_offset)uptr->capac)*capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1));
     else
