@@ -791,7 +791,7 @@ static void ha_cmd(uint8 op, uint8 subdev, uint32 addr, int32 len, t_bool expres
     int32 i, block;
     UNIT *uptr;
     SCSI_DEV *dev;
-    uint8 target;
+    int8 target;
 
     /* Immediately cancel any pending IRQs */
     sim_cancel(cio_unit);
@@ -844,6 +844,7 @@ static void ha_cmd(uint8 op, uint8 subdev, uint32 addr, int32 len, t_bool expres
         cio[ha_state.cid].sysgen_s = 0;
         ha_state.reply.status = CIO_SUCCESS;
         sim_activate_abs(cio_unit, 1200);
+        break;
     case CIO_DSD:
         sim_debug(HA_TRACE, &ha_dev,
                   "[ha_cmd] SCSI DSD - %d CONFIGURED DEVICES (writing to addr %08x).\n",
@@ -1372,7 +1373,7 @@ static void dump_edt()
 
     uint32 offset;
 
-    char name[10];
+    char name[11];
 
     sim_debug(HA_TRACE, &ha_dev,
               "[EDT]  Sanity: %08x\n",
