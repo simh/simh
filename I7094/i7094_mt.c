@@ -550,8 +550,6 @@ t_uint64 dat;
 t_mtrlnt bc;
 t_stat r;
 
-if (xb == NULL)                                         /* valid buffer? */
-    return SCPE_IERR;
 u = uptr - mt_dev[ch].units;
 switch (uptr->UST) {                                    /* case on state */
 
@@ -729,8 +727,6 @@ uint8 *xb = mtxb[ch];
 t_stat r;
 
 if (mt_bptr[ch]) {                                      /* any data? */
-    if (xb == NULL)
-        return SCPE_IERR;
     r = sim_tape_wrrecf (uptr, xb, mt_bptr[ch]);        /* write record */
     if ((r = mt_map_err (uptr, r)))                     /* map error */
         return r;
