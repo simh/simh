@@ -155,7 +155,7 @@ if ((size == 0) || (count == 0))                        /* check arguments */
 c = fread (bptr, size, count, fptr);                    /* read buffer */
 if (sim_end || (size == sizeof (char)) || (c == 0))     /* le, byte, or err? */
     return c;                                           /* done */
-sim_buf_swap_data (bptr, size, count);
+sim_buf_swap_data (bptr, size, c);
 return c;
 }
 
