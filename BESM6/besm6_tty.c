@@ -1058,8 +1058,9 @@ int vt_getc (int num)
     TMLN *t = &tty_line [num];
     extern int32 sim_int_char;
     int c;
+#ifdef REMOTE_TIMEOUT
     time_t now;
-
+#endif
     if (! t->conn) {
         /* Пользователь отключился. */
         if (t->ipad) {

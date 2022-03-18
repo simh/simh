@@ -903,7 +903,7 @@ void disk_ctl (int ctlr, uint32 cmd)
                 c->status |= STATUS_ABSENT;
             else if (md_unit[c->dev].flags & UNIT_ATT)
                 c->status |= STATUS_POWERUP;
-            if (md_unit[c->dev].flags & UNIT_RO)
+            if (c->dev != -1 && md_unit[c->dev].flags & UNIT_RO)
                 c->status |= STATUS_READONLY;
             c->status >>= 12;
 #if 1
