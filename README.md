@@ -238,7 +238,7 @@ Host platforms which have libSDL2 available can leverage this functionality.
     RAW Disk Access (including CDROM)
     Virtual Disk Container files, including differencing disks
     File System type detection to accurately autosize disks.
-    Recognized file systems are: DEC ODS1, DEC ODS2, DEC RT11, DEC RSTS, DEC RSX11, Ultrix Partitions
+    Recognized file systems are: DEC ODS1, DEC ODS2, DEC RT11, DEC RSTS, DEC RSX11, Ultrix Partitions, ISO 9660
 
 #### Tape Extensions
     AWS format tape support

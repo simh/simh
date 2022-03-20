@@ -361,7 +361,7 @@ static t_stat sim_os_disk_write (UNIT *uptr, t_offset addr, uint8 *buf, uint32 *
 static t_stat sim_os_disk_info_raw (FILE *f, uint32 *sector_size, uint32 *removable, uint32 *is_cdrom);
 static char *HostPathToVhdPath (const char *szHostPath, char *szVhdPath, size_t VhdPathSize);
 static char *VhdPathToHostPath (const char *szVhdPath, char *szHostPath, size_t HostPathSize);
-static t_offset get_filesystem_size (UNIT *uptr);
+static t_offset get_filesystem_size (UNIT *uptr, t_bool *readonly);
 
 struct sim_disk_fmt {
     const char          *name;                          /* name */
@@ -566,7 +566,7 @@ if ((uptr->flags & UNIT_ATT) == 0)
     return (t_offset)-1;
 physical_size = ctx->container_size;
 sim_quiet = TRUE;
-filesystem_size = get_filesystem_size (uptr);
+filesystem_size = get_filesystem_size (uptr, NULL);
 sim_quiet = saved_quiet;
 if ((filesystem_size == (t_offset)-1) ||
     (filesystem_size < physical_size))
@@ -1254,7 +1254,7 @@ ODSChecksum (void *Buffer, uint16 WordCount)
     }
 
 
-static t_offset get_ods2_filesystem_size (UNIT *uptr, uint32 physsectsz)
+static t_offset get_ods2_filesystem_size (UNIT *uptr, uint32 physsectsz, t_bool *readonly)
 {
 DEVICE *dptr;
 t_addr saved_capac;
@@ -1335,10 +1335,12 @@ ret_val = ((t_offset)Scb.scb_l_volsize) * 512;
 
 Return_Cleanup:
 uptr->capac = saved_capac;
+if (readonly)
+    *readonly = sim_disk_wrp (uptr);
 return ret_val;
 }
 
-static t_offset get_ods1_filesystem_size (UNIT *uptr, uint32 physsectsz)
+static t_offset get_ods1_filesystem_size (UNIT *uptr, uint32 physsectsz, t_bool *readonly)
 {
 DEVICE *dptr;
 t_addr saved_capac;
@@ -1394,6 +1396,8 @@ sim_messagef (SCPE_OK, "%s: Volume Name: %12.12s Format: %12.12s Sectors In Volu
                                 sim_uname (uptr), Home.hm1_t_volname, Home.hm1_t_format, (uint32)(ret_val / 512));
 Return_Cleanup:
 uptr->capac = saved_capac;
+if (readonly)
+    *readonly = sim_disk_wrp (uptr);
 return ret_val;
 }
 
@@ -1409,7 +1413,7 @@ typedef struct ultrix_disklabel {
 #define PT_MAGIC        0x032957        /* Partition magic number */
 #define PT_VALID        1               /* Indicates if struct is valid */
 
-static t_offset get_ultrix_filesystem_size (UNIT *uptr, uint32 physsectsz)
+static t_offset get_ultrix_filesystem_size (UNIT *uptr, uint32 physsectsz, t_bool *readonly)
 {
 DEVICE *dptr;
 t_addr saved_capac;
@@ -1447,6 +1451,106 @@ ret_val = ((t_offset)max_lbn) * 512;
 
 Return_Cleanup:
 uptr->capac = saved_capac;
+if (readonly)
+    *readonly = sim_disk_wrp (uptr);
+return ret_val;
+}
+
+
+/* ISO 9660 Volume Recognizer - Structure Info gathered from: https://wiki.osdev.org/ISO_9660 */
+
+typedef struct ISO_9660_Volume_Descriptor {
+    uint8   Type;                       // Volume Descriptor type code (0, 1, 2, 3 and 255)
+    uint8   Identifier[5];              // Always 'CD001'.
+    uint8   Version;                    // Volume Descriptor Version (0x01).
+    uint8   Data[2041];                 // Depends on the volume descriptor type.
+    } ISO_9660_Volume_Descriptor;
+
+typedef struct ISO_9660_Primary_Volume_Descriptor {
+    uint8   Type;                       // Always 0x01 for a Primary Volume Descriptor.
+    uint8   Identifier[5];              // Always 'CD001'.
+    uint8   Version;                    // Always 0x01.
+    uint8   Unused;                     // Always 0x00.
+    uint8   SystemIdentifier[32];       // The name of the system that can act upon sectors 0x00-0x0F for the volume.
+    uint8   VolumeIdentifier[32];       // Identification of this volume.
+    uint8   UnusedField[8];             // All zeros.
+    uint32  VolumeSpaceSize[2];         // Number of Logical Blocks in which the volume is recorded
+    uint8   UnusedField2[32];           // All zeroes.
+    uint16  VolumeSetSize[2];           // The size of the set in this logical volume (number of disks).
+    uint16  VolumeSequenceNumber[2];    // The number of this disk in the Volume Set.
+    uint16  LogicalBlockSize[2];        // The size in bytes of a logical block. NB: This means that a logical block on a CD could be something other than 2 KiB!
+    uint32  PathTableSize[2];           // The size in bytes of the path table.
+    uint32  LocationTypeLPathTable;     // LBA location of the path table. The path table pointed to contains only little-endian values.
+    uint32  LocationOptTypeLPathTable;  // LBA location of the optional path table. The path table pointed to contains only little-endian values. Zero means that no optional path table exists.
+    uint32  LocationTypeMPathTable;     // LBA location of the path table. The path table pointed to contains only big-endian values.
+    uint32  LocationOptTypeMPathTable;  // LBA location of the optional path table. The path table pointed to contains only big-endian values. Zero means that no optional path table exists.
+    uint8   DirectoryEntryRootDirectory[34];// Note that this is not an LBA address, it is the actual Directory Record, which contains a single byte Directory Identifier (0x00), hence the fixed 34 byte size.
+    uint8   VolumeSetIdentifier[128];   // Identifier of the volume set of which this volume is a member.
+    uint8   PublisherIdentifier[128];   // The volume publisher. For extended publisher information, the first byte should be 0x5F, followed by the filename of a file in the root directory. If not specified, all bytes should be 0x20.
+    uint8   DataPreparerIdentifier[128];// The identifier of the person(s) who prepared the data for this volume. For extended preparation information, the first byte should be 0x5F, followed by the filename of a file in the root directory. If not specified, all bytes should be 0x20.
+    uint8   ApplicationIdentifier[128]; // Identifies how the data are recorded on this volume. For extended information, the first byte should be 0x5F, followed by the filename of a file in the root directory. If not specified, all bytes should be 0x20.
+    uint8   CopyrightFileIdentifier[37];// Filename of a file in the root directory that contains copyright information for this volume set. If not specified, all bytes should be 0x20.
+    uint8   AbstractFileIdentifier[37]; // Filename of a file in the root directory that contains abstract information for this volume set. If not specified, all bytes should be 0x20.
+    uint8   BibliographicFileIdentifier[37];// Filename of a file in the root directory that contains bibliographic information for this volume set. If not specified, all bytes should be 0x20.
+    uint8   VolumeCreationDateTime[17]; // The date and time of when the volume was created.
+    uint8   VolumeModificationDateTime[17];// The date and time of when the volume was modified.
+    uint8   VolumeExpirationDateTime[17];// The date and time after which this volume is considered to be obsolete. If not specified, then the volume is never considered to be obsolete.
+    uint8   VolumeEffectiveDateTime[17];// The date and time after which the volume may be used. If not specified, the volume may be used immediately.
+    uint8   FileStructureVersion;       // The directory records and path table version (always 0x01).
+    uint8   Unused2;                    // Always 0x00.
+    uint8   ApplicationUsed[512];       // Contents not defined by ISO 9660.
+    uint8   Reserved[653];              // Reserved by ISO.
+    } ISO_9660_Primary_Volume_Descriptor;
+
+static t_offset get_iso9660_filesystem_size (UNIT *uptr, uint32 physsectsz, t_bool *readonly)
+{
+DEVICE *dptr;
+t_addr saved_capac;
+struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
+t_addr temp_capac = (sim_toffset_64 ? (t_addr)0xFFFFFFFFu : (t_addr)0x7FFFFFFFu);  /* Make sure we can access the largest sector */
+uint8 sector_buf[2048];
+ISO_9660_Volume_Descriptor *Desc = (ISO_9660_Volume_Descriptor *)sector_buf;
+uint8 primary_buf[2048];
+ISO_9660_Primary_Volume_Descriptor *Primary = NULL;
+t_lba sectfactor = sizeof (*Desc) / ctx->sector_size;
+t_offset ret_val = (t_offset)-1;
+t_offset cur_pos = 32768;           /* Beyond the boot area of an ISO 9660 image */
+t_seccnt sectsread;
+int read_count = 0;
+
+if ((dptr = find_dev_from_unit (uptr)) == NULL)
+    return ret_val;
+saved_capac = uptr->capac;
+uptr->capac = temp_capac;
+
+while (sim_disk_rdsect(uptr, (t_lba)(sectfactor * cur_pos / sizeof (*Desc)), (uint8 *)Desc, &sectsread, sectfactor) == DKSE_OK) {
+    if ((sectsread != sectfactor)               || 
+        (Desc->Version != 1)                    ||
+        (0 != memcmp (Desc->Identifier, "CD001", sizeof (Desc->Identifier))))
+        break;
+    if (Desc->Type == 1) {  /* Primary Volume Descriptor */
+        Primary = (ISO_9660_Primary_Volume_Descriptor *)primary_buf;
+        *Primary = *(ISO_9660_Primary_Volume_Descriptor *)Desc;
+        }
+    cur_pos += sizeof (*Desc);
+    ++read_count;
+    if ((Desc->Type == 255) ||
+        (read_count >= 32)) {
+        ret_val = ctx->container_size;
+        sim_messagef (SCPE_OK, "%s: '%s' Contains an ISO 9660 filesystem\n", sim_uname (uptr), uptr->filename);
+        if (Primary) {
+            char VolId[sizeof (Primary->VolumeIdentifier) + 1];
+
+            memcpy (VolId, Primary->VolumeIdentifier, sizeof (Primary->VolumeIdentifier));
+            VolId[sizeof (Primary->VolumeIdentifier)] = '\0';
+            sim_messagef (SCPE_OK, "%s: Volume Identifier: %s   Containing %u %u Byte Sectors\n", sim_uname (uptr), sim_trim_endspc (VolId), (uint32)(ctx->container_size / Primary->LogicalBlockSize[1 - sim_end]), (uint32)Primary->LogicalBlockSize[1 - sim_end]);
+            }
+        break;
+        }
+    }
+uptr->capac = saved_capac;
+if (readonly)
+    *readonly = sim_disk_wrp (uptr) || (ret_val != (t_offset)-1);
 return ret_val;
 }
 
@@ -1856,7 +1960,7 @@ if (uar != 0) {
 return SCPE_IOERR;
 }
 
-static t_offset get_rsts_filesystem_size (UNIT *uptr, uint32 physsectsz)
+static t_offset get_rsts_filesystem_size (UNIT *uptr, uint32 physsectsz, t_bool *readonly)
 {
 DEVICE *dptr;
 t_addr saved_capac;
@@ -1936,6 +2040,8 @@ for (context.dcshift = 0; context.dcshift < 8; context.dcshift++) {
     }
 cleanup_done:
 uptr->capac = saved_capac;
+if (readonly)
+    *readonly = sim_disk_wrp (uptr);
 return ret_val;
 }
 
@@ -2018,7 +2124,7 @@ if (strncmp((char *)&home->hb_b_sysid, HB_C_VMSSYSID, strlen(HB_C_VMSSYSID)) == 
 return RT11_NOPART;
 }
 
-static t_offset get_rt11_filesystem_size (UNIT *uptr, uint32 physsectsz)
+static t_offset get_rt11_filesystem_size (UNIT *uptr, uint32 physsectsz, t_bool *readonly)
 {
 DEVICE *dptr;
 t_addr saved_capac;
@@ -2149,19 +2255,22 @@ if (partitions) {
     sim_messagef (SCPE_OK, "%d valid partition%s, Type: %s, Sectors On Disk: %u\n", partitions, partitions == 1 ? "" : "s", parttype, (uint32)(ret_val / 512));
     }
 uptr->capac = saved_capac;
+if (readonly)
+    *readonly = sim_disk_wrp (uptr);
 return ret_val;
 }
 
 t_offset pseudo_filesystem_size = 0;        /* Dummy file system check return used during testing */
 
-typedef t_offset (*FILESYSTEM_CHECK)(UNIT *uptr, uint32);
+typedef t_offset (*FILESYSTEM_CHECK)(UNIT *uptr, uint32, t_bool *);
 
-static t_offset get_filesystem_size (UNIT *uptr)
+static t_offset get_filesystem_size (UNIT *uptr, t_bool *readonly)
 {
 static FILESYSTEM_CHECK checks[] = {
     &get_ods2_filesystem_size,
     &get_ods1_filesystem_size,
     &get_ultrix_filesystem_size,
+    &get_iso9660_filesystem_size,
     &get_rsts_filesystem_size,
     &get_rt11_filesystem_size,          /* This should be the last entry
                                            in the table to reduce the
@@ -2181,7 +2290,7 @@ if (pseudo_filesystem_size != 0) {      /* Dummy file system size mechanism? */
     }
 
 for (i = 0; checks[i] != NULL; i++)
-    if ((ret_val = checks[i] (uptr, 0)) != (t_offset)-1)
+    if ((ret_val = checks[i] (uptr, 0, readonly)) != (t_offset)-1)
         return ret_val;
 /* 
  * The only known interleaved disk devices have either 256 byte 
@@ -2192,10 +2301,10 @@ for (i = 0; checks[i] != NULL; i++)
    
 for (i = 0; checks[i] != NULL; i++) {
     ctx->sector_size = 256;
-    if ((ret_val = checks[i] (uptr, ctx->sector_size)) != (t_offset)-1)
+    if ((ret_val = checks[i] (uptr, ctx->sector_size, readonly)) != (t_offset)-1)
         break;
     ctx->sector_size = 128;
-    if ((ret_val = checks[i] (uptr, ctx->sector_size)) != (t_offset)-1)
+    if ((ret_val = checks[i] (uptr, ctx->sector_size, readonly)) != (t_offset)-1)
         break;
     }
 if ((ret_val != (t_offset)-1) && (ctx->sector_size != saved_sector_size ))
@@ -3022,7 +3131,7 @@ if (get_disk_footer (uptr) != SCPE_OK) {
     sim_disk_detach (uptr);
     return SCPE_OPENERR;
     }
-filesystem_size = get_filesystem_size (uptr);
+filesystem_size = get_filesystem_size (uptr, NULL);
 if (filesystem_size != (t_offset)-1)
     filesystem_size += reserved_sectors * sector_size;
 container_size = sim_disk_size (uptr);
@@ -3165,6 +3274,22 @@ if (container_size && (container_size != (t_offset)-1)) {
         }
     }
 
+if ((uptr->flags & UNIT_RO) == 0) {
+    t_bool readonly;
+    int32 saved_quiet = sim_quiet;
+
+    sim_quiet = 1;
+    get_filesystem_size (uptr, &readonly);
+    if (readonly) {
+        sim_disk_detach (uptr);
+        sim_switches |= SWMASK ('R');
+        sim_disk_attach_ex2 (uptr, cptr, sector_size, xfer_element_size, dontchangecapac,
+                            dbit, dtype, pdp11tracksize, completion_delay, drivetypes,
+                            reserved_sectors);
+
+        }
+    sim_quiet = saved_quiet;
+    }
 if (dtype && (created || (autosized && (ctx->footer == NULL))))
     store_disk_footer (uptr, dtype);
 
