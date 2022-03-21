@@ -1952,7 +1952,7 @@ if (uar != 0) {
                             }
                     }
         scanDone:
-            *result = ((t_offset)(blocks + 1) * context->pcs) - 1;
+            *result = (t_offset)(blocks + 1) * context->pcs;
             return SCPE_OK;
             }
         }
@@ -2029,7 +2029,7 @@ for (context.dcshift = 0; context.dcshift < 8; context.dcshift++) {
                             sim_messagef(SCPE_OK, "%s: '%s' Contains a RSTS File system\n", sim_uname (uptr), uptr->filename);
                             sim_messagef(SCPE_OK, "%s: Pack ID: %6.6s Revision Level: %3s Pack Clustersize: %d\n", 
                                                                   sim_uname (uptr), context.packid, fmt, context.pcs);
-                            sim_messagef(SCPE_OK, "%s: Last Unallocated Sector In File System: %u\n", sim_uname (uptr), (uint32)(ret_val / 512));
+                            sim_messagef(SCPE_OK, "%s: Last Unallocated Sector In File System: %u\n", sim_uname (uptr), (uint32)((ret_val / 512) - 1));
                             goto cleanup_done;
                             }
                         }
