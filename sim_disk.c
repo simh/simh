@@ -1952,7 +1952,7 @@ if (uar != 0) {
                             }
                     }
         scanDone:
-            *result = (t_offset)(blocks + 1) * context->pcs;
+            *result = ((t_offset)(blocks + 1) * context->pcs) - 1;
             return SCPE_OK;
             }
         }
