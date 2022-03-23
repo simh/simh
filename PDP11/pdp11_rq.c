@@ -575,7 +575,7 @@ x  RA73 70(+1)  21      2667+   21      1       ?       3920490
 #define RC25_RCTS       0                               /*  */
 #define RC25_RCTC       1
 #define RC25_RBN        0                               /*  */
-#define RC25_MOD        3
+#define RC25_MOD        2
 #define RC25_MED        0x20643019
 #define RC25_FLGS       RQDF_RMV
 
@@ -625,7 +625,7 @@ x  RA73 70(+1)  21      2667+   21      1       ?       3920490
 #define RA70_RCTS       198             /* Size of the RCT */
 #define RA70_RCTC       7               /* Number of RCT copies */
 #define RA70_RBN        16577           /* 1*11*1507 */
-#define RA70_MOD        0               /* ??? */
+#define RA70_MOD        18              /* ??? */
 #define RA70_MED        0x25641046      /* RA70 MEDIA ID */
 #define RA70_FLGS       RQDF_SDI
 
@@ -642,7 +642,7 @@ x  RA73 70(+1)  21      2667+   21      1       ?       3920490
 #define RA73_RCTS       198             /* Size of the RCT ??????*/
 #define RA73_RCTC       7               /* Number of RCT copies */
 #define RA73_RBN        56007           /* 1*21*2667 */
-#define RA73_MOD        0               /* ??? */
+#define RA73_MOD        47              /* ??? */
 #define RA73_MED        0x25641049      /* RA73 MEDIA ID */
 #define RA73_FLGS       RQDF_SDI
 
@@ -662,7 +662,7 @@ x  RA73 70(+1)  21      2667+   21      1       ?       3920490
 #define RF30_RCTS       1428                            /* cyl 1915-1916? */
 #define RF30_RCTC       1
 #define RF30_RBN        26810                           /* 1 *14*1915 */
-#define RF30_MOD        40
+#define RF30_MOD        21
 #define RF30_MED        0x2264601E
 #define RF30_FLGS       RQDF_DSSI
 
@@ -678,11 +678,27 @@ x  RA73 70(+1)  21      2667+   21      1       ?       3920490
 #define RF31_RCTS       1428                            /* cyl 1915-1916? */
 #define RF31_RCTC       1
 #define RF31_RBN        26810                           /* 1 *14*1915 */
-#define RF31_MOD        40
+#define RF31_MOD        27
 #define RF31_MED        0x2264601F
 #define RF31_FLGS       RQDF_DSSI
 
-#define RF71_DTYPE      24                              /* DSSI drive */
+#define RF35_DTYPE      24                              /* DSSI drive */
+#define RF35_SECT       57                              /* +1 spare/track */
+#define RF35_SURF       14
+#define RF35_CYL        1861                            /* 0-1860 user */
+#define RF35_TPG        RF35_SURF
+#define RF35_GPC        1
+#define RF35_XBN        1456                            /* cyl 1917-1918? */
+#define RF35_DBN        1456                            /* cyl 1919-1920? */
+#define RF35_LBN        1664628                         /* 57*14*1861 */
+#define RF35_RCTS       1428                            /* cyl 1915-1916? */
+#define RF35_RCTC       1
+#define RF35_RBN        26810                           /* 1 *14*1915 */
+#define RF35_MOD        27
+#define RF35_MED        0x2264601F
+#define RF35_FLGS       RQDF_DSSI
+
+#define RF71_DTYPE      25                              /* DSSI drive */
 #define RF71_SECT       37                              /* +1 spare/track */
 #define RF71_SURF       16
 #define RF71_CYL        1320                            /* 0-1914 user */
@@ -698,7 +714,7 @@ x  RA73 70(+1)  21      2667+   21      1       ?       3920490
 #define RF71_MED        0x22646047
 #define RF71_FLGS       RQDF_DSSI
 
-#define RF72_DTYPE      25                              /* DSSI drive */
+#define RF72_DTYPE      26                              /* DSSI drive */
 #define RF72_SECT       50                              /* +1 spare/track */
 #define RF72_SURF       21
 #define RF72_CYL        1861                            /* 0-1860 user */
@@ -710,9 +726,25 @@ x  RA73 70(+1)  21      2667+   21      1       ?       3920490
 #define RF72_RCTS       1428                            /* cyl 1915-1916? */
 #define RF72_RCTC       1
 #define RF72_RBN        26810                           /* 1 *14*1915 */
-#define RF72_MOD        40
+#define RF72_MOD        28
 #define RF72_MED        0x22646048
 #define RF72_FLGS       RQDF_DSSI
+
+#define RF73_DTYPE      27                              /* DSSI drive */
+#define RF73_SECT       71                              /* +1 spare/track */
+#define RF73_SURF       21
+#define RF73_CYL        2621                            /* 0-2620 user */
+#define RF73_TPG        RF73_SURF
+#define RF73_GPC        1
+#define RF73_XBN        1456                            /* cyl 1917-1918? */
+#define RF73_DBN        1456                            /* cyl 1919-1920? */
+#define RF73_LBN        3907911                         /* 71*21*2621 */
+#define RF73_RCTS       1428                            /* cyl 1915-1916? */
+#define RF73_RCTC       1
+#define RF73_RBN        26810                           /* 1 *14*1915 */
+#define RF73_MOD        35
+#define RF73_MED        0x22646049
+#define RF73_FLGS       RQDF_DSSI
 
 /* Controller parameters */
 
@@ -765,40 +797,6 @@ struct drvtyp {
     const char  *name;                                  /* name */
     };
 
-/*
-
-MediaId
-
-Is defined in the MSCP Basic Disk Functions Manual, page 4-37 to 4-38:
-
-The media type identifier is a 32-bit number, and it's coded like this:
-The high 25 bits are 5 characters, each coded with 5 bits. The low 7 
-bits is a binary coded 2 digits.
-
-Looking at it, you have:
-D0,D1,A0,A1,A2,N
-
-For an RA81, it would be:
-
-D0,D1 is the preferred device type name for the unit. In our case, 
-that would be "DU".
-A0,A1,A2 is the name of the media used on the unit. In our case "RA".
-N is the value of the two decimal digits, so 81 for this example.
-
-And for letters, the coding is that A=1, B=2 and so on. 0 means the 
-character is not used.
-
-So, again, for an RA81, we would get:
-
-Decimal Values:        4,    21,    18,     1,     0,      81
-Hex Values:            4,    15,    12,     1,     0,      51
-Binary Values:     00100, 10101, 10010, 00001, 00000, 1010001
-Hex 4 bit Nibbles:    2     5     6     4   1     0     5   1
-
-The 32bit value of RA81_MED is 0x25641051
-
- */
-
 #define RQ_DRV(d) \
   { d##_SECT, d##_SURF, d##_CYL,  d##_TPG, \
     d##_GPC,  d##_XBN,  d##_DBN,  d##_LBN, \
@@ -833,6 +831,7 @@ static struct drvtyp drv_tab[] = {
     RQ_DRV (RF31),
     RQ_DRV (RF71),
     RQ_DRV (RF72),
+    RQ_DRV (RF73),
     { 0 }
     };
 
@@ -866,6 +865,7 @@ static const char *drv_types[] = {
     RQ_DRV (RF31),
     RQ_DRV (RF71),
     RQ_DRV (RF72),
+    RQ_DRV (RF73),
     NULL
     };
 
@@ -1183,10 +1183,14 @@ MTAB rq_mod[] = {
       &rq_set_type, NULL, NULL, "Set RF30 Disk Type" },
     { MTAB_XTD|MTAB_VUN, RF31_DTYPE, NULL, "RF31",
       &rq_set_type, NULL, NULL, "Set RF31 Disk Type" },
+    { MTAB_XTD|MTAB_VUN, RF35_DTYPE, NULL, "RF35",
+      &rq_set_type, NULL, NULL, "Set RF35 Disk Type" },
     { MTAB_XTD|MTAB_VUN, RF71_DTYPE, NULL, "RF71",
       &rq_set_type, NULL, NULL, "Set RF71 Disk Type" },
     { MTAB_XTD|MTAB_VUN, RF72_DTYPE, NULL, "RF72",
       &rq_set_type, NULL, NULL, "Set RF72 Disk Type" },
+    { MTAB_XTD|MTAB_VUN, RF73_DTYPE, NULL, "RF73",
+      &rq_set_type, NULL, NULL, "Set RF73 Disk Type" },
     { MTAB_XTD|MTAB_VUN|MTAB_VALR, RA8U_DTYPE, NULL, "RAUSER=SizeInMB",
       &rq_set_type, NULL, NULL, "Set RAUSER Disk Type and its size" },
     { MTAB_XTD|MTAB_VUN, RA8U_DTYPE, NULL, "RA8U",
