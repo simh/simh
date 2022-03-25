@@ -2290,8 +2290,18 @@ if (pseudo_filesystem_size != 0) {      /* Dummy file system size mechanism? */
     }
 
 for (i = 0; checks[i] != NULL; i++)
-    if ((ret_val = checks[i] (uptr, 0, readonly)) != (t_offset)-1)
+    if ((ret_val = checks[i] (uptr, 0, readonly)) != (t_offset)-1) {
+        /* ISO files that haven't already been determined to be ISO 9660
+         * which contain a known file system are also marked read-only
+         * now.  This fits early DEC distribution CDs that were created 
+         * before ISO 9660 was standardized and operating support was added.
+         */
+        if ((readonly != NULL)          && 
+            (*readonly == FALSE)        &&
+            (NULL != match_ext (uptr->filename, "ISO")))
+            *readonly = TRUE;
         return ret_val;
+        }
 /* 
  * The only known interleaved disk devices have either 256 byte 
  * or 128 byte sector sizes.  If additional interleaved file 
