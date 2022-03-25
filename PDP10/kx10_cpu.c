@@ -4477,7 +4477,7 @@ no_fetch:
             if (((xct_flag & 8) != 0 && !ptr_flg) ||
                 ((xct_flag & 2) != 0 && ptr_flg))
             sect = cur_sect = prev_sect;
-#if 0
+#if 1
          /* The following lines are needed to run Tops 20 V3 on KL/B */
          if (((xct_flag & 014) == 04 && !ptr_flg && prev_sect == 0)
              || ((xct_flag & 03)  == 01 && ptr_flg  && prev_sect == 0))
