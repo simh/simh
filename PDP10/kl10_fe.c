@@ -1071,10 +1071,11 @@ dte_function(UNIT *uptr)
                        lp20_queue.buff[lp20_queue.in_ptr] = ch;
                        inci(&lp20_queue);
                        cmd->dptr++;
+                       sim_debug(DEBUG_DATA, &lp20_dev, "LP20 queue %o\n", ch);
                    }
                    if (cmd->dptr != cmd->dcnt)
                        return;
-                   sim_debug(DEBUG_DETAIL, &dte_dev, "LP20 done\n");
+                   sim_debug(DEBUG_DETAIL, &lp20_dev, "LP20 done\n");
                    break;
                }
 #endif
@@ -1214,15 +1215,17 @@ cty:
 #if (NUM_DEVS_LP20 > 0)
                if (dev == PRI_EMLPT) {
                   lp20_unit.LINE = 0;
+                  sim_debug(DEBUG_DETAIL, &lp20_dev, "LPT OPS\n");
                }
 #endif
                break;
 
         case PRI_EMRDS:            /* Request device status */
                if (dev == PRI_EMLPT) {
-                   if (cmd->data[0] != 0) {
-                      data1[0] = 2 << 8;
-                      data1[1] = 0;
+                   sim_debug(DEBUG_DETAIL, &lp20_dev, "RDS OPS %06o\n", cmd->data[0]);
+                   if (cmd->data[0] != 0) { /* If second unit, offline */
+                      data1[0] = 0;
+                      data1[1] = 2 << 8;
                       data1[2] = 0;
                       if (dte_queue(PRI_EMHDS+PRI_IND_FLG, PRI_EMLPT,
                                          3, data1) == 0)
@@ -1233,8 +1236,8 @@ cty:
                       if (!sim_is_active(&lp20_unit))
                           sim_activate(&lp20_unit, 1000);
 #else
-                      data1[0] = 2 << 8;
-                      data1[1] = 0;
+                      data1[0] = 0;  /* Return device offline */
+                      data1[1] = 2 << 8;
                       data1[2] = 0;
                       if (dte_queue(PRI_EMHDS+PRI_IND_FLG, PRI_EMLPT,
                                          3, data1) == 0)
@@ -1261,14 +1264,14 @@ cty:
         case PRI_EMHDS:            /* Here is device status */
 #if (NUM_DEVS_LP20 > 0)
                if (dev == PRI_EMLPT) {
-                   sim_debug(DEBUG_DETAIL, &dte_dev, "LPT HDS %06o %06o %06o\n",
+                   sim_debug(DEBUG_DETAIL, &lp20_dev, "LPT HDS %06o %06o %06o\n",
                             cmd->data[0], cmd->data[1], cmd->data[2]);
                    if (cmd->data[0] & 040) {
                        lp20_unit.LPST |= EOFFLG;
                        lp20_unit.LPCNT = 0;
                    }
                    lp20_unit.LPST |= HDSFLG;
-                   sim_debug(DEBUG_DETAIL, &dte_dev, "LPT HDS %06o \n",
+                   sim_debug(DEBUG_DETAIL, &lp20_dev, "LPT HDS %06o \n",
                               lp20_unit.LPST);
                    if (!sim_is_active(&lp20_unit))
                        sim_activate(&lp20_unit, 1000);
@@ -1336,6 +1339,7 @@ cty:
 #if (NUM_DEVS_LP20 > 0)
                if ((cmd->dev & 0377) == PRI_EMLPT) {
                   data1[0] = cmd->data[0];
+                  sim_debug(DEBUG_DETAIL, &lp20_dev, "Flush out %o\n", cmd->data[0]);
                   if (dte_queue(PRI_EMLBE, PRI_EMLPT, 1, data1) == 0)
                        return;
                }
@@ -2034,11 +2038,10 @@ t_stat lp20_svc (UNIT *uptr)
 
     if ((uptr->flags & UNIT_ATT) == 0)
         return SCPE_OK;
-    if (dte_dev.flags & TYPE_RSX20 && uptr->LPST & HDSFLG) {
+    if (uptr->LPST & HDSFLG) {
         data1[0] = 0;
-
         data1[1] = (uptr->LINE == 1) ? 01<<8: 0;
-        sim_debug(DEBUG_DETAIL, &dte_dev, "LPT status %06o \n", uptr->LPST);
+        sim_debug(DEBUG_DETAIL, &lp20_dev, "LPT status %06o \n", uptr->LPST);
         if (uptr->LPST & EOFFLG) {
             data1[0] |= 040 << 8;
             uptr->LPCNT = 0;
@@ -2047,7 +2050,7 @@ t_stat lp20_svc (UNIT *uptr)
             data1[1] |= 02 << 8;
             uptr->LPCNT = 0;
         }
-        data1[2] = 0110200; 
+        data1[2] = 0110200;
         if (dte_queue(PRI_EMHDS+PRI_IND_FLG, PRI_EMLPT, 4, data1) == 0)
             sim_activate(uptr, 1000);
         uptr->LPST &= ~(HDSFLG);
