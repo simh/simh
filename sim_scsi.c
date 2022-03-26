@@ -55,6 +55,10 @@
 #define CMD_SPACE       0x11                            /* space */
 #define CMD_WRFMARK     0x10                            /* write filemarks */
 
+#define CMD_READ6_TAPE_FIXED    0x01                    /* Fixed record size read */
+#define CMD_READ6_TAPE_SILI     0x02                    /* Suppress Incorrect Length Indicator */
+
+
 /* SCSI status codes */
 
 #define STS_OK          0                               /* good */
@@ -87,6 +91,26 @@
                          (b[x+2] << 8) | \
                           b[x+3])
 #define GETW(b,x)       ((b[x] << 8)|b[x+1])
+
+static void _scsi_vdebug (uint32 dbits, SCSI_BUS *bus, const char* fmt, va_list arglist)
+{
+UNIT *uptr = bus->dev[bus->target];
+size_t tfmt_size = strlen (fmt) + strlen (sim_uname (uptr)) + 3;
+char *tfmt = (char *)malloc (tfmt_size);
+
+snprintf (tfmt, tfmt_size, "%s: %s", sim_uname (uptr), fmt);
+_sim_vdebug (dbits, bus->dptr, uptr, tfmt, arglist);
+free (tfmt);
+}
+
+static void scsi_debug_cmd (SCSI_BUS *bus, const char* fmt, ...)
+{
+va_list arglist;
+
+va_start (arglist, fmt);
+_scsi_vdebug (SCSI_DBG_CMD, bus, fmt, arglist);
+va_end (arglist);
+}
 
 static const char *scsi_phases[] = {
     "DATO",                                             /* data out */
@@ -352,7 +376,7 @@ void scsi_test_ready (SCSI_BUS *bus, uint8 *data, uint32 len)
 {
 UNIT *uptr = bus->dev[bus->target];
 
-sim_debug (SCSI_DBG_CMD, bus->dptr, "Test Unit Ready\n");
+scsi_debug_cmd (bus, "Test Unit Ready\n");
 
 if (uptr->flags & UNIT_ATT)                             /* attached? */
     scsi_status (bus, STS_OK, KEY_OK, ASC_OK);          /* unit is ready */
@@ -367,7 +391,7 @@ void scsi_inquiry (SCSI_BUS *bus, uint8 *data, uint32 len)
 UNIT *uptr = bus->dev[bus->target];
 SCSI_DEV *dev = (SCSI_DEV *)uptr->up7;
 
-sim_debug (SCSI_DBG_CMD, bus->dptr, "Inquiry\n");
+scsi_debug_cmd (bus, "Inquiry\n");
 
 if ((bus->lun != 0) || (uptr->flags & UNIT_DIS)) {
     memset (&bus->buf[0], 0, 36);                       /* no such device or lun */
@@ -431,7 +455,7 @@ scsi_set_req (bus);                                     /* request to send data 
 
 void scsi_req_sense (SCSI_BUS *bus, uint8 *data, uint32 len)
 {
-sim_debug (SCSI_DBG_CMD, bus->dptr, "Request Sense\n");
+scsi_debug_cmd (bus, "Request Sense\n");
 
 bus->buf[bus->buf_b++] = (0x70 | 0x80);                 /* current error, valid */
 bus->buf[bus->buf_b++] = 0;                             /* segment # */
@@ -467,14 +491,14 @@ scsi_set_req (bus);                                     /* request to send data 
 void scsi_mode_sel6 (SCSI_BUS *bus, uint8 *data, uint32 len)
 {
 if (bus->phase == SCSI_CMD) {
-    sim_debug (SCSI_DBG_CMD, bus->dptr, "Mode Select(6) - CMD\n");
+    scsi_debug_cmd (bus, "Mode Select(6) - CMD\n");
     memcpy (&bus->cmd[0], &data[0], 6);
     bus->buf_b = bus->cmd[4];
     scsi_set_phase (bus, SCSI_DATO);                    /* data out phase next */
     scsi_set_req (bus);                                 /* request data */
     }
 else if (bus->phase == SCSI_DATO) {
-    sim_debug (SCSI_DBG_CMD, bus->dptr, "Mode Select(6) - DATO\n");
+    scsi_debug_cmd (bus, "Mode Select(6) - DATO\n");
     /* Not currently implemented so just return
        good status for now */
     scsi_status (bus, STS_OK, KEY_OK, ASC_OK);
@@ -486,14 +510,14 @@ else if (bus->phase == SCSI_DATO) {
 void scsi_mode_sel10 (SCSI_BUS *bus, uint8 *data, uint32 len)
 {
 if (bus->phase == SCSI_CMD) {
-    sim_debug (SCSI_DBG_CMD, bus->dptr, "Mode Select(10) - CMD\n");
+    scsi_debug_cmd (bus, "Mode Select(10) - CMD\n");
     memcpy (&bus->cmd[0], &data[0], 10);
     bus->buf_b = GETW (data, 7);
     scsi_set_phase (bus, SCSI_DATO);                    /* data out phase next */
     scsi_set_req (bus);                                 /* request data */
     }
 else if (bus->phase == SCSI_DATO) {
-    sim_debug (SCSI_DBG_CMD, bus->dptr, "Mode Select(6) - DATO\n");
+    scsi_debug_cmd (bus, "Mode Select(6) - DATO\n");
     /* Not currently implemented so just return
        good status for now */
     scsi_status (bus, STS_OK, KEY_OK, ASC_OK);
@@ -624,7 +648,7 @@ UNIT *uptr = bus->dev[bus->target];
 SCSI_DEV *dev = (SCSI_DEV *)uptr->up7;
 uint32 pc, pctl;
 
-sim_debug (SCSI_DBG_CMD, bus->dptr, "Mode Sense(6)\n");
+scsi_debug_cmd (bus, "Mode Sense(6)\n");
 
 pc = data[2] & 0x3F;                                    /* page code */
 pctl = (data[2] >> 6) & 0x3F;                           /* page control */
@@ -658,7 +682,7 @@ void scsi_mode_sense10 (SCSI_BUS *bus, uint8 *data, uint32 len)
 {
 uint32 pc, pctl;
 
-sim_debug (SCSI_DBG_CMD, bus->dptr, "Mode Sense(10)\n");
+scsi_debug_cmd (bus, "Mode Sense(10)\n");
 
 pc = data[2] & 0x3F;                                    /* page code */
 pctl = (data[2] >> 6) & 0x3F;                           /* page control */
@@ -691,7 +715,7 @@ scsi_set_req (bus);                                     /* request to send data 
 
 void scsi_start_stop (SCSI_BUS *bus, uint8 *data, uint32 len)
 {
-sim_debug (SCSI_DBG_CMD, bus->dptr, "Start/Stop Unit\n");
+scsi_debug_cmd (bus, "Start/Stop Unit\n");
 scsi_status (bus, STS_OK, KEY_OK, ASC_OK);
 }
 
@@ -699,7 +723,7 @@ scsi_status (bus, STS_OK, KEY_OK, ASC_OK);
 
 void scsi_prev_allow (SCSI_BUS *bus, uint8 *data, uint32 len)
 {
-sim_debug (SCSI_DBG_CMD, bus->dptr, "Prevent/Allow Medium Removal\n");
+scsi_debug_cmd (bus, "Prevent/Allow Medium Removal\n");
 scsi_status (bus, STS_OK, KEY_OK, ASC_OK);
 }
 
@@ -710,7 +734,7 @@ void scsi_read_capacity (SCSI_BUS *bus, uint8 *data, uint32 len)
 UNIT *uptr = bus->dev[bus->target];
 SCSI_DEV *dev = (SCSI_DEV *)uptr->up7;
 
-sim_debug (SCSI_DBG_CMD, bus->dptr, "Read Capacity, pmi = %d\n", (data[8] & 0x1));
+scsi_debug_cmd (bus, "Read Capacity, pmi = %d\n", (data[8] & 0x1));
 
 if ((uptr->flags & UNIT_ATT) == 0) {                    /* not attached? */
     scsi_status (bus, STS_CHK, KEY_NOTRDY, ASC_NOMEDIA);
@@ -740,7 +764,7 @@ sects = data[4];
 if (sects == 0)
     sects = 256;
 
-sim_debug (SCSI_DBG_CMD, bus->dptr, "Read(6) lba %d blks %d\n", lba, sects);
+scsi_debug_cmd (bus, "Read(6) lba %d blks %d\n", lba, sects);
 
 if (uptr->flags & UNIT_ATT)
     r = sim_disk_rdsect (uptr, lba, &bus->buf[0], &sectsread, sects);
@@ -776,43 +800,34 @@ if (sects == 0) {                                       /* no data to read */
     return;
     }
 
-sim_debug (SCSI_DBG_CMD, bus->dptr,
-    "Read(6) blks %d fixed %d\n", sects, (data[1] & 0x1));
+scsi_debug_cmd (bus, "Read(6) blks %d fixed %d\n", sects, (data[1] & 0x1));
 
 if (uptr->flags & UNIT_ATT) {
     if (data[1] & 0x1) {
         r = sim_tape_rdrecf (uptr, &bus->buf[0], &sectsread, (sects * dev->block_size));
-        sim_debug (SCSI_DBG_CMD, bus->dptr,
-            "Read tape blk %d, read %d, r = %d\n", sects, sectsread, r);
+        scsi_debug_cmd (bus, "Read tape blk %d, read %d, r = %d\n", sects, sectsread, r);
         }
     else {
         r = sim_tape_rdrecf (uptr, &bus->buf[0], &sectsread, sects);
-        sim_debug (SCSI_DBG_CMD, bus->dptr,
-            "Read tape max %d, read %d, r = %d\n", sects, sectsread, r);
+        scsi_debug_cmd (bus, "Read tape max %d, read %d, r = %d\n", sects, sectsread, r);
         if (r == MTSE_INVRL) {                          /* overlength condition */
-            sim_debug (SCSI_DBG_CMD, bus->dptr,
-                "Overlength\n");
+            scsi_debug_cmd (bus, "Overlength\n");
             if ((data[1] & 0x2) && (dev->block_size == 0)) { /* SILI set */
-                sim_debug (SCSI_DBG_CMD, bus->dptr,
-                    "SILI set\n");
+                scsi_debug_cmd (bus, "SILI set\n");
                 }
             else {
-                sim_debug (SCSI_DBG_CMD, bus->dptr,
-                    "SILI not set - check condition\n");
+                scsi_debug_cmd (bus, "SILI not set - check condition\n");
                 scsi_status (bus, STS_CHK, (KEY_OK | KEY_M_ILI), ASC_OK);
                 return;
                 }
             }
         else if ((r == MTSE_OK) && (sectsread < sects)) {  /* underlength condition */
-            sim_debug (SCSI_DBG_CMD, bus->dptr,
-                "Underlength\n");
+            scsi_debug_cmd (bus, "Underlength\n");
             if (data[1] & 0x2) {                        /* SILI set */
-                sim_debug (SCSI_DBG_CMD, bus->dptr,
-                    "SILI set\n");
+                scsi_debug_cmd (bus, "SILI set\n");
                 }
             else {
-                sim_debug (SCSI_DBG_CMD, bus->dptr,
-                    "SILI not set - check condition\n");
+                scsi_debug_cmd (bus, "SILI not set - check condition\n");
                 scsi_status_deferred (bus, STS_CHK, (KEY_OK | KEY_M_ILI), ASC_OK);
                 bus->sense_info = (sects - sectsread);
                 }
@@ -820,8 +835,7 @@ if (uptr->flags & UNIT_ATT) {
         }
 
     if (r != MTSE_OK) {
-        sim_debug (SCSI_DBG_CMD, bus->dptr,
-            "Read error, r = %d\n", r);
+        scsi_debug_cmd (bus, "Read error, r = %d\n", r);
         }
         scsi_tape_status (bus, r);
     }
@@ -854,7 +868,7 @@ t_stat r;
 lba = GETL (data, 2);
 sects = GETW (data, 7);
 
-sim_debug (SCSI_DBG_CMD, bus->dptr, "Read(10) lba %d blks %d\n", lba, sects);
+scsi_debug_cmd (bus, "Read(10) lba %d blks %d\n", lba, sects);
 
 if (sects == 0) {                                       /* no data to read */
     scsi_status (bus, STS_OK, KEY_OK, ASC_OK);
@@ -887,7 +901,7 @@ t_stat r;
 lba = GETL (data, 2);
 sects = GETW (data, 7);
 
-sim_debug (SCSI_DBG_CMD, bus->dptr, "Read Long lba %d bytes %d\n", lba, sects);
+scsi_debug_cmd (bus, "Read Long lba %d bytes %d\n", lba, sects);
 
 if (uptr->flags & UNIT_ATT)
     r = sim_disk_rdsect (uptr, lba, &bus->buf[0], &sectsread, ((sects >> 9) + 1));
@@ -911,7 +925,7 @@ t_seccnt sects, sectswritten;
 t_stat r;
 
 if (bus->phase == SCSI_CMD) {
-    sim_debug (SCSI_DBG_CMD, bus->dptr, "Write(6) - CMD\n");
+    scsi_debug_cmd (bus, "Write(6) - CMD\n");
     memcpy (&bus->cmd[0], &data[0], 6);
     sects = bus->cmd[4];
     if (sects == 0) sects = 256;
@@ -923,7 +937,7 @@ else if (bus->phase == SCSI_DATO) {
     sects = bus->cmd[4];
     if (sects == 0) sects = 256;
     lba = GETW (bus->cmd, 2) | ((bus->cmd[1] & 0x1F) << 16);
-    sim_debug (SCSI_DBG_CMD, bus->dptr, "Write(6) - DATO, lba %d bytes %d\n", lba, sects);
+    scsi_debug_cmd (bus, "Write(6) - DATO, lba %d bytes %d\n", lba, sects);
 
     if (uptr->flags & UNIT_ATT)
         r = sim_disk_wrsect (uptr, lba, &bus->buf[0], &sectswritten, sects);
@@ -943,8 +957,7 @@ t_seccnt sects;
 t_stat r;
 
 if (bus->phase == SCSI_CMD) {
-    sim_debug (SCSI_DBG_CMD, bus->dptr,
-        "Write(6) - CMD\n");
+    scsi_debug_cmd (bus, "Write(6) - CMD\n");
     memcpy (&bus->cmd[0], &data[0], 6);                 /* save current cmd */
     sects = GETW (bus->cmd, 3) | (bus->cmd[2] << 16);
     if (data[1] & 0x1)                                  /* FIXED */
@@ -957,13 +970,11 @@ else if (bus->phase == SCSI_DATO) {
     sects = GETW (bus->cmd, 3) | (bus->cmd[2] << 16);
     if (data[1] & 0x1)                                  /* FIXED */
         sects = sects * dev->block_size;
-    sim_debug (SCSI_DBG_CMD, bus->dptr,
-        "Write(6) - DATO, bytes %d\n", sects);
+    scsi_debug_cmd (bus, "Write(6) - DATO, bytes %d\n", sects);
 
     if (uptr->flags & UNIT_ATT) {
         r = sim_tape_wrrecf (uptr, &bus->buf[0], sects);
-        sim_debug (SCSI_DBG_CMD, bus->dptr,
-            "Write(6) - DATO, r = %d\n", r);
+        scsi_debug_cmd (bus, "Write(6) - DATO, r = %d\n", r);
         scsi_tape_status (bus, r);                      /* translate status */
         }
     else
@@ -985,7 +996,7 @@ t_seccnt sects, sectswritten;
 t_stat r;
 
 if (bus->phase == SCSI_CMD) {
-    sim_debug (SCSI_DBG_CMD, bus->dptr, "Write(10) - CMD\n");
+    scsi_debug_cmd (bus, "Write(10) - CMD\n");
     memcpy (&bus->cmd[0], &data[0], 10);
     sects = GETW (bus->cmd, 7);
     if (sects == 0)                                     /* no data to write */
@@ -999,7 +1010,7 @@ if (bus->phase == SCSI_CMD) {
 else if (bus->phase == SCSI_DATO) {
     sects = GETW (bus->cmd, 7);
     lba = GETL (bus->cmd, 2);
-    sim_debug (SCSI_DBG_CMD, bus->dptr, "Write(10) - DATO, lba %d bytes %d\n", lba, sects);
+    scsi_debug_cmd (bus, "Write(10) - DATO, lba %d bytes %d\n", lba, sects);
 
     if (uptr->flags & UNIT_ATT)
         r = sim_disk_wrsect (uptr, lba, &bus->buf[0], &sectswritten, sects);
@@ -1017,7 +1028,7 @@ UNIT *uptr = bus->dev[bus->target];
 SCSI_DEV *dev = (SCSI_DEV *)uptr->up7;
 t_stat r;
 
-sim_debug (SCSI_DBG_CMD, bus->dptr, "Erase\n");
+scsi_debug_cmd (bus, "Erase\n");
 
 if (data[1] & 0x1)                                      /* LONG bit set? */
     r = sim_tape_wreom (uptr);                          /* erase to EOT */
@@ -1032,7 +1043,7 @@ scsi_status (bus, bus->status, bus->sense_key, bus->sense_code);
 
 void scsi_reserve_unit (SCSI_BUS *bus, uint8 *data, uint32 len)
 {
-sim_debug (SCSI_DBG_CMD, bus->dptr, "Reserve Unit\n");
+scsi_debug_cmd (bus, "Reserve Unit\n");
 scsi_status (bus, STS_OK, KEY_OK, ASC_OK);              /* GOOD status */
 }
 
@@ -1040,7 +1051,7 @@ scsi_status (bus, STS_OK, KEY_OK, ASC_OK);              /* GOOD status */
 
 void scsi_release_unit (SCSI_BUS *bus, uint8 *data, uint32 len)
 {
-sim_debug (SCSI_DBG_CMD, bus->dptr, "Release Unit\n");
+scsi_debug_cmd (bus, "Release Unit\n");
 scsi_status (bus, STS_OK, KEY_OK, ASC_OK);              /* GOOD status */
 }
 
@@ -1051,7 +1062,7 @@ void scsi_rewind (SCSI_BUS *bus, uint8 *data, uint32 len)
 UNIT *uptr = bus->dev[bus->target];
 t_stat r;
 
-sim_debug (SCSI_DBG_CMD, bus->dptr, "Rewind\n");
+scsi_debug_cmd (bus, "Rewind\n");
 
 r = sim_tape_rewind (uptr);
 
@@ -1063,7 +1074,7 @@ scsi_status (bus, bus->status, bus->sense_key, bus->sense_code);
 
 void scsi_send_diag (SCSI_BUS *bus, uint8 *data, uint32 len)
 {
-sim_debug (SCSI_DBG_CMD, bus->dptr, "Send Diagnostic\n");
+scsi_debug_cmd (bus, "Send Diagnostic\n");
 
 if (data[1] & 0x4)                                      /* selftest */
     scsi_status (bus, STS_OK, KEY_OK, ASC_OK);          /* GOOD status */
@@ -1083,7 +1094,7 @@ t_stat r = 0;
 code = data[1] & 0x7;
 sects = GETW (data, 3) | (data[2] << 16);
 
-sim_debug (SCSI_DBG_CMD, bus->dptr, "Space %d %s\n", sects, ((code == 0) ? "records" : "files"));
+scsi_debug_cmd (bus, "Space %d %s\n", sects, ((code == 0) ? "records" : "files"));
 
 switch (code) {
 
@@ -1121,7 +1132,7 @@ uint32 i;
 t_seccnt sects;
 t_stat r;
 
-sim_debug (SCSI_DBG_CMD, bus->dptr, "Write Filemarks\n");
+scsi_debug_cmd (bus, "Write Filemarks\n");
 
 sects = GETW (data, 3) | (data[2] << 16);
 
@@ -1140,7 +1151,7 @@ scsi_set_req (bus);                                     /* request to send data 
 
 void scsi_read_blklim (SCSI_BUS *bus, uint8 *data, uint32 len)
 {
-sim_debug (SCSI_DBG_CMD, bus->dptr, "Read Block Limits\n");
+scsi_debug_cmd (bus, "Read Block Limits\n");
 
 bus->buf[bus->buf_b++] = 0x00;                          /* reserved */
 bus->buf[bus->buf_b++] = (MTR_MAXLEN >> 16) & 0xFF;     /* max block length (23:16) */
@@ -1158,7 +1169,7 @@ void scsi_load_unload (SCSI_BUS *bus, uint8 *data, uint32 len)
 {
 UNIT *uptr = bus->dev[bus->target];
 
-sim_debug (SCSI_DBG_CMD, bus->dptr, "Load/Unload\n");
+scsi_debug_cmd (bus, "Load/Unload\n");
 
 if ((data[4] & 0x5) == 0x5) {                           /* EOT & Load? */
     scsi_status (bus, STS_CHK, KEY_ILLREQ, ASC_INVCDB); /* invalid combination */
