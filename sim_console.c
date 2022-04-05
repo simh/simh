@@ -2206,7 +2206,11 @@ return SCPE_OK;
 
 t_stat sim_set_cons_speed (int32 flag, CONST char *cptr)
 {
-return tmxr_set_line_speed (&sim_con_ldsc, cptr);
+t_stat r = tmxr_set_line_speed (&sim_con_ldsc, cptr);
+
+if ((r == SCPE_OK) && (sim_con_ldsc.uptr != NULL))
+    sim_con_ldsc.uptr->wait = sim_con_ldsc.rxdeltausecs;
+return r;
 }
 
 t_stat sim_show_cons_speed (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr)
