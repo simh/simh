@@ -119,7 +119,7 @@ static t_stat diskParse(DISK_INFO *myDisk, uint32 isVerbose)
     uint8 sectorHeadMap[256];
     uint8 sectorCylMap[256];
     uint32 sectorSize, sectorHeadwithFlags, sectRecordType;
-    uint32 i;
+    uint32 hdrBytes, i;
     uint8 start_sect;
 
     uint32 TotalSectorCount = 0;
@@ -150,9 +150,15 @@ static t_stat diskParse(DISK_INFO *myDisk, uint32 isVerbose)
     do {
         sim_debug(myDisk->debugmask, myDisk->device, "start of track %d at file offset %ld\n", myDisk->ntracks, ftell(myDisk->file));
 
-        if (sim_fread(&imd, 1, 5, myDisk->file) != 5) {
-            return (SCPE_OPENERR);
-        }
+        hdrBytes = sim_fread(&imd, 1, 5, myDisk->file);
+  
+	   if (hdrBytes == 0 && feof(myDisk->file))
+		  break;
+
+	   if (hdrBytes != 5) {
+		  sim_printf("SIM_IMD: Header read returned %d bytes instead of 5.\n", hdrBytes);
+		  return (SCPE_OPENERR);
+	   }
 
         if (feof(myDisk->file))
             break;
