@@ -152,16 +152,16 @@ static t_stat diskParse(DISK_INFO *myDisk, uint32 isVerbose)
 
         hdrBytes = sim_fread(&imd, 1, 5, myDisk->file);
   
-	   if (hdrBytes == 0 && feof(myDisk->file))
-		  break;
+	if (hdrBytes == 0 && feof(myDisk->file))
+            break; /*AGN detected end of IMD file */
 
-	   if (hdrBytes != 5) {
-		  sim_printf("SIM_IMD: Header read returned %d bytes instead of 5.\n", hdrBytes);
-		  return (SCPE_OPENERR);
-	   }
+        if (hdrBytes != 5) {
+            sim_printf("SIM_IMD: Header read returned %d bytes instead of 5.\n", hdrBytes);
+            return (SCPE_OPENERR);
+        }
 
         if (feof(myDisk->file))
-            break;
+            break; /*AGN this may no longer be needed now we're check it above */
         sectorSize = 128 << (imd.sectsize & 0x1f);
         sectorHeadwithFlags = imd.head; /*AGN save the head and flags */
         imd.head &= 1 ; /*AGN mask out flag bits to head 0 or 1 */
