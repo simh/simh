@@ -14005,7 +14005,7 @@ if (sim_do_ocptr[sim_do_depth]) {
         sim_cmd_echoed = TRUE;
         }
     else {
-        if (sim_deb) {                      /* Always put context in debug output */
+        if (sim_deb && !sim_cmd_echoed) {   /* Always put context in debug output */
             TMLN *saved_oline = sim_oline;
 
             sim_oline = NULL;               /* avoid potential debug to active socket */
@@ -16557,7 +16557,7 @@ if ((strcmp (gbuf, "ALL") == 0) || (strcmp (gbuf, "SCP") == 0)) {
         return sim_messagef (SCPE_IERR, "SCP argument parsing test failed\n");
     if (test_scp_event_sequencing () != SCPE_OK)
         return sim_messagef (SCPE_IERR, "SCP event sequencing test failed\n");
-}
+    }
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
     t_stat tstat = SCPE_OK;
     t_bool was_disabled = ((dptr->flags & DEV_DIS) != 0);
