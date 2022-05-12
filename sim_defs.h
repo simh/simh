@@ -522,6 +522,8 @@ struct DEVICE {
     const char          *(*description)(DEVICE *dptr);  /* Device Description */
     BRKTYPTAB           *brk_types;                     /* Breakpoint types */
     void                *type_ctx;                      /* Device Type/Library Context */
+    t_stat              (*unit_test)(DEVICE *dptr, const char *cptr);
+                                                        /* Device Unit Test Routine */
     };
 
 /* Device flags */

@@ -572,6 +572,7 @@ t_stat set_runlimit (int32 flag, CONST char *cptr);
 t_stat sim_set_asynch (int32 flag, CONST char *cptr);
 static const char *_get_dbg_verb (uint32 dbits, DEVICE* dptr, UNIT *uptr);
 static t_stat sim_sanity_check_register_declarations (DEVICE **devices);
+static t_stat sim_device_unit_tests (const char *cptr);
 static void fix_writelock_mtab (DEVICE *dptr);
 static t_stat _sim_debug_flush (void);
 
@@ -2717,6 +2718,7 @@ char **targv = NULL;
 int32 i, sw;
 t_bool lookswitch;
 t_bool register_check = FALSE;
+t_bool device_unit_tests = FALSE;
 t_stat stat = SCPE_OK;
 CTAB *docmdp = NULL;
 
@@ -2738,10 +2740,19 @@ sim_prog_name = argv [0];                               /* save a pointer to the
 if (argc > 1) {                                         /* Check for special argument to invoke register test */
     if (sim_strcasecmp (argv[1], "RegisterSanityCheck") == 0) {
         register_check = TRUE;
-        --argc;                                         /* Remove special argument to avoid confusion later */
+        /* Remove special argument to avoid confusion later */
         for (i = 1; i < argc; i++)
             argv[i] = argv[i+1];
-        argv[i+1] = NULL;
+        --argc;
+        }
+    }
+if (argc > 1) {                                         /* Check for special argument to invoke register test */
+    if (sim_strcasecmp (argv[1], "DeviceUnitTests") == 0) {
+        device_unit_tests = TRUE;
+        /* Remove special argument to avoid confusion later */
+        for (i = 1; i < argc; i++)
+            argv[i] = argv[i+1];
+        --argc;
         }
     }
 for (i = 1; i < argc; i++) {                            /* loop thru args */
@@ -2891,6 +2902,36 @@ if ((stat = sim_brk_init ()) != SCPE_OK) {
 /* always check for register definition problems */
 sim_sanity_check_register_declarations (NULL);
 
+if (device_unit_tests) {
+    int i;
+    DEVICE *dptr;
+    int devices_with_tests = 0;
+
+    /* This test is explicitly run after the above reset_all_p() so that 
+       the simulator is in its well initialized state before testing. */
+    for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
+        if (dptr->unit_test)
+            ++devices_with_tests;
+        }
+    if (devices_with_tests == 0) {
+        sim_printf ("*** No device unit tests in this %s simulator.\n", sim_name);
+        sim_exit_status = EXIT_SUCCESS;
+        goto cleanup_and_exit;
+        }
+    sim_printf (" Running device unit tests on %s simulator.\n", sim_name);
+    if ((stat = sim_device_unit_tests (argv[1])) != SCPE_OK) {
+        sim_printf ("Simulator device unit tests error\n");
+        if (sim_ttisatty())
+            read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
+        sim_exit_status = EXIT_FAILURE;
+        goto cleanup_and_exit;
+        }
+    sim_printf ("*** Good device unit tests in %s simulator.\n", sim_name);
+    if (argc < 2) {                                 /* No remaining command arguments? */
+        sim_exit_status = EXIT_SUCCESS;             /* then we're done */
+        goto cleanup_and_exit;
+        }
+    }
 signal (SIGINT, int_handler);
 if (!sim_quiet) {
     printf ("\n");
@@ -16174,6 +16215,22 @@ for (i = 0; (dptr = devices[i]) != NULL; i++) {
 MClose (f);
 return stat;
 }
+
+static t_stat sim_device_unit_tests (const char *cptr)
+{
+int i;
+DEVICE *dptr;
+t_stat stat = SCPE_OK;
+
+for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
+    if (dptr->unit_test != NULL) {
+        sim_printf ("Running Unit Test for %s device:\n", dptr->name);
+        stat = dptr->unit_test (dptr, cptr);
+        }
+    }
+return stat;
+}
+
 
 uint8 treg8;
 uint16 treg16;
