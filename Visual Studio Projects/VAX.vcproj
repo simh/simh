@@ -95,7 +95,7 @@
 			<Tool
 				Name="VCPostBuildEventTool"
 				Description="Copy result to Model based binary name (MicroVAX3900.exe)"
-				CommandLine="if exist &quot;$(TargetPath)&quot; copy &quot;$(TargetPath)&quot; &quot;$(TargetDir)MicroVAX3900$(TargetExt)&quot; &#x0D;&#x0A;Post-Build-Event.cmd VAX &quot;$(TargetDir)$(TargetName).exe&quot; vax-diag_test"
+				CommandLine="if exist &quot;$(TargetPath)&quot; copy &quot;$(TargetPath)&quot; &quot;$(TargetDir)MicroVAX3900$(TargetExt)&quot;&#x0D;&#x0A;Post-Build-Event.cmd VAX &quot;$(TargetDir)$(TargetName).exe&quot; vax-diag_test&#x0D;&#x0A;"
 			/>
 		</Configuration>
 		<Configuration
@@ -185,7 +185,7 @@
 			<Tool
 				Name="VCPostBuildEventTool"
 				Description="Copy result to Model based binary name (MicroVAX3900.exe)"
-				CommandLine="if exist &quot;$(TargetPath)&quot; copy &quot;$(TargetPath)&quot; &quot;$(TargetDir)MicroVAX3900$(TargetExt)&quot; &#x0D;&#x0A;Post-Build-Event.cmd VAX &quot;$(TargetDir)$(TargetName).exe&quot; vax-diag_test"
+				CommandLine="if exist &quot;$(TargetPath)&quot; copy &quot;$(TargetPath)&quot; &quot;$(TargetDir)MicroVAX3900$(TargetExt)&quot;&#x0D;&#x0A;Post-Build-Event.cmd VAX &quot;$(TargetDir)$(TargetName).exe&quot; vax-diag_test&#x0D;&#x0A;"
 			/>
 		</Configuration>
 	</Configurations>
@@ -198,6 +198,10 @@
 			>
 			<File
 				RelativePath="..\PDP11\pdp11_cr.c"
+				>
+			</File>
+			<File
+				RelativePath="..\PDP11\pdp11_dup.c"
 				>
 			</File>
 			<File
@@ -546,6 +550,10 @@
 			>
 			<File
 				RelativePath="..\PDP11\pdp11_cr_dat.h"
+				>
+			</File>
+			<File
+				RelativePath="..\PDP11\pdp11_dup.h"
 				>
 			</File>
 			<File
