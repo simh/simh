@@ -1,0 +1,69 @@
+The LICENSE.txt file summarizes the general simh license which is 
+essentially stated at the top of all source code files, along with 
+some additional limitations spelled out in the LICENSE.txt file.
+
+The purpose of this COPYING.txt file is to provide guidance for folks 
+who may want to include some or all of the simh code in other projects.
+The point of this guidance is so that the actual version of the simh 
+code is retained in whatever derivative work may be produced so that 
+problems may be reasonably reported AND so that users and developers 
+can easily determine what simh version they are working with.
+
+The best way to do this leverages git's archive feature which in 
+the simh case has simh git commit information embedded in the archive.
+Alternatively, some live git operations could be done to fetch and
+extrace the current commit/version information from that archive 
+and then pass it around and through the derivative project's build 
+mechanism.
+
+GIT ARCHIVE CONSIDERATIONS:
+
+For all projects (even those where Internet connectivity may not be
+available on all machines that may build the project) the git archive 
+feature would be most appropriate.  
+Additionally a few dozen megabytes of storage on the build machine 
+won't be needed to hold the complete simh codebase.  These days 
+storage is so cheap that this generally shouldn't be a concern, but
+some folks really like to keep things to a minimal footprint.
+
+A git archive containing all of the simh components can be acquired
+from the simh gitub repository for the latest simh code from:
+        https://github.com/simh/simh/archive/master.zip
+or for a specific simh commit:
+        https://github.com/simh/simh/archive/<commit-hash>.zip
+        
+The archive produced will automatically contain the specifics of the 
+simh git version that has been archived.
+
+Each time the simh components are acquired as an archive, the 
+project's interesting simh pieces can then be extracted from the 
+archive, modified as needed by that project and the project's build 
+mechanism can then compile the simh components with:
+
+    -DSIM_VERSION_MODE=derivative-project-name-and-or-version
+
+This will result in simulators built this way to have SHOW VERSION 
+output both identifying the particular version of simh pieces that 
+were used as well as whatever interesting version the project may 
+want to identify itself with.
+
+Those acquired and extracted pieces can then be stored in the source 
+code system for the derivative project and potentially be updated 
+from time to time.
+
+If all of the simh components aren't going to be available in the 
+derivative project, all of the actual simulator pieces should generally
+be gathered and used within the derivative project.  These pieces 
+should certainly include all the source code (and license files) in 
+the root simh directory along with the particular simulator's source 
+directory, and any additional directories which may be referenced in 
+the normal simulator build.  These additional directories may include:
+display, slirp and slirp_glue.
+
+DIRECT GIT repository access
+
+Using a direct git approach is more complicated and entangles 
+capturing the git commit id and time and passing that around and 
+through the derivative project's build mechanisms and the working
+environment available in the derivative project.  Folks going down 
+this path are on their own to try to solve this.
