@@ -1601,7 +1601,8 @@ while (*cptr != 0) {                                    /* do all mods */
         if (r != SCPE_OK)
             return r;
         }
-    else return SCPE_NOPARAM;
+    else
+        return sim_messagef (SCPE_NOPARAM, "Invalid timer parameter: %s\n", gbuf);
     }
 return SCPE_OK;
 }

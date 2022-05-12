@@ -417,7 +417,8 @@ while (*cptr != 0) {                                    /* do all mods */
         if (r != SCPE_OK)
             return r;
         }
-    else return SCPE_NOPARAM;
+    else
+        return sim_messagef (SCPE_NOPARAM, "Invalid console parameter: %s\n", gbuf);
     }
 return SCPE_OK;
 }
@@ -440,7 +441,8 @@ while (*cptr != 0) {
     cptr = get_glyph (cptr, gbuf, ',');                 /* get modifier */
     if ((shptr = find_shtab (show_con_tab, gbuf)))
         shptr->action (st, dptr, uptr, shptr->arg, NULL);
-    else return SCPE_NOPARAM;
+    else
+        return sim_messagef (SCPE_NOPARAM, "Invalid console parameter: %s\n", gbuf);
     }
 return SCPE_OK;
 }
@@ -588,7 +590,8 @@ while (*cptr != 0) {                                    /* do all mods */
         if (r != SCPE_OK)
             return r;
         }
-    else return SCPE_NOPARAM;
+    else 
+        return sim_messagef (SCPE_NOPARAM, "Invalid remote console parameter: %s\n", gbuf);
     }
 return SCPE_OK;
 }
@@ -1919,7 +1922,7 @@ if (flag) {
             sim_activate_after(rem_con_poll_unit, 1000000);/* check for connection in 1 second */
         return r;
         }
-    return SCPE_NOPARAM;
+    return sim_messagef (SCPE_NOPARAM, "Invalid remote telnet specification: %s\n", gbuf);
     }
 else {
     if (sim_rem_con_tmxr.master) {

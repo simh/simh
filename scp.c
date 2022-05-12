@@ -5978,11 +5978,14 @@ while (*cptr != 0) {                                    /* do all mods */
                     if (r != SCPE_OK)
                         return r;
                     }
-                else if (!mptr->desc)                   /* value desc? */
-                    break;
-                else if (cvptr)                         /* = value? */
-                    return SCPE_ARG;
-                else *((int32 *) mptr->desc) = mptr->match;
+                else 
+                    if (!mptr->desc)                    /* value desc? */
+                        break;
+                    else 
+                        if (cvptr)                      /* = value? */
+                            return SCPE_ARG;
+                        else 
+                            *((int32 *) mptr->desc) = mptr->match;
                 }                                       /* end if xtd */
             else {                                      /* old style */
                 if (cvptr)                              /* = value? */
@@ -6004,9 +6007,11 @@ while (*cptr != 0) {                                    /* do all mods */
             if (r != SCPE_OK)
                 return r;
             }
-        else if (!dptr->modifiers)                      /* no modifiers? */
-            return SCPE_NOPARAM;
-        else return sim_messagef (SCPE_NXPAR, "%s device: Non-existent parameter - %s\n", dptr->name, gbuf);
+        else
+            if (!dptr->modifiers)                      /* no modifiers? */
+                return sim_messagef (SCPE_NOPARAM, "%s device has no parameters\n", dptr->name);
+            else
+                return sim_messagef (SCPE_NXPAR, "%s device: Non-existent parameter - %s\n", dptr->name, gbuf);
         }                                               /* end if no mat */
     }                                                   /* end while */
 return SCPE_OK;                                         /* done all */
