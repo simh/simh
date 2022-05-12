@@ -35,7 +35,7 @@
 #define RZ23_SCSI       1
 #define RZ23_RM         FALSE
 #define RZ23_BLK        512
-#define RZ23_LBN        204863
+#define RZ23_LBN        204864
 #define RZ23_MANU       "DEC"
 #define RZ23_DESC       "RZ23     (C) DEC"
 #define RZ23_REV        "0A18"
@@ -46,7 +46,7 @@
 #define RZ23L_SCSI      1
 #define RZ23L_RM        FALSE
 #define RZ23L_BLK       512
-#define RZ23L_LBN       237587
+#define RZ23L_LBN       237588
 #define RZ23L_MANU      "DEC"
 #define RZ23L_DESC      "RZ23L    (C) DEC"
 #define RZ23L_REV       "2528"
@@ -57,7 +57,7 @@
 #define RZ24_SCSI       1
 #define RZ24_RM         FALSE
 #define RZ24_BLK        512
-#define RZ24_LBN        409791
+#define RZ24_LBN        409792
 #define RZ24_MANU       "DEC"
 #define RZ24_DESC       "RZ24     (C) DEC"
 #define RZ24_REV        "4041"
@@ -68,7 +68,7 @@
 #define RZ24L_SCSI      2
 #define RZ24L_RM        FALSE
 #define RZ24L_BLK       512
-#define RZ24L_LBN       479349
+#define RZ24L_LBN       479350
 #define RZ24L_MANU      "DEC"
 #define RZ24L_DESC      "RZ24L    (C) DEC"
 #define RZ24L_REV       "4766"
@@ -79,7 +79,7 @@
 #define RZ25_SCSI       2
 #define RZ25_RM         FALSE
 #define RZ25_BLK        512
-#define RZ25_LBN        832526
+#define RZ25_LBN        832527
 #define RZ25_MANU       "DEC"
 #define RZ25_DESC       "RZ25     (C) DEC"
 #define RZ25_REV        "0700"
@@ -90,7 +90,7 @@
 #define RZ25L_SCSI      2
 #define RZ25L_RM        FALSE
 #define RZ25L_BLK       512
-#define RZ25L_LBN       1046205
+#define RZ25L_LBN       1046206
 #define RZ25L_MANU      "DEC"
 #define RZ25L_DESC      "RZ25L    (C) DEC"
 #define RZ25L_REV       "0008"
@@ -101,7 +101,7 @@
 #define RZ26_SCSI       2
 #define RZ26_RM         FALSE
 #define RZ26_BLK        512
-#define RZ26_LBN        2050859
+#define RZ26_LBN        2050860
 #define RZ26_MANU       "DEC"
 #define RZ26_DESC       "RZ26     (C) DEC"
 #define RZ26_REV        "0700"
@@ -112,7 +112,7 @@
 #define RZ26L_SCSI      2
 #define RZ26L_RM        FALSE
 #define RZ26L_BLK       512
-#define RZ26L_LBN       2050859
+#define RZ26L_LBN       2050860
 #define RZ26L_MANU      "DEC"
 #define RZ26L_DESC      "RZ26L    (C) DEC"
 #define RZ26L_REV       "0008"
