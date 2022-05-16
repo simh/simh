@@ -1,6 +1,6 @@
 /* pdp11_cpumod.h: PDP-11 CPU model definitions
 
-   Copyright (c) 2004-2015, Robert M Supnik
+   Copyright (c) 2004-2021, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   19-Aug-21    RMS     Added MMU as settable option to 11/23, 11/40, 11/45
    30-Dec-15    RMS     Added 11/03, 11/23 BEVENT disable
    22-Apr-08    RMS     Added 11/70 MBRK register
    30-Aug-05    RMS     Added additional 11/60 registers
@@ -48,7 +49,7 @@
 #define PSW_1120        0000377
 
 #define SOP_1123        (BUS_Q|OPT_EIS|OPT_FPP|OPT_MMU|OPT_BVT)
-#define OPT_1123        (OPT_FPP|OPT_CIS|OPT_BVT)
+#define OPT_1123        (OPT_FPP|OPT_MMU|OPT_CIS|OPT_BVT)
 #define PSW_F           0170777
 #define PAR_F           0177777
 #define PDR_F           0077516
@@ -69,7 +70,7 @@
 #define MM0_1134        0160557
 
 #define SOP_1140        (BUS_U|OPT_EIS|OPT_MMU)
-#define OPT_1140        (OPT_FIS)
+#define OPT_1140        (OPT_FIS|OPT_MMU)
 #define PSW_1140        0170377
 #define PAR_1140        0007777
 #define PDR_1140        0077516
@@ -84,7 +85,7 @@
 #define MM3_1144        0000077
 
 #define SOP_1145        (BUS_U|OPT_EIS|OPT_FPP|OPT_MMU|OPT_RH11)
-#define OPT_1145        (OPT_FPP)
+#define OPT_1145        (OPT_FPP|OPT_MMU)
 #define PSW_1145        0174377
 #define PAR_1145        0007777
 #define PDR_1145        0077717
