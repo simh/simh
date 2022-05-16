@@ -1,6 +1,6 @@
 /* alpha_ev5_tlb.c - Alpha EV5 TLB simulator
 
-   Copyright (c) 2003-2006, Robert M Supnik
+   Copyright (c) 2003-2021, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -99,13 +99,13 @@ REG tlb_reg[] = {
     { HRDATA (IASN, itlb_asn, ITB_ASN_WIDTH) },
     { HRDATA (INLU, itlb_nlu, ITLB_WIDTH) },
     { BRDATA (IMINI, &i_mini_tlb, 16, 32, TLB_ESIZE) },
-    { BRDATA (ITLB, itlb, 16, 32, ITLB_SIZE*TLB_ESIZE) },
+    { BRDATA (ITLB, &itlb, 16, 32, ITLB_SIZE * TLB_ESIZE) },
     { HRDATA (DCM, dtlb_cm, 2) },
     { HRDATA (DSPAGE, dtlb_spage, 2), REG_HRO },
     { HRDATA (DASN, dtlb_asn, DTB_ASN_WIDTH) },
     { HRDATA (DNLU, dtlb_nlu, DTLB_WIDTH) },
     { BRDATA (DMINI, &d_mini_tlb, 16, 32, TLB_ESIZE) },
-    { BRDATA (DTLB, dtlb, 16, 32, DTLB_SIZE*TLB_ESIZE) },
+    { BRDATA (DTLB, &dtlb, 16, 32, DTLB_SIZE * TLB_ESIZE) },
     { NULL }
     };
 
