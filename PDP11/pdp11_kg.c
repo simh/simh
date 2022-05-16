@@ -1,6 +1,6 @@
 /* pdp11_kg.c - Communications Arithmetic Option KG11-A
 
-   Copyright (c) 2007-2010, John A. Dundas III
+   Copyright (c) 2007-2022, John A. Dundas III
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    kg           KG11-A Communications Arithmetic Option (M7251)
 
+   10-Feb-22    PK      Fix bug in continuous computation (Reindert Voorhorst)
    03-Jan-10    JAD     Eliminate gcc warnings
    08-Jan-08    JAD     First public release integrated with SIMH V3.7-3.
    09-Dec-07    JAD     SIMH-style debugging.
@@ -369,6 +370,7 @@ static t_stat kg_wr (int32 data, int32 PA, int32 access)
                 fprintf (sim_deb, ">>KG%d: wr DR %06o, data %06o, PC %06o\n",
                          unit, kg_unit[unit].DR, data, PC);
             kg_unit[unit].SR &= ~KGSR_M_DONE;
+            kg_unit[unit].PULSCNT = 0;
 
 /* In a typical device, this is normally where we would use sim_activate()
    to initiate an I/O to be completed later.  The KG is a little
