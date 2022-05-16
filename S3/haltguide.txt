@@ -1,0 +1,950 @@
+                   IBM System/3 Model 8/10 SCP
+
+                           **********
+                           Halt Guide
+                           **********
+
+This following list is my own reformatting and rewording of the
+official IBM Halt Guide for the Model 8/10 SCP. 
+
+The halts are those displayed on the message display unit.  The
+list is in alphabetical order for easy reference.
+
+When the system halts, the two 7-segment displays will display the
+halt as listed here, and the system console (or printer if the log
+device is the printer) will print the "SCP Message" below.  To 
+respond to the halt, deposit one of the valid response numbers
+(0 thru 3) into the SR, and then use the C command to continue.
+
+Unless otherwise stated, a response of 0 means to continue and accept
+the error, 1 means to retry the operation or re-read the statement in
+error, 2 means to cancel the job and retain added records (if any) and
+3 means to end the job and discard any added records in files.
+
+This is a listing of those halts likely to be encountered using SCP on
+the simuator,   it is not the complete list of all possible halts.
+
+Halt	SCP Message	Description
+----	-----------	-----------
+
+00			Invalid response to another halt.  Deposit a valid
+			value (0 thru 3) in SR.
+
+0A			A 5448 Disk Unit not ready.
+
+0C			5448 Disk Equipment Check
+
+0E			Permanent disk error during logging.
+
+0F	ID0FXX	 23	Invalid cylinder number on disk operation.
+			XX = Disk Drive.
+
+0H	ID0HXX	 23	Invalid sector number on disk operation
+			XX = Disk Drive.
+
+0Y	IK0Y0X	123	3741 Error. X: 1=not ready 2=wrong mode
+			3=parity error 5=record length error
+
+0	ID0 XX   23	Disk Data Check
+			XX = Disk Drive.
+
+0-	ID0-XX		Invalid disk operation code: Start cancels job.
+			XX = Disk Drive.
+
+10	          3  	No input file allocate, user error.
+
+11	       0 23	Square root of a negative field
+
+12	       0 23	Divide Overflow
+
+13	       0 23	Divide by zero
+
+14	       0 23     Varible index zero of out of range
+
+15	       0 23     Sequenced table is out of sequence
+
+16	       0 23	(RPG) OBject tables expected. /* Read.
+
+17 	       0 23  	(RPG) Object table exceeds specified length
+
+18	       0 23 	(RPG) Terminal errors in source program.
+
+19	       0  3	(RPG) Warning errors in source program.  0=continue.
+
+1A		  3	(RPG) Out of core memory
+
+1C	         23	Unidentified halt has been issued.  Probable system
+			error.
+
+1E	       0  3	(RPG) Demand file at end of file.
+
+1F	         23	(RPG) End of file or end of extent.  If during RPG
+			compilation, expand $SOURCE or $WORK.
+
+1H	       0 23	Duplicate keys found during build of indexed file.
+			0=skip this record and continue.
+
+1J	       0 23 	Out of sequence keys during build of indexed file.
+			0=skip this record and continue.
+
+1L	       0 23	Key changed during record update.  User error.
+			0=continue, do not update record.
+
+1P	       01	Forms in printer need positioning. 
+
+1U		123	No record found on direct or indexed file.
+
+1Y	       0 23	(RPG) Invalid numeric data to DSPLY statement.
+
+1	       0  3	Object program ready to punch tables.
+
+20		1 3	Disk Sort:  Invalid header and no // SOURCE
+
+21	       01 3	Disk Sort:  Name on // SOURCE not found
+
+22	       0 2	Disk Sort: Warning errors found.
+
+23	          3	Disk Sort:  Unrecoverable error.
+
+25		  3 	Disk Sort:  Terminal errors in sort statements.		
+
+27	       0	Disk Sort: In debug mode, finished pass.
+
+2C	       0  3	Disk Sort: No Input Records selected.
+
+2E	          3	Disk Sort: Workfile too small.
+
+2F	         23	Disk Sort: Output file too small.
+
+2L	DT2LY2    3	Tape Record too large to process.
+	DT2LY7    3	No FILE statement for tape file open.
+	DT2LY9    3	No enough storage for tape operation
+	DT2LTC	  3	Invalid tape header length
+	DT2LYF	123	Incorrect block length read from tape
+
+2P			Permanent tape error.
+
+2U	        12	Tape unit is write protected.
+
+2Y	          3	Invalid device specification in object.
+
+2-	       0  3	First statement was not a Tape Sort header.
+
+30	EG30      3	Space not available on R1 or F1.
+	UB30A1 0  3	Active files exist on output disk
+	UB30AF 0  3	Active files exist on 5448 disk
+	UB30H1 0  3	Wrong capacity or uninitialized pack
+	UB30NS    3	No 5448 disk for $PCOPY
+	UB30TP 0  3	Pack change required.
+	UC30AF    3	Active or system files on target
+	UC30BD    3	Volume label cannot be read
+	UC30SP    3	Not enough space for work file
+	UP30AF	  3	Active or system files on target
+
+31	UI31AF 0  3	Active or system files on target
+			0=proceed to next unit to initialize
+	UI30WP 01 3	Wrong pack, name does not match.
+
+32	UB32Bx 01 3	5444 pack is not a $PCOPY backup pack.
+	UB32NP 01 3	Unit specified is not a $PCOPY pack.
+	UC32BD    3	FROM pack is a TO pack from an interrupted
+			COPYPACK run.
+	UC32BP	  3	Output pack is a $PCOPY output pack.
+			Must be initialized or reset by a RESET 
+			statement to be used.
+	UC32DS    3	Packs FROM and TO are different sizes.
+
+33	UI33PU 0  3	Pack defective, cannot be initialized.
+ 
+34	Ux34    1 3	Keyword in a utility control statement is invalid.
+
+35	UC35xx	1 3	Error in $COPY or $KCOPY control statement.
+
+36	UI36CE 0  3	CE track defective on unit F1.
+
+37	UC37xx 0  3	Pack change required. xx: FP=mount on R1,
+			IP=pack on COPYIN, OP=pack on COPYO.
+
+38	UA38XX 0  3	Wrong pack mounted.
+	UB38DA 01 3	Dates do not match.
+	UB38DM 01 3	2nd 5444 pack not from same backup set as 1st.
+	UB38IP 01 3	PACKIN keyword pack not same as pack mounted.
+	UB38OP 01 3	PACKO keyword not same as pack mounted.
+
+3A	UC3Axx    3	Key out of sequence (DP), invalid high key (HK), 
+			out of space to copy file (XE), or disk I/O error.
+	
+3C	UC3CCS	  3	COPYFILE out of core.
+	UC3CNF	  3	Module not found, name is logged as R XXXXXX.
+
+3E	UC3EOX 0  3	COPYFILE output not as big as size of input.
+
+3F	UC3Fxx  1 3	Error in COPYFILE statement.
+
+3J	UC3Fxx    3	Invalid specification for Copy/Dump.
+
+3P	UC3Pxx	1 3	Error in COPYPACK, RESET, or LABELS statement.
+
+3Y	UI3YIS 0  3	Requested secondary init when primary required.
+
+3	UI3 xx  1 3	Error in VOL statement.
+
+40	DD40      3	File has been referenced as an output or add file
+			and the file is already allocated.
+
+4A	DD4A      3	File had already been opened and is re-opened.
+
+4C	DD4C	  3	Multivolumne file spec error.
+
+4E	DD4E	  3	FILE indicates a multivolule file being built,
+			but program compiled for single volume.
+
+4F	DD4F	  3	Print buffers not aligned in program.
+
+4H	DD4H   0  3	Unordered load specified for ISAM.  Ordered load
+			must be specified on RPG file specs.
+
+4J	DD4J	  3	All file specs have been checked and there were
+			errors.
+
+4L	DD4L	  3	Referenced file already allocated.	
+
+4P	DD4P      3	Prgram/FILE statement mismatch.
+
+4U	DD4U	  3	File referenced as update, already allocated.
+
+4Y	DD4Y	  3	File has an incorrect device specification.
+
+4	DD4	  3	No FILE specification for referenced file.
+
+4'	DD4'	  3	Attempting reference to a file in 2 levels, one or
+			both using RETAIN-S.
+
+50	UA50ID   2	Bad track which can't be reassigned.
+
+51	UR51    12	Can't use Alternate Track program in procedure.
+
+52	ML52    12	EOJ for Card List program.
+
+53	IU53    1 3	Number of VOL statements does not agree with number
+			of units on UIN statement.
+
+54	EO54	  3	End-of-file.
+
+55	UF55xx	1 3	Error in SCRATCH or REMOVE statement.
+
+56	UA56TS 0  3	ASSIGN track is over disk capacity.
+	UA56XX 0  3	Unit specified is uninitialized.
+
+57	UF57WP 01 3	File delete program.  Wrong pack is mounted.
+			0: Mount correct pack and continue.  1:
+			correct statement and retry.
+
+5A	UA5Axx 012	Alternate track assignment error.
+
+5C	MR5Cxx  1 3 	Invalid reformat specs.
+
+5F	UF5Fxx  1 3	Error in DISPLAY statement.
+
+5H	UA5HEU 0123	Primary track is still defective.
+
+5L	UF5LAF 0  3	PRogram try to delete files that are being used by
+			another program.
+	UF5LNF 0  3	File not found.
+	UF5LTM   23	Too many files specified.  Max is 40.
+
+5U	UI5Uxx  1 3	Error in UIN statement.
+
+5Y	UR5Yxx  1 3	Error in REBUILD statment.
+
+5	UA5 xx  1 3	Error in ALT statement.
+
+5-	          3	Tape Sort error occurred.
+
+5'	UF5'N1 0  3	Pack cannot be used.  Not inited.
+	UF5'NU 0  3	Pack was used as TO pack on a COPYPACK job
+			that required early termination.  Can only
+			be used for another COPYPACK job.
+
+60	LM60SY 0  3	Cannot remove or change library size on pack
+			from which $MAINT was loaded.
+
+61	LM61EP 0  3	Trying to copy a system to a library that is
+			1) not empty, 2) not allocated with large enough
+			SWA, or 3) not allocated with enough space.
+	LM61NS 0  3	System does not exist on FROM pack.
+
+62	LM62CS 01 3	Check Sum error.
+	LM62DR		Can't determine if REMOVE is data or control.
+	LM62EF		FROM, TO, or AFTER statement does not exist or
+			is out of sequence.
+	LM62ND		NO data records following INSERT or REPLACE.
+	LM62SQ		Records are out of sequence.
+	LM62TP		Incorrect type record.
+
+63	LM63DE 0  3	Directory entry error.  Name can't be found or 
+			attributes don't match, or attempt to remove
+			dir entry with MODIFY.
+
+64	LM64DS 0  3	Syntax error in ALLOCATE.
+
+65	LM65UN 0  3	Pack not properly initialized.
+
+66	LA66xx    3	Error with LOAD * function.
+
+67	EL67NL 0  3	Library does not exist.
+
+68	EL68DF 0  3	No room in library or directory.
+
+69	XX69HE    3	Disk I/O Error while using library.
+	 
+6A	LM6Axx  1 3	$MAINT has detected a syntax error on a control
+			statement.  xx gives a hint of what might be wrong.
+			AL: SOURCE or OBJECT missing or invalid
+			AZ: SYSTEM missing or invalid
+			D2: FROM, TO, or WORK is R2 or F2, not available
+			DK: Duplicate keyword
+			DS: Invalid DIRSIZE
+			FL: Invalid or missing FILE keyword
+			FM: Invalid or missing FROM keyword
+			IK: Invalid keyword
+			IN: Invalid INCR keyword
+			IS: first 3 columns must be // blank
+			IV: Invalid statement identifier
+			LB: Invalid LIBRARY keyword
+			LS: Invalid LIST keyword
+			NK: No keywords
+			NM: Invalid NAME keyword
+			NU: Invalid NEWNAME keyword
+			OM: Invalid OMIT keyword
+			RL: Invalid RECL keyword
+			RS: Invalid RESER keyword
+			RT: Invalid RETAIN keyword
+			SF: INvalid SEQFLD keyword
+			SQ: Invalid FROM, TO, or AFTER in MODIFY mode
+			XC: Invalid record.
+			XD: Duplicate keyword
+			XF: $$SYFG could not be found.
+			XL: LIBRARY keyword missing
+			XM: NAME keyword missing
+			XN: NAME parameter is invalid
+			XP: Library does not exist on this pack
+			XS: Syntax error
+			XT: Invalid library type
+			XV: INvalid operation
+
+6C	LM6CSP 0   3	Not enough space on pack.
+	LM6CSW 0   3	Space not available for work file.
+
+6E	LM6EOF 0   3	Overflow in seq field during RESER.
+	LM6EDP 0   3	Entry with same name already exists in library.
+
+6H	EL6HDT 0   3	Trying to replace perm with temp entry.
+	LM6HDP 0   3	NEWNAME is already in library.
+
+6J	LM6JCC 0   3	Control statements are missing.
+
+6L	UA6L       3	Log device is required for this program.
+
+6Y	LM6YNN  1 3	No NEWNAME when copying to same library.
+
+6	LM6 BC    3	Invalid character in source record.
+	LM6 CM 0  3	Invalid object deck.
+	LM6 ND 0  3 	No data between COPY and CEND.
+
+6-	LM6-BC 01	Entry containing a blank card being placed in
+			library. 0: accept, 1: skip and read next card.
+
+6'	LM6'CE 1 3	// CEND expected but not found.  1: Retry,
+			provide CEND.  NOTE:  For option 3, if a module
+			was being replaced, it may have been deleted but
+			new module not loaded.
+
+70	CR70     3	Too many overrides for procedure.  Max is 25.
+
+71	CR71   0  3	OCL Syntax Error.
+
+73	CR73   0	// PARTITION given in invalid location.
+
+74	CR74      3	/& between LOAD and RUN or CALL and RUN.
+
+75	CR75	 23	Extraneous statement.
+
+76	CR76   0  3 	// Missing from OCL statement.
+
+77	CR77	 23	Invalid OCL statement identifier.
+
+78	CR78   0  3	Unknown OCL keyword.
+
+79	CR79     23	Continuation expected but not received.
+
+7A	CR7A      3	A second LOAD or CALL found before run, or a 
+			CALL in procedure overrides.
+
+7C	CR7C   0  3	// COMPILE found between jobs.
+
+7E	CR7E   0  3	// DATE found between jobs.  0: Ignore and continue.
+
+7F	CR7F   0  3	// FILE found between jobs.  Must go between
+			// LOAD or // CALL and // RUN statements.
+
+7H	CR7H   0  3	// SWITCH found between jobs.
+
+7J	CR7J     23	// READER found between LOAD or CALL and RUN.
+
+7L	CI7Lxx	 23	Error when reading a tape file.
+
+7P			New print chain expected.  Load it and press START.
+
+7U	CR7U	  3	RUN statement not preceeded by LOAD or CALL.
+
+7Y	CI7Yxx	 23	Error outputing a tape file.
+
+7	CR7	  3	Too many utility control statements, max is 25.
+
+7-	CR7-   0	// PARTITION was read but system does not support
+			Dual Programming.
+
+7'			Error during tape processing. 
+
+80	CR80   0	// DATE card has not been entered.
+
+81	CR81     23	Error in LOAD statement.
+
+83	CR83	 23	Error in LOAD * statement.
+
+84	CR84	 23	Error in CALL statement
+
+85	CR85	 23	Second SWITCH statement found.
+
+86	CR86	 23	Invalid paramter in switch statement.
+
+88	CR88    1 3	Procedure not found.
+
+89	CR89   01       // DATE has already been given.
+				0 - accept the new date as the date.
+				1 - leave the old date as the current date.
+
+8A	CR8A01 0	Invalid date specified.
+	CR8A02 0 	DATE parameter missing.
+
+8C	CR8C     23	Second DATE found.
+
+8E	CR8E01   23	Date specified incorrectly.
+
+8F	CR8Fxx   23	Invalid BSCA statement.
+
+8H	CR8H      3	More than 9 levels of procedures have been called.
+
+8J	CR8J   0	Invalid // READER parameter.
+
+8L	CR8L   0	Desired system input device being used by other
+			program.
+
+8P	CR8P   0	Output device not defined.
+
+8U	CU8UIP   23	Invalid HIKEY in FILE statement: non-numeric.
+	CR8UKL		Parameter length mismatch.
+	CR8ULO		Key greater than 29.
+	CR8UPL		HIKEY-P greater than 15.
+	CR8USQ		HIKEY parameters not in sequence.
+
+8Y	CR8Y   0	Not logging can be done.  Log turned off by
+			other program level.
+
+8-	CR8-   0  3	Logging requested but cannot be done.
+
+90	CR90   0	// PAUSE statement read.  Check printer or console
+			for instructions and continue.  PAUSE was outside 
+			LOAD and RUN.
+
+91	CR90   0	// PAUSE statement read.  Check printer or console
+			for instructions and continue.  PAUSE was inside 
+			LOAD and RUN.
+
+92	CR92     23	COMPILE already recieved for this job.
+
+93	CR93     23	Error in COMPILE statement.
+
+94	CR94     23	Error in COMPILE statement.
+
+95	CR95	 23	Error in COMPILE statement.
+
+96	CR96   0 23	System error. An OCL error was found, but the system
+			cannot resolve the error.
+
+97	CR97   0	Error in LOG statement.
+
+98	CR98     23	Error in LOG statement.
+
+99	CR99   0 23	Error in LOG statement.
+
+9A	CR9A     23	Indicated action on last OCL statement read will
+			be ignored due to previous errors detected.
+
+9C	CR9Cxx  123	Incorrect tape volume online.
+
+9E	CR9E   0	Logging device being used by other program level.
+
+9F	CR9F   0 23	Logging device in use by other program.
+
+9H	CR9H     23	Log device in use.
+
+9J	CR9J   0	Error in FORMS statement.
+
+9L	CR9L   0 23	Error in FORMS statement.
+
+9P	CR9P     23	Error in FORMS statement.
+
+9U	CR9U   0  3	Other program has gotten a // IMAGE or other
+			program level is using the printer.
+
+9Y	CR9Y   0 23	Logging device not sysgenned or CCP has it.
+
+9	CR9    0 23	Same as 9Y.
+
+9-	CR9-   0  3	Other program level received a // FORMS or
+			other level using the printer.
+
+9'	CR9'   0	Same as 9Y.
+
+A0	CRa0xx   23	Syntax error in FILE statement.
+
+A1	CRA1xx	 23	Keyword error in FILE statement.
+
+A2	CRA2xx	 23	Parameter error on FILE statement.
+			xx gives parameter:
+			01 NAME, 02 UNIT, 03 PACK, 04 LABEL,
+			05 RETAIN, 06 DATE, 07 RECORDS, 08 TRACKS,
+			09 LOCATION, AS ASCII, BL BLKL, CV CONVERT,
+			DF DEFER, DN DENSITY, EN END, PT PARITY,
+			RC RECL, RF RECFM, RL REEL, SP SPLIT, 
+			TN TRANSLATE.
+
+A3	CRA3xx	 23	Missing Parameter on FILE statement, xx =
+			NN: NAME, NP: PACK, NU: UNIT, OP: no
+			parameters.
+
+A4	CRA4xx	 23	Invalid parameter combination in FILE statement:
+			AS: ASCII-YES and RECFM-D/DB on 7-track tape
+			AV: ASCII-YES and RECFB-V/VB
+			AY: RECFM-D/DB without ASCII-YES
+			CT: CONVERT-ON and TRANSLATE
+			DI: UNIT says tape but disk parameters given
+			DN: DENSITY-800 not supported.
+			FS: RECFM is fexed and block or rec len less than 18
+			IL: Incorrected RECL or BLKL for RECFM
+			IP: SPLIT or LOCATION used with RECORDS / TRACKS.
+			IR: LABEL, DATE or RETAIN wirh REEL-NL or REEL-NS
+			NS: Not all units are 7-track
+			PC: CONVERT-ON and PARITY-EVEN
+			RC: CONVERT-ON not given with RECFM-V/VB for 7-track
+			SD: DENSITY-1600 invalid for 7-track
+			SL: LOCATION missing or invalid for SPLIT.
+			SM: SPLIT invalid for multivolume files.
+			ST: 7-track paras with 9-track unit
+			SU: SPlit can't be used with 5444
+			TL: TRACKS/LOCATION invalid with unit
+			TP: UNIT is disk but tape paras given
+			TR: TRACKS and RECORDS both given
+
+A6	CRA6xx   23	Error in FILE statement for multivolumne files.
+
+A7	CRA7xx   23	Error in IMAGE statement.
+
+A8	CRA8xx 0	Error in IMAGE statements o disk.
+
+A9	CRA9xx 0 23	Same as A8.
+
+AA	CRAAxx   23	Same as A8.
+
+AC	CRAC   0	Invalid hex character in chain image.
+
+AE	CRAE   0 23	Same as AC.
+
+AF	CRAF	 23	Same as AC.
+
+AH	CRAH   0	Error in IMAGE statement.
+
+AJ	CRAJ   0 23	Same as AH
+
+AL	CRALxx 0	Error in PARTITION statement.
+
+AP	CRMN   0  3	Either reocvery option has has been selected during
+			a job, or OCL errors have occurred for this job.
+			0: Continue iwth next job, or no data cards in
+			reader for this job, otherwise, 3 to cancel.
+
+AU	CRAUxx   23	Error in PARTITION statement.
+
+A	CRA      23	Total number of volumes for a FILE statement
+			exceeds 40 (!).
+
+A-	CRA-xx 0 23	Error in PARTITION statement.
+
+A'	CRA'	  3	No space remaining is System work area.  Too many
+			FILE statements are in this job.
+
+C1-C9	IFC1	123	1442 Check, various causes.
+
+CL	UDCLxx  1 3	5445 Data Interchange Utility error
+
+E7	DKE7   0  3	Incorrect record length for attached 3741
+
+E8	UTE8xx  1 3	Error in Tape Init VOL statement.
+
+E9	UTE9xy 0  3	Error during Tape Init Processing.
+
+F8	DDF8      3	RPG--LIne counter specs omitted and skip past
+			page size for printer.
+
+F9	CIF9xy   23	Tape drive not available, x = drive #.
+
+FA	CIFA      3	Program requesting Data Recorder,  unsupported.
+
+FC	CIFC      3	Program requesting CRT, unsupported.
+
+FE	DDFE   0  3	Program requesting line line on printer that
+			exceeds sysgen value.
+
+FF			RPQ routine error.  Press start to continue.
+
+FH	CIFH    123	BSCA line not supported.
+
+FJ	CIFJ01	123	1442 not supported but requested
+	CIFJ02  123	3741 not supported but requested
+
+FL	CIFL	123	Printer/keyboard not supported or unavailable.
+
+FP	CIFP	123	Printer not supported or allocated to other level
+
+FU	CIFU	123	MFCU not supported or allocated to other level
+
+FY	CIFY	 23	Device is not supported or in use.
+
+F	CIF	 23	Conflict with a resource being used by other level.
+
+H0-H9	       0 23	RPG Programmed halt indicator is on.
+
+HA	CIHA	  3	Out of space on $SOURCE during compile.
+
+HC	CIHC      3	Program given on LOAD statement not found.
+
+HE	         	Hardware error.  Simulator has messed up.
+
+HF	CIHF   0  3	// COMPILE read but not required.
+
+HJ	CIHJ01  1 3	Program not found on removable unit, 1:
+			mount new unit and retry.
+	CIHJ02    3	Program not found, but removable unit in use.
+
+HL	CIHL      3	Inquiry request made but program is wrong type.
+
+HP	CIHP      3	Insufficient main storage for program.
+	LMHP      3	$MAINT function out of storage.  NOTE: After the
+			cancel, IPL from the system pack or the pack will
+			be unusable.
+
+HU	CIHUxx	  3	Source program not found on disk.  IF a 1 option
+			is present, you can mount a new removeable pack.
+
+HY	CCHYNN 0	A checkpoint is received and accepted.
+
+H	CCH NN 0 23	A restart has been requested.
+
+H'	CIH'      3	An uninitialized pack has been referenced.
+
+J0-J9	        123	Record with specified match field out of sequence.
+			This is an RPG error, the 2nd digit indicates which
+			RPG file statement the error applies to in the
+			source program.  0=greater than statement 9,
+			otherwise indicates the file statement number.
+
+JA	CIJA      3	Trying to laod a program that requires or allows
+			inquiry while another inquiry program is running 
+			in the other level.
+
+JC	CIJCxx	  3	Program cannot be run for this reason (xx):
+			01: Must be dedicated and other level active
+			02: Program in other level must be dedicated
+			03: $$RSTR cannot run in level 2
+			04: CHeckpointed program not allowed in level 2
+			05: Program can't run while checkpoint active
+
+JE	CIJE   0  3	Level 1 partition too small.
+
+JF	CIJF	  3	Attempt to start inquiry program but keyboard
+			in use.	
+
+JH	CIJF	  3	Attempt to start program which allows interrupts in
+			level 2.
+
+JJ	CIJJ      3	No object library on pack requested for load.
+
+JL	CIJL	  3	Not enough storage for program. DPF only.
+
+JP		  	System input device in use by other level.
+
+JU	       0123	Cancel request made from interrupt key.  0: ignore
+			1: continue, request ignored
+
+JY	CIJYRD 0 2	Inquiry request made and accepted.
+
+J-	          3	Attempt to run a CCP program, but CCP not running.
+
+J'	       01 3	Inquiry request is completed, interrupted program
+			can now resume.
+
+L0-L9	        123	RPG.  Unidentified record, 2nd digit gives file 
+			statement number in source program 1-9, 0 means
+			greater than 9.  Can also occur if record is out
+			of sequence.
+
+LA	CILA     23	Too little storage for number of files in program.
+
+LC	CILC     23	Too little storage for requested allocation.
+
+LE	CILE	 23	No FILE or an incorrect FILE for a file requested
+			by current program.
+
+LH	CILH	 23	No space given for an output file on FILE statement.
+
+LJ	CILJ	 23	Attempt to output to existing permanent file.
+
+LL	CILL   0 23	Attempt to output over an existing temporary file.
+
+LP	CILP     23	File already exists.
+
+LU	CILU    123	Pack name requested but wrong pack mounted.  1:
+			retry after mounting correct pack.
+
+LY	CILYxx	 23	Attempt to allocate space that isn't available.
+			xx=02 means space not available in split cylinder 
+			area.
+
+L	LML CP 01 3	$MAINT detected attempt to modify a program on 	
+			a pack with an active checkpoint.
+
+L-	CIL-      3	Attempt to add a split cylinder to a split cyl
+			file while other level is fiddling with a split
+			cylinder file.
+
+L'	CIl'     23	Trying to allocate a split cylinder file before 
+			allocating the first split cylinder file in a group.
+
+P1-P8			Printer hardware errors, should not occur in sim.
+
+PC	IPPC   0 23	Unprintable character.
+
+PH	CIPH     23	LOCATION plus TRACKS goes past end of pack.
+
+PJ	CIPJxx  1	A Pack is to be remounted, pack name printed before
+			half code, xx= unit.
+
+PU	CIPU      3	Duplicate file names in the FILE statements.
+
+PY	CIPY01	  3	ISAM file requires at least 2 tracks.
+	CIPY02    3	ISAM file can't be split cylinder.
+
+P'	CIP'xx   23	Too many scratch or work files.  
+
+U0-U9	       0123	RPG. Unidentified record in file, 2nd digit of
+			halt is file statement in RPG source, 0= greater
+			than 9.
+
+UA	CIUA      3	Attempt to create a multivolume file in
+			invalid.
+
+UC	CIUC      3	The printed actived file cannot be found in the
+			list of scratch files.
+
+UE	CIUExx  1 3	PACK parameter does not match pack name on unit.
+				xx = Unit referenced.
+				1 = Mount another pack and continue.
+
+UF	CIUF      3	Disk file referenced by name and date not found.
+
+UH	CIUH      3	Attempt to create multivolume file failed,
+			because name alreayd exists.
+
+UJ	CIUJ	  3	A LOCATION was specified for an existing disk file
+			and the file exists but not at that location.
+
+UL	CIUL      3	File on // FILE statement not found, and no size
+			in TRACKS or RECORDS was given.
+
+UP	CIUP      3	Permanent file referenced with RETAIN-S
+
+UU	CIUU      3	Disk Pack not available.
+
+UY	CIUY      3	File is a System/3 BASIC file which must be unique.
+
+U	CIU	  3	Existing file: TRACKS/RECORDS or LOCATION mismatch.
+
+U-			General CCP halt.  Press start to see subhalt. 
+			Refer to CCP manual for more info.
+
+U'	CIU'	  23	VTOC is full, or more than 2 multivolume files per
+			pack, or more than 2 ISAM files using HIKEY
+			parameter.
+
+YH	CRYH   0  3	Cards are being punched, but card read from
+			reader was not blank. This means you are trying to
+			punch with a file attached to the CDR device.
+			Unattach the file and take the zero option.
+
+ 0	(blank 0)	FILE WRITE switch in off position.
+
+ 1	(blank 1)	Permanent DIsk I/O Error
+
+ 2	RC 211    3	COBOL.  Out of room on $WORK.
+	RC 212    3	Out of room on $SOURCE.
+	RC 213	  3	Out of room on $WORKX.
+	RC 214	  3	Subprogram name table greater than 20.
+	RC 219 0  3	C or E level diagnostics during compile.
+	RC 2A1   23	Subscript invalid
+	RC 2A2   23	Negative exponent or 0 degrees in program
+	RC 2F1   23	MFCU File not open or opened improperly
+	RC 2F2   23	1442 File not open or opened improperly
+	RC 2F3   23	1403/5203 File not open or opened improperly
+	RC 2F4   23	5444 Disk File not open or opened improperly
+	RC 2F5   23	5444 File not open or opened improperly
+	RC 2F7   23	5444 File not open or opened improperly
+	RC 2F8   23	Tape File not open or opened improperly
+	RC 2H1   23	OPEN attempted after CLOSE WITH LOCK
+	RC 2H2   23	Error during ACCEPT
+	RC 2H3   23	$$STOP not found
+	RC 2H4	 23	CHeckpoint could not be taken.
+	RC 2H5   23	$$STIC not found for ACCEPT
+	RC 2H6	 23	Parameter mismatch CALL and USING
+	RC 2H7   23	ACCEPT after /& read
+	RC 2H8   23	OPEN for a file already OPEN
+	RC 2 0	  3	Too little core for compile
+	RC 2 1    3	PROCEDURE or DATA division not found.
+	RC 2 3    3	Program has more than 65535 statements (!)
+	RC 2 4	  3	Source name on COMPILE statement not found
+	
+ 3	R  3XX 0  3	COBOL Stop literal.  XX is user-specified.
+			0 continues program 3 cancels.
+
+ 4	VF 4NF    3	Program not found.  Program library and
+			not printed before halt message.
+
+ 6	RF 6XX 0 23	FORTRAN stop statement.
+
+ 7 	RF 701   23	Source member on COMPILE not found
+	RF 702   23	Object program too large for core.
+
+ 8 	CS 8	1 3	System input device allocated to other level.
+
+ 9 	CS 9    1 3	System input device has an error.  This usually
+			means the card hopper is empty (i.e. EOF on the
+			file attached to the reader but SCP wants more
+			input).
+
+ A	DC A    123	Number of characters entered from keyboard
+			incorrect.
+
+ C	DD C   0 23	Unprintable character for printer/keyboard.
+
+ E	DC E    123	Hardware error, PKB
+
+ F	DC F   0 23	End of forms, PKB
+
+ L	DD L   0  3	Records with duplicate keys have been loaded
+			into ISAM file.  Each dup key is logged followed
+			by blank P halt.  0: continue.  Index will 
+			contain duplicate keys.  3: cancel, file is
+			not usable, reload it.
+
+ P 	DD P   0  3	Duplicate key encountered.  The key is printed
+			on the log.  0: continue, halt will recur for
+			any other duplicates, then blank L appears.
+
+ U	DD U      3	Disk I/O error while sorting ISAM index.
+
+ Y	DD Y	  3	System error during file termination.
+
+-0	DD-0XX    3	ISAM multivolume file being used and high key
+			not found for current columme, or does not agree
+			with HIKEY spec.  XX=unit number.
+
+-1	DD-1XX	123	Halt -P occurred and option 0 taken.  But, the
+			pack mounted is not a part of volume set.
+
+-2	DD-2XX	123	Multivolume load sequence error.
+
+-3	DD-3XX  123	Multivolume load sequence error.
+
+-4	DD-4XX 0123	Warning that one or more volumes are about to be
+			bypassed.  
+
+-5	DD-5XX  123	Multivolume file not found.  1: mount correct pack.
+
+-6	DD-6XX 0 23	Warning.  ENd of volume and HIKEY not found.
+
+-7	DD-7XX  1 3	-A halt and option 1 taken.  But the pack referenced
+			does not match pack name.
+
+-8	DD-8XX    3	Multivolume file referenced but file isn't	
+			multivolume.
+
+-9	DD-9XX    3	Add to a multivolumen file, but last pack not
+			mounted.
+
+-A	DD-AXX  1 3	Add to existing multivolume filebut no room.
+
+-C	DD-CXX    3	Multivolume file error.  Probably out of sequence
+			volume mounts.
+
+-E	DD-EXX  123	Next volume cannot be processed, because the
+			location is not available or space is not available	
+			or there are scratch files on the pack.
+
+-F	DD-Fxx	123	Finished a volume, next cannot be processed, mount
+			the correct pack or cancel.
+
+-H	DD-Hxx    3	HIKEY length does not match file.
+
+-J	DD-Jxx 01 3	First volume referenced is not volumme 1.  0:
+			continue with this volume, 1: mount another pack.
+
+-L	DD-Lxx	  3	Output to multivolume, but file isn't multivolume
+			or referenced volume isn't first one of set.
+
+-P	DD-PXX 0123	Mount next volume.  XX=unit number.  0: continue
+			bypassing volumes, 1: mount next volume.
+
+-U	DD-UXX  1 3	Halt -J just occurred and 0 or 1 taken.  But the
+			pack name is incorrect or the file isn't found.
+
+-	DD-     123	Multivolume key error.  Key too low or high for
+			volume.
+
+-'	DD-'    123	Sequential add to multivolume file, but HIKEY
+			record missing on previous volume.
+
+'0	GM'0DE    3	SYSGEN.  I/O Error on reader.
+	GM'0EX    3	SYSGEN.  End of extent on MACOUT or $SOURCE.
+	GM'0IC  1 3	SYSGEN.  Option dependent on a preceding option, the
+			preceding one was omitted or invalid.
+	GM'0ID  1 3	SYSGEN invalid delimiter.
+	GM'0IK  1 3	SYSGEN invalid keyword.
+	GM'0IR  1 3	SYSGEN invalid option.
+	GM'0IS  1 3	SYSGEN sequence error.
+	GM'0NF  1 3	SYSGEN entry in cols 8-12 not found.
+	GM'0NS    3	SYSGEN Requested source program not found.
+	GM'0EM  1 3	SYSGEN.  END statement not found.
+	GM'0NP    3	SYSGEN.  Module $SGXP2, $SGXP3, $SGXP4, $SGXP5, or
+			$SGXP6 missing for sysgen, or $MPXP2, $MPXP3 or
+			$MPXP4 missing for macro processor.
+
+'1	GG'1	  3	System Generation Errors.
+
+'2	       0  3	Error during macro processor run.
+
+'3	          3	Invalid 5445 disk label record.
+
+'4	GG'4EX	  3	Out of room on Sysgen, or disk error.
+
+-----------------------  End of haltguide.txt  ---------------------------
