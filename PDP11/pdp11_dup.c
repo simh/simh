@@ -36,6 +36,7 @@
    characters both initially and between DDCMP packets.
 
    15-May-13    MP      Initial implementation
+
 */
 
 #if defined (VM_PDP10)                                  /* PDP10 version */
@@ -316,7 +317,8 @@ static BITFIELD dup_txdbuf_bits[] = {
 #define TXDBUF_MBZ ((1<<15)|(1<<13))
 #define TXDBUF_WRITEABLE (TXDBUF_M_TABRT|TXDBUF_M_TEOM|TXDBUF_M_TSOM|TXDBUF_M_TXDBUF)
 
-
+#define TRAILING_SYNS 8
+const uint8 tsyns[TRAILING_SYNS] = {0x96,0x96,0x96,0x96,0x96,0x96,0x96,0x96}; 
 
 /* DUP data structures
 
@@ -576,7 +578,7 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
         if ((!(dup_rxcsr[dup] & RXCSR_M_RCVEN)) && 
             (orig_val & RXCSR_M_RCVEN)) {               /* Downward transition of receiver enable */
             dup_rxdbuf[dup] &= ~RXDBUF_M_RXDBUF;
-            dup_rxcsr[dup] &= ~RXCSR_M_RXACT;
+            dup_rxcsr[dup] &= ~(RXCSR_M_RXACT|RXCSR_M_RXDONE);    /* also clear RXDONE per DUP11 spec. */
             if ((dup_rcvpkinoff[dup] != 0) || 
                 (dup_rcvpkbytes[dup] != 0))
                 dup_rcvpkinoff[dup] = dup_rcvpkbytes[dup] = 0;
@@ -967,8 +969,8 @@ dup_rxdbuf[dup] &= ~RXDBUF_M_RCRCER;
 dup_rxdbuf[dup] &= ~RXDBUF_M_RXDBUF;
 dup_rxdbuf[dup] |= dup_rcvpacket[dup][dup_rcvpkinoff[dup]++];
 dup_rxcsr[dup] |= RXCSR_M_RXDONE;
-if (((dup_rcvpkinoff[dup] == 8) || 
-     (dup_rcvpkinoff[dup] >= dup_rcvpkbytes[dup])) &&
+if ( ((dup_rcvpkinoff[dup] == 8) || 
+      (dup_rcvpkinoff[dup] >= dup_rcvpkbytes[dup]-TRAILING_SYNS)) && /* don't include trailing SYNs in CRC calc */ 
     (0 == ddcmp_crc16 (0, dup_rcvpacket[dup], dup_rcvpkinoff[dup])))
     dup_rxdbuf[dup] |= RXDBUF_M_RCRCER;
 else
@@ -1070,13 +1072,19 @@ for (dup=active=attached=0; dup < dup_desc.lines; dup++) {
             r = tmxr_get_packet_ln (lp, &buf, &size_t_size);
             size = (uint16)size_t_size;
             }
+        /* in DEC mode add some SYN bytes to the end to deal with host drivers that 
+           implement the DDCMP CRC performance optimisation (DDCMP V4.0 section 5.1.2) */
         if ((r == SCPE_OK) && (buf)) {
-            if (dup_rcvpksize[dup] < size) {
-                dup_rcvpksize[dup] = size;
+            if (dup_rcvpksize[dup] < size + TRAILING_SYNS) {
+                dup_rcvpksize[dup] = size + TRAILING_SYNS;
                 dup_rcvpacket[dup] = (uint8 *)realloc (dup_rcvpacket[dup], dup_rcvpksize[dup]);
                 }
             memcpy (dup_rcvpacket[dup], buf, size);
             dup_rcvpkbytes[dup] = size;
+            if (dup_parcsr[dup] & PARCSR_M_DECMODE) {
+                memcpy(&(dup_rcvpacket[dup][size]), tsyns, TRAILING_SYNS);
+                dup_rcvpkbytes[dup] += TRAILING_SYNS ;
+            }
             dup_rcvpkinoff[dup] = 0;
             dup_rxcsr[dup] |= RXCSR_M_RXACT;
             dup_rcv_byte (dup);
