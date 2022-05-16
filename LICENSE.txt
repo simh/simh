@@ -1,7 +1,7 @@
-This file summarizes below the general simh license which is essentially
-stated at the top of all source code files with the respective authors 
-mentioned there.  Pay particular attention to the last couple of paragraphs
-below.
+This file summarizes below the general simh license (indented) which is 
+essentially stated at the top of all source code files with the respective 
+authors mentioned there.  Pay particular attention to the last couple of 
+paragraphs (beyond the indented section) which add some specific constraints.
 
    Copyright (c) 1993-2022, Robert M Supnik, Mark Pizzolato and others
 
@@ -29,7 +29,9 @@ below.
    written authorization from all those parties.
 
 
-Additionally, the following restrictions on the use of this software apply.
+Additionally, the following restrictions on the use of this software apply
+and, where applicable, thereby override the "without limitation" clause 
+above.
 
 Any use of this codebase that changes the code to influence the behavior of 
 the disk access activities is free to do that as long as anyone doing this 
@@ -39,5 +41,7 @@ Mark Pizzolato.  Changes that qualify for this restriction at least include:
 changing the behavior or default of SET AUTOSIZE/NOAUTOSIZE, or any code 
 in sim_disk.c or any simulator components that use the sim_disk routines.
 
-All changes to the codebase made after the inclusion of this LICENSE.txt 
-file in the github simh repository.
+All changes to the codebase made by Mark Pizzolato after the inclusion of 
+the first version of this LICENSE.txt file in the github simh repository 
+will be not be licensed for use by anyone making any of the above mentioned 
+sim_disk/autosize related changes.
