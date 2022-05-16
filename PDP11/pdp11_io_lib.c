@@ -300,11 +300,13 @@ for (i = 0; i < (int32) dibp->lnt; i = i + 2) {         /* create entries */
         (iodispR[idx] != dibp->rd)) ||
         (iodispW[idx] && dibp->wr &&
         (iodispW[idx] != dibp->wr))) {
-        printf ("Device %s address conflict at \n", sim_dname (dptr));
+        printf ("Device %s address conflict at ", sim_dname (dptr));
         fprint_val (stdout, (t_value) dibp->ba, DEV_RDX, 32, PV_LEFT);
+        printf ("\n");
         if (sim_log) {
-            fprintf (sim_log, "Device %s address conflict at \n", sim_dname (dptr));
+            fprintf (sim_log, "Device %s address conflict at ", sim_dname (dptr));
             fprint_val (sim_log, (t_value) dibp->ba, DEV_RDX, 32, PV_LEFT);
+            fprintf (sim_log, "\n");
             }
         return SCPE_STOP;
         }
