@@ -1,6 +1,6 @@
 /* i1620_cpu.c: IBM 1620 CPU simulator
 
-   Copyright (c) 2002-2018, Robert M. Supnik
+   Copyright (c) 2002-2021, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    This CPU module incorporates code and comments from the 1620 simulator by
    Geoff Kuenning, with his permission.
 
+   01-Feb-21    RMS     Added max value to address registers
    05-Jun-18    RMS     Fixed bug in select index A (COVERITY)
    23-Jun-17    RMS     BS should not enable indexing unless configured
    15-Jun-17    RMS     Added more information to IO in progress message
@@ -232,10 +233,10 @@ extern t_stat fp_fsr (uint32 d, uint32 s);
 UNIT cpu_unit = { UDATA (NULL, UNIT_FIX+UNIT_BCD+MI_STD, MAXMEMSIZE) };
 
 REG cpu_reg[] = {
-    { DRDATA (PC, saved_PC, 16), PV_LEFT },
-    { DRDATA (APC, actual_PC, 16), PV_LEFT + REG_HRO },
-    { DRDATA (IR2, IR2, 16), PV_LEFT },
-    { DRDATA (PR1, PR1, 16), PV_LEFT },
+    { DRDATA (PC, saved_PC, 16), PV_LEFT, MAXADDR },
+    { DRDATA (APC, actual_PC, 16), PV_LEFT + REG_HRO, MAXADDR },
+    { DRDATA (IR2, IR2, 16), PV_LEFT, MAXADDR },
+    { DRDATA (PR1, PR1, 16), PV_LEFT, MAXADDR },
     { DRDATA (PAR, PAR, 16), PV_LEFT + REG_RO },
     { DRDATA (QAR, QAR, 16), PV_LEFT + REG_RO },
     { FLDATA (SW1, ind[IN_SW1], 0) },

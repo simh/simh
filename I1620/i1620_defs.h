@@ -1,6 +1,6 @@
 /* i1620_defs.h: IBM 1620 simulator definitions
 
-   Copyright (c) 2002-2017, Robert M. Supnik
+   Copyright (c) 2002-2021, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,6 +27,7 @@
    I am grateful to Al Kossow, the Computer History Museum, and the IBM Corporate
    Archives for their help in gathering documentation about the IBM 1620.
 
+   01-Feb-21    RMS     Added MAXADDR for register contents
    23-May-17    RMS     MARCHK is indicator 8, not 18 (Dave Wise)
    19-May-17    RMS     Added option for Model I diagnostic mode (Dave Wise)
    05-Feb-15    TFM     Added definitions for flagged RM, GM, NB
@@ -88,6 +89,7 @@
 /* Memory */
 
 #define MAXMEMSIZE      60000                           /* max mem size */
+#define MAXADDR         (MAXMEMSIZE - 1)                /* max address */
 #define MEMSIZE         (cpu_unit.capac)                /* act memory size */
 
 /* Processor parameters */

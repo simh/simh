@@ -1,6 +1,6 @@
 /* i1401_defs.h: IBM 1401 simulator definitions
 
-   Copyright (c) 1993-2010, Robert M. Supnik
+   Copyright (c) 1993-2021, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   08-Jun-21    RMS     Added max memory address
    06-JUl-10    RMS     Added overlap indicator definitions
    22-May-10    RMS     Added check for 64b definitions
    11-Jul-08    RMS     Added IO mode flag for boot (from Bob Abeles)
@@ -81,6 +82,7 @@
 /* Memory and devices */
 
 #define MAXMEMSIZE      16000                           /* max memory */
+#define MAXADDR         (MAXMEMSIZE - 1)                /* max memory address */
 #define MEMSIZE         (cpu_unit.capac)                /* current memory */
 #define CDR_BUF         1                               /* card rdr buffer */
 #define CDR_WIDTH       80                              /* card rdr width */
