@@ -1,6 +1,6 @@
 /* pdp8_fpp.c: PDP-8 floating point processor (FPP8A)
 
-   Copyright (c) 2007-2021, Robert M Supnik
+   Copyright (c) 2007-2022, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    fpp          FPP8A floating point processor
 
+   11-Mar-22    RMS     Zeroed result exponent in double precision (COVERITY)
    05-Jan-22    RHM     Fix fencepost error in FP multiply for extended
                         precision
    21-Oct-21    RMS     Added device number display
@@ -840,6 +841,7 @@ if (fpp_sta & FPS_DP) {                                 /* dp? */
     uint32 cout = fpp_fr_add (z.fr, x.fr, y.fr, EXTEND);/* z = a + b */
     uint32 zsign = z.fr[0] & FPN_FRSIGN;
     cout = (cout? 04000: 0);                            /* make sign bit */
+    z.exp = 0;                                          /* not used in DP */
     /* overflow is indicated when signs are equal and overflow does not
        match the result sign bit */
     fpp_copy (a, &z);                                   /* result is z */
@@ -895,8 +897,10 @@ if ((fpp_fr_test(y.fr, 0, EXACT-1) == 0) && (y.fr[EXACT-1] < 2)) {
     y.exp = 0;
     y.fr[EXACT-1] = 0;
 }
-if (fpp_sta & FPS_DP)                                   /* dp? */
+if (fpp_sta & FPS_DP) {                                 /* dp? */
     fpp_fr_mul (z.fr, x.fr, y.fr, TRUE);                /* mult frac */
+    z.exp = 0;                                          /* not used in DP */
+    }
 else {                                                  /* fp or ep */
     fpp_norm (&x, EXACT);
     fpp_norm (&y, EXACT);
@@ -932,6 +936,7 @@ if (fpp_sta & FPS_DP) {                                 /* dp? */
         fpp_dump_apt (fpp_apta, FPS_IOVX);              /* error */
         return;
         }
+    z.exp = 0;                                          /* not used in DP */
     fpp_copy (a, &z);                                   /* result is z */
     }
 else {                                                  /* fp or ep */
