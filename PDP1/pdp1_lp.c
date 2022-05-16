@@ -1,6 +1,6 @@
 /* pdp1_lp.c: PDP-1 line printer simulator
 
-   Copyright (c) 1993-2008, Robert M. Supnik
+   Copyright (c) 1993-2021, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt          Type 62 line printer for the PDP-1
 
+   09-Jun-21    RMS     Removed use of ftell for pipe compatibility
    19-Jan-07    RMS     Added UNIT_TEXT flag
    21-Dec-06    RMS     Added 16-channel SBS support
    07-Sep-03    RMS     Changed ioc to ios
@@ -167,12 +168,12 @@ if (lpt_spc) {                                          /* space? */
     if ((uptr->flags & UNIT_ATT) == 0)                  /* attached? */
         return IORETURN (lpt_stopioe, SCPE_UNATT);
     fputs (lpt_cc[lpt_spc & 07], uptr->fileref);        /* print cctl */
-    uptr->pos = ftell (uptr->fileref);                  /* update position */
     if (ferror (uptr->fileref)) {                       /* error? */
         perror ("LPT I/O error");
         clearerr (uptr->fileref);
         return SCPE_IOERR;
         }
+    uptr->pos = uptr->pos + strlen (lpt_cc[lpt_spc & 07]);
     lpt_ovrpr = 0;                                      /* dont overprint */
     }
 else {
@@ -182,12 +183,12 @@ else {
     if (lpt_ovrpr)                                      /* overprint? */
         fputc ('\r', uptr->fileref);
     fputs (lpt_buf, uptr->fileref);                     /* print buffer */
-    uptr->pos = ftell (uptr->fileref);                  /* update position */
     if (ferror (uptr->fileref)) {                       /* test error */
         perror ("LPT I/O error");
         clearerr (uptr->fileref);
         return SCPE_IOERR;
         }
+    uptr->pos = uptr->pos + strlen (lpt_buf);           /* update position */
     lpt_bptr = 0;
     for (i = 0; i <= LPT_BSIZE; i++)                    /* clear buffer */
         lpt_buf[i] = 0;

@@ -1,6 +1,6 @@
 /* h316_stddev.c: Honeywell 316/516 standard devices
 
-   Copyright (c) 1999-2015, Robert M. Supnik
+   Copyright (c) 1999-2021, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,7 @@
    tty          316/516-33 teleprinter
    clk/options  316/516-12 real time clocks/internal options
 
+   20-Mar-21    RMS     Reverted use of ftell for pipe compatibility
    10-Sep-13    RMS     Fixed several bugs in the TTY logic
                         Added SET file type commands to PTR/PTP
    03-Jul-13    RLA     compatibility changes for extended interrupts
@@ -407,7 +408,7 @@ else {
         }
     else if ((uptr->flags & UNIT_ASC) && (c != 0))      /* ASCII? */
         c = c | 0200;
-    uptr->pos = ftell (uptr->fileref);                  /* update pos */
+    uptr->pos = uptr->pos + 1;                          /* update pos */
     }
 SET_INT (INT_PTR);                                      /* set ready flag */
 uptr->buf = c & 0377;                                   /* get byte */
@@ -562,7 +563,7 @@ if (putc (c, uptr->fileref) == EOF) {                   /* output byte */
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }
-uptr->pos = ftell (uptr->fileref);                      /* update pos */
+uptr->pos = uptr->pos + 1;                              /* update pos */
 return SCPE_OK;
 }
 
@@ -697,7 +698,7 @@ else if ((ruptr->flags & UNIT_ATT) &&                   /* TTR attached */
             }
         else if ((ruptr->flags & UNIT_ASC) && (c != 0))
             c = c | 0200;                               /* ASCII nz? cvt */
-        ruptr->pos = ftell (ruptr->fileref);
+        ruptr->pos = ruptr->pos + 1;
         }
     if (ttr_xoff_read != 0) {                           /* reader stopping? */
         if (c == RUBOUT)                                /* rubout? stop */
@@ -801,7 +802,7 @@ if ((puptr->flags & UNIT_ATT) &&                        /* TTP attached */
             clearerr (puptr->fileref);
             return SCPE_IOERR;
             }
-        puptr->pos = ftell (puptr->fileref);            /* update pos */
+        puptr->pos = puptr->pos + 1;                    /* update pos */
         }
     }
 return SCPE_OK;

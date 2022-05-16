@@ -1,6 +1,6 @@
 /* i1401_lp.c: IBM 1403 line printer simulator
 
-   Copyright (c) 1993-2015, Robert M. Supnik
+   Copyright (c) 1993-2021, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt          1403 line printer
 
+   09-Jun-21    RMS     Removed use of ftell for pipe compatibility
    08-Mar-15    RMS     Added print to console option
    16-Apr-13    RMS     Fixed printer chain selection
    19-Jan-07    RMS     Added UNIT_TEXT flag
@@ -248,19 +249,19 @@ if ((lpt_unit.flags & UNIT_ATT) != 0) {                 /* attached? */
         ind[IN_LPT] = 1;
         perror ("Line printer I/O error");
         clearerr (lpt_unit.fileref);
-        if (iochk)
+        if (iochk != 0)
             return SCPE_IOERR;
         }
-    lpt_unit.pos = ftell (lpt_unit.fileref);            /* update position */
+    lpt_unit.pos = lpt_unit.pos + strlen (buf);         /* update position */
     return SCPE_OK;
     }
-if ((lpt_unit.flags & UNIT_CONS) != 0) {               /* default to cons? */
-    if (buf[0] == '\n') {                              /* bare lf? */
-        inq_puts ("\r");                               /* cvt to crlf */
+if ((lpt_unit.flags & UNIT_CONS) != 0) {                /* default to cons? */
+    if (buf[0] == '\n') {                               /* bare lf? */
+        inq_puts ("\r");                                /* cvt to crlf */
         lpt_unit.pos = lpt_unit.pos + 1;
         }
     inq_puts (buf);
-    lpt_unit.pos = lpt_unit.pos + strlen (buf);
+    lpt_unit.pos = lpt_unit.pos + strlen (buf);         /* update position */
     return SCPE_OK;
     }
 return SCPE_UNATT;

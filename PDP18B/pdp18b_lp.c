@@ -1,6 +1,6 @@
 /* pdp18b_lp.c: 18b PDP's line printer simulator
 
-   Copyright (c) 1993-2017, Robert M Supnik
+   Copyright (c) 1993-2021, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,7 @@
    lp09         (PDP-9,15) LP09 line printer
    lp15         (PDP-15)   LP15 line printer
 
+   09-Jun-21    RMS     Reverted use of ftell for pipe compatibility
    13-Mar-17    RMS     Annotated fall throughs in switch
    10-Mar-16    RMS     Added 3-cycle databreak set/show entry
    07-Mar-16    RMS     Revised for dynamically allocated memory
@@ -190,12 +191,12 @@ if (lp62_spc) {                                         /* space? */
     if ((uptr->flags & UNIT_ATT) == 0)                  /* attached? */
         return IORETURN (lp62_stopioe, SCPE_UNATT);
     fputs (lp62_cc[lp62_spc & 07], uptr->fileref);      /* print cctl */
-    uptr->pos = ftell (uptr->fileref);                  /* update position */
     if (ferror (uptr->fileref)) {                       /* error? */
         perror ("LPT I/O error");
         clearerr (uptr->fileref);
         return SCPE_IOERR;
         }
+    uptr->pos = uptr->pos + strlen (lp62_cc[lp62_spc & 07]); /* update position */
     lp62_ovrpr = 0;                                     /* clear overprint */
     }
 else {
@@ -205,12 +206,13 @@ else {
     if (lp62_ovrpr)                                     /* overprint? */
         fputc ('\r', uptr->fileref);
     fputs (lp62_buf, uptr->fileref);                    /* print buffer */
-    uptr->pos = ftell (uptr->fileref);                  /* update position */
     if (ferror (uptr->fileref)) {                       /* test error */
         perror ("LPT I/O error");
         clearerr (uptr->fileref);
         return SCPE_IOERR;
         }
+    uptr->pos = uptr->pos + strlen (lp62_buf) +         /* update position */
+        (lp62_ovrpr? 1: 0);                             /* including \r */
     lp62_bp = 0;
     for (i = 0; i <= LP62_BSIZE; i++)                   /* clear buffer */
         lp62_buf[i] = 0;
@@ -432,23 +434,23 @@ if ((lp647_iot & 020) == 0) {                           /* print? */
     for (i = 0; i < LP647_BSIZE; i++)                   /* clear buffer */
         lp647_buf[i] = 0;
     fputs (pbuf, uptr->fileref);                        /* print buffer */
-    uptr->pos = ftell (uptr->fileref);                  /* update position */
     if (ferror (uptr->fileref)) {                       /* error? */
         perror ("LPT I/O error");
         clearerr (uptr->fileref);
         lp647_bp = 0;
         return SCPE_IOERR;
         }
+    uptr->pos = uptr->pos + strlen (pbuf);              /* update position */
     lp647_bp = 0;                                       /* clear buffer ptr */
     }
 if (lp647_iot & 060) {                                  /* space? */
     fputs (lp647_cc[lp647_iot & 07], uptr->fileref);    /* write cctl */
-    uptr->pos = ftell (uptr->fileref);                  /* update position */
     if (ferror (uptr->fileref)) {                       /* error? */
         perror ("LPT I/O error");
         clearerr (uptr->fileref);
         return SCPE_IOERR;
         }
+    uptr->pos = uptr->pos + strlen (lp647_cc[lp647_iot & 07]);
     }
 return SCPE_OK;
 }
@@ -616,12 +618,12 @@ c = uptr->buf & 0177;                                   /* get char */
 if ((c == 0) || (c == 0177))                            /* skip NULL, DEL */
     return SCPE_OK;
 fputc (c, uptr->fileref);                               /* print char */
-uptr->pos = ftell (uptr->fileref);                      /* update position */
 if (ferror (uptr->fileref)) {                           /* error? */
     perror ("LPT I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }
+uptr->pos = uptr->pos + 1;                              /* update position */
 return SCPE_OK;
 }
 
@@ -830,7 +832,6 @@ for (more = 1; more != 0; ) {                           /* loop until ctrl */
             lp15_buf[lp15_bp] = 0;                      /* append nul */
             fputs (lp15_buf, uptr->fileref);            /* print line */
             fputs (ctrl[c[i] & 037], uptr->fileref);    /* space */
-            uptr->pos = ftell (uptr->fileref);
             if (ferror (uptr->fileref)) {               /* error? */
                 perror ("LPT I/O error");
                 clearerr (uptr->fileref);
@@ -838,6 +839,8 @@ for (more = 1; more != 0; ) {                           /* loop until ctrl */
                 lp15_updsta (STA_DON | STA_ALM);
                 return SCPE_IOERR;
                 }
+            uptr->pos = uptr->pos + strlen (lp15_buf)   /* update position */
+                + strlen (ctrl[c[i] & 037]);            /* incl spacing */
             lp15_bp = more = 0;
             }
         else {

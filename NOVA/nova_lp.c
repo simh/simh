@@ -1,6 +1,6 @@
 /* nova_lp.c: NOVA line printer simulator
 
-   Copyright (c) 1993-2008, Robert M. Supnik
+   Copyright (c) 1993-2021, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt          line printer
 
+   09-Jun-21    RMS     Reverted use of ftell for pipe compatibility
    04-Jul-07    BKR     DEV_SET/CLR macros now used,
                         <FF>, <CR>, <LF> output character delay now contingent upon non-zero TIME value,
                         LPT can now be DISABLED
@@ -132,12 +133,12 @@ DEV_UPDATE_INTR ;
 if ((lpt_unit.flags & UNIT_ATT) == 0)                   /* attached? */
     return IORETURN (lpt_stopioe, SCPE_UNATT);
 fputc (uptr->buf, uptr->fileref);
-uptr->pos = ftell (uptr->fileref);
 if (ferror (uptr->fileref)) {
     perror ("LPT I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }
+uptr->pos = uptr->pos + 1;
 return SCPE_OK;
 }
 

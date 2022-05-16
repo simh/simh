@@ -1,6 +1,6 @@
 /* i1620_cd.c: IBM 1622 card reader/punch
 
-   Copyright (c) 2002-2017, Robert M. Supnik
+   Copyright (c) 2002-2021, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    cdr          1622 card reader
    cdp          1622 card punch
 
+   09-Jun-21    RMS     Removed use of ftell on output for pipe compatibility
    23-Jun-17    RMS     Unattached error does not set RDCHK/WRCHK
    09-Mar-17    RMS     Guardbanded translation table lookups (COVERITY)
    31-Jan-15    TFM     Changes to translation tables (Tom McBride)
@@ -528,13 +529,13 @@ cdp_buf[len] = '\n';                                    /* newline, null */
 cdp_buf[len + 1] = 0;
 
 fputs (cdp_buf, cdp_unit.fileref);                      /* write card */
-cdp_unit.pos = ftell (cdp_unit.fileref);                /* count char */
 if (ferror (cdp_unit.fileref)) {                        /* error? */
     ind[IN_WRCHK] = 1;
     sim_perror ("CDP I/O error");
     clearerr (cdp_unit.fileref);
     return SCPE_IOERR;
     }
+cdp_unit.pos = cdp_unit.pos + strlen (cdp_buf);         /* update position */
 return SCPE_OK;
 }
 

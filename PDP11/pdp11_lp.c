@@ -1,6 +1,6 @@
 /* pdp11_lp.c: PDP-11 line printer simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2021, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt          LP11 line printer
 
+   20-Mar-21    RMS     Reverted use of ftell for pipe compatibility
    19-Jan-07    RMS     Added UNIT_TEXT flag
    07-Jul-05    RMS     Removed extraneous externs
    19-May-03    RMS     Revised for new conditional compilation scheme
@@ -159,12 +160,12 @@ if (lpt_csr & CSR_IE)
 if ((uptr->flags & UNIT_ATT) == 0)
     return IORETURN (lpt_stopioe, SCPE_UNATT);
 fputc (uptr->buf & 0177, uptr->fileref);
-uptr->pos = ftell (uptr->fileref);
 if (ferror (uptr->fileref)) {
     perror ("LPT I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }
+uptr->pos = uptr->pos + 1;
 lpt_csr = lpt_csr & ~CSR_ERR;
 return SCPE_OK;
 }

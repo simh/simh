@@ -1,6 +1,6 @@
 /* i1620_lp.c: IBM 1443 line printer simulator
 
-   Copyright (c) 2002-2017, Robert M. Supnik
+   Copyright (c) 2002-2021, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt          1443 line printer
 
+   10-Jun-21    RMS     Removed use of ftell for pipe compatibility
    15-Jun-17    RMS     Fixed K constants and print-no-spacing (Tom McBride)
                         Added option to emulate form feed with newlines
    31-Jan-15    TFM     Fixed various problems ... see comments in code
@@ -279,7 +280,7 @@ return sta;
 
 t_stat lpt_print (uint32 flag)
 {
-int32 i;
+int32 i, cc;
 
 if ((lpt_unit.flags & UNIT_ATT) == 0) {                 /* not attached? */
     ind[IN_PRCHK] = 1;                                  /* pri check */
@@ -292,9 +293,11 @@ while ((lpt_bptr > 0) && (lpt_buf[lpt_bptr - 1] == ' '))
     lpt_buf[--lpt_bptr] = 0;                            /* trim buffer */
 if (lpt_bptr != 0) {                                    /* any line? */
     fputs (lpt_buf, lpt_unit.fileref);                  /* print */
-    if ((flag & 1) != 0)                                /* no space? */
+    cc = strlen (lpt_buf);
+    if ((flag & 1) != 0) {                              /* no space? */
         fputc ('\r', lpt_unit.fileref);                 /* bare return */
-    lpt_unit.pos = ftell (lpt_unit.fileref);            /* update pos */
+        cc++;
+        }
     lpt_buf_init ();                                    /* reinit buf */
     if (ferror (lpt_unit.fileref)) {                    /* error? */
         ind[IN_PRCHK] = 1;                              /* pri check */
@@ -302,6 +305,7 @@ if (lpt_bptr != 0) {                                    /* any line? */
         clearerr (lpt_unit.fileref);
         return SCPE_IOERR;
         }
+    lpt_unit.pos = lpt_unit.pos + (t_addr)cc;           /* update pos */
     }
 if ((flag & 1) == 0)                                    /* spacing? */
     return lpt_spcop (lpt_savctrl);                     /* execute */
@@ -336,17 +340,19 @@ return STOP_CCT;                                        /* runaway channel */
 
 t_stat lpt_space (int32 count, int32 sflag)
 {
-int32 i;
+int32 i, cc;
 
 cct_ptr = (cct_ptr + count) % cct_lnt;                  /* adv cct, mod lnt */
 if (sflag && CHP (0, cct[cct_ptr]) &&                   /* skip, top of form, */
-    ((lpt_unit.flags & UNIT_FF) != 0))                  /* and use form feeds? */
+    ((lpt_unit.flags & UNIT_FF) != 0)) {                /* and use form feeds? */
     fputs ("\n\f", lpt_unit.fileref);                   /* nl, ff */
+    cc = 2;
+    }
 else {
     for (i = 0; i < count; i++)                         /* count lines */
         fputc ('\n', lpt_unit.fileref);
+    cc = count;
     }
-lpt_unit.pos = ftell (lpt_unit.fileref);                /* update position */
 ind[IN_PRCH9] = CHP (9, cct[cct_ptr]) != 0;             /* set indicators */
 ind[IN_PRCH12] = CHP (12, cct[cct_ptr]) != 0;
 if (ferror (lpt_unit.fileref)) {                        /* error? */
@@ -355,6 +361,7 @@ if (ferror (lpt_unit.fileref)) {                        /* error? */
     clearerr (lpt_unit.fileref);
     return SCPE_IOERR;
     }
+lpt_unit.pos = lpt_unit.pos + (t_addr)cc;               /* update position */
 ind[IN_PRBSY] = 1;                                      /* print busy */
 sim_activate (&lpt_unit, lpt_unit.wait);                /* start timer */
 return SCPE_OK;
