@@ -124,8 +124,8 @@ extern "C" {
 #if defined(USE_NETWORK) && defined(USE_SHARED)
 #undef USE_SHARED
 #endif
-/* USE_SHARED only works on Windows or if HAVE_DLOPEN */
-#if defined(USE_SHARED) && !defined(_WIN32) && !defined(HAVE_DLOPEN)
+/* USE_SHARED only works on Windows or if SIM_HAVE_DLOPEN */
+#if defined(USE_SHARED) && !defined(_WIN32) && !defined(SIM_HAVE_DLOPEN)
 #undef USE_SHARED
 #endif
 
@@ -232,6 +232,8 @@ struct eth_queue {
   struct eth_item*    item;
 };
 
+typedef unsigned char ETH_MAC[6];
+
 struct eth_list {
   char    name[ETH_DEV_NAME_MAX];
   char    desc[ETH_DEV_DESC_MAX];
@@ -239,7 +241,6 @@ struct eth_list {
 };
 
 typedef int ETH_BOOL;
-typedef unsigned char ETH_MAC[6];
 typedef unsigned char ETH_MULTIHASH[8];
 typedef struct eth_packet  ETH_PACK;
 typedef void (*ETH_PCALLBACK)(int status);
@@ -342,11 +343,17 @@ t_stat eth_filter (ETH_DEV* dev, int addr_count,        /* set filter on incomin
                    ETH_MAC* const addresses,
                    ETH_BOOL all_multicast,
                    ETH_BOOL promiscuous);
-t_stat eth_filter_hash (ETH_DEV* dev, int addr_count,   /* set filter on incoming packets with AUTODIN II based hash */
+t_stat eth_filter_hash (ETH_DEV* dev, int addr_count,   /* set filter on incoming packets with hash */
                         ETH_MAC* const addresses,
                         ETH_BOOL all_multicast,
                         ETH_BOOL promiscuous,
-                        ETH_MULTIHASH* const hash);
+                        ETH_MULTIHASH* const hash);     /* AUTODIN II based 8 byte imperfect hash */
+t_stat eth_filter_hash_ex (ETH_DEV* dev, int addr_count,/* set filter on incoming packets with hash */
+                           ETH_MAC* const addresses,
+                           ETH_BOOL all_multicast,
+                           ETH_BOOL promiscuous,
+                           ETH_BOOL match_broadcast,
+                           ETH_MULTIHASH* const hash);  /* AUTODIN II based 8 byte imperfect hash */
 t_stat eth_check_address_conflict (ETH_DEV* dev, 
                                    ETH_MAC* const address);
 const char *eth_version (void);                         /* Version of dynamically loaded library (pcap) */
@@ -362,6 +369,7 @@ t_stat eth_show (FILE* st, UNIT* uptr,                  /* show ethernet devices
                  int32 val, CONST void* desc);
 t_stat eth_show_devices (FILE* st, DEVICE *dptr,        /* show ethernet devices */
                          UNIT* uptr, int32 val, CONST char* desc);
+int eth_devices (int max, ETH_LIST* dev, ETH_BOOL framers); /* get ethernet devices on host */
 void eth_show_dev (FILE*st, ETH_DEV* dev);              /* show ethernet device state */
 
 void eth_mac_fmt (ETH_MAC* const add, char* buffer);    /* format ethernet mac address */
@@ -379,7 +387,7 @@ void ethq_insert_data(ETH_QUE* que, int32 type,         /* insert item into FIFO
                   size_t crc_len, const uint8 *crc_data, int32 status);
 t_stat ethq_destroy(ETH_QUE* que);                      /* release FIFO queue */
 const char *eth_capabilities(void);
-t_stat sim_ether_test (DEVICE *dptr);                   /* unit test routine */
+t_stat sim_ether_test (DEVICE *dptr, const char *cptr); /* unit test routine */
 
 #if !defined(SIM_TEST_INIT)     /* Need stubs for test APIs */
 #define SIM_TEST_INIT
