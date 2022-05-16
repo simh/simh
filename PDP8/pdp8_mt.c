@@ -1,6 +1,6 @@
 /* pdp8_mt.c: PDP-8 magnetic tape simulator
 
-   Copyright (c) 1993-2020, Robert M Supnik
+   Copyright (c) 1993-2022, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    mt           TM8E/TU10 magtape
 
+   26-Mar-22    RMS     Added extra case points for new MTSE definitions
    23-Mar-20    RMS     Unload should call sim_tape_detach (Mark Pizzolato)
    16-Feb-06    RMS     Added tape capacity checking
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
@@ -555,6 +556,7 @@ switch (st) {
 
     case MTSE_FMT:                                      /* illegal fmt */
     case MTSE_UNATT:                                    /* unattached */
+    default:                                            /* unknown error */
         mt_sta = mt_sta | STA_ILL | STA_ERR;
     case MTSE_OK:                                       /* no error */
         return SCPE_IERR;                               /* never get here! */

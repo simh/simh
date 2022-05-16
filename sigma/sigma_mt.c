@@ -1,6 +1,6 @@
 /* sigma_mt.c: Sigma 732X 9-track magnetic tape
 
-   Copyright (c) 2007-2020, Robert M. Supnik
+   Copyright (c) 2007-2022, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    mt           7320 and 7322/7323 magnetic tape
 
+   26-Mar-22    RMS     Added extra case points for new MTSE definitions
    23-Mar-20    RMS     Unload should call sim_tape_detach (Mark Pizzolato)
    13-Mar-17    RMS     Annotated fall through in switch
 
@@ -478,6 +479,7 @@ switch (st) {
     case MTSE_FMT:                                      /* illegal fmt */
     case MTSE_UNATT:                                    /* not attached */
     case MTSE_WRP:                                      /* write protect */
+    default:                                            /* unknown error*/
         chan_set_chf (mt_dib.dva, CHF_XMME);            /* set err, fall through */
     case MTSE_OK:                                       /* no error */
         chan_uen (mt_dib.dva);                          /* uend */

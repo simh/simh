@@ -1,6 +1,6 @@
 /* pdp11_tq.c: TMSCP tape controller simulator
 
-   Copyright (c) 2002-2018, Robert M Supnik
+   Copyright (c) 2002-2022, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    tq           TQK50 tape controller
 
+   26-Mar-22    RMS     Added extra case points for new MTSE definitions
+   31-Jan-21    RMS     Revised for new register macros
    28-May-18    RMS     Changed to avoid nested comment warnings (Mark Pizzolato)
    23-Oct-13    RMS     Revised for new boot setup routine
    17-Mar-13    RMS     Fixed bug in ABORT link walk loop (Dave Bryan)
@@ -459,7 +461,7 @@ REG tq_reg[] = {
     { DRDATA (QTIME, tq_qtime, 24), PV_LEFT + REG_NZ },
     { DRDATA (XTIME, tq_xtime, 24), PV_LEFT + REG_NZ },
     { DRDATA (RWTIME, tq_rwtime, 32), PV_LEFT + REG_NZ },
-    { BRDATA (PKTS, tq_pkt, DEV_RDX, 16, TQ_NPKTS * (TQ_PKT_SIZE_W + 1)) },
+    { XRDATA (PKTS, tq_pkt, DEV_RDX, 16, 0, TQ_NPKTS * (TQ_PKT_SIZE_W + 1), sizeof (int16), sizeof (int16)) },
     { DRDATA (DEVTYPE, tq_typ, 2), REG_HRO },
     { DRDATA (DEVCAP, drv_tab[TQU_TYPE].cap, T_ADDR_W), PV_LEFT | REG_HRO },
     { GRDATA (DEVADDR, tq_dib.ba, DEV_RDX, 32, 0), REG_HRO },
@@ -1447,6 +1449,10 @@ switch (st) {
     case MTSE_WRP:
         uptr->flags = uptr->flags | UNIT_SXC;
         return ST_WPR;
+
+    default:
+        uptr->flags = uptr->flags | UNIT_SXC;
+        return SCPE_IERR;
         }
 
 return ST_SUC;

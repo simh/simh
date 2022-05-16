@@ -1,6 +1,6 @@
 /* h316_mt.c: H316/516 magnetic tape simulator
 
-   Copyright (c) 2003-2012, Robert M. Supnik
+   Copyright (c) 2003-2022, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    mt           516-4100 seven track magnetic tape
 
+   26-Mar-22    RMS     Added extra case points for new MTSE definitions
    03-Jul-13    RLA     compatibility changes for extended interrupts
    19-Mar-12    RMS     Fixed declaration of chan_req (Mark Pizzolato)
    09-Jun-07    RMS     Fixed bug in write without stop (Theo Engel)
@@ -519,6 +520,7 @@ switch (st) {
 
     case MTSE_FMT:                                      /* illegal fmt */
     case MTSE_UNATT:                                    /* unattached */
+    default:                                            /* unknown error */
         mt_err = 1;                                     /* reject */
     case MTSE_OK:                                       /* no error */
         return SCPE_IERR;                               /* never get here! */

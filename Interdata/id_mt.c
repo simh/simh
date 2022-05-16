@@ -1,6 +1,6 @@
 /* id_mt.c: Interdata magnetic tape simulator
 
-   Copyright (c) 2001-2008, Robert M Supnik
+   Copyright (c) 2001-2022, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    mt           M46-494 dual density 9-track magtape controller
 
+   26-Mar-22    RMS     Added extra case points for new MTSE definitions
    16-Feb-06    RMS     Added tape capacity checking
    18-Mar-05    RMS     Added attached test to detach routine
    07-Dec-04    RMS     Added read-only file support
@@ -424,6 +425,7 @@ switch (st) {
 
     case MTSE_FMT:                                      /* illegal fmt */
     case MTSE_UNATT:                                    /* not attached */
+    default:                                            /* unknown error */
         mt_sta = mt_sta | STA_ERR;
     case MTSE_OK:                                       /* no error */
         return SCPE_IERR;

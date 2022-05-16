@@ -1,6 +1,6 @@
 /* i7094_mt.c: IBM 7094 magnetic tape simulator
 
-   Copyright (c) 2003-2021, Robert M Supnik
+   Copyright (c) 2003-2022, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    mt           magtape simulator
 
+   26-Mar-22    RMS     Added extra case points for new MTSE definitions
+   11-Mar-22    RMS     Removed dead code (COVERITY)
    31-Jan-21    RMS     Replaced dynamic buffers with static (Mark Pizzolato)
    19-Mar-12    RMS     Fixed declaration of sel_name (Mark Pizzolato)
    16-Jul-10    RMS     Fixed handling of BSR, BSF (Dave Pitts)
@@ -514,7 +516,7 @@ if (ch >= NUM_CHAN)                                     /* invalid chan? */
     return SCPE_IERR;
 xb = mtxb[ch];                                          /* get xfer buf */
 u = mt_unit[ch] & 017;
-if ((xb == NULL) || (u > MT_NUMDR))                     /* invalid args? */
+if (u > MT_NUMDR)                                       /* invalid args */
     return SCPE_IERR;
 uptr = mt_dev[ch].units + u;                            /* get unit */
 mt_chob[ch] = val & DMASK;                              /* save word from chan */
@@ -554,8 +556,6 @@ t_uint64 dat;
 t_mtrlnt bc;
 t_stat r;
 
-if (xb == NULL)                                         /* valid buffer? */
-    return SCPE_IERR;
 u = uptr - mt_dev[ch].units;
 switch (uptr->UST) {                                    /* case on state */
 
@@ -733,8 +733,6 @@ uint8 *xb = mtxb[ch];
 t_stat r;
 
 if (mt_bptr[ch]) {                                      /* any data? */
-    if (xb == NULL)
-        return SCPE_IERR;
     r = sim_tape_wrrecf (uptr, xb, mt_bptr[ch]);        /* write record */
     if ((r = mt_map_err (uptr, r)))                     /* map error */
         return r;
@@ -761,6 +759,7 @@ switch (st) {
 
     case MTSE_FMT:                                      /* illegal fmt */
     case MTSE_UNATT:                                    /* not attached */
+    default:                                            /* unknown error */
         ch6_err_disc (ch, u, CHF_TRC);
         mt_unit[ch] = 0;                                /* disconnect */
         return SCPE_IERR;

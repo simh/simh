@@ -1,6 +1,6 @@
 /* pdp11_ts.c: TS11/TSV05 magnetic tape simulator
 
-   Copyright (c) 1993-2014, Robert M Supnik
+   Copyright (c) 1993-2022, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    ts           TS11/TSV05 magtape
 
+   26-Mar-22    RMS     Added extra case points for new MTSE definitions
    27-Oct-14    RMS     Fixed bug in read forward with byte swap
    23-Oct-13    RMS     Revised for new boot setup routine
    19-Mar-12    RMS     Fixed declaration of cpu_opt (Mark Pizzolato)
@@ -460,6 +461,7 @@ switch (st) {
         msgxs0 = msgxs0 | XS0_MOT;                      /* tape has moved */
     case MTSE_INVRL:                                    /* invalid rec lnt */
     case MTSE_IOERR:                                    /* IO error */
+    default:                                            /* unknown error */
         msgxs1 = msgxs1 | XS1_UCOR;                     /* uncorrectable */
         return (XTC (XS0_RLS, TC6));                    /* pos lost */
 
