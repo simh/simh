@@ -62,7 +62,7 @@
 
   Modification history:
 
-  28-May-18 RMS   Changed to avoid nested comment warnings (Mark Pizzolato)
+  28-May-18  RMS  Changed to avoid nested comment warnings (Mark Pizzolato)
   12-Jan-11  DTH  Added SHOW XU FILTERS modifier
   11-Jan-11  DTH  Corrected SELFTEST command, enabling use by VMS 3.7, VMS 4.7, and Ultrix 1.1
   09-Dec-10  MP   Added address conflict check during attach.

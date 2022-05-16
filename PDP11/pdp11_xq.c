@@ -1,7 +1,7 @@
 /* pdp11_xq.c: DEQNA/DELQA ethernet controller simulator
   ------------------------------------------------------------------------------
 
-   Copyright (c) 2002-2007, David T. Hittner
+   Copyright (c) 2002-2021, David T. Hittner
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -68,6 +68,7 @@
 
   Modification history:
 
+  31-Jan-21  RMS  Fixed structure save/restore macros (Mark Pizzolato)
   20-Apr-11  MP   Fixed missing information from save/restore which
                   caused operations to not complete correctly after 
                   a restore until the OS reset the controller.
@@ -359,9 +360,9 @@ REG xqa_reg[] = {
   { GRDATA ( SETUP_L2, xqa.setup.l2, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( SETUP_L3, xqa.setup.l3, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( SETUP_SAN, xqa.setup.sanity_timer, XQ_RDX, 32, 0), REG_HRO},
-  { BRDATA ( SETUP_MACS, &xqa.setup.macs, XQ_RDX, 8, sizeof(xqa.setup.macs)), REG_HRO},
-  { BRDATA ( STATS, &xqa.stats, XQ_RDX, 8, sizeof(xqa.setup.macs)), REG_HRO},
-  { BRDATA ( TURBO_INIT, &xqa.init, XQ_RDX, 8, sizeof(xqa.init)), REG_HRO},
+  { SAVEDATA ( SETUP_MACS, xqa.setup.macs) },
+  { SAVEDATA ( STATS, xqa.stats) },
+  { SAVEDATA ( TURBO_INIT, xqa.init) },
   { GRDATA ( SRR,  xqa.srr,  XQ_RDX, 16, 0), REG_FIT },
   { GRDATA ( SRQR,  xqa.srqr,  XQ_RDX, 16, 0), REG_FIT },
   { GRDATA ( IBA,  xqa.iba,  XQ_RDX, 32, 0), REG_FIT },
@@ -415,9 +416,9 @@ REG xqb_reg[] = {
   { GRDATA ( SETUP_L2, xqb.setup.l2, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( SETUP_L3, xqb.setup.l3, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( SETUP_SAN, xqb.setup.sanity_timer, XQ_RDX, 32, 0), REG_HRO},
-  { BRDATA ( SETUP_MACS, &xqb.setup.macs, XQ_RDX, 8, sizeof(xqb.setup.macs)), REG_HRO},
-  { BRDATA ( STATS, &xqb.stats, XQ_RDX, 8, sizeof(xqa.setup.macs)), REG_HRO},
-  { BRDATA ( TURBO_INIT, &xqb.init, XQ_RDX, 8, sizeof(xqb.init)), REG_HRO},
+  { SAVEDATA ( SETUP_MACS, xqb.setup.macs) },
+  { SAVEDATA ( STATS, xqb.stats) },
+  { SAVEDATA ( TURBO_INIT, xqb.init) },
   { GRDATA ( SRR,  xqb.srr,  XQ_RDX, 16, 0), REG_FIT },
   { GRDATA ( SRQR,  xqb.srqr,  XQ_RDX, 16, 0), REG_FIT },
   { GRDATA ( IBA,  xqb.iba,  XQ_RDX, 32, 0), REG_FIT },
