@@ -1,7 +1,7 @@
 This file summarizes below the general simh license (indented) which is 
 essentially stated at the top of all source code files with the respective 
-authors mentioned there.  Pay particular attention to the last couple of 
-paragraphs (beyond the indented section) which add some specific constraints.
+authors mentioned there.  Pay particular attention to the paragraphs 
+(beyond the indented section) which add some specific constraints.
 
    Copyright (c) 1993-2022, Robert M Supnik, Mark Pizzolato and others
 
@@ -31,17 +31,40 @@ paragraphs (beyond the indented section) which add some specific constraints.
 
 Additionally, the following restrictions on the use of this software apply
 and, where applicable, thereby override the "without limitation" clause 
-above.
+above or in each relevant source code module.
 
 Any use of this codebase that changes the code to influence the behavior of 
-the disk access activities is free to do that as long as anyone doing this 
-is explicitly not licensed to any subsequent changes to any part of the
-codebase made by Mark Pizzolato after that functionality was implemented by 
-Mark Pizzolato.  Changes that qualify for this restriction at least include: 
-changing the behavior or default of SET AUTOSIZE/NOAUTOSIZE, or any code 
-in sim_disk.c or any simulator components that use the sim_disk routines.
+the disk access activities provided by sim_disk.c and scp.c is free to do 
+that as long as anyone doing this is explicitly not licensed to any subsequent 
+changes to any part of the codebase made by Mark Pizzolato after the
+LICENSE.txt was added to the repository. Changes that qualify for this
+restriction at least include: changing the behavior or default of 
+SET AUTOSIZE/NOAUTOSIZE, or any code in scp.c and sim_disk.c or any simulator 
+components that use the sim_disk routines.
 
 All changes to the codebase made by Mark Pizzolato after the inclusion of 
 the first version of this LICENSE.txt file in the github simh repository 
 will be not be licensed for use by anyone making any of the above mentioned 
 sim_disk/autosize related changes.
+
+There are three potential categories of users who may need clarification 
+when interpreting the above license wording:
+
+Group 1: Any person who uses completely unmodified code from the repo is 
+         licensed to use all of "Mark Pizzolato's future changes".
+Group 2: Any person using a simulator that has no devices which use sim_disk
+         and that doesn't modify scp.c is licensed to use all of "Mark 
+         Pizzolato's future changes".
+Group 3: Any person who finds it desireable to change the AUTOSIZE 
+         functionality of scp.c or any aspect of the sim_disk.c is NOT 
+         licensed for any of "Mark Pizzolato's future changes".
+
+Note: Mark Pizzolato's future changes are commits made to the repository 
+      authored by Mark Pizzolato after the first version of this LICENSE.txt 
+      was added to the repository.
+
+For many years, there exist some binary files in the repository which may 
+not have formal copyright releases from the original copyright holders and 
+therefore those are certainly not granted a license by this LICENSE.txt file.
+
+Upon specific request any such unlicensed will be removed.
