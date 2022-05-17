@@ -134,8 +134,8 @@ endif
 ifneq (,$(findstring pdp7,${MAKECMDGOALS}))
   VIDEO_USEFUL = true
 endif
-# building the pdp11, any pdp10, any 3b2, or any vax simulator could use networking support
-ifneq (,$(findstring pdp11,${MAKECMDGOALS})$(findstring pdp10,${MAKECMDGOALS})$(findstring vax,${MAKECMDGOALS})$(findstring infoserver,${MAKECMDGOALS})$(findstring 3b2,${MAKECMDGOALS})$(findstring all,${MAKECMDGOALS}))
+# building the pdp11, any pdp10, or any vax simulator could use networking support
+ifneq (,$(findstring pdp11,${MAKECMDGOALS})$(findstring pdp10,${MAKECMDGOALS})$(findstring vax,${MAKECMDGOALS})$(findstring infoserver,${MAKECMDGOALS})$(findstring all,${MAKECMDGOALS}))
   NETWORK_USEFUL = true
   ifneq (,$(findstring all,${MAKECMDGOALS}))
     BUILD_MULTIPLE = s
@@ -2056,28 +2056,6 @@ KS10 = ${KS10D}/kx10_cpu.c ${KS10D}/kx10_sys.c ${KS10D}/kx10_disk.c \
 	${KS10D}/ks10_kmc.c ${KS10D}/ks10_dup.c ${KS10D}/kx10_imp.c
 KS10_OPT = -DKS=1 -DUSE_INT64 -I $(KS10D) -I $(PDP11D) ${NETWORK_OPT}
 
-ATT3B2D = ${SIMHD}/3B2
-ATT3B2M400 = ${ATT3B2D}/3b2_cpu.c ${ATT3B2D}/3b2_sys.c \
-	${ATT3B2D}/3b2_rev2_sys.c ${ATT3B2D}/3b2_rev2_mmu.c \
-	${ATT3B2D}/3b2_rev2_mau.c ${ATT3B2D}/3b2_rev2_csr.c \
-	${ATT3B2D}/3b2_rev2_timer.c ${ATT3B2D}/3b2_stddev.c \
-	${ATT3B2D}/3b2_mem.c ${ATT3B2D}/3b2_iu.c \
-	${ATT3B2D}/3b2_if.c ${ATT3B2D}/3b2_id.c \
-	${ATT3B2D}/3b2_dmac.c ${ATT3B2D}/3b2_io.c \
-	${ATT3B2D}/3b2_ports.c ${ATT3B2D}/3b2_ctc.c \
-	${ATT3B2D}/3b2_ni.c
-ATT3B2M400_OPT = -DUSE_INT64 -DUSE_ADDR64 -DREV2 -I ${ATT3B2D} ${NETWORK_OPT}
-
-ATT3B2M600 = ${ATT3B2D}/3b2_cpu.c ${ATT3B2D}/3b2_sys.c \
-	${ATT3B2D}/3b2_rev3_sys.c ${ATT3B2D}/3b2_rev3_mmu.c \
-	${ATT3B2D}/3b2_rev2_mau.c ${ATT3B2D}/3b2_rev3_csr.c \
-	${ATT3B2D}/3b2_rev3_timer.c ${ATT3B2D}/3b2_stddev.c \
-	${ATT3B2D}/3b2_mem.c ${ATT3B2D}/3b2_iu.c \
-	${ATT3B2D}/3b2_if.c ${ATT3B2D}/3b2_dmac.c \
-	${ATT3B2D}/3b2_io.c ${ATT3B2D}/3b2_ports.c \
-	${ATT3B2D}/3b2_scsi.c ${ATT3B2D}/3b2_ni.c
-ATT3B2M600_OPT = -DUSE_INT64 -DUSE_ADDR64 -DREV3 -I ${ATT3B2D} ${NETWORK_OPT}
-
 SIGMAD = ${SIMHD}/sigma
 SIGMA = ${SIGMAD}/sigma_cpu.c ${SIGMAD}/sigma_sys.c ${SIGMAD}/sigma_cis.c \
 	${SIGMAD}/sigma_coc.c ${SIGMAD}/sigma_dk.c ${SIGMAD}/sigma_dp.c \
@@ -2147,13 +2125,13 @@ ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	nova eclipse hp2100 hp3000 i1401 i1620 s3 altair altairz80 gri \
 	i7094 ibm1130 id16 id32 sds lgp h316 cdc1700 \
 	swtp6800mp-a swtp6800mp-a2 tx-0 ssem b5500 intel-mds \
-	scelbi 3b2 i701 i704 i7010 i7070 i7080 i7090 \
+	scelbi i701 i704 i7010 i7070 i7080 i7090 \
 	sigma uc15 pdp10-ka pdp10-ki pdp10-kl pdp10-ks pdp6 i650 \
 	imlac tt2500 sel32 
 
 all : ${ALL}
 
-EXPERIMENTAL = cdc1700 3b2-600
+EXPERIMENTAL = cdc1700
 
 experimental : ${EXPERIMENTAL}
 
@@ -2790,24 +2768,6 @@ ${BIN}b5500${EXE} : ${B5500} ${SIM}
 	${CC} ${B5500} ${SIM} ${B5500_OPT} ${CC_OUTSPEC} ${LDFLAGS}
 ifneq (,$(call find_test,${B5500D},b5500))
 	$@ $(call find_test,${B5500D},b5500) ${TEST_ARG}
-endif
-
-3b2 : ${BIN}3b2${EXE}
- 
-${BIN}3b2${EXE} : ${ATT3B2M400} ${SIM} ${BUILD_ROMS}
-	${MKDIRBIN}
-	${CC} ${ATT3B2M400} ${SIM} ${ATT3B2M400_OPT} ${CC_OUTSPEC} ${LDFLAGS}
-ifneq (,$(call find_test,${ATT3B2D},3b2))
-	$@ $(call find_test,${ATT3B2D},3b2) ${TEST_ARG}
-endif
-
-3b2-600 : ${BIN}3b2-600${EXE}
-
-${BIN}3b2-600${EXE} : ${ATT3B2M600} ${SIM} ${BUILD_ROMS}
-	${MKDIRBIN}
-	${CC} ${ATT3B2M600} ${SCSI} ${SIM} ${ATT3B2M600_OPT} ${CC_OUTSPEC} ${LDFLAGS}
-ifneq (,$(call find_test,${ATT3B2D},3b2-600))
-	$@ $(call find_test,${ATT3B2D},3b2-600) ${TEST_ARG}
 endif
 
 i7090 : ${BIN}i7090${EXE}

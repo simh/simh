@@ -11,7 +11,7 @@ env:
   - SIM="microvax3100m80 vaxstation4000vlc infoserver1000 nova eclipse hp2100 hp3000 i1401 i1620 s3 altair altairz80 gri i7094 ibm1130"
   - SIM="id16 id32 sds lgp h316 cdc1700 swtp6800mp-a swtp6800mp-a2 tx-0 ssem b5500"
   - SIM="besm6 imlac tt2500 intel-mds"
-  - SIM="scelbi 3b2 i701 i704 i7010 i7070 i7080 i7090 sigma uc15 i650"
+  - SIM="scelbi i701 i704 i7010 i7070 i7080 i7090 sigma uc15 i650"
 sudo: required
 install: sh -ex .travis/deps.sh "$TRAVIS_OS_NAME"
 script: make $SIM

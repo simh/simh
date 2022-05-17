@@ -3430,7 +3430,6 @@ const char helpString[] =
     "\n"
     "++DEUNA/DELUA  Unibus PDP11 and VAX simulators\n"
     "++XS           VAX simulators\n"
-    "++NI           AT&T 3b2 simulator\n"
     "++NIA-20       KL10 simulator\n"
     "\n"
     ;
