@@ -600,6 +600,8 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
         dup_txcsr[dup] |= (data & TXCSR_WRITEABLE);
         if (dup_txcsr[dup] & TXCSR_M_DRESET) {
             dup_clear(dup, dup_W3[dup]);
+            /* must also clear loopback if it was set */
+            tmxr_set_line_loopback (&dup_desc.ldsc[dup], FALSE);
             break;
             }
         if (TXCSR_GETMAISEL(dup_txcsr[dup]) != TXCSR_GETMAISEL(orig_val)) { /* Maint Select Changed */
