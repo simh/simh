@@ -1,6 +1,6 @@
 /* sigma_dp.c: moving head disk pack controller
 
-   Copyright (c) 2008-2017, Robert M Supnik
+   Copyright (c) 2008-2022, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    dp           moving head disk pack controller
 
+   06-Jun-22    RMS     Fixed missing loop increment in TDV (Ken Rector)
    13-Mar-17    RMS     Fixed bug in selecting 3281 unit F (COVERITY)
 
    Transfers are always done a sector at a time.
@@ -611,7 +612,7 @@ switch (op) {                                           /* case on op */
                     chan_uen (dva);                     /* uend */
                     }
                 dp_clr_ski (cidx, i);                   /* clear seek int */
-                sim_cancel (&dp_unit[i + DP_SEEK]);     /* cancel seek compl */
+                sim_cancel (&dp_unit[i] + DP_SEEK);     /* cancel seek compl */
                 }
             chan_clr_chi (dva);                         /* clear chan int */
             }
@@ -1028,6 +1029,7 @@ while (tptr->byte != 0) {
         data = (uint8) ((ctx->dp_flags & tptr->mask) >> tptr->fpos);
         c[tptr->byte] |= (data << tptr->tpos);
         }
+    tptr++;
     }
 return;
 }
