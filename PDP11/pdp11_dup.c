@@ -74,6 +74,7 @@ static uint16 dup_txdbuf[DUP_LINES];
 static t_bool dup_W3[DUP_LINES];
 static t_bool dup_W5[DUP_LINES];
 static t_bool dup_W6[DUP_LINES];
+static t_bool dup_kmc[DUP_LINES];                       /* being used by a kmc or other internal simulator device */
 static uint32 dup_rxi = 0;                                     /* rcv interrupts */
 static uint32 dup_txi = 0;                                     /* xmt interrupts */
 static uint32 dup_wait[DUP_LINES];                             /* rcv/xmt byte delay */
@@ -837,6 +838,7 @@ if (!protocol_DDCMP) {
 if (crc_inhibit) {
     return SCPE_ARG;                /* Must enable CRC for DDCMP */
     }
+dup_kmc[dup] = TRUE;     /* remember we are being used by an internal simulator device */
 /* These settings reflect how RSX operates a bare DUP when used for 
    DECnet communications */
 dup_clear(dup, FALSE);
@@ -955,6 +957,8 @@ return SCPE_OK;
 
 static t_stat dup_rcv_byte (int32 dup)
 {
+int32 crcoffset;
+    
 sim_debug (DBG_TRC, DUPDPTR, "dup_rcv_byte(dup=%d) - %s, byte %d of %d\n", dup, 
            (dup_rxcsr[dup] & RXCSR_M_RCVEN) ? "enabled" : "disabled",
            dup_rcvpkinoff[dup], dup_rcvpkbytes[dup]);
@@ -966,13 +970,15 @@ if (dup_rcv_packet_data_callback[dup]) {
     dup_rcv_packet_data_callback[dup](dup, dup_rcvpkbytes[dup]);
     return SCPE_OK;
     }
+/* if we added trailing SYNs, don't include them in the CRC calc */
+crcoffset = (dup_kmc[dup] ? 0 : TRAILING_SYNS);
 dup_rxcsr[dup] |= RXCSR_M_RXACT;
 dup_rxdbuf[dup] &= ~RXDBUF_M_RCRCER;
 dup_rxdbuf[dup] &= ~RXDBUF_M_RXDBUF;
 dup_rxdbuf[dup] |= dup_rcvpacket[dup][dup_rcvpkinoff[dup]++];
 dup_rxcsr[dup] |= RXCSR_M_RXDONE;
 if ( ((dup_rcvpkinoff[dup] == 8) || 
-      (dup_rcvpkinoff[dup] >= dup_rcvpkbytes[dup]-TRAILING_SYNS)) && /* don't include trailing SYNs in CRC calc */ 
+      (dup_rcvpkinoff[dup] >= dup_rcvpkbytes[dup]-crcoffset)) && 
     (0 == ddcmp_crc16 (0, dup_rcvpacket[dup], dup_rcvpkinoff[dup])))
     dup_rxdbuf[dup] |= RXDBUF_M_RCRCER;
 else
@@ -1083,7 +1089,7 @@ for (dup=active=attached=0; dup < dup_desc.lines; dup++) {
                 }
             memcpy (dup_rcvpacket[dup], buf, size);
             dup_rcvpkbytes[dup] = size;
-            if (dup_parcsr[dup] & PARCSR_M_DECMODE) {
+            if (!dup_kmc[dup] && (dup_parcsr[dup] & PARCSR_M_DECMODE)) {
                 memcpy(&(dup_rcvpacket[dup][size]), tsyns, TRAILING_SYNS);
                 dup_rcvpkbytes[dup] += TRAILING_SYNS ;
             }
@@ -1235,11 +1241,12 @@ if (dup_ldsc == NULL) {                                 /* First time startup */
             ++attached;
         }
     dup_units[dup_desc.lines] = dup_poll_unit_template;
-    /* Initialize to standard factory Option Jumper Settings */
+    /* Initialize to standard factory Option Jumper Settings and no associated KMC */
     for (i = 0; i < DUP_LINES; i++) {
         dup_W3[i] = TRUE;
         dup_W5[i] = FALSE;
         dup_W6[i] = TRUE;
+        dup_kmc[i] = FALSE;
         }
     }
 for (i = 0; i < dup_desc.lines; i++) {                  /* init each line */
