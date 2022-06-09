@@ -1,4 +1,4 @@
-/*  mp-a2_sys.c: SWTP 6800 system interface
+/*  mp-a2_sys.c: SWTP 6800 CPU Board Type 2
 
     Copyright (c) 2005-2012, William Beech
 
@@ -43,13 +43,7 @@ extern DEVICE ptr_dev;
 extern DEVICE ptp_dev;
 extern DEVICE mp_8m_dev;
 extern DEVICE dsk_dev;
-
-/* external routines */
-
-extern void CPU_BD_put_mbyte(int32 addr, int32 val);
-extern void CPU_BD_put_mword(int32 addr, int32 val);
-extern int32 CPU_BD_get_mbyte(int32 addr);
-extern int32 CPU_BD_get_mword(int32 addr);
+extern DEVICE fd400_dsk_dev;
 
 extern int32 saved_PC;                     /* Program counter */
 
@@ -70,8 +64,8 @@ REG *sim_PC = &m6800_reg[0];
 int32 sim_emax = 4;
 
 DEVICE *sim_devices[] = {
-    &CPU_BD_dev,
     &m6800_dev,
+    &CPU_BD_dev,
     &BOOTROM_dev,
     &m6810_dev,
     &i2716_dev,
@@ -81,6 +75,7 @@ DEVICE *sim_devices[] = {
     &ptp_dev,
     &mp_8m_dev,
     &dsk_dev,
+    &fd400_dsk_dev,
     NULL
 };
 

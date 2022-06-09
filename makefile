@@ -1806,11 +1806,13 @@ SDS_OPT = -I ${SDSD} -DUSE_SIM_CARD
 SWTP6800D = ${SIMHD}/swtp6800/swtp6800
 SWTP6800C = ${SIMHD}/swtp6800/common
 SWTP6800MP-A = ${SWTP6800C}/mp-a.c ${SWTP6800C}/m6800.c ${SWTP6800C}/m6810.c \
-	${SWTP6800C}/bootrom.c ${SWTP6800C}/dc-4.c ${SWTP6800C}/mp-s.c ${SWTP6800D}/mp-a_sys.c \
-	${SWTP6800C}/mp-b2.c ${SWTP6800C}/mp-8m.c
+	${SWTP6800C}/bootrom.c ${SWTP6800C}/dc-4.c ${SWTP6800D}/mp-a_sys.c \
+	${SWTP6800C}/mp-8m.c ${SWTP6800C}/fd400.c ${SWTP6800C}/mp-b2.c \
+	${SWTP6800C}/mp-s.c
 SWTP6800MP-A2 = ${SWTP6800C}/mp-a2.c ${SWTP6800C}/m6800.c ${SWTP6800C}/m6810.c \
-	${SWTP6800C}/bootrom.c ${SWTP6800C}/dc-4.c ${SWTP6800C}/mp-s.c ${SWTP6800D}/mp-a2_sys.c \
-	${SWTP6800C}/mp-b2.c ${SWTP6800C}/mp-8m.c ${SWTP6800C}/i2716.c
+	${SWTP6800C}/bootrom.c ${SWTP6800C}/dc-4.c ${SWTP6800D}/mp-a2_sys.c \
+	${SWTP6800C}/mp-8m.c ${SWTP6800C}/i2716.c ${SWTP6800C}/fd400.c \
+	${SWTP6800C}/mp-s.c ${SWTP6800C}/mp-b2.c
 SWTP6800_OPT = -I ${SWTP6800D}
 
 INTELSYSD = ${SIMHD}/Intel-Systems

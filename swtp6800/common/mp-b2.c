@@ -25,7 +25,7 @@
 
     MODIFICATIONS:
 
-        24 Apr 15 -- Modified to use simh_debug
+        28 May 22 -- Roberto Sancho Villa (RSV) fixes for other disk controllers
 
     NOTES:
 
@@ -49,22 +49,20 @@
 
 /* function prototypes */
 
-int32 get_base(void);
-int32 CPU_BD_get_mbyte(int32 addr);
-int32 CPU_BD_get_mword(int32 addr);
-void CPU_BD_put_mbyte(int32 addr, int32 val);
-void CPU_BD_put_mword(int32 addr, int32 val);
+// CPU Boards
+extern int32 CPU_BD_get_mbyte(int32 addr);
+extern int32 CPU_BD_get_mword(int32 addr);
+extern void CPU_BD_put_mbyte(int32 addr, int32 val);
+extern void CPU_BD_put_mword(int32 addr, int32 val);
 
 /* empty I/O device routine */
 int32 nulldev(int32 io, int32 data);
 
-/* SS-50 bus routines */
+/* SS-50 MB routines */
 int32 MB_get_mbyte(int32 addr);
 int32 MB_get_mword(int32 addr);
 void MB_put_mbyte(int32 addr, int32 val);
 void MB_put_mword(int32 addr, int32 val);
-t_stat mpb2_examine(t_value *eval_array, t_addr addr, UNIT *uptr, int32 switches);
-t_stat mpb2_deposit(t_value value, t_addr addr, UNIT *uptr, int32 switches);
 
 /* MP-8M bus routines */
 extern int32 mp_8m_get_mbyte(int32 addr);
@@ -85,6 +83,16 @@ extern int32 fdctrk(int32 io, int32 data);
 extern int32 fdcsec(int32 io, int32 data);
 extern int32 fdcdata(int32 io, int32 data);
 
+/* LFD-400 FDC I/O routines */
+
+extern int32 fd400_fdcstatus(int32 io, int32 data);
+extern int32 fd400_cstatus(int32 io, int32 data);
+extern int32 fd400_data(int32 io, int32 data);
+extern int32 fd400_cursect(int32 io, int32 data);
+extern int32 fd400_startrw(int32 io, int32 data);
+
+extern DEVICE fd400_dsk_dev;
+
 /* This is the I/O configuration table.  There are 32 possible
 device addresses, if a device is plugged into a port it's routine
 address is here, 'nulldev' means no device is available
@@ -95,16 +103,22 @@ struct idev {
 };
 
 struct idev dev_table[32] = {
-        {&nulldev}, {&nulldev}, {&nulldev}, {&nulldev}, /*Port 0 8000-8003 */
-        {&sio0s},   {&sio0d},   {&sio1s},   {&sio1d},   /*Port 1 8004-8007 */
+        {&nulldev},     {&nulldev},     {&nulldev},     {&nulldev}, /*Port 0 8000-8003 */
+        {&sio0s},       {&sio0d},       {&sio1s},       {&sio1d},   /*Port 1 8004-8007 */
 /* sio1x routines just return the last value read on the matching
    sio0x routine.  SWTBUG tests for the MP-C with most port reads! */
-        {&nulldev}, {&nulldev}, {&nulldev}, {&nulldev}, /*Port 2 8008-800B*/
-        {&nulldev}, {&nulldev}, {&nulldev}, {&nulldev}, /*Port 3 800C-800F*/
-        {&nulldev}, {&nulldev}, {&nulldev}, {&nulldev}, /*Port 4 8010-8013*/
-        {&fdcdrv},  {&nulldev}, {&nulldev}, {&nulldev}, /*Port 5 8014-8017*/
-        {&fdccmd},  {&fdctrk},  {&fdcsec},  {&fdcdata}, /*Port 6 8018-801B*/
-        {&nulldev}, {&nulldev}, {&nulldev}, {&nulldev}  /*Port 7 801C-801F*/
+        {&nulldev},     {&nulldev},     {&nulldev},     {&nulldev},     /*Port 2 8008-800B*/
+        {&nulldev},     {&nulldev},     {&nulldev},     {&nulldev},     /*Port 3 800C-800F*/
+        {&nulldev},     {&nulldev},     {&nulldev},     {&nulldev},     /*Port 4 8010-8013*/
+        {&fdcdrv},      {&nulldev},     {&nulldev},     {&nulldev},     /*Port 5 8014-8017*/
+        {&fdccmd},      {&fdctrk},      {&fdcsec},      {&fdcdata},     /*Port 6 8018-801B*/
+        {&nulldev},     {&nulldev},     {&nulldev},     {&nulldev}      /*Port 7 801C-801F*/
+};
+
+/* RSV - LFD-400 routines */
+struct idev dev_table2[8] = {
+        {&fd400_cstatus}, {&fd400_data}, {&fd400_cursect}, {&fd400_fdcstatus}, /* Port CC00-CC03 */ 
+        {&fd400_startrw}, {&nulldev},    {&nulldev},       {&nulldev}   /* Port CC04-CC07 */
 };
 
 /* dummy i/o device */
@@ -167,8 +181,8 @@ DEVICE MB_dev = {
     1,                                  //aincr
     16,                                 //dradix
     8,                                  //dwidth
-    mpb2_examine,                        //examine
-    mpb2_deposit,                        //deposit
+    NULL,                               //examine
+    NULL,                               //deposit
     NULL,                               //reset
     NULL,                               //boot
     NULL,                               //attach
@@ -190,45 +204,45 @@ int32 MB_get_mbyte(int32 addr)
     switch(addr & 0xE000) {
         case 0x0000:                    //0000-1FFFh
             if (MB_unit.flags & UNIT_RAM_0000)
-                val = mp_8m_get_mbyte(addr) & 0xFF;
+                val = mp_8m_get_mbyte(addr) & BYTEMASK;
             else
                 val = 0xFF;
             break;
         case 0x2000:                    //2000-3FFFh
             if (MB_unit.flags & UNIT_RAM_2000)
-                val = mp_8m_get_mbyte(addr) & 0xFF;
+                val = mp_8m_get_mbyte(addr) & BYTEMASK;
             else
                 val = 0xFF;
             break;
         case 0x4000:                    //4000-5FFFh
             if (MB_unit.flags & UNIT_RAM_4000)
-                val = mp_8m_get_mbyte(addr) & 0xFF;
+                val = mp_8m_get_mbyte(addr) & BYTEMASK;
             else
                 val = 0xFF;
             break;
         case 0x6000:                    //6000-7FFFh
             if (MB_unit.flags & UNIT_RAM_6000)
-                val = mp_8m_get_mbyte(addr) & 0xFF;
+                val = mp_8m_get_mbyte(addr) & BYTEMASK;
             else
                 val = 0xFF;
             break;
         case 0x8000:                    //8000-9FFFh (I/O ports)
-            if (addr < 0x8020)
-                val = (dev_table[addr - 0x8000].routine(0, 0)) & 0xFF;
-            else
+            if (addr < 0x8020) {
+                val = (dev_table[addr - 0x8000].routine(0, 0)) & BYTEMASK;
+            } else
                 val = 0xFF;
-            sim_debug (DEBUG_read, &MB_dev, "MB_get_mbyte: I/O addr=%04X val=%02X\n",
-                addr, val);
             break;
         case 0xA000:                    //A000-AFFFh
             if (MB_unit.flags & UNIT_RAM_A000)
-                val = mp_8m_get_mbyte(addr) & 0xFF;
+                val = mp_8m_get_mbyte(addr) & BYTEMASK;
             else
                 val = 0xFF;
             break;
         case 0xC000:                    //C000-CFFFh
-            if (MB_unit.flags & UNIT_RAM_C000)
-                val = mp_8m_get_mbyte(addr) & 0xFF;
+            if (((fd400_dsk_dev.flags & DEV_DIS) == 0) && ((addr & 0xFFF0) == 0xCC00)) //RSV
+                val = (dev_table2[addr - 0xCC00].routine(0, 0));
+            else if (MB_unit.flags & UNIT_RAM_C000)
+                val = mp_8m_get_mbyte(addr) & BYTEMASK;
             else
                 val = 0xFF;
             break;
@@ -244,11 +258,9 @@ int32 MB_get_mword(int32 addr)
 {
     int32 val;
 
-    sim_debug (DEBUG_read, &MB_dev, "MB_get_mword: addr=%04X\n", addr);
     val = (MB_get_mbyte(addr) << 8);
     val |= MB_get_mbyte(addr+1);
     val &= 0xFFFF;
-    sim_debug (DEBUG_read, &MB_dev, "MB_get_mword: val=%04X\n", val);
     return val;
 }
 
@@ -282,7 +294,9 @@ void MB_put_mbyte(int32 addr, int32 val)
                 mp_8m_put_mbyte(addr, val);
             break;
         case 0xC000:                    //C000-CFFFh
-            if (MB_unit.flags & UNIT_RAM_C000)
+            if (((fd400_dsk_dev.flags & DEV_DIS) == 0) && ((addr & 0xFFF0) == 0xCC00)) //RSV
+                dev_table2[addr - 0xCC00].routine(1, val);
+            else if (MB_unit.flags & UNIT_RAM_C000)
                 mp_8m_put_mbyte(addr, val);
             break;
         default:
@@ -294,24 +308,8 @@ void MB_put_mbyte(int32 addr, int32 val)
 
 void MB_put_mword(int32 addr, int32 val)
 {
-    sim_debug (DEBUG_write, &MB_dev, "MB_ptt_mword: addr=%04X, val=%04X\n", addr, val);
     MB_put_mbyte(addr, val >> 8);
     MB_put_mbyte(addr+1, val);
-}
-
-t_stat mpb2_examine(t_value *eval_array, t_addr addr, UNIT *uptr, int32 switches)
-{
-    int32 i;
-
-    for (i=0; i<sim_emax; ++i)
-        *eval_array++ = CPU_BD_get_mbyte(addr++);
-    return SCPE_OK;
-}
-
-t_stat mpb2_deposit(t_value value, t_addr addr, UNIT *uptr, int32 switches)
-{
-    CPU_BD_put_mbyte(addr,value);
-    return SCPE_OK;
 }
 
 /* end of mp-b2.c */

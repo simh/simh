@@ -55,12 +55,10 @@ int32 CPU_BD_get_mbyte(int32 addr);
 int32 CPU_BD_get_mword(int32 addr);
 void CPU_BD_put_mbyte(int32 addr, int32 val);
 void CPU_BD_put_mword(int32 addr, int32 val);
-t_stat mpa_examine(t_value *eval_array, t_addr addr, UNIT *uptr, int32 switches);
-t_stat mpa_deposit(t_value value, t_addr addr, UNIT *uptr, int32 switches);
 
 /* external routines */
 
-/* MP-B2 bus routines */
+/* MP-B2 MB routines */
 extern int32 MB_get_mbyte(int32 addr);
 extern int32 MB_get_mword(int32 addr);
 extern void MB_put_mbyte(int32 addr, int32 val);
@@ -114,8 +112,8 @@ DEVICE CPU_BD_dev = {
     1,                                  //aincr
     16,                                 //dradix
     8,                                  //dwidth
-    mpa_examine,                        //examine
-    mpa_deposit,                        //deposit
+    NULL,                               //examine
+    NULL,                               //deposit
     NULL,                               //reset
     NULL,                               //boot
     NULL,                               //attach
@@ -132,30 +130,27 @@ DEVICE CPU_BD_dev = {
 
 int32 CPU_BD_get_mbyte(int32 addr)
 {
-    int32 val;
+    int32 val = 0, EA = 0, EA1 = 0;
 
     sim_debug (DEBUG_read, &CPU_BD_dev, "CPU_BD_get_mbyte: addr=%04X\n", addr);
     switch(addr & 0xF000) {
         case 0xA000:
             if (CPU_BD_unit.flags & UNIT_RAM) {
-                val = m6810_get_mbyte(addr - 0xA000) & 0xFF;
-                sim_debug (DEBUG_read, &CPU_BD_dev, "CPU_BD_get_mbyte: m6810 val=%02X\n", val);
+                val = m6810_get_mbyte(addr - 0xA000) & BYTEMASK;
             } else {
-                val = MB_get_mbyte(addr) & 0xFF;
-                sim_debug (DEBUG_read, &CPU_BD_dev, "CPU_BD_get_mbyte: m6810 val=%02X\n", val);
+                val = MB_get_mbyte(addr) & BYTEMASK;
             }
             break;
         case 0xE000:
-            val = BOOTROM_get_mbyte(addr - 0xE000) & 0xFF;
-            sim_debug (DEBUG_read, &CPU_BD_dev, "CPU_BD_get_mbyte: EPROM=%02X\n", val);
+            val = BOOTROM_get_mbyte(addr - 0xE000) & BYTEMASK;
             break;
         case 0xF000:
-            val = BOOTROM_get_mbyte(addr - (0x10000 - BOOTROM_unit.capac)) & 0xFF;
-            sim_debug (DEBUG_read, &CPU_BD_dev, "CPU_BD_get_mbyte: EPROM=%02X\n", val);
+            EA1 = 0x10000 - BOOTROM_unit.capac;
+            EA = addr - EA1;
+            val = BOOTROM_get_mbyte(EA) & BYTEMASK;
             break;
         default:
-            val = MB_get_mbyte(addr) & 0xFF;
-            sim_debug (DEBUG_read, &CPU_BD_dev, "CPU_BD_get_mbyte: mp_b2 val=%02X\n", val);
+            val = MB_get_mbyte(addr) & BYTEMASK;
     }
     return val;
 }
@@ -166,11 +161,9 @@ int32 CPU_BD_get_mword(int32 addr)
 {
     int32 val;
 
-    sim_debug (DEBUG_read, &CPU_BD_dev, "CPU_BD_get_mword: addr=%04X\n", addr);
     val = (CPU_BD_get_mbyte(addr) << 8);
     val |= CPU_BD_get_mbyte(addr+1);
     val &= 0xFFFF;
-    sim_debug (DEBUG_read, &CPU_BD_dev, "CPU_BD_get_mword: val=%04X\n", val);
     return val;
 }
 
@@ -178,8 +171,6 @@ int32 CPU_BD_get_mword(int32 addr)
 
 void CPU_BD_put_mbyte(int32 addr, int32 val)
 {
-    sim_debug (DEBUG_write, &CPU_BD_dev, "CPU_BD_put_mbyte: addr=%04X, val=%02X\n",
-        addr, val);
     switch(addr & 0xF000) {
         case 0xA000:
             if (CPU_BD_unit.flags & UNIT_RAM)
@@ -196,25 +187,8 @@ void CPU_BD_put_mbyte(int32 addr, int32 val)
 
 void CPU_BD_put_mword(int32 addr, int32 val)
 {
-    sim_debug (DEBUG_write, &CPU_BD_dev, "CPU_BD_put_mword: addr=%04X, val=%04X\n",
-        addr, val);
     CPU_BD_put_mbyte(addr, val >> 8);
     CPU_BD_put_mbyte(addr+1, val);
-}
-
-t_stat mpa_examine(t_value *eval_array, t_addr addr, UNIT *uptr, int32 switches)
-{
-    int32 i;
-
-    for (i=0; i<sim_emax; ++i)
-        *eval_array++ = CPU_BD_get_mbyte(addr++);
-    return SCPE_OK;
-}
-
-t_stat mpa_deposit(t_value value, t_addr addr, UNIT *uptr, int32 switches)
-{
-    CPU_BD_put_mbyte(addr,value);
-    return SCPE_OK;
 }
 
 /* end of mp-a.c */

@@ -200,6 +200,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\swtp6800\common\fd400.c"
+				>
+			</File>
+			<File
 				RelativePath="..\swtp6800\common\m6800.c"
 				>
 			</File>
