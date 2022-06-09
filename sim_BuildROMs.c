@@ -69,7 +69,7 @@ struct ROM_File_Descriptor {
    {"PDP11/lunar11/lunar.lda",          "PDP11/pdp11_vt_lunar_rom.h",               13824,            0xFFF15D00,        "lunar_lda"},
    {"PDP11/dazzledart/dazzle.lda",      "PDP11/pdp11_dazzle_dart_rom.h",             6096,            0xFFF83848,        "dazzle_lda"},
    {"PDP11/11logo/11logo.lda",          "PDP11/pdp11_11logo_rom.h",                 26009,            0xFFDD77F7,        "logo_lda"},
-   {"swtp6800/swtp6800/swtbug.bin",     "swtp6800/swtp6800/swtp_swtbug_bin.h",       1024,            0xFFFE4FBC,        "swtp_swtbug_bin"},
+   {"swtp6800/swtp6800/swtbugv10.bin",  "swtp6800/swtp6800/swtp_swtbugv10_bin.h",    1024,            0xFFFE4FBC,        "swtp_swtbugv10_bin"},
    {"3B2/rom_rev2.bin",                 "3B2/rom_rev2_bin.h",                       32768,            0xFFD55762,        "rom_rev2_bin"},
    {"3B2/rom_rev2_demon.bin",           "3B2/rom_rev2_demon_bin.h",                 65536,            0xFFB345BB,        "rom_rev2_demon_bin"},
    {"3B2/rom_rev3.bin",                 "3B2/rom_rev3_bin.h",                      131072,            0xFFDC0EB8,        "rom_rev3_bin"},
