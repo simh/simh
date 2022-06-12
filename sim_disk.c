@@ -7023,6 +7023,101 @@ if (stat == SCPE_OK)
 return sim_messagef (SCPE_OK, "No such file or directory: %s\n", cptr);
 }
 
+/*
+
+MediaId
+
+Is defined in the MSCP Basic Disk Functions Manual, page 4-37 to 4-38:
+
+The media type identifier is a 32-bit number, and it's coded like this:
+The high 25 bits are 5 characters, each coded with 5 bits. The low 7 
+bits is a binary coded 2 digits.
+
+Looking at it, you have:
+D0,D1,A0,A1,A2,N
+
+For an RA81, it would be:
+
+D0,D1 is the preferred device type name for the unit. In our case, 
+that would be "DU".
+A0,A1,A2 is the name of the media used on the unit. In our case "RA".
+N is the value of the two decimal digits, so 81 for this example.
+
+And for letters, the coding is that A=1, B=2 and so on. 0 means the 
+character is not used.
+
+So, again, for an RA81, we would get:
+
+Decimal Values:        4,    21,    18,     1,     0,      81
+Hex Values:            4,    15,    12,     1,     0,      51
+Binary Values:     00100, 10101, 10010, 00001, 00000, 1010001
+Hex 4 bit Nibbles:    2     5     6     4   1     0     5   1
+
+The 32bit value of RA81_MED is 0x25641051
+
+ */
+const char *sim_disk_decode_mediaid (uint32 MediaId)
+{
+static char text[16];
+char D0[2] = "";
+char D1[2] = "";
+char A0[2] = "";
+char A1[2] = "";
+char A2[2] = "";
+uint32 byte;
+char num[4];
+
+byte = (MediaId >> 27) & 0x1F;
+if (byte)
+    snprintf (D0, sizeof (D0), "%c", ('A' - 1) + byte);
+byte = (MediaId >> 22) & 0x1F;
+if (byte)
+    snprintf (D1, sizeof (D1), "%c", ('A' - 1) + byte);
+byte = (MediaId >> 17) & 0x1F;
+if (byte)
+    snprintf (A0, sizeof (A0), "%c", ('A' - 1) + byte);
+byte = (MediaId >> 12) & 0x1F;
+if (byte)
+    snprintf (A1, sizeof (A1), "%c", ('A' - 1) + byte);
+byte = (MediaId >> 7) & 0x1F;
+if (byte)
+    snprintf (A2, sizeof (A2), "%c", ('A' - 1) + byte);
+snprintf (num, sizeof (num), "%d", MediaId & 0x7F);
+snprintf (text, sizeof (text), "%s%s - %s%s%s%s", D0, D1, A0, A1, num, A2);
+return text;
+}
+
+uint32 sim_disk_drive_type_to_mediaid (const char *drive_type, const char *device_type)
+{
+uint32 D0 = 0;
+uint32 D1 = 0;
+uint32 num = 0;
+uint32 A0 = 0;
+uint32 A1 = 0;
+uint32 A2 = 0;
+
+if (device_type == NULL)
+    device_type = "DU";
+if (isalpha (device_type[0]))
+    D0 = toupper (device_type[0]) - 'A' + 1;
+if (isalpha (device_type[1]))
+    D1 = toupper (device_type[1]) - 'A' + 1;
+if (isalpha (drive_type[0]))
+    A0 = toupper (drive_type[0]) - 'A' + 1;
+if (isalpha (drive_type[1]))
+    A1 = toupper (drive_type[1]) - 'A' + 1;
+if (isalpha (drive_type[strlen (drive_type) - 1]))
+    A2 = toupper (drive_type[strlen (drive_type) - 1]) - 'A' + 1;
+while (isalpha (*drive_type))
+    ++drive_type;
+if (isdigit (*drive_type))
+    num = strtoul (drive_type, NULL, 10);
+return (D0 << 27) | (D1 << 22) | (A0 << 17) | (A1 << 12) | (A2 << 7) | num;
+}
+
+
+
+
 /* disk testing */
 
 #include <setjmp.h>

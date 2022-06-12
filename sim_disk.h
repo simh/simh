@@ -123,6 +123,8 @@ t_bool sim_disk_isavailable (UNIT *uptr);
 t_bool sim_disk_isavailable_a (UNIT *uptr, DISK_PCALLBACK callback);
 t_bool sim_disk_wrp (UNIT *uptr);
 t_stat sim_disk_pdp11_bad_block (UNIT *uptr, int32 sec, int32 wds);
+const char *sim_disk_decode_mediaid (uint32 MediaId);
+uint32 sim_disk_drive_type_to_mediaid (const char *drive_type, const char *device_type);
 t_offset sim_disk_size (UNIT *uptr);
 t_bool sim_disk_vhd_support (void);
 t_bool sim_disk_raw_support (void);
