@@ -79,6 +79,7 @@ int sim_mkdir(const char *path);
 int sim_rmdir(const char *path);
 t_stat sim_copyfile (const char *source_file, const char *dest_file, t_bool overwrite_existing);
 char *sim_filepath_parts (const char *pathname, const char *parts);
+const char *sim_relative_path (const char *filepath);
 char *sim_getcwd (char *buf, size_t buf_size);
 #include <sys/stat.h>
 typedef void (*DIR_ENTRY_CALLBACK)(const char *directory, 

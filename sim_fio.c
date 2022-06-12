@@ -482,8 +482,7 @@ static struct pack_test {
     t_bool      dlsb;
     uint32      scount;
     t_bool      exp_stat;
-    } p_test[] =
-    {
+    } p_test[] = {
 #if defined (USE_INT64)
         {&int64_data, &res_36bitM, 64, TRUE,  36, FALSE, 4,  FALSE},
         {&res_36bitM, &int64_data, 36, FALSE, 64, TRUE,  4,  FALSE},
@@ -518,12 +517,30 @@ static struct pack_test {
         {NULL},
         };
 
+
+
+static struct relative_path_test {
+    const char  *input;
+    t_bool      prepend_cwd;
+    const char  *result;
+    } r_test[] = {
+        {"file.dat",             FALSE, "./file.dat"},
+        {"\\file.dat",           TRUE,  "./file.dat"},
+        {"C:/XXX/yyy/file.dat",  FALSE, "C:/XXX/yyy/file.dat"},
+        {"C:/Users/yyy/file.dat",FALSE, "C:/Users/yyy/file.dat"},
+        {"W:/XXX/yyy/file.dat",  FALSE, "W:/XXX/yyy/file.dat"},
+        {"/file.dat",            TRUE,  "./file.dat"},
+        {"/x/filepath/file.dat", FALSE, "/x/filepath/file.dat"},
+        {NULL},
+        };
+
 t_stat sim_fio_test (const char *cptr)
 {
 struct pack_test *pt;
+struct relative_path_test *rt;
 t_stat r = SCPE_OK;
-char test_desc[128];
-uint8 result[128];
+char test_desc[512];
+uint8 result[512];
 
 sim_register_internal_device (&sim_fio_test_dev);
 sim_fio_test_dev.dctrl = (sim_switches & SWMASK ('D')) ? FIO_DBG_PACK : 0;
@@ -551,6 +568,47 @@ for (pt = p_test; pt->src; ++pt) {
         }
     else
         r = sim_messagef (SCPE_IERR, "%s - BAD Status - Expected: %s got %s\n", test_desc, pt->exp_stat ? "True" : "False", res ? "True" : "False");
+    }
+for (rt = r_test; rt->input; ++rt) {
+    char input[PATH_MAX + 1];
+    char cmpbuf[PATH_MAX + 1];
+    char cwd[PATH_MAX + 1];
+    char *wd = sim_getcwd(cwd, sizeof (cwd));
+    char *cp;
+    const char *result;
+    static const char seperators[] = "/\\";
+    const char *sep;
+
+    if (rt->prepend_cwd) {
+        strlcpy (input, cwd, sizeof (input));
+        strlcat (input, rt->input, sizeof (input));
+        }
+    else
+        strlcpy (input, rt->input, sizeof (input));
+    for (sep = seperators; *sep != '\0'; ++sep) {
+        while ((cp = strchr (input, *sep)))
+            *cp = (*sep == '/') ? '\\' : '/';
+        while ((cp = strchr (cwd, *sep)))
+            *cp = (*sep == '/') ? '\\' : '/';
+        result = sim_relative_path (input);
+        strlcpy (cmpbuf, rt->result, sizeof (cmpbuf));
+        if (strchr (input, *sep) != NULL) {         /* Input has separators? */
+            while ((cp = strchr (cmpbuf, *sep)))
+                *cp = (*sep == '/') ? '\\' : '/';   /* Change the expected result to match */
+            }
+        if (strcmp (result, cmpbuf) != 0) {
+            r = sim_messagef (SCPE_IERR, "Relative Path Unexpected Result:\n");
+            sim_messagef (SCPE_IERR, "    input: %s\n", input);
+            sim_messagef (SCPE_IERR, "   result: %s\n", result);
+            sim_messagef (SCPE_IERR, " expected: %s\n", cmpbuf);
+            sim_messagef (SCPE_IERR, "      cwd: %s\n", cwd);
+            }
+        else {
+            sim_messagef (SCPE_OK, "Relative Path Good Result:\n");
+            sim_messagef (SCPE_OK, "    input: %s\n", input);
+            sim_messagef (SCPE_OK, "   result: %s\n", result);
+            }
+        }
     }
 return r;
 }
@@ -1372,6 +1430,78 @@ for (p = parts; *p; p++) {
     }
 free (fullpath);
 return result;
+}
+
+const char *sim_relative_path (const char *filenamepath)
+{
+char dir[PATH_MAX+1] = "";
+char *wd = sim_getcwd(dir, sizeof (dir));
+char dsep = (strchr (dir, '/') != NULL) ? '/' : '\\';
+char *cp;
+static char buf[CBUFSIZE*4];
+char *filepath = NULL;
+char fsep = (strchr (filenamepath, '\\') != NULL) ? '\\' : '/';
+char updir[4] = {'.', '.', fsep};
+size_t offset = 0, lastdir = 0, updirs = 0, up, cwd_dirs;
+
+filepath = sim_filepath_parts (filenamepath, "f");
+if (strchr (filepath, fsep) == NULL) {  /* file directory path separators changed? */
+    char csep = (fsep == '/') ? '\\' : '/';
+
+    while ((cp = strchr (filepath, csep)))
+        *cp = fsep;                     /* restore original file path separator */
+    }
+if (dsep != fsep) {                     /* if directory path separators aren't the same */
+    while ((cp = strchr (dir, dsep)) != NULL)
+        *cp = fsep;                     /* change to the file path separator */
+    dsep = fsep;
+    }
+cp = dir - 1;
+cwd_dirs = (isalpha(dir[0]) && (dir[1] == ':')) ? 1 : 0;
+while ((cp = strchr (cp + 1, fsep)) != NULL)
+    cwd_dirs++;
+buf[0] = '\0';
+while ((dir[offset] != '\0') && (filepath[offset] != '\0')) {
+    if (dir[offset] == dsep) {
+        if (filepath[offset] == fsep) {
+            lastdir = offset;
+            ++offset;
+            continue;
+            }
+        }
+
+#if defined(_WIN32)         /* Windows has case independent file names */
+#define _CMP(x) toupper (x)
+#else
+#define _CMP(x) (x)
+#endif
+    if (_CMP(dir[offset]) != _CMP(filepath[offset]))
+        break;
+    ++offset;
+    }
+while (dir[++lastdir] != '\0') {
+    if (dir[lastdir] == dsep)
+        ++updirs;
+    }
+if (updirs > 0) {
+    if ((offset == 3) &&                /* if only match windows drive letter? */
+        (dir[1] == ':') && 
+        (dir[2] == dsep))
+        offset = 0;                     /* */
+    if ((offset > 0) && (updirs != cwd_dirs)) {
+        for (up = 0; up <= updirs; up++)
+            strlcat (buf, updir, sizeof (buf));
+        if (strlen (buf) > offset) {    /* if relative path prefix is longer than input path? */
+            offset = 0;                 /* revert to original path */
+            buf[0] = '\0';
+            }
+        }
+    }
+else
+    strlcpy (buf, ".", sizeof (buf));
+strlcat (buf, &filepath[offset], sizeof (buf));
+free (filepath);
+return buf;
 }
 
 #if defined (_WIN32)
