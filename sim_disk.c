@@ -6903,7 +6903,9 @@ if (info->flag) {        /* zap type */
             sector_data = (uint8 *)malloc (sector_size * sizeof (*sector_data));
             zero_sector = (uint8 *)calloc (sector_size, sizeof (*sector_data));
             container_size -= sizeof (*f);
-            while (container_size > highwater) {
+            stop_cpu = FALSE;
+            while ((container_size > highwater) &&
+                   (!stop_cpu)) {
                 if ((sim_fseeko (container, container_size - sector_size, SEEK_SET) != 0) ||
                     (sector_size != sim_fread (sector_data, 1, sector_size, container))   ||
                     (0 != memcmp (sector_data, zero_sector, sector_size)))
@@ -6913,14 +6915,21 @@ if (info->flag) {        /* zap type */
                     sim_messagef (SCPE_OK, "Trimming trailing zero containing blocks at lbn: %u          \r", (uint32)(container_size / sector_size));
                 container_size -= sector_size;
                 }
-            if (sim_switches & SWMASK ('Z'))
-                sim_messagef (SCPE_OK, "Last zero containing block found at lbn: %u          \n", (uint32)(container_size / sector_size));
             free (sector_data);
             free (zero_sector);
-            (void)sim_set_fsize (container, (t_addr)container_size);
-            fclose (container);
-            sim_set_file_times (FullPath, statb.st_atime, statb.st_mtime);
-            info->stat = sim_messagef (SCPE_OK, "Disk Type Removed from container '%s'\n", FullPath);
+            if (!stop_cpu) {
+                if (sim_switches & SWMASK ('Z'))
+                    sim_messagef (SCPE_OK, "Last zero containing block found at lbn: %u          \n", (uint32)(container_size / sector_size));
+                (void)sim_set_fsize (container, (t_addr)container_size);
+                fclose (container);
+                sim_set_file_times (FullPath, statb.st_atime, statb.st_mtime);
+                info->stat = sim_messagef (SCPE_OK, "Disk Type Removed from container '%s'\n", FullPath);
+                }
+            else {
+                stop_cpu = FALSE;
+                fclose (container);
+                info->stat = sim_messagef (SCPE_ARG, "Canceled Disk Type Removal from container '%s'\n", FullPath);
+                }
             return;
             }
         }
