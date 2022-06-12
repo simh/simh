@@ -612,7 +612,7 @@ switch (op) {                                           /* case on op */
                     chan_uen (dva);                     /* uend */
                     }
                 dp_clr_ski (cidx, i);                   /* clear seek int */
-                sim_cancel (&dp_unit[i] + DP_SEEK);     /* cancel seek compl */
+                sim_cancel (&dp_unit[i + DP_SEEK]);     /* cancel seek compl */
                 }
             chan_clr_chi (dva);                         /* clear chan int */
             }
