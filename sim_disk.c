@@ -1554,6 +1554,297 @@ if (readonly)
 return ret_val;
 }
 
+/* 2.11 BSD Volume Recognizer - Structure Info gathered from: the 2.11 BSD disklabel section 5 man page */
+
+#define BSD_DISKMAGIC           ((uint32) 0x82564557)   /* The disk label magic number */
+#define BSD_211_MAXPARTITIONS   8
+
+typedef struct BSD_211_disklabel {
+    uint32  d_magic;        /* the magic number */
+    uint8   d_type;         /* drive type */
+    uint8   d_subtype;      /* controller/d_type specific */
+    char    d_typename[16]; /* type name, e.g. "eagle" */
+    /* 
+     * d_packname contains the pack identifier and is returned when
+     * the disklabel is read off the disk or in-core copy.
+     * d_boot0 is the (optional) name of the primary (block 0) bootstrap
+     * as found in /mdec.  This is returned when using
+     * getdiskbyname(3) to retrieve the values from /etc/disktab.
+     */
+    char    d_packname[16];     /* pack identifier */ 
+                                /* disk geometry: */
+    uint16  d_secsize;          /* # of bytes per sector */
+    uint16  d_nsectors;         /* # of data sectors per track */
+    uint16  d_ntracks;          /* # of tracks per cylinder */
+    uint16  d_ncylinders;       /* # of data cylinders per unit */
+    uint16  d_secpercyl;        /* # of data sectors per cylinder */
+    uint32  d_secperunit;       /* # of data sectors per unit */
+    /*
+     * Spares (bad sector replacements) below
+     * are not counted in d_nsectors or d_secpercyl.
+     * Spare sectors are assumed to be physical sectors
+     * which occupy space at the end of each track and/or cylinder.
+     */
+    uint16  d_sparespertrack;   /* # of spare sectors per track */
+    uint16  d_sparespercyl;     /* # of spare sectors per cylinder */
+    /*
+     * Alternate cylinders include maintenance, replacement,
+     * configuration description areas, etc.
+     */
+    uint16  d_acylinders;       /* # of alt. cylinders per unit */
+
+        /* hardware characteristics: */
+    /*
+     * d_interleave, d_trackskew and d_cylskew describe perturbations
+     * in the media format used to compensate for a slow controller.
+     * Interleave is physical sector interleave, set up by the formatter
+     * or controller when formatting.  When interleaving is in use,
+     * logically adjacent sectors are not physically contiguous,
+     * but instead are separated by some number of sectors.
+     * It is specified as the ratio of physical sectors traversed
+     * per logical sector.  Thus an interleave of 1:1 implies contiguous
+     * layout, while 2:1 implies that logical sector 0 is separated
+     * by one sector from logical sector 1.
+     * d_trackskew is the offset of sector 0 on track N
+     * relative to sector 0 on track N-1 on the same cylinder.
+     * Finally, d_cylskew is the offset of sector 0 on cylinder N
+     * relative to sector 0 on cylinder N-1.
+     */
+    uint16  d_rpm;              /* rotational speed */
+    uint8   d_interleave;       /* hardware sector interleave */
+    uint8   d_trackskew;        /* sector 0 skew, per track */
+    uint8   d_cylskew;          /* sector 0 skew, per cylinder */
+    uint8   d_headswitch;       /* head swith time, usec */
+    uint16  d_trkseek;          /* track-to-track seek, msec */
+    uint16  d_flags;            /* generic flags */
+#define NDDATA 5
+    uint32  d_drivedata[NDDATA]; /* drive-type specific information */
+#define NSPARE 5
+    uint32  d_spare[NSPARE];    /* reserved for future use */
+    uint32  d_magic2;           /* the magic number (again) */
+    uint16  d_checksum;         /* xor of data incl. partitions */
+
+            /* filesystem and partition information: */
+    uint16  d_npartitions;      /* number of partitions in following */
+    uint8   d_bbsize;           /* size of boot area at sn0, bytes */
+    uint8   d_sbsize;           /* max size of fs superblock, bytes */
+    struct  {                   /* the partition table */
+        uint32  p_size;         /* number of sectors in partition */
+        uint32  p_offset;       /* starting sector */
+        uint16  p_fsize;        /* filesystem basic fragment size */
+        uint8   p_fstype;       /* filesystem type, see below */
+        uint8   p_frag;         /* filesystem fragments per block */
+        } d_partitions[BSD_211_MAXPARTITIONS];/* actually may be more */
+} BSD_211_disklabel;
+
+
+static t_offset get_BSD_211_filesystem_size (UNIT *uptr, uint32 physsectsz, t_bool *readonly)
+{
+DEVICE *dptr;
+t_addr saved_capac;
+struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
+t_addr temp_capac = (sim_toffset_64 ? (t_addr)0xFFFFFFFFu : (t_addr)0x7FFFFFFFu);  /* Make sure we can access the largest sector */
+uint8 sector_buf[512];
+BSD_211_disklabel *Label = (BSD_211_disklabel *)sector_buf;
+t_offset ret_val = (t_offset)-1;
+uint16 i;
+uint32 max_lbn = 0, max_lbn_partnum = 0;
+t_seccnt sects_read;
+uint16 sum = 0;
+uint16 *pdata;
+#define WORDSWAP(l) (((l >> 16) & 0xFFFF) | ((l & 0xFFFF) << 16))
+
+if ((dptr = find_dev_from_unit (uptr)) == NULL)
+    return ret_val;
+saved_capac = uptr->capac;
+uptr->capac = temp_capac;
+if ((_DEC_rdsect (uptr, 1, sector_buf, &sects_read, 512 / ctx->sector_size, physsectsz)) ||
+    (sects_read != (512 / ctx->sector_size)))
+    goto Return_Cleanup;
+
+/* Confirm the Label magic numbers */
+if ((WORDSWAP(Label->d_magic) != BSD_DISKMAGIC) || 
+    (WORDSWAP(Label->d_magic2) != BSD_DISKMAGIC))
+    goto Return_Cleanup;
+
+/* Verify the label checksum */
+if (Label->d_npartitions > BSD_211_MAXPARTITIONS)
+    goto Return_Cleanup;
+
+pdata = (uint16 *)Label;
+for (sum = 0, pdata = (uint16 *)Label; pdata < (uint16 *)&Label->d_partitions[Label->d_npartitions]; pdata++)
+    sum ^= *pdata;
+
+if (sum != 0)
+    goto Return_Cleanup;
+
+/* Walk through the partitions */
+for (i = 0; i < Label->d_npartitions; i++) {
+    uint32 end_lbn = WORDSWAP (Label->d_partitions[i].p_offset) + WORDSWAP (Label->d_partitions[i].p_size);
+    if (end_lbn > max_lbn) {
+        max_lbn = end_lbn;
+        max_lbn_partnum = i;
+        }
+    }
+sim_messagef (SCPE_OK, "%s: '%s' Contains BSD 2.11 partitions\n", sim_uname (uptr), uptr->filename);
+sim_messagef (SCPE_OK, "Partition with highest sector: %c, Sectors On Disk: %u\n", 'a' + max_lbn_partnum, max_lbn);
+ret_val = ((t_offset)max_lbn) * 512;
+
+Return_Cleanup:
+uptr->capac = saved_capac;
+if (readonly)
+    *readonly = sim_disk_wrp (uptr);
+return ret_val;
+}
+
+/* NetBSD Volume Recognizer - Structure Info gathered from: the NetBSD disklabel section 5 man page */
+
+#define NETBSD_MAXPARTITIONS   22
+
+typedef struct NetBSD_disklabel {
+    uint32  d_magic;        /* the magic number */
+    uint16  d_type;         /* drive type */
+    uint16  d_subtype;      /* controller/d_type specific */
+    char    d_typename[16]; /* type name, e.g. "eagle" */
+    /* 
+     * d_packname contains the pack identifier and is returned when
+     * the disklabel is read off the disk or in-core copy.
+     * d_boot0 is the (optional) name of the primary (block 0) bootstrap
+     * as found in /mdec.  This is returned when using
+     * getdiskbyname(3) to retrieve the values from /etc/disktab.
+     */
+    char    d_packname[16];     /* pack identifier */ 
+                                /* disk geometry: */
+    uint32  d_secsize;          /* # of bytes per sector */
+    uint32  d_nsectors;         /* # of data sectors per track */
+    uint32  d_ntracks;          /* # of tracks per cylinder */
+    uint32  d_ncylinders;       /* # of data cylinders per unit */
+    uint32  d_secpercyl;        /* # of data sectors per cylinder */
+    uint32  d_secperunit;       /* # of data sectors per unit */
+    /*
+     * Spares (bad sector replacements) below
+     * are not counted in d_nsectors or d_secpercyl.
+     * Spare sectors are assumed to be physical sectors
+     * which occupy space at the end of each track and/or cylinder.
+     */
+    uint16  d_sparespertrack;   /* # of spare sectors per track */
+    uint16  d_sparespercyl;     /* # of spare sectors per cylinder */
+    /*
+     * Alternate cylinders include maintenance, replacement,
+     * configuration description areas, etc.
+     */
+    uint32  d_acylinders;       /* # of alt. cylinders per unit */
+
+        /* hardware characteristics: */
+    /*
+     * d_interleave, d_trackskew and d_cylskew describe perturbations
+     * in the media format used to compensate for a slow controller.
+     * Interleave is physical sector interleave, set up by the formatter
+     * or controller when formatting.  When interleaving is in use,
+     * logically adjacent sectors are not physically contiguous,
+     * but instead are separated by some number of sectors.
+     * It is specified as the ratio of physical sectors traversed
+     * per logical sector.  Thus an interleave of 1:1 implies contiguous
+     * layout, while 2:1 implies that logical sector 0 is separated
+     * by one sector from logical sector 1.
+     * d_trackskew is the offset of sector 0 on track N
+     * relative to sector 0 on track N-1 on the same cylinder.
+     * Finally, d_cylskew is the offset of sector 0 on cylinder N
+     * relative to sector 0 on cylinder N-1.
+     */
+    uint16  d_rpm;              /* rotational speed */
+    uint16  d_interleave;       /* hardware sector interleave */
+    uint16  d_trackskew;        /* sector 0 skew, per track */
+    uint16  d_cylskew;          /* sector 0 skew, per cylinder */
+    uint32  d_headswitch;       /* head swith time, usec */
+    uint32  d_trkseek;          /* track-to-track seek, msec */
+    uint32  d_flags;            /* generic flags */
+#define NDDATA 5
+    uint32  d_drivedata[NDDATA]; /* drive-type specific information */
+#define NSPARE 5
+    uint32  d_spare[NSPARE];    /* reserved for future use */
+    uint32  d_magic2;           /* the magic number (again) */
+    uint16  d_checksum;         /* xor of data incl. partitions */
+
+            /* filesystem and partition information: */
+    uint16  d_npartitions;      /* number of partitions in following */
+    uint32  d_bbsize;           /* size of boot area at sn0, bytes */
+    uint32  d_sbsize;           /* max size of fs superblock, bytes */
+    struct  {                   /* the partition table */
+        uint32  p_size;         /* number of sectors in partition */
+        uint32  p_offset;       /* starting sector */
+        uint32  p_fsize;        /* filesystem basic fragment size */
+        uint8   p_fstype;       /* filesystem type, see below */
+        uint8   p_frag;         /* filesystem fragments per block */
+        union {
+            uint16 cpg;         /* UFS: FS cylinders per group */
+            uint16 sgs;         /* LFS: FS segment shift */
+            } __partition_u1;
+#define p_cpg   __partition_ul.cpg
+#define p_sgs   __partition_ul.sgs
+        } d_partitions[NETBSD_MAXPARTITIONS];/* actually may be more */
+} NetBSD_disklabel;
+
+
+static t_offset get_NetBSD_filesystem_size (UNIT *uptr, uint32 physsectsz, t_bool *readonly)
+{
+DEVICE *dptr;
+t_addr saved_capac;
+struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
+t_addr temp_capac = (sim_toffset_64 ? (t_addr)0xFFFFFFFFu : (t_addr)0x7FFFFFFFu);  /* Make sure we can access the largest sector */
+uint8 sector_buf[512];
+NetBSD_disklabel *Label = (NetBSD_disklabel *)(&sector_buf[64]);
+t_offset ret_val = (t_offset)-1;
+uint16 i = sizeof (NetBSD_disklabel);
+uint32 max_lbn = 0, max_lbn_partnum = 0;
+t_seccnt sects_read;
+uint16 sum = 0;
+uint16 *pdata;
+
+if ((dptr = find_dev_from_unit (uptr)) == NULL)
+    return ret_val;
+saved_capac = uptr->capac;
+uptr->capac = temp_capac;
+if ((_DEC_rdsect (uptr, 0, (uint8 *)sector_buf, &sects_read, 512 / ctx->sector_size, physsectsz)) ||
+    (sects_read != (512 / ctx->sector_size)))
+    goto Return_Cleanup;
+
+/* Confirm the Label magic numbers */
+if ((Label->d_magic != BSD_DISKMAGIC) || 
+    (Label->d_magic2 != BSD_DISKMAGIC))
+    goto Return_Cleanup;
+
+/* Verify the label checksum */
+if (Label->d_npartitions > NETBSD_MAXPARTITIONS)
+    goto Return_Cleanup;
+
+pdata = (uint16 *)Label;
+for (sum = 0, pdata = (uint16 *)Label; pdata < (uint16 *)&Label->d_partitions[Label->d_npartitions]; pdata++)
+    sum ^= *pdata;
+
+if (sum != 0)
+    goto Return_Cleanup;
+
+/* Walk through the partitions */
+for (i = 0; i < Label->d_npartitions; i++) {
+    uint32 end_lbn = Label->d_partitions[i].p_offset + Label->d_partitions[i].p_size;
+    if (end_lbn > max_lbn) {
+        max_lbn = end_lbn;
+        max_lbn_partnum = i;
+        }
+    }
+sim_messagef (SCPE_OK, "%s: '%s' Contains NET/Open BSD partitions\n", sim_uname (uptr), uptr->filename);
+sim_messagef (SCPE_OK, "Partition with highest sector: %c, Sectors On Disk: %u\n", 'a' + max_lbn_partnum, max_lbn);
+ret_val = ((t_offset)max_lbn) * 512;
+
+Return_Cleanup:
+uptr->capac = saved_capac;
+if (readonly)
+    *readonly = sim_disk_wrp (uptr);
+return ret_val;
+}
+
+
 #pragma pack(push,1)
 /*
  * The first logical block of device cluster 1 is either:
@@ -2272,6 +2563,8 @@ static FILESYSTEM_CHECK checks[] = {
     &get_ultrix_filesystem_size,
     &get_iso9660_filesystem_size,
     &get_rsts_filesystem_size,
+    &get_BSD_211_filesystem_size,
+    &get_NetBSD_filesystem_size,
     &get_rt11_filesystem_size,          /* This should be the last entry
                                            in the table to reduce the
                                            possibility of matching an RT-11
