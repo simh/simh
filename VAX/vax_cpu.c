@@ -3960,10 +3960,13 @@ fprintf (st, "translation:\n\n");
 fprintf (st, "   sim> SHOW {-kesu} CPU VIRTUAL=n      show translation for address n\n");
 fprintf (st, "                                        in kernel/exec/supervisor/user mode\n\n");
 fprintf (st, "Memory can be loaded with a binary byte stream using the LOAD command.  The\n");
-fprintf (st, "LOAD command recognizes three switches:\n\n");
+fprintf (st, "LOAD command recognizes these switches:\n\n");
 fprintf (st, "      -o      origin argument follows file name\n");
-fprintf (st, "      -r      load the boot ROM\n");
-fprintf (st, "      -n      load the non-volatile RAM\n\n");
+if (find_dev ("ROM") != NULL)
+    fprintf (st, "      -r      load the boot ROM\n");
+if (find_dev ("NVR") != NULL)
+    fprintf (st, "      -n      load the non-volatile RAM\n");
+fprintf (st, "\n");
 fprintf (st, "These switches are recognized when examining or depositing in CPU memory:\n\n");
 fprintf (st, "      -b      examine/deposit bytes\n");
 fprintf (st, "      -w      examine/deposit words\n");
