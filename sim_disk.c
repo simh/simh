@@ -2935,7 +2935,7 @@ if ((DK_GET_FMT (uptr) == DKUF_F_VHD) || (ctx->footer)) {
         container_dtype = (char *)ctx->footer->DriveType;
         }
     if (dtype) {
-        char cmd[32];
+        char cmd[64];
         t_stat r = SCPE_OK;
 
         if ((strcmp (container_dtype, dtype) == 0) ||
@@ -6653,7 +6653,7 @@ if (info->flag == 0) {
     container = sim_vhd_disk_open (FullPath, "r");
     if (container == NULL) {
         sim_disk_set_fmt (uptr, 0, "SIMH", NULL);
-        container = sim_fopen (FullPath, "rb+");
+        container = sim_fopen (FullPath, "rb");
         close_function = fclose;
         size_function = sim_fsize_ex;
         }
@@ -6665,7 +6665,7 @@ if (info->flag == 0) {
         container_size = size_function (container);
         uptr->filename = strdup (FullPath);
         uptr->fileref = container;
-        uptr->flags |= UNIT_ATT;
+        uptr->flags |= UNIT_ATT | UNIT_RO;
         get_disk_footer (uptr);
         f = ctx->footer;
         if (f) {
