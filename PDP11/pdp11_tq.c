@@ -509,8 +509,6 @@ MTAB tq_mod[] = {
 #if defined (VM_PDP11)
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 004,     "ADDRESS", "ADDRESS",
         &set_addr, &show_addr, NULL, "Bus address" },
-    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, NULL, "AUTOCONFIGURE",
-        &set_addr_flt, NULL, NULL, "Enable autoconfiguration of address & vector" },
 #else
     { MTAB_XTD|MTAB_VDV, 004,               "ADDRESS", NULL,
         NULL, &show_addr, NULL, "Bus address" },

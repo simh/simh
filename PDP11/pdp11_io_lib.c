@@ -73,7 +73,7 @@ if (autcon_enb == val)
 autcon_enb = val;
 if (autcon_enb == 0) {
     sim_messagef (SCPE_OK, "Device auto configuration is now disabled.\n");
-    sim_messagef (SCPE_OK, "Explicitly setting any address or vector value tells the system\n");
+    sim_messagef (SCPE_OK, "Explicitly changing any address or vector value tells the system\n");
     sim_messagef (SCPE_OK, "that you are planning a specific configuration that may not use\n");
     sim_messagef (SCPE_OK, "use standard values.  You must explicitly specify bus address and\n");
     sim_messagef (SCPE_OK, "vector values for any device you enable or otherwise add to the\n");
@@ -119,9 +119,11 @@ if (r != SCPE_OK)
     return r;
 if ((newba <= IOPAGEBASE) ||                            /* > IO page base? */
     (newba % ((uint32) val)))                           /* check modulus */
-    return SCPE_ARG;
-dibp->ba = newba;                                       /* store */
-set_autocon (NULL, 0, NULL, NULL);                      /* autoconfig off */
+    return sim_messagef (SCPE_ARG, "Invalid bus address value: %s\n", cptr);
+if (dibp->ba != newba) {                                /* changed? */
+    dibp->ba = newba;                                   /* store */
+    set_autocon (NULL, 0, NULL, NULL);                  /* autoconfig off */
+    }
 return SCPE_OK;
 }
 
@@ -213,9 +215,11 @@ newvec = (uint32) get_uint (cptr, DEV_RDX, 01000, &r);
 if ((r != SCPE_OK) ||
     ((newvec + (dibp->vnum * 4)) >= 01000) ||           /* total too big? */
     (newvec & ((dibp->vnum > 1)? 07: 03)))              /* properly aligned value? */
-    return SCPE_ARG;
-dibp->vec = newvec;
-set_autocon (NULL, 0, NULL, NULL);                      /* autoconfig off */
+    return sim_messagef (SCPE_ARG, "Invalid vector value: %s\n", cptr);
+if (dibp->vec != newvec) {                              /* changed? */
+    dibp->vec = newvec;                                 /* store */
+    set_autocon (NULL, 0, NULL, NULL);                  /* autoconfig off */
+    }
 return SCPE_OK;
 }
 

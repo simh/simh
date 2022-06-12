@@ -154,8 +154,6 @@ MTAB dli_mod[] = {
       NULL, &tmxr_show_cstat, (void *) &dlx_desc },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS", NULL,
       NULL, &tmxr_show_cstat, (void *) &dlx_desc },
-    { MTAB_XTD | MTAB_VDV, 0, NULL, "AUTOCONFIGURE",
-      &set_addr_flt, NULL, NULL },
     { MTAB_XTD | MTAB_VDV, 0, "LINES", "LINES",
       &dlx_set_lines, &tmxr_show_lines, (void *) &dlx_desc },
     { 0 }

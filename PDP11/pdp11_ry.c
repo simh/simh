@@ -231,8 +231,6 @@ MTAB ry_mod[] = {
 #if defined (VM_PDP11)
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 004, "ADDRESS", "ADDRESS",
       &set_addr, &show_addr, NULL, "Bus Address" },
-    { MTAB_XTD | MTAB_VDV, 0, NULL, "AUTOCONFIGURE",
-      &set_addr_flt, NULL, NULL, "Enable autoconfiguration of address & vector" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", "VECTOR",
       &set_vec, &show_vec, NULL, "Interrupt vector" },
 #else

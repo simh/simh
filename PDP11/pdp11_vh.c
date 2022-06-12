@@ -561,8 +561,6 @@ static const MTAB vh_mod[] = {
         &set_addr, &show_addr, NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", "VECTOR",
         &set_vec, &vh_show_vec, (void *) &vh_desc, "Interrupt vector" },
-    { MTAB_XTD|MTAB_VDV, 0, NULL, "AUTOCONFIGURE",
-        &set_addr_flt, NULL, NULL, "Enable autoconfiguration of address & vector" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "LINES", "LINES=n",
         &vh_setnl, &tmxr_show_lines, (void *) &vh_desc, "Display number of lines" },
     { UNIT_ATT,         UNIT_ATT, "summary", NULL,

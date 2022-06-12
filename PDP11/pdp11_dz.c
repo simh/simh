@@ -342,10 +342,6 @@ MTAB dz_mod[] = {
         &set_addr, &show_addr, NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", "VECTOR",
         &set_vec, &dz_show_vec, (void *) &dz_desc, "Interrupt vector" },
-#if !defined (VM_PDP10)
-    { MTAB_XTD|MTAB_VDV, 0, NULL, "AUTOCONFIGURE",
-        &set_addr_flt, NULL, NULL, "Enable autoconfiguration of address & vector" },
-#endif
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "LINES", "LINES=n",
         &dz_setnl, &tmxr_show_lines, (void *) &dz_desc, "Display number of lines" },
     { MTAB_XTD|MTAB_VDV|MTAB_NC, 0, NULL, "LOG=n=file",
