@@ -3452,7 +3452,7 @@ if (enabled_units == 1) {
     if (found_unit == 0)
         snprintf (unit_spec, sizeof (unit_spec), "%s", sim_dname (dptr));
     else
-        snprintf (unit_spec, sizeof (unit_spec), "%s%u", sim_dname (dptr), found_unit);
+        snprintf (unit_spec, sizeof (unit_spec), "%s", sim_uname (&dptr->units[found_unit]));
     }
 else
     snprintf (unit_spec, sizeof (unit_spec), "%sn", sim_dname (dptr));
@@ -6441,8 +6441,9 @@ for (j = ucnt = udbl = 0; j < dptr->numunits; j++) {    /* count units */
     uptr = dptr->units + j;
     if (!(uptr->flags & UNIT_DIS))                      /* count enabled units */
         ucnt++;
-    else if (uptr->flags & UNIT_DISABLE)
-        udbl++;                                         /* count user-disabled */
+    else
+        if (uptr->flags & UNIT_DISABLE)
+            udbl++;                                     /* count user-disabled */
     }
 show_all_mods (st, dptr, dptr->units, MTAB_VDV, &toks); /* show dev mods */
 if (dptr->numunits == 0) {
@@ -6452,15 +6453,22 @@ if (dptr->numunits == 0) {
 else {
     if (ucnt == 0) {
         fprint_sep (st, &toks);
-        fprintf (st, "all units disabled\n");
+        fprintf (st, "all %d units disabled\n", udbl);
         }
-    else if ((ucnt > 1) || (udbl > 0)) {
-        fprint_sep (st, &toks);
-        fprintf (st, "%d units\n", ucnt + udbl);
+    else {
+        if ((ucnt > 1) || (udbl > 0)) {
+            fprint_sep (st, &toks);
+            fprintf (st, "%d units\n", ucnt + udbl);
+            }
+        else {
+            if ((flag != 2) || !dptr->description || toks) {
+                if ((ucnt == 1) && (toks < 0) && (flag != 2) &&
+                    (dptr->description) && ((sim_switches & SWMASK ('D')) == 0))
+                    fprintf (st, "%s", dptr->description (dptr));
+                fprintf (st, "\n");
+                }
+            }
         }
-    else
-        if ((flag != 2) || !dptr->description || toks) 
-            fprintf (st, "\n");
     toks = 0;
     }
 if (flag)                                               /* dev only? */
