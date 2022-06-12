@@ -154,17 +154,10 @@ struct xu_device    xua = {
   };
 
 MTAB xu_mod[] = {
-#if defined (VM_PDP11)
   { MTAB_XTD|MTAB_VDV|MTAB_VALR, 010, "ADDRESS", "ADDRESS",
-    &set_addr, &show_addr, NULL },
+    &set_addr, &show_addr, NULL, "Unibus address" },
   { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", "VECTOR",
-    &set_vec, &show_vec, NULL },
-#else
-  { MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
-    NULL, &show_addr, NULL, "Unibus address" },
-  { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
-    NULL, &show_vec, NULL, "Interrupt vector" },
-#endif
+    &set_vec, &show_vec, NULL, "Interrupt vector" },
   { MTAB_XTD|MTAB_VDV|MTAB_VALR|MTAB_NC, 0, "MAC", "MAC=xx:xx:xx:xx:xx:xx",
     &xu_setmac, &xu_showmac, NULL, "MAC address" },
   { MTAB_XTD |MTAB_VDV|MTAB_NMO, 0, "ETH", NULL,

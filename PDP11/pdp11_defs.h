@@ -497,11 +497,13 @@ typedef struct {
 #define DEV_V_QBUS      (DEV_V_UF + 1)                  /* Qbus */
 #define DEV_V_Q18       (DEV_V_UF + 2)                  /* Qbus with <= 256KB */
 #define DEV_V_MBUS      (DEV_V_UF + 3)                  /* Massbus */
-#define DEV_V_FFUF      (DEV_V_UF + 4)                  /* first free flag */
+#define DEV_V_NOAUTOCON (DEV_V_UF + 4)                  /* Don't autoconfigure */
+#define DEV_V_FFUF      (DEV_V_UF + 5)                  /* first free flag */
 #define DEV_UBUS        (1u << DEV_V_UBUS)
 #define DEV_QBUS        (1u << DEV_V_QBUS)
 #define DEV_Q18         (1u << DEV_V_Q18)
 #define DEV_MBUS        (1u << DEV_V_MBUS)
+#define DEV_NOAUTOCON   (1u << DEV_V_NOAUTOCON)
 
 #define DEV_RDX         8                               /* default device radix */
 

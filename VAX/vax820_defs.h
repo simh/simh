@@ -266,6 +266,7 @@ extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, CONST void* desc
 #define DEV_NEXUS       (1u << DEV_V_NEXUS)
 #define DEV_QBUS        (0)
 #define DEV_Q18         (0)
+#define DEV_NOAUTOCON   (0)
 
 #define UNIBUS          TRUE                            /* Unibus only */
 

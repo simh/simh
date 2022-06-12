@@ -264,6 +264,7 @@ extern uint32 va_addr;                                  /* QDSS memory offset */
 #define DEV_UBUS        (1u << DEV_V_UBUS)
 #define DEV_QBUS        (1u << DEV_V_QBUS)
 #define DEV_Q18         (1u << DEV_V_Q18)
+#define DEV_NOAUTOCON   (0)
 
 #define UNIBUS          FALSE                           /* 22b only */
 

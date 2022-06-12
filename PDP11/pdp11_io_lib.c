@@ -442,6 +442,18 @@ for (i = 0; i < (int32) dibp->lnt; i = i + 2) {         /* create entries */
         iodibp[idx] = dibp;                         /* remember DIB */
         }
     }
+for (j = 0; (cdptr = sim_devices[j]) != NULL; j++) { /* Look for enabled but unaddressed devices */
+    DIB *cdibp = (DIB *)(cdptr->ctxt);
+    
+    if (((sim_switches & SWMASK ('P')) != 0)          || 
+        (cdptr->flags & DEV_DIS)                      || 
+        (cdibp == NULL)                               || 
+        ((cdptr->flags & (DEV_UBUS | DEV_QBUS)) == 0) ||
+        ((cdptr->flags & DEV_NOAUTOCON) != 0)         ||
+        (cdibp->ba != IOBA_AUTO))
+        continue;
+    return sim_messagef (SCPE_STOP, "%s: Missing Address\n", cdptr->name);
+    }
 return SCPE_OK;
 }
 
