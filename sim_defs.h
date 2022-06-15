@@ -602,6 +602,7 @@ struct UNIT {
     void                *up8;                           /* device specific */
     uint16              us9;                            /* device specific */
     uint16              us10;                           /* device specific */
+    void                *up11;                          /* device specific */
     DRVTYP              *drvtyp;                        /* Drive Type */
     void                *tmxr;                          /* TMXR linkage */
     uint32              recsize;                        /* Tape specific info */
