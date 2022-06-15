@@ -6519,10 +6519,10 @@ return SCPE_OK;
 const char *sprint_capac (DEVICE *dptr, UNIT *uptr)
 {
 static char capac_buf[MAX_WIDTH + 12];
-t_addr kval = (uptr->flags & UNIT_BINK)? 1024: 1000;
-t_addr mval;
+t_offset kval = (uptr->flags & UNIT_BINK)? 1024: 1000;
+t_offset mval;
 double remfrac;
-t_addr psize = uptr->capac;
+t_offset psize = (t_offset)uptr->capac;
 const char *scale, *width;
 
 if (sim_switches & SWMASK ('B'))
