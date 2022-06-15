@@ -5945,6 +5945,8 @@ if ((dptr = find_dev (gbuf))) {                         /* device match? */
     ctbr = set_dev_tab;                                 /* global table */
     lvl = MTAB_VDV;                                     /* device match */
     GET_SWITCHES (cptr);                                /* get more switches */
+    if (dptr->numunits == 1)                            /* Single unit devices have optional */
+        lvl |= MTAB_VUN;                                /*  unit number */
     }
 else {
     if ((dptr = find_unit (gbuf, &uptr))) {             /* unit match? */
@@ -8654,6 +8656,8 @@ for (i = 0; i < (device_count + sim_internal_device_count); i++) {/* loop thru d
         fprintf (sfile, "%.0f\n", uptr->usecs_remaining);/* [V4.0] remaining wait */
         WRITE_I (uptr->pos);
         if (uptr->flags & UNIT_ATT) {
+            if ((uptr->drvtyp != NULL) && (sim_disk_drive_type_set_string (uptr) != NULL))
+                fprintf (sfile, "\001DriveType=%s\001", sim_disk_drive_type_set_string (uptr));
             fputs (sim_relative_path (uptr->filename), sfile);
             if ((uptr->flags & UNIT_BUF) &&             /* writable buffered */
                 uptr->hwmark &&                         /* files need to be */
@@ -9052,8 +9056,21 @@ for (j=0, r = SCPE_OK; j<attcnt; j++) {
     if ((r == SCPE_OK) && (!dont_detach_attach)) {
         struct stat fstat;
         t_addr saved_pos;
+        char drivetype[CBUFSIZE], filename[CBUFSIZE], cmd[CBUFSIZE * 2];
 
-        sim_debug (SIM_DBG_RESTORE, &sim_scp_dev, "ATTACHING=%s to %s\n", sim_uname (attunits[j]), attnames[j]);
+        if (0 != memcmp (attnames[j], "\001DriveType=", 11)) {
+            strlcpy (filename, attnames[j], sizeof (filename));
+            cmd[0] = drivetype[0] = '\0';
+            }
+        else {
+            const char *fname = get_glyph (attnames[j] + 11, drivetype, '\001');
+
+            strlcpy (filename, fname, sizeof (filename));
+            snprintf (cmd, sizeof (cmd), "%s %s", sim_uname (attunits[j]), drivetype);
+            }
+        sim_debug (SIM_DBG_RESTORE, &sim_scp_dev, "ATTACHING=%s to %s%s%s\n", sim_uname (attunits[j]), filename, drivetype[0] ? " as " : "", drivetype);
+        if (cmd[0])
+            set_cmd (0, cmd);
         dptr = find_dev_from_unit (attunits[j]);
         if ((!force_restore) && 
             (!stat(attnames[j], &fstat)))
@@ -9077,7 +9094,7 @@ for (j=0, r = SCPE_OK; j<attcnt; j++) {
                 warned = TRUE;
                 sim_printf ("warning - %s was attached to '%s'", sim_uname (attunits[j]), attnames[j]);
                 if (attunits[j]->filename)
-                    sim_printf (", now attached to '%s'\n", sim_relative_path (attunits[j]->filename));
+                    sim_printf (", now attached to '%s'\n", attunits[j]->filename);
                 else
                     sim_printf (", now unattached\n");
                 }
@@ -12595,13 +12612,13 @@ while (bp) {
         if (bp == sim_brk_tab[sim_brk_ins])
             bpl = sim_brk_tab[sim_brk_ins] = bp->next;  /* remove from head of list */
         else
-            bpl->next = bp->next;                       /* remove from middle of list */
+            bpl->next = bp->next;                       /* remove from middle or end of list */
         free (bp);
         bp = bpl;
         }
     else {
         bpl = bp;
-        bp = bp->next;
+        bp = bpl->next;
         }
     }
 if (sim_brk_tab[sim_brk_ins] == NULL) {                 /* erased entry */
@@ -13827,7 +13844,7 @@ static const char *sim_debug_prefix (uint32 dbits, DEVICE* dptr, UNIT* uptr)
 const char* debug_type = _get_dbg_verb (dbits, dptr, uptr);
 char tim_t[32] = "";
 char tim_a[32] = "";
-char pc_s[MAX_WIDTH + 1] = "";
+char pc_s[MAX_WIDTH + 33] = "";
 struct timespec time_now;
 
 if (sim_deb_switches & (SWMASK ('T') | SWMASK ('R') | SWMASK ('A'))) {
@@ -13860,7 +13877,7 @@ if (sim_deb_switches & SWMASK ('P')) {
     sprintf(pc_s, "-%s:", sim_PC->name);
     sprint_val (&pc_s[strlen(pc_s)], val, sim_PC->radix, sim_PC->width, sim_PC->flags & REG_FMT);
     }
-sprintf(debug_line_prefix, "DBG(%s%s%.0f%s)%s> %s %s: ", tim_t, tim_a, sim_gtime(), pc_s, AIO_MAIN_THREAD ? "" : "+", dptr->name, debug_type);
+snprintf(debug_line_prefix, sizeof (debug_line_prefix), "DBG(%s%s%.0f%s)%s> %s %s: ", tim_t, tim_a, sim_gtime(), pc_s, AIO_MAIN_THREAD ? "" : "+", dptr->name, debug_type);
 return debug_line_prefix;
 }
 

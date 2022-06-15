@@ -72,7 +72,9 @@
 #define SCSI_WLK        (UNIT_WLK|UNIT_RO)              /* hwre write lock */
 #define SCSI_NOAUTO     DKUF_NOAUTOSIZE
 
-
+/* This structure has been obsoleted and its role is now provided by 
+   the DRVTYP structure */
+#if 0
 struct scsi_dev_t {
     uint8 devtype;                                      /* device type */
     uint8 pqual;                                        /* peripheral qualifier */
@@ -86,6 +88,7 @@ struct scsi_dev_t {
     const char *name;                                   /* gap length for tapes */
     uint32 gaplen;
     };
+#endif
 
 struct scsi_bus_t {
     DEVICE *dptr;                                       /* SCSI device */
@@ -108,7 +111,6 @@ struct scsi_bus_t {
 };
 
 typedef struct scsi_bus_t SCSI_BUS;
-typedef struct scsi_dev_t SCSI_DEV;
 
 t_bool scsi_arbitrate (SCSI_BUS *bus, uint32 initiator);
 void scsi_release (SCSI_BUS *bus);
@@ -119,7 +121,6 @@ uint32 scsi_write (SCSI_BUS *bus, uint8 *data, uint32 len);
 uint32 scsi_read (SCSI_BUS *bus, uint8 *data, uint32 len);
 uint32 scsi_state (SCSI_BUS *bus, uint32 id);
 void scsi_add_unit (SCSI_BUS *bus, uint32 id, UNIT *uptr);
-void scsi_set_unit (SCSI_BUS *bus, UNIT *uptr, SCSI_DEV *dev);
 void scsi_reset_unit (UNIT *uptr);
 void scsi_reset (SCSI_BUS *bus);
 t_stat scsi_init (SCSI_BUS *bus, uint32 maxfr);

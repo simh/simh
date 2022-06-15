@@ -479,6 +479,7 @@ typedef struct DEBTAB DEBTAB;
 typedef struct FILEREF FILEREF;
 typedef struct MEMFILE MEMFILE;
 typedef struct BITFIELD BITFIELD;
+typedef struct DRVTYP DRVTYP;
 
 typedef t_stat (*ACTIVATE_API)(UNIT *unit, int32 interval);
 
@@ -556,10 +557,11 @@ struct DEVICE {
 #define DEV_TYPEMASK    (((1 << DEV_S_TYPE) - 1) << DEV_V_TYPE)
 #define DEV_DISK        (1 << DEV_V_TYPE)               /* sim_disk Attach */
 #define DEV_TAPE        (2 << DEV_V_TYPE)               /* sim_tape Attach */
-#define DEV_MUX         (3 << DEV_V_TYPE)               /* sim_tmxr Attach */
-#define DEV_CARD        (4 << DEV_V_TYPE)               /* sim_card Attach */
-#define DEV_ETHER       (5 << DEV_V_TYPE)               /* Ethernet Device */
-#define DEV_DISPLAY     (6 << DEV_V_TYPE)               /* Display Device */
+#define DEV_SCSI        (3 << DEV_V_TYPE)               /* sim_scsi Attach */
+#define DEV_MUX         (4 << DEV_V_TYPE)               /* sim_tmxr Attach */
+#define DEV_CARD        (5 << DEV_V_TYPE)               /* sim_card Attach */
+#define DEV_ETHER       (6 << DEV_V_TYPE)               /* Ethernet Device */
+#define DEV_DISPLAY     (7 << DEV_V_TYPE)               /* Display Device */
 #define DEV_TYPE(dptr)  ((dptr)->flags & DEV_TYPEMASK)
 
 #define DEV_UFMASK_31   (((1u << DEV_V_RSV) - 1) & ~((1u << DEV_V_UF_31) - 1))
@@ -600,7 +602,7 @@ struct UNIT {
     void                *up8;                           /* device specific */
     uint16              us9;                            /* device specific */
     uint16              us10;                           /* device specific */
-    uint32              disk_type;                      /* Disk specific info */
+    DRVTYP              *drvtyp;                        /* Drive Type */
     void                *tmxr;                          /* TMXR linkage */
     uint32              recsize;                        /* Tape specific info */
     t_addr              tape_eom;                       /* Tape specific info */
