@@ -51,14 +51,26 @@
 
 #include "pdp11_defs.h"
 
-#define RX_NUMTR        77                              /* tracks/disk */
+#include "sim_disk.h"
+
+#define RX_NUMCY        77                              /* tracks/disk */
+#define RX_NUMSF        1                               /* surfaces */
 #define RX_M_TRACK      0377
 #define RX_NUMSC        26                              /* sectors/track */
 #define RX_M_SECTOR     0177
 #define RX_NUMBY        128                             /* bytes/sector */
-#define RX_SIZE         (RX_NUMTR * RX_NUMSC * RX_NUMBY)        /* bytes/disk */
+#define RX_SIZE         (RX_NUMCY * RX_NUMSC * RX_NUMSF)/* sectors/disk */
 #define RX_NUMDR        2                               /* drives/controller */
 #define RX_M_NUMDR      01
+
+#define RX_DRV(d)                           \
+  { RX_NUMSC, RX_NUMSF, RX_NUMCY,  RX_SIZE, \
+    #d,       RX_NUMBY, DRVFL_RMV, "DY" }
+
+static DRVTYP drv_tab[] = {
+    RX_DRV (RX01),
+    { 0 }
+    };
 
 #define IDLE            0                               /* idle state */
 #define RWDS            1                               /* rw, sect next */
@@ -124,6 +136,8 @@ int32 rx_enb = 1;                                       /* device enable */
 t_stat rx_rd (int32 *data, int32 PA, int32 access);
 t_stat rx_wr (int32 data, int32 PA, int32 access);
 t_stat rx_svc (UNIT *uptr);
+t_stat rx_attach (UNIT *uptr, CONST char *cptr);
+t_stat rx_detach (UNIT *uptr);
 t_stat rx_reset (DEVICE *dptr);
 t_stat rx_boot (int32 unitno, DEVICE *dptr);
 void rx_done (int32 esr_flags, int32 new_ecode);
@@ -143,12 +157,7 @@ DIB rx_dib = {
     1, IVCL (RX), VEC_AUTO, { NULL }, IOLN_RX,
     };
 
-UNIT rx_unit[] = {
-    { UDATA (&rx_svc,
-             UNIT_FIX+UNIT_ATTABLE+UNIT_BUFABLE+UNIT_MUSTBUF, RX_SIZE) },
-    { UDATA (&rx_svc,
-             UNIT_FIX+UNIT_ATTABLE+UNIT_BUFABLE+UNIT_MUSTBUF, RX_SIZE) }
-    };
+UNIT rx_unit[RX_NUMDR] = {{0}};
 
 REG rx_reg[] = {
     { ORDATA (RXCS, rx_csr, 16) },
@@ -197,8 +206,9 @@ DEVICE rx_dev = {
     "RX", rx_unit, rx_reg, rx_mod,
     RX_NUMDR, 8, 20, 1, 8, 8,
     NULL, NULL, &rx_reset,
-    &rx_boot, NULL, NULL,
-    &rx_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS
+    &rx_boot, &rx_attach, &rx_detach,
+    &rx_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DISK, 0,
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &drv_tab
     };
 
 /* I/O dispatch routine, I/O addresses 17777170 - 17777172
@@ -372,7 +382,7 @@ switch (rx_state) {                                     /* case on state */
             rx_done (0, 0110);                          /* done, error */
             return IORETURN (rx_stopioe, SCPE_UNATT);
             }
-        if (rx_track >= RX_NUMTR) {                     /* bad track? */
+        if (rx_track >= RX_NUMCY) {                     /* bad track? */
             rx_done (0, 0040);                          /* done, error */
             break;
             }
@@ -458,6 +468,20 @@ return;
 
 t_stat rx_reset (DEVICE *dptr)
 {
+static t_bool inited = FALSE;
+
+if (!inited) {
+    int32 i;
+    UNIT *uptr;
+
+    inited = TRUE;
+    for (i = 0; i < RX_NUMDR; i++) {
+        uptr = dptr->units + i;
+        uptr->action = &rx_svc;
+        uptr->flags = UNIT_FIX|UNIT_ATTABLE|UNIT_BUFABLE|UNIT_MUSTBUF;
+        sim_disk_set_drive_type_by_name (uptr, "RX01");
+        }
+    }
 rx_csr = rx_dbr = 0;                                    /* clear regs */
 rx_esr = rx_ecode = 0;                                  /* clear error */
 rx_track = rx_sector = 0;                               /* clear addr */
@@ -472,6 +496,21 @@ else if (rx_unit[0].flags & UNIT_BUF)  {                /* attached? */
     }
 else rx_done (0, 0010);                                 /* no, error */
 return auto_config (0, 0);                              /* run autoconfig */
+}
+
+/* Attach routine */
+
+t_stat rx_attach (UNIT *uptr, CONST char *cptr)
+{
+return sim_disk_attach (uptr, cptr, RX_NUMBY, 
+                     sizeof (uint16), TRUE, 0, 
+                     "RX01", 0, 0);
+}
+
+t_stat rx_detach (UNIT *uptr)
+{
+sim_cancel (uptr);
+return sim_disk_detach (uptr);
 }
 
 /* Device bootstrap */

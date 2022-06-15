@@ -37,6 +37,7 @@
 #define PDP11_TD_H
 
 #include "sim_defs.h"
+#include "sim_disk.h"
 
 typedef struct CTLR CTLR;
 
@@ -84,6 +85,14 @@ static DEBTAB td_deb[] = {
     { "DAT", TDDEB_DAT, "data" },
     { "ERR", TDDEB_ERR, "errors" },
     { NULL, 0 }
+    };
+
+#define TD_DRV(d)           \
+    { 128, 4, 1,  512, #d, 512 }
+
+static DRVTYP drv_tab[] = {
+    TD_DRV (TU58),
+    { 0 }
     };
 
 #endif /* _PDP11_TD_H */

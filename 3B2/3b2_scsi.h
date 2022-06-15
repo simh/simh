@@ -93,14 +93,13 @@
         ha_state.reply.status = (cio_stat);    \
     }
 
-#define HA_MAX_DTYPE   1
 
 /* CDC Wren IV 327 MB Hard Disk (AT&T KS-23483,L3) */
-#define SD327_DTYPE     0
 #define SD327_PQUAL     0x00
 #define SD327_SCSI      1
 #define SD327_BLK       512
 #define SD327_LBN       640396
+#define SD327_TEXT      "Set CDC 327MB Disk Type"
 #define SD327_MANU      "AT&T"
 #define SD327_DESC      "KS23483"
 #define SD327_REV       "0001"           /* TODO: Find real rev */
@@ -118,28 +117,25 @@
 #define SD327_RPM       3600
 
 /* Wangtek 120MB cartridge tape (AT&T KS-23465) */
-#define ST120_DTYPE      1
 #define ST120_PQUAL      0x00
 #define ST120_SCSI       1
 #define ST120_BLK        512
 #define ST120_LBN        266004
+#define ST120_TEXT       "Set Wangtek 120MB Tape Type"
 #define ST120_MANU       "WANGTEK"
 #define ST120_DESC       "KS23465"
 #define ST120_REV        "CX17"
 #define ST120_DENS       5
 
-#define UNIT_V_DTYPE    (SCSI_V_UF + 0)
-#define UNIT_M_DTYPE    0x1f
-#define UNIT_DTYPE      (UNIT_M_DTYPE << UNIT_V_DTYPE)
-
-#define GET_DTYPE(x)    (((x) >> UNIT_V_DTYPE) & UNIT_M_DTYPE)
-#define HA_DISK(d)      {                                    \
+#define HA_DISK(d)      {    DRV_SCSI(                       \
         SCSI_DISK, d##_PQUAL, d##_SCSI,  FALSE,     d##_BLK, \
-        d##_LBN,   d##_MANU,  d##_DESC,  d##_REV,   #d,   0  \
+        d##_LBN,   d##_MANU,  d##_DESC,  d##_REV,   #d,   0, \
+        d##_TEXT)                                            \
     }
-#define HA_TAPE(d)      {                                    \
+#define HA_TAPE(d)      {    DRV_SCSI(                       \
         SCSI_TAPE, d##_PQUAL, d##_SCSI,  TRUE,      d##_BLK, \
-        d##_LBN,   d##_MANU,  d##_DESC,  d##_REV,   #d,   0  \
+        d##_LBN,   d##_MANU,  d##_DESC,  d##_REV,   #d,   0, \
+        d##_TEXT)                                            \
     }
 #define HA_SIZE(d)      d##_LBN
 

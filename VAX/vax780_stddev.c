@@ -82,6 +82,7 @@
 
 #include "vax_defs.h"
 #include "sim_tmxr.h"
+#include "sim_disk.h"
 
 /* Terminal definitions */
 
@@ -155,8 +156,9 @@ static BITFIELD tmr_iccs_bits [] = {
 #define FL_M_TRACK      0377
 #define FL_NUMSC        26                              /* sectors/track */
 #define FL_M_SECTOR     0177
+#define FL_NUMSF        1
 #define FL_NUMBY        128                             /* bytes/sector */
-#define FL_SIZE         (FL_NUMTR * FL_NUMSC * FL_NUMBY)/* bytes/disk */
+#define FL_SIZE         (FL_NUMTR * FL_NUMSC)           /* sectors/disk */
 
 #define FL_IDLE         0                               /* idle state */
 #define FL_RWDS         1                               /* rw, sect next */
@@ -189,6 +191,16 @@ static BITFIELD tmr_iccs_bits [] = {
 
 #define TRACK u3                                        /* current track */
 #define CALC_DA(t,s) (((t) * FL_NUMSC) + ((s) - 1)) * FL_NUMBY
+
+#define FL_DRV(d)                                \
+    { FL_NUMSC, FL_NUMSF, FL_NUMTR, FL_SIZE, #d, \
+      FL_NUMBY }
+
+
+static DRVTYP drv_typ[] = {
+    FL_DRV(RX01),
+    { 0 }
+    };
 
 int32 tti_csr = 0;                                      /* control/status */
 uint32 tti_buftime;                                     /* time input character arrived */
@@ -248,6 +260,8 @@ t_stat clk_detach (UNIT *uptr);
 t_stat tmr_reset (DEVICE *dptr);
 t_stat fl_svc (UNIT *uptr);
 t_stat fl_reset (DEVICE *dptr);
+t_stat fl_attach (UNIT *uptr, CONST char *cptr);
+t_stat fl_detach (UNIT *uptr);
 int32 icr_rd (void);
 void tmr_sched (uint32 incr);
 t_stat todr_resync (void);
@@ -402,8 +416,7 @@ DEVICE tmr_dev = {
    fl_mod       RX modifier list
 */
 
-UNIT fl_unit = { UDATA (&fl_svc,
-      UNIT_FIX+UNIT_ATTABLE+UNIT_BUFABLE+UNIT_MUSTBUF, FL_SIZE) };
+UNIT fl_unit = {0};
 
 REG fl_reg[] = {
     { HRDATAD (FNC,          fl_fnc,  8, "function select") },
@@ -434,9 +447,9 @@ DEVICE fl_dev = {
     "CS", &fl_unit, fl_reg, fl_mod,
     1, DEV_RDX, 20, 1, DEV_RDX, 8,
     NULL, NULL, &fl_reset,
-    NULL, NULL, NULL,
-    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
-    &fl_description
+    NULL, &fl_attach, &fl_detach,
+    NULL, DEV_DISK, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    &fl_description, NULL, &drv_typ
     };
 
 /* Terminal MxPR routines
@@ -1221,12 +1234,36 @@ tti_buf = FL_CPROT;                                     /* status */
 fl_state = FL_IDLE;                                     /* floppy idle */
 }
 
+/* Attach routine */
+
+t_stat fl_attach (UNIT *uptr, CONST char *cptr)
+{
+return sim_disk_attach (uptr, cptr, FL_NUMBY,
+                        sizeof (uint8), TRUE, 0,
+                        "RX01", 0, 0);
+}
+
+t_stat fl_detach (UNIT *uptr)
+{
+sim_cancel (uptr);
+return sim_disk_detach (uptr);
+}
+
+
 /* Reset */
 
 t_stat fl_reset (DEVICE *dptr)
 {
 uint32 i;
 extern int32 sys_model;
+static t_bool inited = FALSE;
+
+if (!inited) {
+    inited = TRUE;
+    dptr->units->action = &fl_svc;
+    dptr->units->flags = UNIT_FIX|UNIT_ATTABLE|UNIT_BUFABLE|UNIT_MUSTBUF;
+    sim_disk_set_drive_type_by_name (dptr->units, "RX01");
+    }
 
 fl_esr = FL_STAINC;
 fl_ecode = 0;                                           /* clear error */

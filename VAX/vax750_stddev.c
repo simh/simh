@@ -390,8 +390,8 @@ DEVICE td_dev = {
     1, DEV_RDX, 20, 1, DEV_RDX, 8,
     NULL, NULL, &td_reset,
     NULL, NULL, NULL,
-    NULL, DEV_DEBUG, 0, td_deb, NULL, NULL, NULL, NULL, NULL, 
-    &td_description
+    NULL, DEV_DEBUG | DEV_DISK, 0, td_deb, NULL, NULL, NULL, NULL, NULL, 
+    &td_description, NULL, &drv_tab
     };
 
 static void set_csi_int (int32 ctlr, t_bool val)

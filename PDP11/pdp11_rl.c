@@ -104,23 +104,20 @@
 #define RL_NUMWD        (128)                           /* words/sector */
 #define RL_NUMSC        (40)                            /* sectors/surface */
 #define RL_NUMSF        (2)                             /* surfaces/cylinder */
-#define RL_NUMCY        (256)                           /* cylinders/drive */
+#define RL01_NUMCYL     (256)                           /* cylinders/drive */
+#define RL02_NUMCYL     (512)                           /* cylinders/drive */
 #define RL_NUMDR        (4)                             /* drives/controller */
 #define RL_MAXFR        (RL_NUMSC * RL_NUMWD)           /* max transfer */
-#define RL01_SIZE (RL_NUMCY * RL_NUMSF * RL_NUMSC * RL_NUMWD) /* words/drive */
-#define RL02_SIZE       (RL01_SIZE * 2)                 /* words/drive */
 
-struct drvtyp {
-    int32       sect;                                   /* sectors */
-    int32       surf;                                   /* surfaces */
-    int32       cyl;                                    /* cylinders */
-    int32       size;                                   /* #blocks */
-    const char  *name;                                  /* device type name */
-    };
+#define RL_DRV(d)                                       \
+    { RL_NUMSC, RL_NUMSF, d##_NUMCYL,                   \
+      (RL_NUMSC * RL_NUMSF * d##_NUMCYL),               \
+      #d,       256,      DRVFL_RMV | DRVFL_TYPE_RL,    \
+      "DL" }
 
-static struct drvtyp drv_tab[] = {
-    { RL_NUMSC, RL_NUMSF, RL_NUMCY,   RL01_SIZE, "RL01" },
-    { RL_NUMSC, RL_NUMSF, RL_NUMCY*2, RL02_SIZE, "RL02" },
+static DRVTYP drv_tab[] = {
+    RL_DRV(RL01),
+    RL_DRV(RL02),
     { 0 }
     };
 
@@ -132,16 +129,13 @@ static struct drvtyp drv_tab[] = {
 
 /* Flags in the unit flags word */
 
-#define UNIT_V_RL02     (DKUF_V_UF + 0)                 /* RL01 vs RL02 */
-#define UNIT_V_DUMMY    (UNIT_V_RL02 + 1)               /* dummy flag, for SET BADBLOCK */
+#define UNIT_V_DUMMY    (DKUF_V_UF  + 0)                /* dummy flag, for SET BADBLOCK */
 #define UNIT_V_OFFL     (UNIT_V_DUMMY + 1)              /* unit off line */
 #define UNIT_V_BRUSH    (UNIT_V_OFFL + 1)               /* unit has brushes */
 #define UNIT_BRUSH      (1u << UNIT_V_BRUSH)
 #define UNIT_OFFL       (1u << UNIT_V_OFFL)
 #define UNIT_DUMMY      (1u << UNIT_V_DUMMY)
-#define UNIT_RL02       (1u << UNIT_V_RL02)
 #define UNIT_NOAUTO     DKUF_NOAUTOSIZE                 /* autosize disable */
-#define GET_DTYPE(x)    (((x) >> UNIT_V_RL02) & 1)
 
 /* Parameters in the unit descriptor */
 
@@ -280,8 +274,6 @@ t_stat rl_reset (DEVICE *dptr);
 void rl_set_done (int32 error);
 t_stat rl_boot (int32 unitno, DEVICE *dptr);
 t_stat rl_attach (UNIT *uptr, CONST char *cptr);
-t_stat rl_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
-t_stat rl_show_type (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat rl_set_bad (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 static void rlv_maint (void);
 t_stat rl_detach (UNIT *uptr);
@@ -311,12 +303,7 @@ static DIB rl_dib = {
     IOBA_AUTO, IOLN_RL, &rl_rd, &rl_wr,
     1, IVCL (RL), VEC_AUTO, { NULL }, IOLN_RL };
 
-static UNIT rl_unit[] = {
-    { UDATA (&rl_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE, RL01_SIZE) },
-    { UDATA (&rl_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE, RL01_SIZE) },
-    { UDATA (&rl_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE, RL01_SIZE) },
-    { UDATA (&rl_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE, RL01_SIZE) }
-    };
+static UNIT rl_unit[RL_NUMDR] = {{0}};
 
 static const REG rl_reg[] = {
     { GRDATAD (RLCS,              rlcs, DEV_RDX, 16, 0, "control/status") },
@@ -372,12 +359,6 @@ static const MTAB rl_mod[] = {
         &set_writelock, NULL,   NULL, "Write lock disk drive" },
     { UNIT_DUMMY, 0, NULL, "BADBLOCK", 
         &rl_set_bad, NULL, NULL, "Write bad block table on last track" },
-    { MTAB_XTD|MTAB_VUN, 0, NULL, "RL01",
-      &rl_set_type, NULL, NULL, "Set RL01 Disk Type" },
-    { MTAB_XTD|MTAB_VUN, 1, NULL, "RL02",
-      &rl_set_type, NULL, NULL, "Set RL02 Disk Type" },
-    { MTAB_XTD|MTAB_VUN, 0, "TYPE", NULL,
-      NULL, &rl_show_type, NULL, "Display device type" },
     { UNIT_NOAUTO,           0, "autosize", "AUTOSIZE", 
       NULL, NULL, NULL, "Set type based on file size at attach" },
     { UNIT_NOAUTO, UNIT_NOAUTO, "noautosize",   "NOAUTOSIZE",   
@@ -408,7 +389,7 @@ DEVICE rl_dev = {
     &rl_boot, &rl_attach, &rl_detach,
     &rl_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DISK | DEV_DEBUG, 0,
     rl_deb, NULL, NULL, &rl_help, NULL, NULL,
-    &rl_description 
+    &rl_description, NULL, &drv_tab
     };
 
 /* Drive states */
@@ -537,8 +518,7 @@ bit is cleared by software.  If set, check for interrupts and return.
             offs = GET_CYL (rlda);                  /* offset */
             if (rlda & RLDA_SK_DIR) {               /* in or out? */
                 newc = curr + offs;                 /* out */
-                maxc = (uptr->flags & UNIT_RL02)?
-                    RL_NUMCY * 2: RL_NUMCY;
+                maxc = uptr->drvtyp->cyl;
                 if (newc >= maxc)
                     newc = maxc - 1;
             } else {
@@ -579,7 +559,7 @@ max 17ms for 1 track seek w/head switch
                 uptr->STAT &= ~RLDS_ERR;
                 /* develop drive state */
             rlmp = (uint16)(uptr->STAT | (uptr->TRK & RLDS_HD));
-            if (uptr->flags & UNIT_RL02)
+            if (0 == strcasecmp (uptr->drvtyp->name, "RL02"))
                 rlmp |= RLDS_RL02;
             if (uptr->flags & UNIT_WPRT)
                 rlmp |= RLDS_WLK;
@@ -1001,7 +981,20 @@ t_stat rl_reset (DEVICE *dptr)
 {
 int32 i;
 UNIT *uptr;
+static t_bool inited = FALSE;
 
+if (!inited) {
+    inited = TRUE;
+    for (i = 0; i < RL_NUMDR; i++) {
+        char cmd[CBUFSIZE];
+
+        uptr = dptr->units + i;
+        uptr->action = &rl_svc;
+        uptr->flags = UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_ROABLE;
+        snprintf (cmd, sizeof (cmd), "%s %s", sim_uname (uptr), "RL01");
+        set_cmd (0, cmd);
+        }
+    }
 rlcs = CSR_DONE;
 rlda = rlba = rlbae = rlmp = rlmp1 = rlmp2 = 0;
 CLR_INT (RL);
@@ -1022,13 +1015,10 @@ return auto_config (0, 0);
 t_stat rl_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
-static const char *drives[] = {"RL01", "RL02", NULL};
 
-uptr->capac = (uptr->flags & UNIT_RL02)? RL02_SIZE: RL01_SIZE;
 r = sim_disk_attach_ex (uptr, cptr, RL_NUMWD * sizeof (uint16), 
                         sizeof (uint16), TRUE, 0, 
-                        (uptr->capac == RL02_SIZE) ? "RL02" : "RL01", RL_NUMSC, 0,
-                        (uptr->flags & UNIT_NOAUTO) ? NULL : drives);
+                        uptr->drvtyp->name, RL_NUMSC, 0, NULL);
 if (r != SCPE_OK)                                       /* error? */
     return r;
 /*
@@ -1046,38 +1036,6 @@ sim_cancel (uptr);
 uptr->STAT = RLDS_BHO | RLDS_LOAD;
 return sim_disk_detach (uptr);
 }
-
-/* Set size routine */
-
-t_stat rl_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
-{
-if (uptr->flags & UNIT_ATT)
-    return SCPE_ALATT;
-uptr->capac = (val & UNIT_RL02)? RL02_SIZE: RL01_SIZE;
-return SCPE_OK;
-}
-
-/* Set type command validation routine */
-
-t_stat rl_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
-{
-if ((val < 0) || (cptr && *cptr))
-    return SCPE_ARG;
-if (uptr->flags & UNIT_ATT)
-    return SCPE_ALATT;
-uptr->flags = (uptr->flags & ~UNIT_RL02) | (val << UNIT_V_RL02);
-uptr->capac = (t_addr)drv_tab[val].size;
-return SCPE_OK;
-}
-
-/* Show unit type */
-
-t_stat rl_show_type (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
-{
-fprintf (st, "%s", drv_tab[GET_DTYPE (uptr->flags)].name);
-return SCPE_OK;
-}
-
 
 
 /* Set bad block routine */
