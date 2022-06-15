@@ -4049,14 +4049,16 @@ if (bus) {
     fprintf (st, "In addition to autoconfiguration, most devices support the SET <device>\n");
     fprintf (st, "ADDRESS command, which allows the I/O page address of the device to be\n");
     fprintf (st, "changed, and the SET <device> VECTOR command, which allows the vector of\n");
-    fprintf (st, "the device to be changed.  Explicitly setting the I/O address or vector of\n");
-    fprintf (st, "any device DISABLES autoconfiguration for the entire system.  As\n");
-    fprintf (st, "a consequence, when autoconfiguration is disabled, the user may have to\n");
-    fprintf (st, "manually configure all remaining devices in the system that are explicitly\n");
-    fprintf (st, "enabled after autoconfiguration has been disabled.  Autoconfiguration can\n");
-    fprintf (st, "be restored for the entire system with the SET %s AUTOCONFIGURE command.\n\n", bus->name);
+    fprintf (st, "the device to be changed.  Explicitly changing the I/O address or vector of\n");
+    fprintf (st, "any device to a different value DISABLES autoconfiguration for the entire\n");
+    fprintf (st, "system.  As a consequence, when autoconfiguration is disabled, the user may\n");
+    fprintf (st, "have to manually configure all remaining devices in the system that are\n");
+    fprintf (st, "explicitly enabled after autoconfiguration has been disabled.\n");
+    fprintf (st, "Autoconfiguration can be restored for the entire system with the\n");
+    fprintf (st, "SET %s AUTOCONFIGURE command.\n\n", bus->name);
     fprintf (st, "The current I/O map can be displayed with the SHOW %s IOSPACE command.\n", bus->name);
-    fprintf (st, "Addresses that have set by autoconfiguration are marked with an asterisk (*).\n");
+    fprintf (st, "Addresses that have set by autoconfiguration in floating address space are\n");
+    fprintf (st, "marked with an asterisk (*).\n\n");
     fprintf (st, "All devices support the SHOW <device> ADDRESS and SHOW <device> VECTOR\n");
     fprintf (st, "commands, which display the device address and vector, respectively.\n\n");
     }
