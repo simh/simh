@@ -1,6 +1,6 @@
 /* pdp11_tm.c: PDP-11 magnetic tape simulator
 
-   Copyright (c) 1993-2013, Robert M Supnik
+   Copyright (c) 1993-2022, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tm           TM11/TU10 magtape
 
+   26-Mar-22    RMS     Added extra case points for new MTSE definitions
    23-Oct-13    RMS     Revised for new boot setup routine
    16-Feb-06    RMS     Added tape capacity checking
    31-Oct-05    RMS     Fixed address width for large files
@@ -541,6 +542,7 @@ switch (st) {
     case MTSE_UNATT:                                    /* not attached */
         tm_sta = tm_sta | STA_ILL;
     case MTSE_OK:                                       /* no error */
+    default:                                            /* unknown error */
         return SCPE_IERR;
 
     case MTSE_TMK:                                      /* tape mark */
@@ -572,9 +574,6 @@ switch (st) {
     case MTSE_WRP:                                      /* write protect */
         tm_sta = tm_sta | STA_ILL;                      /* illegal operation */
         break;
-
-    default:                                            /* shouldn't happen */
-        return SCPE_IERR;
         }
 
 return SCPE_OK;

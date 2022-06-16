@@ -1,6 +1,6 @@
 /* pdp11_tq.c: TMSCP tape controller simulator
 
-   Copyright (c) 2002-2013, Robert M Supnik
+   Copyright (c) 2002-2022, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tq           TQK50 tape controller
 
+   26-Mar-22    RMS     Added extra case points for new MTSE definitions
    23-Oct-13    RMS     Revised for new boot setup routine
    23-Jan-12    MP      Added missing support for Logical EOT detection while
                         positioning.
@@ -1581,11 +1582,12 @@ switch (st) {
         uptr->flags = uptr->flags | UNIT_SXC;
         return ST_WPR;
 
+    default:
+        uptr->flags = uptr->flags | UNIT_SXC;
+        return SCPE_IERR;
+
     case MTSE_LEOT:
         return ST_LED;
-
-    default:                                            /* shouldn't happen */
-        return SCPE_IERR;
         }
 
 return ST_SUC;

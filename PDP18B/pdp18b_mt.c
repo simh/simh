@@ -1,6 +1,6 @@
 /* pdp18b_mt.c: 18b PDP magnetic tape simulator
 
-   Copyright (c) 1993-2016, Robert M Supnik
+   Copyright (c) 1993-2022, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    mt           (PDP-9) TC59 magtape
                 (PDP-15) TC59D magtape
 
+   26-Mar-22    RMS     Added extra case points for new MTSE definitions
    10-Mar-16    RMS     Added 3-cycle databreak set/show entries
    07-Mar-16    RMS     Revised for dynamically allocated memory
    13-Sep-15    RMS     Added APIVEC register
@@ -437,6 +438,7 @@ switch (st) {
 
     case MTSE_FMT:                                      /* illegal fmt */
     case MTSE_UNATT:                                    /* not attached */
+    default:                                            /* unknown error */
         mt_sta = mt_sta | STA_ILL | STA_ERR;
     case MTSE_OK:                                       /* no error */
         return SCPE_IERR;
@@ -472,9 +474,6 @@ switch (st) {
     case MTSE_WRP:                                      /* write protect */
         mt_sta = mt_sta | STA_ILL | STA_ERR;            /* illegal operation */
         break;
-
-    default:                                            /* shouldn't happen */
-        return SCPE_IERR;
         }
 
 return SCPE_OK;

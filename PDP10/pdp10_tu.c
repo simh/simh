@@ -1,6 +1,6 @@
 /* pdp10_tu.c - PDP-10 RH11/TM03/TU45 magnetic tape simulator
 
-   Copyright (c) 1993-2018, Robert M Supnik
+   Copyright (c) 1993-2022, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tu           RH11/TM03/TU45 magtape
 
+   26-Mar-22    RMS     Added extra case points for new MTSE definitions
    07-Sep-20    RMS     Fixed || -> | in macro (Mark Pizzolato)
    12-Jan-18    RMS     Fixed missing () in logical test (Mark Pizzolato)
    29-Dec-17    RMS     Read tape mark must set Massbus EXC (TRE)
@@ -1095,6 +1096,7 @@ switch (st) {
 
     case MTSE_FMT:                                      /* illegal fmt */
     case MTSE_UNATT:                                    /* not attached */
+    default:                                            /* unknown error */
         set_tuer (ER_NXF);                              /* can't execute */
         if (qdt)                                        /* data xfr? set TRE */
             tucs1 = tucs1 | CS1_TRE;
