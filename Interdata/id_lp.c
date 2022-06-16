@@ -1,6 +1,6 @@
 /* id_lp.c: Interdata line printer
 
-   Copyright (c) 2001-2008, Robert M. Supnik
+   Copyright (c) 2001-2021, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt          M46-206 line printer
 
+   10-Jun-21    RMS     Removed use of ftell for pipe compatibility
    27-May-08    RMS     Fixed bug in printing test (Davis Johnson)
    19-Jan-07    RMS     Added UNIT_TEXT flag
    25-Apr-03    RMS     Revised for extended file support
@@ -72,8 +73,8 @@ t_stat lpt_svc (UNIT *uptr);
 t_stat lpt_reset (DEVICE *dptr);
 t_stat lpt_attach (UNIT *uptr, CONST char *cptr);
 t_stat lpt_bufout (UNIT *uptr);
-t_stat lpt_vfu (UNIT *uptr, int32 ch);
-t_stat lpt_spc (UNIT *uptr, int32 cnt);
+int32 lpt_vfu (UNIT *uptr, int32 ch);
+int32 lpt_spc (UNIT *uptr, int32 cnt);
 
 /* LPT data structures
 
@@ -158,8 +159,7 @@ return 0;
 
 t_stat lpt_svc (UNIT *uptr)
 {
-int32 t;
-t_stat r = SCPE_OK;
+int32 t, cc;
 
 lpt_sta = 0;                                            /* clear busy */
 if (lpt_arm)                                            /* armed? intr */
@@ -172,22 +172,27 @@ if (lpt_spnd || ((t >= LF) && (t < CR))) {              /* spc pend or spc op? *
     if (lpt_bufout (uptr) != SCPE_OK)                   /* print */
         return SCPE_IOERR;
     if ((t == 1) || (t == LF))                          /* single space */
-        lpt_spc (uptr, 1);
+        cc = lpt_spc (uptr, 1);
     else if (t == VT)                                   /* VT->VFU */
-        r = lpt_vfu (uptr, VT_VFU - 1);
+        cc = lpt_vfu (uptr, VT_VFU - 1);
     else if (t == 0xC)                                  /* FF->VFU */
-        r = lpt_vfu (uptr, FF_VFU - 1);
-    else if ((t >= SPC_BASE) && (t < VFU_BASE))
-        lpt_spc (uptr, t - SPC_BASE);                   /* space */
+        cc = lpt_vfu (uptr, FF_VFU - 1);
+    else if ((t >= SPC_BASE) && (t < VFU_BASE))         /* space */
+        cc = lpt_spc (uptr, t - SPC_BASE);
     else if ((t >= VFU_BASE) && (t < VFU_BASE + VFU_WIDTH))
-        r = lpt_vfu (uptr, t - VFU_BASE);               /* VFU */
-    else fputs ("\r", uptr->fileref);                   /* overprint */
-    uptr->pos = ftell (uptr->fileref);                  /* update position */
-    if (ferror (lpt_unit.fileref)) {
+        cc = lpt_vfu (uptr, t - VFU_BASE);              /* VFU */
+    else {
+        fputs ("\r", uptr->fileref);                    /* overprint */
+        cc = 1;
+        }
+    if (cc < 0)                                         /* VFU runaway? */
+        return STOP_VFU;
+    if (ferror (lpt_unit.fileref)) {                    /* I/O error? */
         sim_perror ("LPT I/O error");
         clearerr (uptr->fileref);
         return SCPE_IOERR;
         }
+    uptr->pos = uptr->pos + (t_addr)cc;                /* update position */
     }
 else if (t == CR) {                                     /* CR? */
     lpt_spnd = 1;                                       /* set spc pend */
@@ -199,7 +204,7 @@ else if (t >= 0x20) {                                   /* printable? */
     if (lpt_bptr < LPT_WIDTH)
         lpxb[lpt_bptr++] = t;
     }
-return r;
+return SCPE_OK;
 }
 
 /* Printing and spacing routines */
@@ -214,12 +219,12 @@ for (i = LPT_WIDTH - 1; (i >= 0) && (lpxb[i] == ' '); i--)
     lpxb[i] = 0;                                        /* backscan line */
 if (lpxb[0]) {                                          /* any char left? */
     fputs (lpxb, uptr->fileref);                        /* write line */
-    lpt_unit.pos = ftell (uptr->fileref);               /* update position */
-    if (ferror (uptr->fileref)) {
+    if (ferror (uptr->fileref)) {                       /* I/O error? */
         sim_perror ("LPT I/O error");
         clearerr (uptr->fileref);
         r = SCPE_IOERR;
         }
+    lpt_unit.pos = lpt_unit.pos + strlen (lpxb);        /* update position */
     }   
 lpt_bptr = 0;                                           /* reset buffer */
 for (i = 0; i < LPT_WIDTH; i++)

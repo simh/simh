@@ -1,6 +1,6 @@
 /* i7094_cd.c: IBM 711/721 card reader/punch
 
-   Copyright (c) 2003-2017, Robert M. Supnik
+   Copyright (c) 2003-2021, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    cdr          711 card reader
    cdp          721 card punch
 
+   09-Jun-21    RMS     Removed use of ftell on output for pipe compatibility
    13-Mar-17    RMS     Annotated fall through in switch
    19-Mar-12    RMS     Fixed declaration of sim_switches (Mark Pizzolato)
    19-Jan-07    RMS     Added UNIT_TEXT
@@ -448,12 +449,12 @@ for (i = ((2 * CD_CHRLNT) + 1); (i > 0) &&
 cdp_cbuf[i++] = '\n';                                   /* append nl */
 cdp_cbuf[i++] = 0;                                      /* append nul */
 fputs (cdp_cbuf, uptr->fileref);                        /* write card */
-uptr->pos = ftell (uptr->fileref);                      /* update position */
 if (ferror (uptr->fileref)) {                           /* error? */
     sim_perror ("CDP I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }
+uptr->pos = uptr->pos + strlen (cdp_cbuf);              /* update position */
 cdp_sta = CDS_END;                                      /* end state */
 sim_cancel (uptr);                                      /* cancel current */
 sim_activate (uptr, cdp_tstop);                         /* long timer */

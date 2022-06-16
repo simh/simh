@@ -1,6 +1,6 @@
 /* i7094_lp.c: IBM 716 line printer simulator
 
-   Copyright (c) 2003-2017, Robert M. Supnik
+   Copyright (c) 2003-2021, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt          716 line printer
 
+   09-Jun-21    RMS     Removed use of ftell for pipe compatibility
    13-Mar-17    RMS     Fixed GET_PCHAIN macro (COVERITY)
    19-Jan-07    RMS     Added UNIT_TEXT flag
 
@@ -331,12 +332,12 @@ lpt_cbuf[i] = 0;                                        /* append nul */
 if (uptr->flags & UNIT_ATT) {                           /* file? */
     fputs (lpt_cbuf, uptr->fileref);                    /* write line */
     fputc ('\n', uptr->fileref);                        /* append nl */
-    uptr->pos = ftell (uptr->fileref);                  /* update position */
     if (ferror (uptr->fileref)) {                       /* error? */
         sim_perror ("LPT I/O error");
         clearerr (uptr->fileref);
         return SCPE_IOERR;
         }
+    uptr->pos = uptr->pos + strlen (lpt_cbuf) + 1;      /* update pos, add nl */
     }
 else if (uptr->flags & UNIT_CONS) {                     /* print to console? */
     for (i = 0; lpt_cbuf[i] != 0; i++)

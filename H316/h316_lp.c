@@ -1,6 +1,6 @@
 /* h316_lp.c: Honeywell 316/516 line printer
 
-   Copyright (c) 1999-2015, Robert M. Supnik
+   Copyright (c) 1999-2021, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,7 +25,8 @@
 
    lpt          line printer
 
-   03-Jul-13    RLA     compatibility changes for extended interrupts
+   09-Jun-21    RMS     Added error detection, removed use of ftell
+   03-Jul-13    RLA     Compatibility changes for extended interrupts
    09-Jun-07    RMS     Fixed lost last print line (Theo Engel)
    19-Jan-06    RMS     Added UNIT_TEXT flag
    03-Apr-06    RMS     Fixed bug in blanks backscanning (Theo Engel)
@@ -321,7 +322,12 @@ if (lpt_svcst & LPT_SVCSH) {                            /* shuttling? */
             }
         lpt_buf[i + 1] = 0;
         fputs (lpt_buf, uptr->fileref);                 /* output buf */
-        uptr->pos = ftell (uptr->fileref);              /* update pos */
+        if (ferror (uptr->fileref)) {                   /* error? */
+            perror ("LPT I/O error");
+            clearerr (uptr->fileref);
+            return SCPE_IOERR;
+            }
+        uptr->pos = uptr->pos + strlen (lpt_buf);       /* update pos */
         for (i = 0; i < LPT_WIDTH; i++)                 /* clear buf */
             lpt_buf[i] = ' ';
         lpt_prdn = 1;                                   /* print done */
@@ -330,7 +336,12 @@ if (lpt_svcst & LPT_SVCSH) {                            /* shuttling? */
 if (lpt_svcst & LPT_SVCPA) {                            /* paper advance */
     SET_INT (INT_LPT);                                  /* interrupt */
     fputs (lpt_cc[lpt_svcch & 03], uptr->fileref);      /* output eol */
-    uptr->pos = ftell (uptr->fileref);                  /* update pos */
+    if (ferror (uptr->fileref)) {                       /* error? */
+        perror ("LPT I/O error");
+        clearerr (uptr->fileref);
+        return SCPE_IOERR;
+        }
+    uptr->pos = uptr->pos + strlen (lpt_cc[lpt_svcch & 03]); /* update pos */
     }
 lpt_svcst = 0;
 return SCPE_OK;

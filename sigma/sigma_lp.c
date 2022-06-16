@@ -1,6 +1,6 @@
 /* sigma_lp.c: Sigma 7440/7450 line printer
 
-   Copyright (c) 2007-2017, Robert M. Supnik
+   Copyright (c) 2007-2021, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lp           7440/7445 or 7450 line printer
 
+   10-Jun-2021  RMS     Removed use of ftell for pipe compatibility
    09-Mar-2017  RMS     Fixed unclosed file returns in CCT load (COVERITY)
 */
 
@@ -300,7 +301,7 @@ switch (lp_cmd) {                                       /* case on state */
 return SCPE_OK;
 }
 
-/* Format routine */
+/* Format routine - uses skip or space */
 
 uint32 lp_fmt (UNIT *uptr)
 {
@@ -327,7 +328,7 @@ else if ((c & ~CCH_MASK) == FMT_SKP)                    /* skip? */
 return 0;
 }
 
-/* Skip to channel */
+/* Skip to channel - uses space */
 
 uint32 lp_skip (UNIT *uptr, uint32 ch)
 {
@@ -345,22 +346,25 @@ return lp_space (uptr, lp_cctl, TRUE);                  /* space max */
 
 uint32 lp_space (UNIT *uptr, uint32 cnt, t_bool skp)
 {
-uint32 i;
+uint32 i, cc;
 
 lp_cctp = (lp_cctp + cnt) % lp_cctl;                    /* adv cct, mod lnt */
-if (skp && CHP (CH_TOF, lp_cct[lp_cctp]))               /* skip, TOF? */
-        fputs ("\f", uptr->fileref);                    /* ff */
+if (skp && CHP (CH_TOF, lp_cct[lp_cctp])) {             /* skip, TOF? */
+        fputc ('\f', uptr->fileref);                    /* ff */
+        cc = 1;
+        }
     else {                                              /* space */
         for (i = 0; i < cnt; i++)
             fputc ('\n', uptr->fileref);
+        cc = cnt;
         }
-uptr->pos = ftell (uptr->fileref);                      /* update position */
 if (ferror (uptr->fileref)) {                           /* error? */
     perror ("Line printer I/O error");
     clearerr (uptr->fileref);
     chan_set_chf (lp_dib.dva, CHF_XMDE);
     return SCPE_IOERR;
     }
+uptr->pos = uptr->pos + cc;                             /* update position */
 return 0;
 }
 
@@ -386,16 +390,16 @@ for (bp = 0, st = 0; (bp < max) && !st; bp++) {          /* fill buffer */
 if ((lp_model == LP_7440) || lp_pass) {                 /* ready to print? */
     lp_pass = 0;
     for (i = BUF_LNT4; (i > 0) && (lp_buf[i - 1] == ' '); i--) ; /* trim */
-    if (i)                                              /* write line */
+    if (i != 0)                                         /* write line */
         sim_fwrite (lp_buf, 1, i, uptr->fileref);
     fputc (lp_inh? '\r': '\n', uptr->fileref);          /* cr or nl */
-    uptr->pos = ftell (uptr->fileref);                  /* update position */
     if (ferror (uptr->fileref)) {                       /* error? */
         perror ("Line printer I/O error");
         clearerr (uptr->fileref);
         chan_set_chf (lp_dib.dva, CHF_XMDE);
         return SCPE_IOERR;
         }
+    uptr->pos = uptr->pos + i + 1;                      /* update position */
     if ((lp_model == LP_7440) &&                        /* 7440? */
         ((bp != BUF_LNT4) || (st != CHS_ZBC)) &&        /* check lnt err */
         chan_set_chf (lp_dib.dva, CHF_LNTE))
