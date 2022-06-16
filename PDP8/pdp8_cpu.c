@@ -25,6 +25,7 @@
 
    cpu          central processor
 
+   21-Oct-21    RMS     Fixed bug in reporting device conflicts (Hans-Bernd Eggenstein)
    07-Sep-17    RMS     Fixed sim_eval declaration in history routine (COVERITY)
    09-Mar-17    RMS     Fixed PCQ_ENTRY for interrupts (COVERITY)
    13-Feb-17    RMS     RESET clear L'AC, per schematics
