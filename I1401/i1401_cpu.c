@@ -1,6 +1,6 @@
 /* i1401_cpu.c: IBM 1401 CPU simulator
 
-   Copyright (c) 1993-2017, Robert M. Supnik
+   Copyright (c) 1993-2021, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   08-Jun-21    RMS     Added max value to address registers
    13-Mar-17    RMS     Fixed MTF length checking (COVERITY)
    30-Jan-15    RMS     Fixed treatment of overflow (Ken Shirriff)
    08-Oct-12    RMS     Clear storage and branch preserves B register (Van Snyder)
@@ -249,9 +250,9 @@ UNIT cpu_unit = {
     };
 
 REG cpu_reg[] = {
-    { DRDATA (IS, saved_IS, 14), PV_LEFT },
-    { DRDATA (AS, AS, 14), PV_LEFT },
-    { DRDATA (BS, BS, 14), PV_LEFT },
+    { DRDATA (IS, saved_IS, 14), PV_LEFT, MAXADDR },
+    { DRDATA (AS, AS, 14), PV_LEFT, MAXADDR },
+    { DRDATA (BS, BS, 14), PV_LEFT, MAXADDR },
     { FLDATA (ASERR, as_err, 0) },
     { FLDATA (BSERR, bs_err, 0) },
     { ORDATA (D, D, 7) },

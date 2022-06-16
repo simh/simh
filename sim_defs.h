@@ -703,8 +703,9 @@ struct REG {
     size_t              obj_size;                       /* sizeof(*loc) */
     size_t              ele_size;                       /* sizeof(**loc) or sizeof(*loc) if depth == 1 */
     const char          *macro;                         /* Initializer Macro Name */
-    /* NOTE: Flags MUST always be last since it is initialized outside of macro definitions */
+    /* NOTE: Flags and maxval MUST always be last since they are initialized outside of macro definitions */
     uint32              flags;                          /* flags */
+    t_value             maxval;                         /* maximum value */
     };
 
 /* Register flags */
