@@ -1,6 +1,6 @@
 /* sim_rev.h: simulator revisions and current rev level
 
-   Copyright (c) 1993-2020, Robert M Supnik
+   Copyright (c) 1993-2021, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,19 +28,60 @@
 #define _SIM_REV_H_     0
 
 #define SIM_MAJOR       3
-#define SIM_MINOR       11
+#define SIM_MINOR       12
 #define SIM_PATCH       2
 #define SIM_DELTA       0
 
-/* V3.11 revision history
+/* V3.12 revision history
 
-   V3.11 incorporates SCP additions and extensions by Dave Bryan to support his
-   HP simulators.
+   V3.12 incorporates a major rework of the register sizing macros and access
+   logic by Dave Bryan.
 
 patch   date            module(s) and fix(es)
 
-  2     tbd             scp.h
+  2     26-Mar-2022     sim_defs.h, scp.c
+                        - deprecated UNIT_RAW, UNIT_TEXT
+                        - dropped non-C_STD string support
+
+                        sim_tape.h, sim_tape.c
+                        - added extended tape format (Dave Bryan)
+
+                        all magtape simulators
+                        - added extra case points for new MTSE definitions
+
+                        pdp11_kg.c
+                        - fixed bug in repeated operations (Paul Koning)
+
+                        pdp11_rq.c
+                        - added additional disk types
+
+                        pdp8_fpp.c
+                        -   fix fencepost error in FP multiply extended precision (Rick Murphy)
+
+  1     01-Nov-2021     scp.c
+                        - fixed bugs in ID and search on PDP11, VAX, etc.
+
+                        sim_tape.c, sim_tape.h (Dave Bryan)
+                        - added sim_tape_erase routine
+                        - improved tape_erase_fwd corrupt image error checking
+
+                        pdp11_cpumod.c, pdp11_cpumod.h
+                        - added MMU as settable option to 11/23, 11/40, 11/45
+
+                        pdp8_cpu.c
+                        - fixed bug in reporting device conflicts (Hans-Bernd Eggenstein)
+
+                        pdp8_fpp.c
+                        - added DEVNO reporting
+
+                        pdp8_ttx.c
+                        - added DEVNO reporting from V4
+
+  0     15-Jun-2021     scp.h
                         - changed sim_vm_init to build time option (Dave Bryan)
+                        - changed register structure to separate access size from display size (Dave Bryan)
+                        - added maximum value to register structure (Dave Bryan)
+                        - added UNIT_PIPE dynamic flag (Dave Bryan)
 
                         scp.c
                         - changed sim_vm_init to build time option (Dave Bryan)
@@ -48,15 +89,30 @@ patch   date            module(s) and fix(es)
                         - flush terminal line logs at return from simulation (Dave Bryan)
                         - close terminal line logs at exit from simulator (Dave Bryan)
                         - fixed RUN problem if CPU reset clears PC (Mark Pizzolato)
+                        - separated register access size from display size (Dave Bryan)
+                        - added maximum value for register input (Dave Bryan)
+                        - added support for pipes as sequential IO sources (Dave Bryan)
 
                         sim_tmxr.h, sim_tmxr.c
                         - added capability to flush/close log files (Dave Bryan)
+
+                        i1401_defs.h, i1401_cpu.c
+                        - added maximum value for address registers
+
+                        i1620_defs.h, i1620_cpu.c
+                        - added maximum value for address registers
+
+                        i7094_mt.c
+                        - replaced dynamic buffer allocation with static (Mark Pizzolato)
 
                         nova_cpu.c
                         - fixed bug in history handling of C bit (Samuel Deutsch)
 
                         pdp10_tu.c
                         - fixed bad macro (Mark Pizzolato)
+
+                        pdp11_cpumod.h
+                        - added MMU as settable option to 11/23, 11/40, 11/45
 
                         pdp11_cpumod.c
                         - fixed KDJ11E programmable rate select (Paul Koning)
@@ -67,6 +123,19 @@ patch   date            module(s) and fix(es)
                         pdp18b_dr15.c
                         - zero out shared section on initial allocate (Dave Bryan)
 
+                        pdp18b_dt.c, pdp18b_rf.c
+                        - fixed bug if read overwrites WC memory location
+
+                        pdp8_clk.c
+                        - added diagnostic mode for timing dependency in TSS/8
+
+                        pdp8_df.c, pdp8_dt.c, pdpd8_rf.c
+                        - fixed bug if read overwrites WC memory location
+
+                        pdp8_sys.c
+                        - fixed treatment of RUBOUT in binary loader (Mark Pizzolato)
+                        - fixed decoding of RF/DF and LP intructions
+
                         s3_sys.c
                         - fixed bldaddr length (Mark Pizzolatto)
 
@@ -76,19 +145,29 @@ patch   date            module(s) and fix(es)
                         sds_cr.c, sds_cp.c
                         - New devices (Ken Rector)
 
+                        sds_cpu.c, sds_mt.c, sds_rad.c
+                        - Added C register support (Ken Rector)
+
                         sds_io.c
                         - TOP disconnects the channel rather than setting CHF_EOR
                         - Fixed overrun/underrun handling in single-word IO
 
                         sds_stddev.c
                         - TTO recognizes no leader flag (Ken Rector)
+                        - Added C register support to PTR boot (Ken Rector)
 
                         sds_sys.c
                         - Fixed handling of SDS character value 060 (Ken Rector)
-                        - Addec card reader and punch (Ken Rector)
+                        - Added card reader and punch (Ken Rector)
+                        - Added C register support to loader (Ken Rector)
 
                         vax_cpu.c
                         - added idle test for VMS 5.0/5.1 (Mark Pizzolato)
+
+/* V3.11 revision history
+
+   V3.11 incorporates SCP additions and extensions by Dave Bryan to support his
+   HP simulators.
 
   1     31-Mar-2020     scp.c and sim_tmxr_c
                         - new extensions to support HP simulators

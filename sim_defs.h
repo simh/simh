@@ -1,6 +1,6 @@
 /* sim_defs.h: simulator definitions
 
-   Copyright (c) 1993-2020, Robert M Supnik
+   Copyright (c) 1993-2022, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,13 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   10-Mar-22    JDB     Modified REG macros to fix "stringizing" problem
+   12-Nov-21    JDB     Added UNIT_EXTEND dynamic flag
+   17-Mar-21    JDB     Added UNIT_PIPE dynamic flag
+   16-Feb-21    JDB     Added "stride" to REG to support arrays of structures
+                        Modified REG macros to initialize strides
+   21-Jan-21    JDB     Added "size" and "maxval" fields to the REG structure
+                        Modified REG macros to initialize access sizes
    09-Nov-20    RMS     More V4.X compatibility hooks (Mark Pizzolato)
    26-Oct-19    RMS     Removed MTAB_VAL definition
    23-Jun-17    RMS     Added #include sim_rev.h (Mark Pizzolato)
@@ -137,7 +144,7 @@ typedef signed short    int16;
 typedef signed int      int32;
 typedef unsigned char   uint8;
 typedef unsigned short  uint16;
-typedef unsigned int    uint32;         
+typedef unsigned int    uint32;
 typedef int             t_stat;                         /* status */
 typedef int             t_bool;                         /* boolean */
 
@@ -417,11 +424,13 @@ struct sim_unit {
 #define UNIT_UFMASK     (((1u << UNIT_V_RSV) - 1) & ~((1u << UNIT_V_UF) - 1))
 #define UNIT_RFLAGS     (UNIT_UFMASK|UNIT_DIS)          /* restored flags */
 
-/* Unit dynamic flags (dynflags) (from 4.0) 
+/* Unit dynamic flags (dynflags) (from 4.0)
    These flags are only set dynamically */
 
 #define UNIT_ATTMULT    000001                          /* allow multiple ATT cmd */
-#define UNIT_V_DF_TAPE  3                               /* tape density reservation */
+#define UNIT_PIPE       000002                          /* file is a pipe */
+#define UNIT_EXTEND     000004                          /* extended SIMH tape format is enabled */
+#define UNIT_V_DF_TAPE  3                               /* tape density reservation (bits 3-5) */
 #define UNIT_W_DF_TAPE  3
 
 /* Register data structure */
@@ -433,7 +442,10 @@ struct sim_reg {
     uint32              width;                          /* width */
     uint32              offset;                         /* starting bit */
     uint32              depth;                          /* save depth */
+    size_t              size;                           /* size of location in bytes */
+    size_t              stride;                         /* spacing of array elements in bytes */
     uint32              flags;                          /* flags */
+    t_value             maxval;                         /* maximum value */
     uint32              qptr;                           /* circ q ptr */
     };
 
@@ -443,11 +455,10 @@ struct sim_reg {
 #define REG_RO          00004                           /* read only */
 #define REG_HIDDEN      00010                           /* hidden */
 #define REG_NZ          00020                           /* must be non-zero */
-#define REG_UNIT        00040                           /* in unit struct */
 #define REG_CIRC        00100                           /* circular array */
 #define REG_VMIO        00200                           /* use VM data print/parse */
 #define REG_VMAD        00400                           /* use VM addr print/parse */
-#define REG_FIT         01000                           /* fit access to size */
+#define REG_FIT         00000                           /* fit access to size (obsolete) */
 #define REG_HRO         (REG_RO | REG_HIDDEN)           /* hidden, read only */
 
 #define REG_V_UF        16                              /* device specific */
@@ -520,7 +531,7 @@ struct sim_schtab {
 struct sim_brktab {
     t_addr              addr;                           /* address */
     int32               typ;                            /* mask of types */
-    int32               cnt;                            /* proceed count */     
+    int32               cnt;                            /* proceed count */
     char                *act;                           /* action string */
     };
 
@@ -540,31 +551,117 @@ struct sim_debtab {
 
 #define UDATA(act,fl,cap) NULL,act,NULL,NULL,NULL,0,0,(fl),0,(cap),0,0
 
-#if defined (__STDC__) || defined (_WIN32)
-#define ORDATA(nm,loc,wd) #nm, &(loc), 8, (wd), 0, 1
-#define DRDATA(nm,loc,wd) #nm, &(loc), 10, (wd), 0, 1
-#define HRDATA(nm,loc,wd) #nm, &(loc), 16, (wd), 0, 1
-#define FLDATA(nm,loc,pos) #nm, &(loc), 2, 1, (pos), 1
-#define GRDATA(nm,loc,rdx,wd,pos) #nm, &(loc), (rdx), (wd), (pos), 1
-#define BRDATA(nm,loc,rdx,wd,dep) #nm, (loc), (rdx), (wd), 0, (dep)
-#define VBRDATA(nm,loc,rdx,wd,dep) #nm, (loc), (rdx), (wd), 0, (dep)
-#define SAVEDATA(nm,loc) \
-    #nm, &(loc), 8, 8, 0, sizeof(loc), REG_HRO
+/* Register initialization macros.
+
+   The following macros should be used to initialize the elements of a
+   simulator's register array.  The macros provide simplified initialization,
+   ensure that unspecified fields are set appropriately, and insulate the
+   simulator writer from changes in the underlying REG structure.
+
+   The macros take varying numbers of parameters with the following meanings:
+
+     Param  Meaning
+     -----  ------------------------------------------
+      nm    Register symbolic name
+      loc   Location of the associated variable
+      aloc  Location of the associated array
+      floc  Location of the associated structure field
+      rdx   Display and entry radix
+      wd    Field width in bits
+      off   Field offset in bits from LSB
+      dep   Number of array elements
+      siz   Element size in bytes
+      str   Array element spacing in bytes
+
+   The macros have the following uses:
+
+     Macro     Use with
+     --------  ---------------------------------------------------------------
+     ORDATA    Scalar with octal display/entry
+     DRDATA    Scalar with decimal display/entry
+     HRDATA    Scalar with hexadecimal display/entry
+     FLDATA    Scalar with single bit display/entry
+     GRDATA    Scalar with with specification of radix/width/offset parameters
+
+     BRDATA    Singly-subscripted array
+     CRDATA    Doubly-subscripted array
+
+     SRDATA    Singly-subscripted array of general structure fields
+     URDATA    Singly-subscripted array of UNIT structure fields
+
+     XRDATA    Generic type with specification of all parameters
+     SAVEDATA  Generic type used only for persistence across SAVE/RESTORE
+
+   Normally, scalar and array locations specify the variable name; the names are
+   converted internally to pointers as needed.  However, the starting point of
+   a partial array may be specified by passing a pointer to the desired element.
+   For example:
+
+     BRDATA (SYM, array, ...)
+
+   ...specifies a register starting with array element zero, while:
+
+     BRDATA (SYM, &array[3], ...)
+
+   ...specifies a register starting with array element three.
+
+   For arrays of general structures, the names of the array and selected field
+   are given:
+
+     SRDATA (SYM, array, field, ...)
+
+   This specifies a arrayed register whose elements are array[0].field,
+   array[1].field, etc.
+
+
+   Implementation notes:
+
+    1. The "RegCheck" macro is used to ensure that each of the user macros has
+       the correct number of parameters.  This improves maintenance reliability,
+       as changes to the REG structure need to be reflected only in the
+       "RegCheck" macro.
+
+    2. "Stringization" must occur at the first macro call level to support
+       register names that are themselves macros.  Otherwise, macro expansion
+       will occur before stringization, resulting in the wrong register name.
+
+    3. Additional REG initialization values may be supplied after a macro
+       invocation.  If present, these begin with the "flags" field.
+
+    4. The URDATA macro is obsolescent and present for backward-compatibility.
+       It is a special case of the generic SRDATA macro, which provides the same
+       functionality.  Note also that URDATA requires a "flags" parameter value,
+       which is optional for all other macros.
+
+    5. The SAVEDATA macro is useful to indicate global variables whose values
+       must persist across a SAVE and RESTORE.  Such data is hidden from the
+       register user interface.
+*/
+
+#define RegCheck(nm,loc,rdx,wd,off,dep,siz,str) \
+          nm, (loc), (rdx), (wd), (off), (dep), (siz), (str)
+
+#define ORDATA(nm,loc,wd)           RegCheck (#nm, &(loc),  8, (wd), 0, 1, sizeof (loc), 0)
+#define DRDATA(nm,loc,wd)           RegCheck (#nm, &(loc), 10, (wd), 0, 1, sizeof (loc), 0)
+#define HRDATA(nm,loc,wd)           RegCheck (#nm, &(loc), 16, (wd), 0, 1, sizeof (loc), 0)
+#define FLDATA(nm,loc,off)          RegCheck (#nm, &(loc), 2, 1, (off), 1, sizeof (loc), 0)
+#define GRDATA(nm,loc,rdx,wd,off)   RegCheck (#nm, &(loc), (rdx), (wd), (off), 1, sizeof (loc), 0)
+
+#define BRDATA(nm,aloc,rdx,wd,dep)  RegCheck (#nm, (aloc), (rdx), (wd), 0, (dep), sizeof  *(aloc), sizeof  *(aloc))
+#define CRDATA(nm,aloc,rdx,wd,dep)  RegCheck (#nm, (aloc), (rdx), (wd), 0, (dep), sizeof **(aloc), sizeof **(aloc))
+
+#define SRDATA(nm,aloc,floc,rdx,wd,off,dep) \
+                                    RegCheck (#nm, &((aloc)->floc), (rdx), (wd), (off), (dep), \
+                                              sizeof ((aloc)->floc), sizeof (*(aloc)))
+
+#define XRDATA(nm,loc,rdx,wd,off,dep,siz,str) \
+                                    RegCheck (#nm, (loc), (rdx), (wd), (off), (dep), (siz), (str))
+
 #define URDATA(nm,loc,rdx,wd,off,dep,fl) \
-    #nm, &(loc), (rdx), (wd), (off), (dep), ((fl) | REG_UNIT)
-#else
-#define ORDATA(nm,loc,wd) "nm", &(loc), 8, (wd), 0, 1
-#define DRDATA(nm,loc,wd) "nm", &(loc), 10, (wd), 0, 1
-#define HRDATA(nm,loc,wd) "nm", &(loc), 16, (wd), 0, 1
-#define FLDATA(nm,loc,pos) "nm", &(loc), 2, 1, (pos), 1
-#define GRDATA(nm,loc,rdx,wd,pos) "nm", &(loc), (rdx), (wd), (pos), 1
-#define BRDATA(nm,loc,rdx,wd,dep) "nm", (loc), (rdx), (wd), 0, (dep)
-#define VBRDATA(nm,loc,rdx,wd,dep) "nm", (loc), (rdx), (wd), 0, (dep)
-#define SAVEDATA(nm,loc) \
-    "nm", &(loc), 8, 8, 0, sizeof(loc), REG_HRO
-#define URDATA(nm,loc,rdx,wd,off,dep,fl) \
-    "nm", &(loc), (rdx), (wd), (off), (dep), ((fl) | REG_UNIT)
-#endif
+                                    RegCheck (#nm, &(loc), (rdx), (wd), (off), (dep), \
+                                              sizeof (loc), sizeof (UNIT)), (fl)
+
+#define SAVEDATA(nm,loc)            RegCheck (#nm, &(loc), 8, 8, 0, sizeof (loc), 1, 1), REG_HRO
 
 /* Typedefs for principal structures */
 
@@ -587,7 +684,41 @@ typedef struct sim_debtab DEBTAB;
 #include "sim_fio.h"
 #include "sim_sock.h"
 
-/* V4 compatibility definitions
+/* V4 register definitions.
+
+
+   Implementation notes:
+
+    1. Unfortunately, the requirement that "stringization" must occur at the
+       first macro call level precludes defining these V4 macros in terms of
+       their V3 equivalents.  Hence, the V3 definitions must be repeated here.
+*/
+
+#define ORDATAD(nm,loc,wd,desc)                       RegCheck (#nm, &(loc),  8, (wd), 0, 1, sizeof (loc), 0)
+#define DRDATAD(nm,loc,wd,desc)                       RegCheck (#nm, &(loc), 10, (wd), 0, 1, sizeof (loc), 0)
+#define HRDATAD(nm,loc,wd,desc)                       RegCheck (#nm, &(loc), 16, (wd), 0, 1, sizeof (loc), 0)
+#define FLDATAD(nm,loc,off,desc)                      RegCheck (#nm, &(loc), 2, 1, (off), 1, sizeof (loc), 0)
+#define GRDATAD(nm,loc,rdx,wd,off,desc)               RegCheck (#nm, &(loc), (rdx), (wd), (off), 1, sizeof (loc), 0)
+#define BRDATAD(nm,loc,rdx,wd,dep,desc)               RegCheck (#nm, (loc), (rdx), (wd), 0, (dep), \
+                                                        sizeof  *(loc), sizeof  *(loc))
+#define URDATAD(nm,loc,rdx,wd,off,dep,fl,desc)        RegCheck (#nm, &(loc), (rdx), (wd), (off), (dep), \
+                                                        sizeof (loc), sizeof (UNIT)), (fl)
+
+#define ORDATADF(nm,loc,wd,desc,flds)                 RegCheck (#nm, &(loc),  8, (wd), 0, 1, sizeof (loc), 0)
+#define DRDATADF(nm,loc,wd,desc,flds)                 RegCheck (#nm, &(loc), 10, (wd), 0, 1, sizeof (loc), 0)
+#define HRDATADF(nm,loc,wd,desc,flds)                 RegCheck (#nm, &(loc), 16, (wd), 0, 1, sizeof (loc), 0)
+#define FLDATADF(nm,loc,off,desc,flds)                RegCheck (#nm, &(loc), 2, 1, (off), 1, sizeof (loc), 0)
+#define GRDATADF(nm,loc,rdx,wd,off,desc,flds)         RegCheck (#nm, &(loc), (rdx), (wd), (off), 1, sizeof (loc), 0)
+#define BRDATADF(nm,loc,rdx,wd,dep,desc,flds)         RegCheck (#nm, (loc), (rdx), (wd), 0, (dep), \
+                                                        sizeof  *(loc), sizeof  *(loc))
+#define URDATADF(nm,loc,rdx,wd,off,dep,fl,desc,flds)  RegCheck (#nm, &(loc), (rdx), (wd), (off), (dep), \
+                                                        sizeof (loc), sizeof (UNIT)), (fl)
+
+#ifndef INT64_C
+#define INT64_C(x)      (x##LL)
+#endif
+
+/* V4 compatibility definitions.
 
    The SCP API for version 4.0 introduces a number of "pointer-to-const"
    parameter qualifiers that were not present in the 3.x versions.  To maintain
@@ -595,46 +726,6 @@ typedef struct sim_debtab DEBTAB;
    "CONST" rather than "const".  This allows macro removal of the qualifiers
    when compiling for SIMH 3.x.
 */
-
-#if defined (__STDC__) || defined (_WIN32)
-#define ORDATAD(nm,loc,wd,desc) #nm, &(loc), 8, (wd), 0, 1
-#define DRDATAD(nm,loc,wd,desc) #nm, &(loc), 10, (wd), 0, 1
-#define HRDATAD(nm,loc,wd,desc) #nm, &(loc), 16, (wd), 0, 1
-#define FLDATAD(nm,loc,pos,desc) #nm, &(loc), 2, 1, (pos), 1
-#define GRDATAD(nm,loc,rdx,wd,pos,desc) #nm, &(loc), (rdx), (wd), (pos), 1
-#define BRDATAD(nm,loc,rdx,wd,dep,desc) #nm, (loc), (rdx), (wd), 0, (dep)
-#define URDATAD(nm,loc,rdx,wd,off,dep,fl,desc) \
-        #nm, &(loc), (rdx), (wd), (off), (dep), ((fl) | REG_UNIT)
-#define ORDATADF(nm,loc,wd,desc) #nm, &(loc), 8, (wd), 0, 1
-#define DRDATADF(nm,loc,wd,desc) #nm, &(loc), 10, (wd), 0, 1
-#define HRDATADF(nm,loc,wd,desc) #nm, &(loc), 16, (wd), 0, 1
-#define FLDATADF(nm,loc,pos,desc) #nm, &(loc), 2, 1, (pos), 1
-#define GRDATADF(nm,loc,rdx,wd,pos,desc) #nm, &(loc), (rdx), (wd), (pos), 1
-#define BRDATADF(nm,loc,rdx,wd,dep,desc) #nm, (loc), (rdx), (wd), 0, (dep)
-#define URDATADF(nm,loc,rdx,wd,off,dep,fl,desc) \
-        #nm, &(loc), (rdx), (wd), (off), (dep), ((fl) | REG_UNIT)
-#else
-#define ORDATAD(nm,loc,wd) "nm", &(loc), 8, (wd), 0, 1
-#define DRDATAD(nm,loc,wd) "nm", &(loc), 10, (wd), 0, 1
-#define HRDATAD(nm,loc,wd) "nm", &(loc), 16, (wd), 0, 1
-#define FLDATAD(nm,loc,pos) "nm", &(loc), 2, 1, (pos), 1
-#define GRDATAD(nm,loc,rdx,wd,pos) "nm", &(loc), (rdx), (wd), (pos), 1
-#define BRDATAD(nm,loc,rdx,wd,dep) "nm", (loc), (rdx), (wd), 0, (dep)
-#define URDATAD(nm,loc,rdx,wd,off,dep,fl) \
-    "nm", &(loc), (rdx), (wd), (off), (dep), ((fl) | REG_UNIT)
-#define ORDATADF(nm,loc,wd) "nm", &(loc), 8, (wd), 0, 1
-#define DRDATADF(nm,loc,wd) "nm", &(loc), 10, (wd), 0, 1
-#define HRDATADF(nm,loc,wd) "nm", &(loc), 16, (wd), 0, 1
-#define FLDATADF(nm,loc,pos) "nm", &(loc), 2, 1, (pos), 1
-#define GRDATADF(nm,loc,rdx,wd,pos) "nm", &(loc), (rdx), (wd), (pos), 1
-#define BRDATADF(nm,loc,rdx,wd,dep) "nm", (loc), (rdx), (wd), 0, (dep)
-#define URDATADF(nm,loc,rdx,wd,off,dep,fl) \
-    "nm", &(loc), (rdx), (wd), (off), (dep), ((fl) | REG_UNIT)
-#endif
-
-#ifndef INT64_C
-#define INT64_C(x)      (x##LL)
-#endif
 
 #ifdef PF_USER
 #undef PF_USER

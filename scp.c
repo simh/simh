@@ -1,6 +1,6 @@
 /* scp.c: simulator control program
 
-   Copyright (c) 1993-2020, Robert M Supnik
+   Copyright (c) 1993-2022, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,7 +23,17 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   06-Mar-22    RMS     Removed UNIT_RAW support
    21-Oct-21    RMS     Fixed bug in byte deposits if aincr > 1
+   20=Sep-21    RMS     Fixed bug in nested DO recognition (per Mark Pizzolato)
+   15-Apr-21    RMS     Changed RUN to store new PC value both before RESET
+                        (former behavior) and after (per Mark Pizzolato)
+   18-Mar-21    JDB     Revised "attach_unit" and "detach_unit" for pipe support
+                        Modified tests to allow UNIT_RO without UNIT_ROABLE
+   16-Feb-21    JDB     Rewrote get_rval, put_rval to support arrays of structures
+   01-Feb-21    JDB     Added casts for down-conversions
+   25-Jan-21    JDB     REG "size" field now determines access size
+                        REG "maxval" field now determines maximum allowed value
    30-Nov-20    RMS     Fixed RUN problem if CPU reset clears PC (Mark Pizzolato)
    09-Nov-20    RMS     Added hack for sim_card multiple attach (Mark Pizzolato)
    23-Oct-20    JDB     Added tmxr_post_logs calls to flush and close log files
@@ -230,8 +240,9 @@
 #include "sim_tmxr.h"
 #include <signal.h>
 #include <ctype.h>
+#include <sys/stat.h>
 
-#if defined(HAVE_DLOPEN)                                 /* Dynamic Readline support */
+#if defined(SIM_HAVE_DLOPEN)                             /* Dynamic Readline support */
 #include <dlfcn.h>
 #endif
 
@@ -258,8 +269,6 @@
     x = sim_interval
 
 #define SZ_D(dp) (size_map[((dp)->dwidth + CHAR_BIT - 1) / CHAR_BIT])
-#define SZ_R(rp) \
-    (size_map[((rp)->width + (rp)->offset + CHAR_BIT - 1) / CHAR_BIT])
 #if defined (USE_INT64)
 #define SZ_LOAD(sz,v,mb,j) \
     if (sz == sizeof (uint8)) v = *(((uint8 *) mb) + ((uint32) j)); \
@@ -374,7 +383,8 @@ t_stat ex_reg (FILE *ofile, t_value val, int32 flag, REG *rptr, uint32 idx);
 t_stat dep_reg (int32 flag, char *cptr, REG *rptr, uint32 idx);
 t_stat exdep_addr_loop (FILE *ofile, SCHTAB *schptr, int32 flag, char *cptr,
     t_addr low, t_addr high, DEVICE *dptr, UNIT *uptr);
-t_stat ex_addr (FILE *ofile, int32 flag, t_addr addr, DEVICE *dptr, UNIT *uptr, int32 dfltinc);
+t_stat ex_addr (FILE *ofile, int32 flag, t_addr addr, DEVICE *dptr,
+    UNIT *uptr, int32 dfltinc);
 t_stat dep_addr (int32 flag, char *cptr, t_addr addr, DEVICE *dptr,
     UNIT *uptr, int32 dfltinc);
 t_stat step_svc (UNIT *ptr);
@@ -1020,7 +1030,7 @@ do {
     sim_switches = 0;                                   /* init switches */
     isdo = FALSE;
     if (cmdp = find_cmd (gbuf)) {                       /* lookup command */
-        isdo = (MATCH_CMD (gbuf, "DO") == 0);
+        isdo = (strcmp (cmdp->name, "DO") == 0);
         if (isdo) {                                     /* DO command? */
             if (flag >= DO_NEST_LVL)                    /* nest too deep? */
                 stat = SCPE_NEST;
@@ -1374,8 +1384,9 @@ if (cptr)
 if (uptr == NULL)
     return SCPE_NOFNC;
 if (((uptr->flags & UNIT_SEQ) == 0) ||                  /* must be sequential, */
-    ((uptr->flags & UNIT_ROABLE) != 0) ||               /* not RO settable */
-    ((uptr->flags & UNIT_MUSTBUF) != 0))                /* not buffered */
+    ((uptr->flags & (UNIT_RO | UNIT_ROABLE)) != 0) ||   /* not RO settable */
+    ((uptr->flags & UNIT_MUSTBUF) != 0) ||              /* not buffered */
+    ((uptr->dynflags & UNIT_PIPE) != 0))                /* not a pipe */
     return SCPE_NOFNC;
 if ((uptr->flags & UNIT_ATT) == 0)                      /* must be attached */
     return SCPE_UNATT;
@@ -2127,9 +2138,21 @@ return attach_unit (uptr, cptr);                        /* no, std routine */
 
 /* Attach unit to file */
 
+#if !defined (S_ISFIFO)
+  #if !defined (S_IFMT) && defined (_S_IFMT)
+  #define S_IFMT   _S_IFMT
+  #endif
+  #if defined (_S_IFIFO)
+  #define S_ISFIFO(m)   (((m) & S_IFMT) == _S_IFIFO)
+  #else
+  #define S_ISFIFO(m)   0
+  #endif
+#endif
+
 t_stat attach_unit (UNIT *uptr, char *cptr)
 {
 DEVICE *dptr;
+struct stat info;
 
 if (!(uptr->flags & UNIT_ATTABLE))                      /* not attachable? */
     return SCPE_NOATT;
@@ -2141,8 +2164,24 @@ uptr->filename = (char *) calloc (CBUFSIZE, sizeof (char)); /* alloc name buf */
 if (uptr->filename == NULL)
     return SCPE_MEM;
 strncpy (uptr->filename, cptr, CBUFSIZE);               /* save name */
-if (sim_switches & SWMASK ('R')) {                      /* read only? */
-    if ((uptr->flags & UNIT_ROABLE) == 0)               /* allowed? */
+
+if ((!stat (cptr, &info)) && S_ISFIFO (info.st_mode))   /* if file exists and is a pipe */
+    if (uptr->flags & UNIT_SEQ) {                       /*   then if the unit is sequential */
+        if (uptr->flags & (UNIT_RO | UNIT_ROABLE))      /* if the unit is readable */
+            uptr->fileref = sim_fopen (cptr, "rb");     /*   then open the pipe for reading */
+        else                                            /* otherwise */
+            uptr->fileref = sim_fopen (cptr, "wb");     /*   open the pipe for writing */
+
+        if (uptr->fileref == NULL)                          /* if the file failed to open */
+            return attach_err (uptr, SCPE_OPENERR);         /*   then report the error */
+        else                                                /* otherwise */
+            uptr->dynflags = uptr->dynflags | UNIT_PIPE;    /*   set the pipe flag */
+        }
+    else                                                /* otherwise the unit is not sequential */
+        return SCPE_NOFNC;                              /*   so it cannot be attached to a pipe */
+
+else if (sim_switches & SWMASK ('R')) {                 /* read only? */
+    if ((uptr->flags & (UNIT_RO | UNIT_ROABLE)) == 0)   /* allowed? */
         return attach_err (uptr, SCPE_NORO);            /* no, error */
     uptr->fileref = sim_fopen (cptr, "rb");             /* open rd only */
     if (uptr->fileref == NULL)                          /* open fail? */
@@ -2152,18 +2191,18 @@ if (sim_switches & SWMASK ('R')) {                      /* read only? */
         sim_printf ("%s: unit is read only\n", sim_dname (dptr));
     }
 else if (sim_switches & SWMASK ('N')) {                 /* new file only? */
-        uptr->fileref = sim_fopen (cptr, "wb+");        /* open new file */
-        if (uptr->fileref == NULL)                      /* open fail? */
-            return attach_err (uptr, SCPE_OPENERR);     /* yes, error */
-        if (!sim_quiet)
-            sim_printf ("%s: creating new file\n", sim_dname (dptr));
+    uptr->fileref = sim_fopen (cptr, "wb+");            /* open new file */
+    if (uptr->fileref == NULL)                          /* open fail? */
+        return attach_err (uptr, SCPE_OPENERR);         /* yes, error */
+    if (!sim_quiet)
+        sim_printf ("%s: creating new file\n", sim_dname (dptr));
     }
 else {                                                  /* normal */
     uptr->fileref = sim_fopen (cptr, "rb+");            /* open r/w */
     if (uptr->fileref == NULL) {                        /* open fail? */
         if ((errno == EROFS) || (errno == EACCES)) {    /* read only? */
-            if ((uptr->flags & UNIT_ROABLE) == 0)       /* allowed? */
-                return attach_err (uptr, SCPE_NORO);    /* no error */
+            if ((uptr->flags & (UNIT_RO | UNIT_ROABLE)) == 0)   /* allowed? */
+                return attach_err (uptr, SCPE_NORO);            /* no error */
             uptr->fileref = sim_fopen (cptr, "rb");     /* open rd only */
             if (uptr->fileref == NULL)                  /* open fail? */
                 return attach_err (uptr, SCPE_OPENERR); /* yes, error */
@@ -2316,6 +2355,7 @@ if ((uptr->flags & UNIT_BUF) && (uptr->filebuf)) {      /* buffered? */
     }
 uptr->flags = uptr->flags & ~(UNIT_ATT |                /* clear ATT */
     ((uptr->flags & UNIT_ROABLE) ? UNIT_RO : 0));       /* clear RO if dynamic */
+uptr->dynflags = uptr->dynflags & ~UNIT_PIPE;           /* clear the pipe flag */
 free (uptr->filename);
 uptr->filename = NULL;
 if (fclose (uptr->fileref) == EOF)
@@ -2560,7 +2600,7 @@ void *mbuf;
 int32 j, blkcnt, limit, unitno, time, flg;
 uint32 us, depth;
 t_addr k, high, old_capac;
-t_value val, mask;
+t_value val, max;
 t_stat r;
 size_t sz;
 t_bool v35, v32;
@@ -2732,10 +2772,13 @@ for ( ;; ) {                                            /* device loop */
         if (depth != rptr->depth)                       /* [V2.10+] mismatch? */
             sim_printf ("Register depth mismatch: %s %s, file = %d, sim = %d\n",
                 sim_dname (dptr), buf, depth, rptr->depth);
-        mask = width_mask[rptr->width];                 /* get mask */
+        if (rptr->maxval > 0)                           /* if a maximum value is defined */
+            max = rptr->maxval;                         /*   then use it */
+        else                                            /* otherwise */
+            max = width_mask[rptr->width];              /*   the mask defines the maximum value */
         for (us = 0; us < depth; us++) {                /* loop thru values */
             READ_I (val);                               /* read value */
-            if (val > mask)                             /* value ok? */
+            if (val > max)                              /* value ok? */
                 sim_printf ("Invalid register value: %s %s\n", sim_dname (dptr), buf);
             else if (us < rptr->depth)                  /* in range? */
                 put_rval (rptr, us, val);
@@ -2777,14 +2820,17 @@ if ((flag == RU_RUN) || (flag == RU_GO)) {              /* run or go */
             pcv = sim_vm_parse_addr (sim_dflt_dev, gbuf, &tptr);
         else pcv = strtotv (gbuf, &tptr, sim_PC->radix);/* parse PC */
         if ((tptr == gbuf) || (*tptr != 0) ||           /* error? */
-            (pcv > width_mask[sim_PC->width]))
+            (pcv > (sim_PC->maxval > 0
+                     ? sim_PC->maxval
+                     : width_mask[sim_PC->width])))
             return SCPE_ARG;
+        put_rval (sim_PC, 0, pcv);			/* store new PC */
         }
     if ((flag == RU_RUN) &&                             /* run? */
         ((r = run_boot_prep ()) != SCPE_OK))            /* reset sim */
         return r;
     if (new_pcv)                                        /* new PC value? */
-        put_rval (sim_PC, 0, pcv);
+        put_rval (sim_PC, 0, pcv);                      /* store again */
     }
 
 else if (flag == RU_STEP) {                             /* step */
@@ -2830,7 +2876,8 @@ else if (flag != RU_CONT)                               /* must be cont */
 for (i = 1; (dptr = sim_devices[i]) != NULL; i++) {     /* reposition all */
     for (j = 0; j < dptr->numunits; j++) {              /* seq devices */
         uptr = dptr->units + j;
-        if ((uptr->flags & (UNIT_ATT + UNIT_SEQ)) == (UNIT_ATT + UNIT_SEQ))
+        if ((uptr->flags & (UNIT_ATT + UNIT_SEQ)) == (UNIT_ATT + UNIT_SEQ) &&
+            (uptr->dynflags & UNIT_PIPE) == 0)
             sim_fseek (uptr->fileref, uptr->pos, SEEK_SET);
         }
     }
@@ -2875,7 +2922,6 @@ for (i = 1; (dptr = sim_devices[i]) != NULL; i++) {     /* flush attached files 
         if ((uptr->flags & UNIT_ATT) &&                 /* attached, */
             !(uptr->flags & UNIT_BUF) &&                /* not buffered, */
             (uptr->fileref) &&                          /* real file, */
-            !(uptr->flags & UNIT_RAW) &&                /* not raw, */
             !(uptr->flags & UNIT_RO))                   /* not read only? */
             fflush (uptr->fileref);
         }
@@ -3155,11 +3201,15 @@ t_stat exdep_addr_loop (FILE *ofile, SCHTAB *schptr, int32 flag, char *cptr,
 t_addr i, mask;
 t_stat reason, dfltinc;
 
+
 if (uptr->flags & UNIT_DIS)                             /* disabled? */
     return SCPE_UDIS;
 mask = (t_addr) width_mask[dptr->awidth];
 if ((low > mask) || (high > mask) || (low > high))
     return SCPE_ARG;
+dfltinc =  parse_sym ("0", 0, uptr, sim_eval, sim_switches);
+if (dfltinc > 0)                                         /* parse_sym doing nums? */
+    dfltinc = 1 - dptr->aincr;                          /* no, use std dflt incr */
 for (i = low; i <= high; ) {                            /* all paths must incr!! */
     reason = get_aval (i, dptr, uptr);                  /* get data */
     if (reason != SCPE_OK)                              /* return if error */
@@ -3229,43 +3279,50 @@ return SCPE_OK;
         idx     =       index
    Outputs:
         return  =       register value
+
+   Implementation notes:
+
+    1. The stride is the size of the element spacing for arrays, which is
+       equivalent to the addressing increment for array subscripting.  For
+       scalar registers, the stride will be zero (as will the idx value), so the
+       access pointer is same as the specified location pointer.
+
+    2. The size of the t_value type is determined by the USE_INT64 symbol and
+       will be either a 32-bit or a 64-bit type.  It represents the largest
+       value that can be returned and so is the default if one of the smaller
+       sizes is not indicated.  If USE_INT64 is not defined, t_value will be
+       identical to uint32.  In this case, compilers are generally smart enough
+       to eliminate the 32-bit size test and combine the two assignments into a
+       single default assignment.
 */
 
 t_value get_rval (REG *rptr, uint32 idx)
 {
-size_t sz;
 t_value val;
-UNIT *uptr;
+void    *ptr;
 
-sz = SZ_R (rptr);
-if ((rptr->depth > 1) && (rptr->flags & REG_CIRC)) {
-    idx = idx + rptr->qptr;
-    if (idx >= rptr->depth) idx = idx - rptr->depth;
+if ((rptr->depth > 1) && (rptr->flags & REG_CIRC)) {    /* if the register is a circular queue */
+    idx = idx + rptr->qptr;                             /*   then adjust the index relative to the queue */
+    if (idx >= rptr->depth)                             /* if the index is beyond the end of the array */
+        idx = idx - rptr->depth;                        /*   then wrap it around */
     }
-if ((rptr->depth > 1) && (rptr->flags & REG_UNIT)) {
-    uptr = ((UNIT *) rptr->loc) + idx;
-#if defined (USE_INT64)
-    if (sz <= sizeof (uint32))
-        val = *((uint32 *) uptr);
-    else val = *((t_uint64 *) uptr);
-#else
-    val = *((uint32 *) uptr);
-#endif
-    }
-else if (((rptr->depth > 1) || (rptr->flags & REG_FIT)) &&
-    (sz == sizeof (uint8)))
-    val = *(((uint8 *) rptr->loc) + idx);
-else if (((rptr->depth > 1) || (rptr->flags & REG_FIT)) &&
-    (sz == sizeof (uint16)))
-    val = *(((uint16 *) rptr->loc) + idx);
-#if defined (USE_INT64)
-else if (sz <= sizeof (uint32))
-     val = *(((uint32 *) rptr->loc) + idx);
-else val = *(((t_uint64 *) rptr->loc) + idx);
-#else
-else val = *(((uint32 *) rptr->loc) + idx);
-#endif
-val = (val >> rptr->offset) & width_mask[rptr->width];
+
+ptr = ((char *) rptr->loc) + (idx * rptr->stride);      /* point at the starting byte of the item */
+
+if (rptr->size == sizeof (uint8))                       /* get the value */
+    val = *((uint8 *) ptr);                             /*   using a size */
+                                                        /*     appropriate to */
+else if (rptr->size == sizeof (uint16))                 /*       the size of */
+    val = *((uint16 *) ptr);                            /*         the underlying type */
+
+else if (rptr->size == sizeof (uint32))
+    val = *((uint32 *) ptr);
+
+else                                                    /* if the element size is non-standard */
+    val = *((t_value *) ptr);                           /*   then access using the largest size permitted */
+
+val = (val >> rptr->offset) & width_mask[rptr->width];  /* shift and mask to obtain the final value */
+
 return val;
 }
 
@@ -3283,7 +3340,7 @@ return val;
 t_stat dep_reg (int32 flag, char *cptr, REG *rptr, uint32 idx)
 {
 t_stat r;
-t_value val, mask;
+t_value val, max;
 int32 rdx;
 char *tptr, gbuf[CBUFSIZE];
 
@@ -3300,17 +3357,20 @@ if (flag & EX_I) {
     if (*cptr == 0)                                     /* success */
         return SCPE_OK;
     }
-mask = width_mask[rptr->width];
+if (rptr->maxval > 0)                                   /* if a maximum value is defined */
+    max = rptr->maxval;                                 /*   then use it */
+else                                                    /* otherwise */
+    max = width_mask[rptr->width];                      /*   the mask defines the maximum value */
 GET_RADIX (rdx, rptr->radix);
 if ((rptr->flags & REG_VMAD) && sim_vm_parse_addr) {    /* address form? */
     val = sim_vm_parse_addr (sim_dflt_dev, cptr, &tptr);
-    if ((tptr == cptr) || (*tptr != 0) || (val > mask))
+    if ((tptr == cptr) || (*tptr != 0) || (val > max))
         return SCPE_ARG;
     }
 else if (!(rptr->flags & REG_VMFLAGS) ||                /* dont use sym? */
     (parse_sym (cptr, (rptr->flags & REG_UFMASK) | rdx, NULL,
                 &val, sim_switches | SIM_SW_REG) > SCPE_OK)) {
-    val = get_uint (cptr, rdx, mask, &r);
+    val = get_uint (cptr, rdx, max, &r);
     if (r != SCPE_OK)
         return SCPE_ARG;
     }
@@ -3326,59 +3386,54 @@ return SCPE_OK;
         rptr    =       pointer to register descriptor
         idx     =       index
         val     =       new value
-        mask    =       mask
    Outputs:
         none
+
+
+   Implementation notes:
+
+    1. mask and val are of type t_value, so an explicit cast is not needed for
+       that type of assignment.
+
+    2. See the notes for the get_rval routine for additional information
+       regarding the stride calculation and the t_value default assignment,
 */
 
 void put_rval (REG *rptr, uint32 idx, t_value val)
 {
-size_t sz;
 t_value mask;
-UNIT *uptr;
+void    *ptr;
 
-#define PUT_RVAL(sz,rp,id,v,m) \
-    *(((sz *) rp->loc) + id) = \
-            (*(((sz *) rp->loc) + id) & \
-            ~((m) << (rp)->offset)) | ((v) << (rp)->offset)
+if (rptr == sim_PC)                                     /* if the PC is changing */
+    sim_brk_npc (0);                                    /*   then notify the breakpoint package */
 
-if (rptr == sim_PC)
-    sim_brk_npc (0);
-sz = SZ_R (rptr);
-mask = width_mask[rptr->width];
-if ((rptr->depth > 1) && (rptr->flags & REG_CIRC)) {
-    idx = idx + rptr->qptr;
-    if (idx >= rptr->depth)
-        idx = idx - rptr->depth;
+mask = ~(width_mask [rptr->width] << rptr->offset);     /* set up a mask to produce a hole in the element */
+val  = val << rptr->offset;                             /*   and position the new value to fit the hole */
+
+if ((rptr->depth > 1) && (rptr->flags & REG_CIRC)) {    /* if the register is a circular queue */
+    idx = idx + rptr->qptr;                             /*   then adjust the index relative to the queue */
+    if (idx >= rptr->depth)                             /* if the index is beyond the end of the array */
+        idx = idx - rptr->depth;                        /*   then wrap it around */
     }
-if ((rptr->depth > 1) && (rptr->flags & REG_UNIT)) {
-    uptr = ((UNIT *) rptr->loc) + idx;
-#if defined (USE_INT64)
-    if (sz <= sizeof (uint32))
-        *((uint32 *) uptr) = (*((uint32 *) uptr) &
-        ~(((uint32) mask) << rptr->offset)) |
-        (((uint32) val) << rptr->offset);
-    else *((t_uint64 *) uptr) = (*((t_uint64 *) uptr)
-        & ~(mask << rptr->offset)) | (val << rptr->offset);
-#else
-    *((uint32 *) uptr) = (*((uint32 *) uptr) &
-        ~(((uint32) mask) << rptr->offset)) |
-        (((uint32) val) << rptr->offset);
-#endif
-    }
-else if (((rptr->depth > 1) || (rptr->flags & REG_FIT)) &&
-    (sz == sizeof (uint8)))
-    PUT_RVAL (uint8, rptr, idx, (uint32) val, (uint32) mask);
-else if (((rptr->depth > 1) || (rptr->flags & REG_FIT)) &&
-    (sz == sizeof (uint16)))
-    PUT_RVAL (uint16, rptr, idx, (uint32) val, (uint32) mask);
-#if defined (USE_INT64)
-else if (sz <= sizeof (uint32))
-    PUT_RVAL (uint32, rptr, idx, (int32) val, (uint32) mask);
-else PUT_RVAL (t_uint64, rptr, idx, val, mask);
-#else
-else PUT_RVAL (uint32, rptr, idx, val, mask);
-#endif
+
+ptr = ((char *) rptr->loc) + (idx * rptr->stride);      /* point at the starting byte of the item */
+
+if (rptr->size == sizeof (uint8))                       /* store the value */
+    *((uint8 *) ptr) =                                  /*   using a size */
+      (uint8) (*((uint8 *) ptr) & mask | val);          /*     appropriate to */
+                                                        /*       the size of */
+else if (rptr->size == sizeof (uint16))                 /*         the underlying type */
+    *((uint16 *) ptr) =
+      (uint16) (*((uint16 *) ptr) & mask | val);
+
+else if (rptr->size == sizeof (uint32))
+    *((uint32 *) ptr) =
+      (uint32) (*((uint32 *) ptr) & mask | val);
+
+else                                                    /* if the element size is non-standard */
+    *((t_value *) ptr) =                                /*   then access using the largest size permitted */
+      *((t_value *) ptr) & mask | val;
+
 return;
 }
 
@@ -3411,7 +3466,7 @@ if (!(flag & EX_E))
 GET_RADIX (rdx, dptr->dradix);
 if ((reason = fprint_sym (ofile, addr, sim_eval, uptr, sim_switches)) > 0) {
     fprint_val (ofile, sim_eval[0], rdx, dptr->dwidth, PV_RZRO);
-    return dfltinc;
+    reason = dfltinc;
     }
 if (flag & EX_I)
     fprintf (ofile, "\t");
@@ -3452,8 +3507,8 @@ for (i = 0, j = addr; i < sim_emax; i++, j = j + dptr->aincr) {
     else {
         if (!(uptr->flags & UNIT_ATT))
             return SCPE_UNATT;
-        if (((uptr->flags & UNIT_RAW) != 0) ||
-            (uptr->fileref == NULL))
+        if ((uptr->fileref == NULL) ||
+            ((uptr->dynflags & UNIT_PIPE) != 0))
             return SCPE_NOFNC;
         if (((uptr->flags & UNIT_FIX) != 0) &&
             (j >= uptr->capac)) {
@@ -3545,7 +3600,7 @@ for (i = 0, j = addr; i < count; i++, j = j + dptr->aincr) {
     else {
         if (!(uptr->flags & UNIT_ATT))
             return SCPE_UNATT;
-        if (uptr->flags & UNIT_RAW)
+        if (uptr->dynflags & UNIT_PIPE)
             return SCPE_NOFNC;
         if ((uptr->flags & UNIT_FIX) && (j >= uptr->capac))
             return SCPE_NXM;
@@ -3641,7 +3696,7 @@ return read_line_p (NULL, cptr, size, stream);
 char *read_line_p (char *prompt, char *cptr, int32 size, FILE *stream)
 {
 char *tptr;
-#if defined(HAVE_DLOPEN)
+#if defined(SIM_HAVE_DLOPEN)
 static int initialized = 0;
 static char *(*p_readline)(const char *) = NULL;
 static void (*p_add_history)(const char *) = NULL;
@@ -3705,7 +3760,7 @@ while (isspace (*cptr))                                 /* trim leading spc */
 if (*cptr == ';')                                       /* ignore comment */
     *cptr = 0;
 
-#if defined (HAVE_DLOPEN)
+#if defined (SIM_HAVE_DLOPEN)
 if (prompt && p_add_history && *cptr)                   /* Save non blank lines in history */
     p_add_history (cptr);
 #endif
@@ -3730,7 +3785,7 @@ char *get_glyph_gen (char *iptr, char *optr, char mchar, t_bool uc)
 {
 while ((isspace (*iptr) == 0) && (*iptr != 0) && (*iptr != mchar)) {
     if (islower (*iptr) && uc)
-        *optr = toupper (*iptr);
+        *optr = (char) toupper (*iptr);
     else *optr = *iptr;
     iptr++; optr++;
     }
@@ -4528,7 +4583,7 @@ do {
     d = d - 1;
     digit = (int32) (val % radix);
     val = val / radix;
-    dbuf[d] = (digit <= 9)? '0' + digit: 'A' + (digit - 10);
+    dbuf[d] = (char) ((digit <= 9)? '0' + digit: 'A' + (digit - 10));
     } while ((d > 0) && (val != 0));
 
 if (format != PV_LEFT) {

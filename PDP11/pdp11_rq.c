@@ -1,6 +1,6 @@
 /* pdp11_rq.c: MSCP disk controller simulator
 
-   Copyright (c) 2002-2018, Robert M Supnik
+   Copyright (c) 2002-2022, Robert M Supnik
    Derived from work by Stephen F. Shirron
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -26,6 +26,8 @@
 
    rq           RQDX3 disk controller
 
+   06=Mar-22    RMS     Added more disk types (Mark Pizzolato)
+   31-Jan-21    RMS     Revised for new register macros
    28-May-18    RMS     Changed to avoid nested comment warnings (Mark Pizzolato)
    23-Oct-13    RMS     Revised for new boot setup routine
    17-Mar-13    RMS     Fixed bug in ABORT link walk loop (Dave Bryan)
@@ -249,6 +251,7 @@ x  RA73 70(+1)  21      2667+   21      1       ?       3920490
 #define RQDF_RMV        01                              /* removable */
 #define RQDF_RO         02                              /* read only */
 #define RQDF_SDI        04                              /* SDI drive */
+#define RQDF_DSSI       010                             /* DSSI drive */
 
 #define RX50_DTYPE      0
 #define RX50_SECT       10
@@ -525,6 +528,160 @@ x  RA73 70(+1)  21      2667+   21      1       ?       3920490
 #define RD32_MED        0x25644020
 #define RD32_FLGS       0
 
+/* Below here, imported from V4 */
+
+#define RC25_DTYPE      17                              /*  */
+#define RC25_SECT       50                              /*  */
+#define RC25_SURF       8
+#define RC25_CYL        1260                            /*  */
+#define RC25_TPG        RC25_SURF
+#define RC25_GPC        1
+#define RC25_XBN        0                               /*  */
+#define RC25_DBN        0                               /*  */
+#define RC25_LBN        50902                           /* ? 50*8*1260 ? */
+#define RC25_RCTS       0                               /*  */
+#define RC25_RCTC       1
+#define RC25_RBN        0                               /*  */
+#define RC25_MOD        2
+#define RC25_MED        0x20643019
+#define RC25_FLGS       RQDF_RMV
+
+#define RCF25_DTYPE     18                              /*  */
+#define RCF25_SECT      50                              /*  */
+#define RCF25_SURF      8
+#define RCF25_CYL       1260                            /*  */
+#define RCF25_TPG       RCF25_SURF
+#define RCF25_GPC       1
+#define RCF25_XBN       0                               /*  */
+#define RCF25_DBN       0                               /*  */
+#define RCF25_LBN       50902                           /* ? 50*8*1260 ? */
+#define RCF25_RCTS      0                               /*  */
+#define RCF25_RCTC      1
+#define RCF25_RBN       0                               /*  */
+#define RCF25_MOD       3
+#define RCF25_MED       0x20643319
+#define RCF25_FLGS      0
+
+#define RA80_DTYPE      19                              /* SDI drive */
+#define RA80_SECT       31                              /* +1 spare/track */
+#define RA80_SURF       14
+#define RA80_CYL        546                             /*  */
+#define RA80_TPG        RA80_SURF
+#define RA80_GPC        1
+#define RA80_XBN        0                               /*  */
+#define RA80_DBN        0                               /*  */
+#define RA80_LBN        237212                          /* 31*14*546 */
+#define RA80_RCTS       0                               /*  */
+#define RA80_RCTC       1
+#define RA80_RBN        0                               /*  */
+#define RA80_MOD        1
+#define RA80_MED        0x25641050
+#define RA80_FLGS       RQDF_SDI
+
+// [RLA] Most of these RA70 parameters came from doing a DUSTAT on a real
+// [RLA] RA70 drive.  The remainder are just educated guesses...
+
+#define RA70_DTYPE      20                             /* SDI drive */
+#define RA70_SECT       33                             /* +1 spare/track */
+#define RA70_SURF       11                             /* tracks/cylinder */
+#define RA70_CYL        1507                           /* 0-1506 user */
+#define RA70_TPG        RA70_SURF
+#define RA70_GPC        1
+#define RA70_XBN        0                              /* ??? */
+#define RA70_DBN        0                              /* ??? */
+#define RA70_LBN        547041                         /* 33*11*1507 */
+#define RA70_RCTS       198                            /* Size of the RCT */
+#define RA70_RCTC       7                              /* Number of RCT copies */
+#define RA70_RBN        16577                          /* 1*11*1507 */
+#define RA70_MOD        18
+#define RA70_MED        0x25641046                     /* RA70 MEDIA ID */
+#define RA70_FLGS       RQDF_SDI
+
+// [RLA] Likewise for the RA73 ...
+#define RA73_DTYPE      21                             /* SDI drive */
+#define RA73_SECT       70                             /* +1 spare/track */
+#define RA73_SURF       21                             /* tracks/cylinder */
+#define RA73_CYL        2667                           /* 0-2666 user */
+#define RA73_TPG        RA73_SURF
+#define RA73_GPC        1
+#define RA73_XBN        0                              /* ??? */
+#define RA73_DBN        0                              /* ??? */
+#define RA73_LBN        3920490                        /* 70*21*2667 */
+#define RA73_RCTS       198                            /* Size of the RCT ??????*/
+#define RA73_RCTC       7                              /* Number of RCT copies */
+#define RA73_RBN        56007                          /* 1*21*2667 */
+#define RA73_MOD        47
+#define RA73_MED        0x25641049                     /* RA73 MEDIA ID */
+#define RA73_FLGS       RQDF_SDI
+
+/* The RF drives don't have any useful error parameters. */
+/* These entries are derived from basic geometry and size */
+/* info in Ultrix 4.5 disktab entries. */
+
+#define RF30_DTYPE      22                              /* DSSI drive */
+#define RF30_SECT       37                              /* +1 spare/track */
+#define RF30_SURF       6
+#define RF30_CYL        1320                            /* 0-1914 user */
+#define RF30_TPG        RF30_SURF
+#define RF30_GPC        1
+#define RF30_XBN        1456                            /* cyl 1917-1918? */
+#define RF30_DBN        1456                            /* cyl 1919-1920? */
+#define RF30_LBN        293040                          /* 37*6*1320 */
+#define RF30_RCTS       1428                            /* cyl 1915-1916? */
+#define RF30_RCTC       1
+#define RF30_RBN        26810                           /* 1 *14*1915 */
+#define RF30_MOD        21
+#define RF30_MED        0x2264601E
+#define RF30_FLGS       RQDF_DSSI
+
+#define RF31_DTYPE      23                              /* DSSI drive */
+#define RF31_SECT       50                              /* +1 spare/track */
+#define RF31_SURF       8
+#define RF31_CYL        1861                            /* 0-1860 user */
+#define RF31_TPG        RF31_SURF
+#define RF31_GPC        1
+#define RF31_XBN        1456                            /* cyl 1917-1918? */
+#define RF31_DBN        1456                            /* cyl 1919-1920? */
+#define RF31_LBN        744400                          /* 50*8*1861 */
+#define RF31_RCTS       1428                            /* cyl 1915-1916? */
+#define RF31_RCTC       1
+#define RF31_RBN        26810                           /* 1 *14*1915 */
+#define RF31_MOD        27
+#define RF31_MED        0x2264601F
+#define RF31_FLGS       RQDF_DSSI
+
+#define RF71_DTYPE      24                              /* DSSI drive */
+#define RF71_SECT       37                              /* +1 spare/track */
+#define RF71_SURF       16
+#define RF71_CYL        1320                            /* 0-1914 user */
+#define RF71_TPG        RF71_SURF
+#define RF71_GPC        1
+#define RF71_XBN        1456                            /* cyl 1917-1918? */
+#define RF71_DBN        1456                            /* cyl 1919-1920? */
+#define RF71_LBN        781440                          /* 37*16*1320 */
+#define RF71_RCTS       1428                            /* cyl 1915-1916? */
+#define RF71_RCTC       1
+#define RF71_RBN        26810                           /* 1 *14*1915 */
+#define RF71_MOD        40
+#define RF71_MED        0x22646047
+#define RF71_FLGS       RQDF_DSSI
+
+#define RF72_DTYPE      25                              /* DSSI drive */
+#define RF72_SECT       50                              /* +1 spare/track */
+#define RF72_SURF       21
+#define RF72_CYL        1861                            /* 0-1860 user */
+#define RF72_TPG        RF72_SURF
+#define RF72_GPC        1
+#define RF72_XBN        1456                            /* cyl 1917-1918? */
+#define RF72_DBN        1456                            /* cyl 1919-1920? */
+#define RF72_LBN        1954050                         /* 50*21*1861 */
+#define RF72_RCTS       1428                            /* cyl 1915-1916? */
+#define RF72_RCTC       1
+#define RF72_RBN        26810                           /* 1 *14*1915 */
+#define RF72_MOD        28
+#define RF72_MED        0x22646048
+#define RF72_FLGS       RQDF_DSSI
+
 struct drvtyp {
     int32       sect;                                   /* sectors */
     int32       surf;                                   /* surfaces */
@@ -551,15 +708,87 @@ struct drvtyp {
 #define RQ_SIZE(d)      (d##_LBN * RQ_NUMBY)
 
 static struct drvtyp drv_tab[] = {
-    { RQ_DRV (RX50), "RX50" }, { RQ_DRV (RX33), "RX33" },
-    { RQ_DRV (RD51), "RD51" }, { RQ_DRV (RD31), "RD31" },
-    { RQ_DRV (RD52), "RD52" }, { RQ_DRV (RD53), "RD53" },
-    { RQ_DRV (RD54), "RD54" }, { RQ_DRV (RA82), "RA82" },
-    { RQ_DRV (RRD40), "RRD40" }, { RQ_DRV (RA72), "RA72" },
-    { RQ_DRV (RA90), "RA90" }, { RQ_DRV (RA92), "RA92" },
-    { RQ_DRV (RA8U), "RAUSER" }, { RQ_DRV (RA60), "RA60" },
-    { RQ_DRV (RA81), "RA81" }, { RQ_DRV (RA71), "RA71" },
+    { RQ_DRV (RX50), "RX50" },
+    { RQ_DRV (RX33), "RX33" },
+    { RQ_DRV (RD51), "RD51" },
+    { RQ_DRV (RD31), "RD31" },
+    { RQ_DRV (RD52), "RD52" },
+    { RQ_DRV (RD53), "RD53" },
+    { RQ_DRV (RD54), "RD54" },
+    { RQ_DRV (RA82), "RA82" },
+    { RQ_DRV (RRD40), "RRD40" },
+    { RQ_DRV (RA72), "RA72" },
+    { RQ_DRV (RA90), "RA90" },
+    { RQ_DRV (RA92), "RA82" },
+    { RQ_DRV (RA8U), "RAUSER" },
+    { RQ_DRV (RA60), "RA60" },
+    { RQ_DRV (RA81), "RA81" },
+    { RQ_DRV (RA71), "RA71" },
     { RQ_DRV (RD32), "RD32" },
+    { RQ_DRV (RC25), "RC25" },
+    { RQ_DRV (RCF25), "RCF25" },
+    { RQ_DRV (RA80), "RA80" },
+    { RQ_DRV (RA70), "RA70" },
+    { RQ_DRV (RA73), "RA73" },
+    { RQ_DRV (RF30), "RF30" },
+    { RQ_DRV (RF31), "RF31" },
+    { RQ_DRV (RF71), "RF71" },
+    { RQ_DRV (RF72), "RF72" },
+    { 0 }
+    };
+
+/* Controller parameters */
+
+#define DEFAULT_CTYPE   0
+
+// AFAIK the UNIBUS KLESI and QBUS KLESI used the same controller type...
+
+#define KLESI_CTYPE     1               // RC25 controller (UNIBUS and QBUS both)
+#define KLESI_UQPM      1
+#define KLESI_MODEL     1
+
+#define RUX50_CTYPE     2               // UNIBUS RX50-only controller
+#define RUX50_UQPM      2
+#define RUX50_MODEL     2
+
+#define UDA50_CTYPE     3               // UNIBUS SDI (RAxx) controller
+#define UDA50_UQPM      6
+#define UDA50_MODEL     6
+
+#define RQDX3_CTYPE     4               // QBUS RX50/RDxx controller
+#define RQDX3_UQPM      19
+#define RQDX3_MODEL     19
+
+#define KDA50_CTYPE     5               // QBUS SDI (RAxx) controller
+#define KDA50_UQPM      13
+#define KDA50_MODEL     13
+
+#define KRQ50_CTYPE     6               // QBUS RRD40/50 CDROM controller
+#define KRQ50_UQPM      16
+#define KRQ50_MODEL     16
+
+#define KRU50_CTYPE     7               // UNIBUS RRD40/50 CDROM controller
+#define KRU50_UQPM      26
+#define KRU50_MODEL     26
+
+struct ctlrtyp {
+    uint32      uqpm;                                   /* port model */
+    uint16      model;                                  /* controller model */
+    const char  *name;                                  /* name */
+    };
+
+#define RQ_CTLR(d) \
+    d##_UQPM, d##_MODEL
+
+static struct ctlrtyp ctlr_tab[] = {
+    { 0, 0, "DEFAULT" },
+    { RQ_CTLR (KLESI), "KLESI" },
+    { RQ_CTLR (RUX50), "RUX50" },
+    { RQ_CTLR (UDA50), "UDA50" },
+    { RQ_CTLR (RQDX3), "RQDX3" },
+    { RQ_CTLR (KDA50), "KDA50" },
+    { RQ_CTLR (KRQ50), "KRQ50" },
+    { RQ_CTLR (KRU50), "KRU50" },
     { 0 }
     };
 
@@ -592,6 +821,7 @@ typedef struct {
     uint32              credits;                        /* credits */
     uint32              hat;                            /* host timer */
     uint32              htmo;                           /* host timeout */
+//    uint32              ctype;                          /* controller type */
     struct uq_ring      cq;                             /* cmd ring */
     struct uq_ring      rq;                             /* rsp ring */
     struct rqpkt        pak[RQ_NPKTS];                  /* packet queue */
@@ -708,7 +938,7 @@ REG rq_reg[] = {
     { DRDATA (I4TIME, rq_itime4, 24), PV_LEFT + REG_NZ },
     { DRDATA (QTIME, rq_qtime, 24), PV_LEFT + REG_NZ },
     { DRDATA (XTIME, rq_xtime, 24), PV_LEFT + REG_NZ },
-    { BRDATA (PKTS, rq_ctx.pak, DEV_RDX, 16, RQ_NPKTS * (RQ_PKT_SIZE_W + 1)) },
+    { XRDATA (PKTS, rq_ctx.pak, DEV_RDX, 16, 0, RQ_NPKTS * (RQ_PKT_SIZE_W + 1), sizeof (int16), sizeof (int16)) },
     { URDATA (CPKT, rq_unit[0].cpkt, 10, 5, 0, RQ_NUMDR, 0) },
     { URDATA (PKTQ, rq_unit[0].pktq, 10, 5, 0, RQ_NUMDR, 0) },
     { URDATA (UFLG, rq_unit[0].uf, DEV_RDX, 16, 0, RQ_NUMDR, 0) },
@@ -754,6 +984,8 @@ MTAB rq_mod[] = {
       &rq_set_type, NULL, NULL },
     { MTAB_XTD | MTAB_VUN, RA60_DTYPE, NULL, "RA60",
       &rq_set_type, NULL, NULL },
+    { MTAB_XTD | MTAB_VUN, RA80_DTYPE, NULL, "RA80",
+      &rq_set_type, NULL, NULL },
     { MTAB_XTD | MTAB_VUN, RA81_DTYPE, NULL, "RA81",
       &rq_set_type, NULL, NULL },
     { MTAB_XTD | MTAB_VUN, RA82_DTYPE, NULL, "RA82",
@@ -762,15 +994,31 @@ MTAB rq_mod[] = {
       &rq_set_type, NULL, NULL },
     { MTAB_XTD | MTAB_VUN, RRD40_DTYPE, NULL, "CDROM",
       &rq_set_type, NULL, NULL },
+    { MTAB_XTD | MTAB_VUN, RA70_DTYPE, NULL, "RA70",
+      &rq_set_type, NULL, NULL },
     { MTAB_XTD | MTAB_VUN, RA71_DTYPE, NULL, "RA71",
       &rq_set_type, NULL, NULL },
     { MTAB_XTD | MTAB_VUN, RA72_DTYPE, NULL, "RA72",
+      &rq_set_type, NULL, NULL },
+    { MTAB_XTD | MTAB_VUN, RA73_DTYPE, NULL, "RA73",
       &rq_set_type, NULL, NULL },
     { MTAB_XTD | MTAB_VUN, RA90_DTYPE, NULL, "RA90",
       &rq_set_type, NULL, NULL },
     { MTAB_XTD | MTAB_VUN, RA92_DTYPE, NULL, "RA92",
       &rq_set_type, NULL, NULL },
     { MTAB_XTD | MTAB_VUN, RA8U_DTYPE, NULL, "RAUSER",
+      &rq_set_type, NULL, NULL },
+    { MTAB_XTD | MTAB_VUN, RC25_DTYPE, NULL, "RC25",
+      &rq_set_type, NULL, NULL },
+    { MTAB_XTD | MTAB_VUN, RCF25_DTYPE, NULL, "RCF25",
+      &rq_set_type, NULL, NULL },
+    { MTAB_XTD | MTAB_VUN, RF30_DTYPE, NULL, "RF30",
+      &rq_set_type, NULL, NULL },
+    { MTAB_XTD | MTAB_VUN, RF31_DTYPE, NULL, "RF31",
+      &rq_set_type, NULL, NULL },
+    { MTAB_XTD | MTAB_VUN, RA8U_DTYPE, NULL, "RAUSER",
+      &rq_set_type, NULL, NULL },
+    { MTAB_XTD | MTAB_VUN, RA8U_DTYPE, NULL, "RA8U",
       &rq_set_type, NULL, NULL },
     { MTAB_XTD | MTAB_VUN, 0, "TYPE", NULL,
       NULL, &rq_show_type, NULL },
@@ -847,7 +1095,7 @@ REG rqb_reg[] = {
     { FLDATA (PRGI, rqb_ctx.prgi, 0), REG_HIDDEN },
     { FLDATA (PIP, rqb_ctx.pip, 0), REG_HIDDEN },
     { FLDATA (INT, rqb_ctx.irq, 0) },
-    { BRDATA (PKTS, rqb_ctx.pak, DEV_RDX, 16, RQ_NPKTS * (RQ_PKT_SIZE_W + 1)) },
+    { XRDATA (PKTS, rqb_ctx.pak, DEV_RDX, 16, 0, RQ_NPKTS * (RQ_PKT_SIZE_W + 1), sizeof (int16), sizeof (int16)) },
     { URDATA (CPKT, rqb_unit[0].cpkt, 10, 5, 0, RQ_NUMDR, 0) },
     { URDATA (PKTQ, rqb_unit[0].pktq, 10, 5, 0, RQ_NUMDR, 0) },
     { URDATA (UFLG, rqb_unit[0].uf, DEV_RDX, 16, 0, RQ_NUMDR, 0) },
@@ -916,7 +1164,7 @@ REG rqc_reg[] = {
     { FLDATA (PRGI, rqc_ctx.prgi, 0), REG_HIDDEN },
     { FLDATA (PIP, rqc_ctx.pip, 0), REG_HIDDEN },
     { FLDATA (INT, rqc_ctx.irq, 0) },
-    { BRDATA (PKTS, rqc_ctx.pak, DEV_RDX, 16, RQ_NPKTS * (RQ_PKT_SIZE_W + 1)) },
+    { XRDATA (PKTS, rqc_ctx.pak, DEV_RDX, 16, 0, RQ_NPKTS * (RQ_PKT_SIZE_W + 1), sizeof (int16), sizeof (int16)) },
     { URDATA (CPKT, rqc_unit[0].cpkt, 10, 5, 0, RQ_NUMDR, 0) },
     { URDATA (PKTQ, rqc_unit[0].pktq, 10, 5, 0, RQ_NUMDR, 0) },
     { URDATA (UFLG, rqc_unit[0].uf, DEV_RDX, 16, 0, RQ_NUMDR, 0) },
@@ -985,7 +1233,7 @@ REG rqd_reg[] = {
     { FLDATA (PRGI, rqd_ctx.prgi, 0), REG_HIDDEN },
     { FLDATA (PIP, rqd_ctx.pip, 0), REG_HIDDEN },
     { FLDATA (INT, rqd_ctx.irq, 0) },
-    { BRDATA (PKTS, rqd_ctx.pak, DEV_RDX, 16, RQ_NPKTS * (RQ_PKT_SIZE_W + 1)) },
+    { XRDATA (PKTS, rqd_ctx.pak, DEV_RDX, 16, 0, RQ_NPKTS * (RQ_PKT_SIZE_W + 1), sizeof (int16), sizeof (int16)) },
     { URDATA (CPKT, rqd_unit[0].cpkt, 10, 5, 0, RQ_NUMDR, 0) },
     { URDATA (PKTQ, rqd_unit[0].pktq, 10, 5, 0, RQ_NUMDR, 0) },
     { URDATA (UFLG, rqd_unit[0].uf, DEV_RDX, 16, 0, RQ_NUMDR, 0) },

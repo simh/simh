@@ -1,6 +1,6 @@
 /* id_fd.c: Interdata floppy disk simulator
 
-   Copyright (c) 2001-2013, Robert M Supnik
+   Copyright (c) 2001-2021, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    fd           M46-630 floppy disk
 
+   31-Jan-21    RMS     Revised for new register macros
    03-Sep-13    RMS     Added explicit void * cast
    19-Mar-12    RMS     Fixed macro naming conflict (Mark Pizzolato)
 
@@ -169,7 +170,7 @@ REG fd_reg[] = {
     { HRDATA (STA, fd_sta, 8) },
     { HRDATA (BUF, fd_db, 8) },
     { HRDATA (LRN, fd_lrn, 16) },
-    { BRDATA (ESTA, fd_es, 16, 8, ES_SIZE * FD_NUMDR) },
+    { CRDATA (ESTA, fd_es, 16, 8, ES_SIZE * FD_NUMDR) },
     { BRDATA (DBUF, fdxb, 16, 8, FD_NUMBY) },
     { HRDATA (DBPTR, fd_bptr, 8) },
     { FLDATA (WDV, fd_wdv, 0) },
