@@ -1,6 +1,6 @@
 /* sim_timer.c: simulator timer library
 
-   Copyright (c) 1993-2017, Robert M Supnik
+   Copyright (c) 1993-2021, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   01-Feb-21    JDB     Added cast for down-conversion
    22-May-17    RMS     Hacked for V4.0 CONST compatibility
    23-Nov-15    RMS     Fixed calibration lost path to reinitialize timer
    28-Mar-15    RMS     Revised to use sim_printf
@@ -561,10 +562,10 @@ else {
     val = strtotv (cptr, &tptr, 10);
     if (cptr == tptr)
         return SCPE_ARG;
-    c = toupper (*tptr++);
+    c = (char) toupper (*tptr++);
     if (*tptr != 0)
         return SCPE_ARG;
-    if (c == 'M') 
+    if (c == 'M')
         sim_throt_type = SIM_THROT_MCYC;
     else if (c == 'K')
         sim_throt_type = SIM_THROT_KCYC;

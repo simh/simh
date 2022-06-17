@@ -1,6 +1,6 @@
 /* sim_tmxr.c: Telnet terminal multiplexor library
 
-   Copyright (c) 2001-2020, Robert M Supnik
+   Copyright (c) 2001-2021, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    Based on the original DZ11 simulator by Thord Nilson, as updated by
    Arthur Krewat.
 
+   31-Jan-21    JDB     Added a cast in "tmxr_set_lnorder" from t_addr to uint32
    26-Oct-20    JDB     Line order now supports partial connection lists
    23-Oct-20    JDB     Added tmxr_table and tmxr_post_logs
                         tmxr_set_log now takes -N switch for new file
@@ -1107,12 +1108,12 @@ tptr = cptr + strlen (cptr);                            /* append a semicolon */
 
 idx = 0;                                                /* initialize the index of ordered values */
 
-while (*cptr != '\0') {                                 /* while characters remain in the command string */
-    if (strncmp (cptr, "ALL;", 4) == 0) {               /*   if the parameter is "ALL" */
-        if (val != 0 || idx > 0 && idx <= max)          /*     then if some lines are restrictied or unspecified */
-            for (line = min; line <= max; line++)       /*       then fill them in sequentially */
-                if (set [line] == FALSE)                /*         setting each unspecified line */
-                    list [idx++] = line;                /*           into the line order */
+while (*cptr != '\0') {                                     /* while characters remain in the command string */
+    if (strncmp (cptr, "ALL;", 4) == 0) {                   /*   if the parameter is "ALL" */
+        if (val != 0 || idx > 0 && idx <= max)              /*     then if some lines are restrictied or unspecified */
+            for (line = (uint32) min; line <= max; line++)  /*       then fill them in sequentially */
+                if (set [line] == FALSE)                    /*         setting each unspecified line */
+                    list [idx++] = line;                    /*           into the line order */
 
         cptr = cptr + 4;                                /* advance past "ALL" and the trailing semicolon */
 
@@ -1134,11 +1135,11 @@ while (*cptr != '\0') {                                 /* while characters rema
         break;                                          /*     and terminate the parse */
         }
 
-    else                                                            /* otherwise it's a valid range */
-        for (line = (uint32) low; line <= (uint32) high; line++)    /*   so add the line(s) to the order */
-            if (set [line] == FALSE) {                              /* if the line number has not been specified */
-                set [line] = TRUE;                                  /*   then now it is */
-                list [idx++] = line;                                /*     and add it to the connection order */
+    else                                                /* otherwise it's a valid range */
+        for (line = (uint32) low; line <= high; line++) /*   so add the line(s) to the order */
+            if (set [line] == FALSE) {                  /* if the line number has not been specified */
+                set [line] = TRUE;                      /*   then now it is */
+                list [idx++] = line;                    /*     and add it to the connection order */
                 }
     }
 
