@@ -8456,6 +8456,7 @@ if (uptr->fileref) {                        /* Only close open file */
         }
     uptr->fileref = NULL;
     }
+uptr->dynflags &= ~UNIT_NO_FIO;
 return SCPE_OK;
 }
 
@@ -10158,7 +10159,8 @@ for (i = 0, j = addr; i < sim_emax; i++, j = j + dptr->aincr) {
         if (!(uptr->flags & UNIT_ATT))
             return SCPE_UNATT;
         if ((uptr->dynflags & UNIT_NO_FIO) ||
-            (uptr->fileref == NULL))
+            (uptr->fileref == NULL) ||
+            (sim_can_seek (uptr->fileref) == FALSE))
             return SCPE_NOFNC;
         if ((uptr->flags & UNIT_FIX) && (j >= uptr->capac)) {
             reason = SCPE_NXM;
@@ -10256,7 +10258,8 @@ for (i = 0, j = addr; i < count; i++, j = j + dptr->aincr) {
     else {
         if (!(uptr->flags & UNIT_ATT))
             return SCPE_UNATT;
-        if (uptr->dynflags & UNIT_NO_FIO)
+        if ((uptr->dynflags & UNIT_NO_FIO) || 
+            (sim_can_seek (uptr->fileref) == FALSE))
             return SCPE_NOFNC;
         if ((uptr->flags & UNIT_FIX) && (j >= uptr->capac))
             return SCPE_NXM;
