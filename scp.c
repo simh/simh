@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   21-Oct-21    RMS     Fixed bug in byte deposits if aincr > 1
    30-Nov-20    RMS     Fixed RUN problem if CPU reset clears PC (Mark Pizzolato)
    09-Nov-20    RMS     Added hack for sim_card multiple attach (Mark Pizzolato)
    23-Oct-20    JDB     Added tmxr_post_logs calls to flush and close log files
@@ -373,7 +374,7 @@ t_stat ex_reg (FILE *ofile, t_value val, int32 flag, REG *rptr, uint32 idx);
 t_stat dep_reg (int32 flag, char *cptr, REG *rptr, uint32 idx);
 t_stat exdep_addr_loop (FILE *ofile, SCHTAB *schptr, int32 flag, char *cptr,
     t_addr low, t_addr high, DEVICE *dptr, UNIT *uptr);
-t_stat ex_addr (FILE *ofile, int32 flag, t_addr addr, DEVICE *dptr, UNIT *uptr);
+t_stat ex_addr (FILE *ofile, int32 flag, t_addr addr, DEVICE *dptr, UNIT *uptr, int32 dfltinc);
 t_stat dep_addr (int32 flag, char *cptr, t_addr addr, DEVICE *dptr,
     UNIT *uptr, int32 dfltinc);
 t_stat step_svc (UNIT *ptr);
@@ -3152,7 +3153,7 @@ t_stat exdep_addr_loop (FILE *ofile, SCHTAB *schptr, int32 flag, char *cptr,
     t_addr low, t_addr high, DEVICE *dptr, UNIT *uptr)
 {
 t_addr i, mask;
-t_stat reason;
+t_stat reason, dfltinc;
 
 if (uptr->flags & UNIT_DIS)                             /* disabled? */
     return SCPE_UDIS;
@@ -3164,16 +3165,16 @@ for (i = low; i <= high; ) {                            /* all paths must incr!!
     if (reason != SCPE_OK)                              /* return if error */
         return reason;
     if (schptr && !test_search (sim_eval[0], schptr))
-        i = i + dptr->aincr;                            /* sch fails, incr */
+        i = i + (1 - dfltinc);                          /* sch fails, incr */
     else {                                              /* no sch or success */
         if (flag != EX_D) {                             /* ex, ie, or id? */
-            reason = ex_addr (ofile, flag, i, dptr, uptr);
+            reason = ex_addr (ofile, flag, i, dptr, uptr, dfltinc);
             if (reason > SCPE_OK)
                 return reason;
             if (sim_log && (ofile == stdout))
-                ex_addr (sim_log, flag, i, dptr, uptr);
+                ex_addr (sim_log, flag, i, dptr, uptr, dfltinc);
             }
-        else reason = 1 - dptr->aincr;                  /* no, dflt incr */
+        else reason = dfltinc;                          /* no, dflt incr */
         if (flag != EX_E) {                             /* ie, id, or d? */
             reason = dep_addr (flag, cptr, i, dptr, uptr, reason);
             if (reason > SCPE_OK)
@@ -3389,12 +3390,13 @@ return;
         addr    =       address to examine
         dptr    =       pointer to device
         uptr    =       pointer to unit
+        dfltinc =       default increment
    Outputs:
         return  =       if > 0, error status
                         if <= 0,-number of extra addr units retired
 */
 
-t_stat ex_addr (FILE *ofile, int32 flag, t_addr addr, DEVICE *dptr, UNIT *uptr)
+t_stat ex_addr (FILE *ofile, int32 flag, t_addr addr, DEVICE *dptr, UNIT *uptr, int32 dfltinc)
 {
 t_stat reason;
 int32 rdx;
@@ -3404,12 +3406,12 @@ if (sim_vm_fprint_addr)
 else fprint_val (ofile, addr, dptr->aradix, dptr->awidth, PV_LEFT);
 fprintf (ofile, ":\t");
 if (!(flag & EX_E))
-    return (1 - dptr->aincr);
+    return dfltinc;
 
 GET_RADIX (rdx, dptr->dradix);
 if ((reason = fprint_sym (ofile, addr, sim_eval, uptr, sim_switches)) > 0) {
     fprint_val (ofile, sim_eval[0], rdx, dptr->dwidth, PV_RZRO);
-    reason = 1 - dptr->aincr;
+    return dfltinc;
     }
 if (flag & EX_I)
     fprintf (ofile, "\t");
