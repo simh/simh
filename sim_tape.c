@@ -1,6 +1,6 @@
 /* sim_tape.c: simulator tape support library
 
-   Copyright (c) 1993-2018, Robert M Supnik
+   Copyright (c) 1993-2021, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,9 @@
    Ultimately, this will be a place to hide processing of various tape formats,
    as well as OS-specific direct hardware access.
 
+   15-Dec-21    JDB     Added extended SIMH format support
+   10-Oct-21    JDB     Improved tape_erase_fwd corrupt image error checking
+   06-Oct-21    JDB     Added sim_tape_erase global, tape_erase internal functions
    27-Dec-18    JDB     Added missing fall through comment in sim_tape_wrrecf
    03-May-17    JDB     Added support for erasing tape marks to sim_tape_errec[fr]
    02-May-17    JDB     Added error checks to sim_fseek calls
@@ -54,6 +57,12 @@
    25-Apr-03    RMS     Added extended file support
    28-Mar-03    RMS     Added E11 and TPC format support
 
+
+   The tape formats and functions implemented herein are described in separate
+   monographs titled, "SIMH Magtape Representation and Handling" and "Writing a
+   Simulator for the SIMH System," respectively.
+
+
    Public routines:
 
    sim_tape_attach      attach tape unit
@@ -63,11 +72,13 @@
    sim_tape_wrrecf      write tape record forward
    sim_tape_sprecf      space tape record forward
    sim_tape_sprecr      space tape record reverse
+   sim_tape_wrmrk       write private marker
    sim_tape_wrtmk       write tape mark
    sim_tape_wreom       erase remainder of tape
    sim_tape_wrgap       write erase gap
    sim_tape_errecf      erase record forward
    sim_tape_errecr      erase record reverse
+   sim_tape_erase       erase a specified number of bytes
    sim_tape_rewind      rewind
    sim_tape_reset       reset unit
    sim_tape_bot         TRUE if at beginning of tape
@@ -90,14 +101,18 @@ struct sim_tape_fmt {
     t_addr              bot;                            /* bot test */
     };
 
-static struct sim_tape_fmt fmts[MTUF_N_FMT] = {
-    { "SIMH", 0,       sizeof (t_mtrlnt) - 1 },
-    { "E11",  0,       sizeof (t_mtrlnt) - 1 },
-    { "TPC",  UNIT_RO, sizeof (t_tpclnt) - 1 },
-    { "P7B",  0,       0 },
-/*  { "TPF",  UNIT_RO, 0 }, */
-    { NULL,   0,       0 }
+static const struct sim_tape_fmt fmts [] = {            /* format table, indexed by MTUF_F number */
+/*     name          uflags                  bot          */
+/*    -------  -------------------  --------------------- */
+    { "SIMH",  MT_F_STD,            sizeof (t_mtrlnt) - 1 },    /* 0 = MTUF_F_STD */
+    { "E11",   MT_F_E11,            sizeof (t_mtrlnt) - 1 },    /* 1 = MTUF_F_E11 */
+    { "TPC",   MT_F_TPC | UNIT_RO,  sizeof (t_tpclnt) - 1 },    /* 2 = MTUF_F_TPC */
+    { "P7B",   MT_F_P7B,            0                     },    /* 3 = MTUF_F_P7B */
+    { "   ",   MT_F_TDF | UNIT_RO,  0                     },    /* 4 = MTUF_F_TDF (not implemented) */
+    { "SIMH",  MT_F_EXT,            sizeof (t_mtrlnt) - 1 }     /* 5 = MTUF_F_EXT */
     };
+
+#define FMT_COUNT       (sizeof fmts / sizeof fmts [0]) /* count of format table entries */
 
 static const uint32 bpi [] = {                          /* tape density table, indexed by MT_DENS constants */
     0,                                                  /*   0 = MT_DENS_NONE -- density not set */
@@ -114,6 +129,8 @@ static t_stat sim_tape_ioerr (UNIT *uptr);
 static t_stat sim_tape_wrdata (UNIT *uptr, uint32 dat);
 static uint32 sim_tape_tpc_map (UNIT *uptr, t_addr *map);
 static t_addr sim_tape_tpc_fnd (UNIT *uptr, t_addr *map);
+static t_stat tape_read      (UNIT *uptr, uint8 *buffer, t_mtrlnt *class_count, t_mtrlnt bufsize, t_bool reverse);
+static t_stat tape_erase     (UNIT *uptr, t_mtrlnt byte_count);
 static t_stat tape_erase_fwd (UNIT *uptr, t_mtrlnt gap_size);
 static t_stat tape_erase_rev (UNIT *uptr, t_mtrlnt gap_size);
 
@@ -155,7 +172,7 @@ switch (MT_GET_FMT (uptr)) {                            /* case on format */
 
     default:
         break;
-        }
+    }
 
 sim_tape_rewind (uptr);
 return SCPE_OK;
@@ -188,28 +205,49 @@ sim_tape_rewind (uptr);
 return SCPE_OK;
 }
 
+
 /* Read record length forward (internal routine).
 
    Inputs:
         uptr    =       pointer to tape unit
         bc      =       pointer to returned record length
+
    Outputs:
         status  =       operation status
 
    exit condition       tape position
    ------------------   -----------------------------------------------------
    unit unattached      unchanged
-   read error           unchanged, PNU set
+   read error           unchanged, PNU set if initial read
    end of file/medium   updated if a gap precedes, else unchanged and PNU set
    tape mark            updated
+   other marker         updated
    tape runaway         updated
    data record          updated, sim_fread will read record forward
 
    This routine is called to set up a record read or spacing in the forward
-   direction.  On return, status is MTSE_OK and the tape is positioned at the
-   first data byte if a record was encountered, or status is an MTSE error code
-   giving the reason that the operation did not succeed and the tape position is
-   as indicated above.
+   direction.  On return, status is MTSE_OK if a data record, private marker, or
+   reserved marker was read, or an MTSE error code if a standard marker (e.g.
+   tape mark) was read, or an error occurred.  The file is positioned at the
+   first byte of a data record, after a tape mark or private marker, or
+   otherwise as indicated above.  In all cases, the successfully read marker or
+   data record length word is returned via the "bc" pointer.
+
+   When the extended SIMH format is enabled, then the variable addressed by the
+   "bc" parameter must be set on entry to a bitmap of the object classes to
+   return.  Each of the classes is represented by its corresponding bit, i.e.,
+   bit 0 represents class 0, bit 1 for class 1, etc.  The routine will return
+   only objects from the selected classes.  Unselected class objects will be
+   ignored by skipping over them until the first selected class object is seen.
+   This allows a simulator to declare those classes it understands (e.g.,
+   standard classes 0 and 8, plus private classes 2 and 7) and those classes it
+   wishes to ignore.  Erase gap markers are always skipped, and standard markers
+   are always returned, so specifying an empty bitmap will perform the
+   equivalent of a "space file forward," returning only when a tape mark or
+   EOM/EOF is encountered.
+
+   When standard SIMH format is enabled, standard classes 0 and 8 are
+   automatically selected, and the entry value addressed by "bc" is ignored.
 
    The ANSI standards for magnetic tape recording (X3.22, X3.39, and X3.54) and
    the equivalent ECMA standard (ECMA-62) specify a maximum erase gap length of
@@ -228,35 +266,40 @@ return SCPE_OK;
    MTSE_RUNAWAY status is never returned.  In effect, erase gaps present in the
    tape image file will be transparent to the caller.
 
-   Erase gaps are currently supported only in SIMH (MTUF_F_STD) tape format.
-   Because gaps may be partially overwritten with data records, gap metadata
-   must be examined marker-by-marker.  To reduce the number of file read calls,
-   a buffer of metadata elements is used.  The buffer size is initially
-   established at 256 elements but may be set to any size desired.  To avoid a
-   large read for the typical case where an erase gap is not present, the first
-   read is of a single metadatum marker.  If that is a gap marker, then
-   additional buffered reads are performed.
+   Erase gaps are currently supported only in standard and extended SIMH tape
+   formats.  Because gaps may be partially overwritten with data records, gap
+   metadata must be examined marker-by-marker.  To reduce the number of file
+   read calls, a buffer of metadata elements is used.  The buffer size is
+   initially established at 256 elements but may be set to any size desired.  To
+   avoid a large read for the typical case where an erase gap is not present,
+   the first read is of a single metadatum marker.  If that is a gap marker,
+   then additional buffered reads are performed.
 
-   See the notes at "tape_erase_fwd" regarding the erase gap implementation.
+   The permissibility of data record lengths that are not multiples of the
+   metadatum size presents a difficulty when reading through gaps.  If such an
+   "odd length" record is written over a gap, half of a gap marker will exist
+   immediately after the trailing record length.
+
+   This condition is detected when reading forward by the appearance of a
+   "reversed" marker.  The value appears reversed because the value is made up
+   of half of one marker and half of the next.  This is handled by seeking
+   forward two bytes to resync (it is illegal to overwrite and leave only two
+   bytes of gap, so at least one "whole" metadata marker will follow the
+   half-gap).
 
 
    Implementation notes:
 
     1. For programming convenience, erase gap processing is performed for both
-       SIMH standard and E11 tape formats, although the latter will never
-       contain erase gaps, as the "tape_erase_fwd" call takes no action for the
-       E11 format.
+       SIMH and E11 tape formats, although the latter will never contain erase
+       gaps, as the "tape_erase_fwd" call takes no action for the E11 format.
 
-    2. The "feof" call cannot return a non-zero value on the first pass through
-       the loop, because the "sim_fseek" call resets the internal end-of-file
-       indicator.  Subsequent passes only occur if an erase gap is present, so
-       a non-zero return indicates an EOF was seen while reading through a gap.
-
-    3. The "runaway_counter" cannot decrement to zero (or below) in the presence
+    2. The "runaway_counter" cannot decrement to zero (or below) in the presence
        of an error that terminates the gap-search loop.  Therefore, the test
-       after the loop exit need not check for error status.
+       after the loop exit need not check for error status, except to check
+       whether an EOM occurred while reading a gap.
 
-    4. The dynamic start/stop test of the HP 3000 magnetic tape diagnostic
+    3. The dynamic start/stop test of the HP 3000 magnetic tape diagnostic
        heavily exercises the erase gap scanning code.  Sample test execution
        times for various buffer sizes on a 2 GHz host platform are:
 
@@ -270,25 +313,51 @@ return SCPE_OK;
              512              186
             1024              171
 
-    5. Because an erase gap may precede the logical end-of-medium, represented
+    4. Because an erase gap may precede the logical end-of-medium, represented
        either by the physical end-of-file or by an EOM marker, the "position not
        updated" flag is set only if the tape is positioned at the EOM when the
        routine is entered.  If at least one gap marker precedes the EOM, then
        the PNU flag is not set.  This ensures that a backspace-and-retry
        sequence will work correctly in both cases.
+
+    5. When a data record length word is seen, a check is made to see if the
+       word is the last word in the metadata buffer.  If it is, then the file
+       stream is correctly positioned to read the data, i.e., is positioned
+       immediately after the length word.  If the word is somewhere within the
+       buffer, then the stream is repositioned to the location of the start of
+       the data.
+
+    6. A skipped data record may reside entirely within the metadata buffer.
+       However, the buffer consists of four-byte elements, and a data record may
+       not end on an element boundary.  Rather than testing for this and
+       succeeding only half of the time, we unilaterally reposition the file
+       stream and invalidate the buffer to force a read.
+
+    7. A partial buffer read without a host I/O error occurs when the physical
+       EOF is reached.  If the buffer contains only erase gap markers, i.e., the
+       tape image ends with a gap, then the next read will return zero because
+       the EOF flag is set.  In this case, we could avoid this read by calling
+       the "feof" function first.  We do not, because the common case -- entry
+       with the file positioned at EOF -- will not have the EOF flag set, as the
+       preceding "fseek" resets it, so the read call would be made anyway.
+       Thus, we would incur a small overhead on every call to save some overhead
+       on a rare corner-case.
 */
 
 static t_stat sim_tape_rdlntf (UNIT *uptr, t_mtrlnt *bc)
 {
-uint8    c;
-t_bool   all_eof;
-uint32   f = MT_GET_FMT (uptr);
-t_mtrlnt sbc;
-t_tpclnt tpcbc;
-t_mtrlnt buffer [256];                                  /* local tape buffer */
-uint32   bufcntr, bufcap;                               /* buffer counter and capacity */
-int32    runaway_counter, sizeof_gap;                   /* bytes remaining before runaway and bytes per gap */
-t_stat   status = MTSE_OK;
+const uint32 f = MT_GET_FMT (uptr);                     /* the tape format */
+uint8        c;
+t_bool       all_eof;
+t_mtrlnt     sbc;
+t_tpclnt     tpcbc;
+t_mtrlnt     buffer [256];                              /* local tape buffer */
+uint32       bufcntr, bufcap;                           /* buffer counter and capacity */
+uint32       classbit;                                  /* bit representing the object class */
+int32        runaway_counter, max_gap, sizeof_gap;      /* bytes remaining before runaway and bytes per gap */
+t_addr       next_pos;                                  /* next record position */
+t_stat       status = MTSE_OK;                          /* preset status return */
+uint32       accept = MTB_STANDARD;                     /* preset the standard class acceptance set */
 
 MT_CLR_PNU (uptr);                                      /* clear the position-not-updated flag */
 
@@ -302,66 +371,61 @@ if (sim_fseek (uptr->fileref, uptr->pos, SEEK_SET)) {   /* set the initial tape 
 
 else switch (f) {                                       /* otherwise the read method depends on the tape format */
 
+    case MTUF_F_EXT:
+        accept = (uint32) (*bc);                        /* get the set of acceptable classes */
+
+    /* fall through into the standard SIMH and E11 handler */
+
     case MTUF_F_STD:
     case MTUF_F_E11:
-        runaway_counter = 25 * 12 * bpi [MT_DENS (uptr->dynflags)]; /* set the largest legal gap size in bytes */
+        max_gap = 25 * 12                               /* set the largest legal gap size in bytes */
+                    * bpi [MT_DENS (uptr->dynflags)];   /*   corresponding to 25 feet of tape */
 
-        if (runaway_counter == 0) {                     /* if tape density has not been not set */
+        if (max_gap == 0) {                             /* if tape density has not been not set */
             sizeof_gap = 0;                             /*   then disable runaway detection */
-            runaway_counter = INT_MAX;                  /*     to allow gaps of any size */
+            max_gap = INT_MAX;                          /*     and allow gaps of any size */
             }
 
         else                                            /* otherwise */
             sizeof_gap = sizeof (t_mtrlnt);             /*   set the size of the gap */
 
+        runaway_counter = max_gap;                      /* initialize the runaway counter */
+
         bufcntr = 0;                                    /* force an initial read */
         bufcap = 0;                                     /*   but of just one metadata marker */
 
-        do {                                            /* loop until a record, gap, or error is seen */
-            if (bufcntr == bufcap) {                    /* if the buffer is empty then refill it */
-                if (feof (uptr->fileref)) {             /* if we hit the EOF while reading a gap */
-                    if (sizeof_gap > 0)                 /*   then if detection is enabled */
-                        status = MTSE_RUNAWAY;          /*     then report a tape runaway */
-                    else                                /*   otherwise report the physical EOF */
-                        status = MTSE_EOM;              /*     as the end-of-medium */
-                    break;
-                    }
-
-                else if (bufcap == 0)                   /* otherwise if this is the initial read */
-                    bufcap = 1;                         /*   then start with just one marker */
-
-                else                                    /* otherwise reset the capacity */
-                    bufcap = sizeof (buffer)            /*   to the full size of the buffer */
+        do {                                            /* loop until an object is accepted or an error occurs */
+            if (bufcntr == bufcap) {                    /* if the buffer is empty */
+                if (bufcap == 0)                        /*   then if this is the initial read */
+                    bufcap = 1;                         /*     then start with just one marker */
+                else                                    /*   otherwise reset the capacity */
+                    bufcap = sizeof (buffer)            /*     to the full size of the buffer */
                                / sizeof (buffer [0]);
 
-                bufcap = sim_fread (buffer,             /* fill the buffer */
-                                    sizeof (t_mtrlnt),  /*   with tape metadata */
-                                    bufcap,
-                                    uptr->fileref);
+                bufcap = sim_fread (buffer, sizeof (t_mtrlnt),  /* fill the buffer */
+                                    bufcap, uptr->fileref);     /*   with tape metadata */
 
                 if (ferror (uptr->fileref)) {           /* if a file I/O error occurred */
                     if (bufcntr == 0)                   /*   then if this is the initial read */
-                        MT_SET_PNU (uptr);              /*     then set position not updated */
+                        MT_SET_PNU (uptr);              /*     then set position-not-updated */
 
                     status = sim_tape_ioerr (uptr);     /* report the error and quit */
                     break;
                     }
 
                 else if (bufcap == 0                    /* otherwise if positioned at the physical EOF */
-                  || buffer [0] == MTR_EOM)             /*   or at the logical EOM */
-                    if (bufcntr == 0) {                 /*     then if this is the initial read */
+                  || buffer [0] == MTR_EOM) {           /*   or at the logical EOM */
+                    if (bufcntr == 0)                   /*     then if this is the initial read */
                         MT_SET_PNU (uptr);              /*       then set position not updated */
-                        status = MTSE_EOM;              /*         and report the end-of-medium and quit */
-                        break;
-                        }
 
-                    else {                              /*     otherwise some gap has already been skipped */
-                        if (sizeof_gap > 0)             /*       so if detection is enabled */
-                            status = MTSE_RUNAWAY;      /*         then report a tape runaway */
-                        else                            /*       otherwise report the physical EOF */
-                            status = MTSE_EOM;          /*         as the end-of-medium */
-                        break;
-                        }
+                    if (bufcap == 0)                    /* if an EOM marker was not read */
+                        *bc = 0;                        /*   then zero the marker value */
+                    else                                /* otherwise */
+                        *bc = MTR_EOM;                  /*   store the EOM value */
+
+                    status = MTSE_EOM;                  /* report the end-of-medium */
+                    break;                              /*   and quit */
+                    }
 
                 else                                    /* otherwise reset the index */
                     bufcntr = 0;                        /*   to the start of the buffer */
@@ -370,25 +434,22 @@ else switch (f) {                                       /* otherwise the read me
             *bc = buffer [bufcntr++];                   /* store the metadata marker value */
 
             if (*bc == MTR_EOM) {                       /* if an end-of-medium marker is seen */
-                if (sizeof_gap > 0)                     /*   then if detection is enabled */
-                    status = MTSE_RUNAWAY;              /*     then report a tape runaway */
-                else                                    /*   otherwise report the physical EOF */
-                    status = MTSE_EOM;                  /*     as the end-of-medium */
-                break;
+                status = MTSE_EOM;                      /*   then report the end-of-medium */
+                break;                                  /*     and quit */
                 }
 
             uptr->pos = uptr->pos + sizeof (t_mtrlnt);  /* space over the marker */
 
-            if (*bc == MTR_TMK) {                       /* if the value is a tape mark */
+            if (*bc == MTR_TMK) {                       /* if the marker is a tape mark */
                 status = MTSE_TMK;                      /*   then quit with tape mark status */
                 break;
                 }
 
-            else if (*bc == MTR_GAP)                    /* otherwise if the value is a full gap */
+            else if (*bc == MTR_GAP)                    /* otherwise if the marker is a full gap */
                 runaway_counter -= sizeof_gap;          /*   then decrement the gap counter */
 
-            else if (*bc == MTR_FHGAP) {                        /* otherwise if the value if a half gap */
-                uptr->pos = uptr->pos - sizeof (t_mtrlnt) / 2;  /*   then back up and resync */
+            else if (*bc == MTR_FHGAP) {                        /* otherwise if the marker if a half gap */
+                uptr->pos = uptr->pos - sizeof (t_mtrlnt) / 2;  /*   then back up to resync */
 
                 if (sim_fseek (uptr->fileref, uptr->pos, SEEK_SET)) {   /* set the tape position; if it fails */
                     status = sim_tape_ioerr (uptr);                     /*   then quit with I/O error status */
@@ -396,29 +457,60 @@ else switch (f) {                                       /* otherwise the read me
                     }
 
                 bufcntr = bufcap;                       /* mark the buffer as invalid to force a read */
-
-                *bc = MTR_GAP;                          /* reset the marker */
-                runaway_counter -= sizeof_gap / 2;      /*   and decrement the gap counter */
+                runaway_counter -= sizeof_gap / 2;      /*   and decrement the gap counter by half */
                 }
 
-            else {                                                      /* otherwise it's a record marker */
-                if (bufcntr < bufcap                                    /* if the position is within the buffer */
-                  && sim_fseek (uptr->fileref, uptr->pos, SEEK_SET)) {  /*   then seek to the data area; if it fails */
-                    status = sim_tape_ioerr (uptr);                     /*     then quit with I/O error status */
-                    break;
+            else {                                      /* otherwise it is not a known marker */
+                classbit = MTR_FB (*bc);                /*   so get the bit corresponding to the class */
+
+                next_pos = uptr->pos + MTR_RL (*bc)     /* it it's a data record */
+                             + sizeof (t_mtrlnt);       /*   then preset to the end of the record */
+
+                if (f != MTUF_F_E11)                    /* if the format is not E11 */
+                    next_pos += MTR_RL (*bc) & 1;       /*   then record sizes are an even number of bytes */
+
+                if (classbit & accept) {                /* if the class is accepted */
+                    if (classbit == MTB_SMARK)          /*   then if it's a SIMH-reserved marker */
+                        status = MTSE_RESERVED;         /*     then return reserved status */
+
+                    else if (classbit == MTB_PMARK)     /*   otherwise if it's a private marker */
+                        status = MTSE_OK;               /*     then return successful status */
+
+                    else if (bufcntr == bufcap                  /*   otherwise if the record starts after the buffer */
+                      || sim_fseek (uptr->fileref,              /*     or repositioning to the start */
+                                    uptr->pos, SEEK_SET) == 0)  /*       of the data area succeeds */
+                        uptr->pos = next_pos;                   /*         then position past the record */
+
+                    else                                /*   otherwise the seek failed */
+                        status = sim_tape_ioerr (uptr); /*     so quit with I/O error status */
+
+                    break;                              /* acceptance terminates the search */
                     }
 
-                sbc = MTR_L (*bc);                              /* extract the record length */
-                uptr->pos = uptr->pos + sizeof (t_mtrlnt)       /* position to the start */
-                  + (f == MTUF_F_STD ? (sbc + 1) & ~1 : sbc);   /*   of the record */
+                else if (classbit & MTB_RECORDSET) {    /* otherwise if ignoring a data record */
+                    uptr->pos = next_pos;               /*   then position past the record */
+
+                    if (sim_fseek (uptr->fileref, uptr->pos, SEEK_SET)) {   /* set the new position; if it fails */
+                        status = sim_tape_ioerr (uptr);                     /*   then quit with I/O error status */
+                        break;
+                        }
+
+                    bufcntr = bufcap;                   /* mark the buffer as invalid to force a read */
+                    }
+
+                runaway_counter = max_gap;              /* ignoring a marker or record resets the counter */
                 }
             }
-        while (*bc == MTR_GAP && runaway_counter > 0);  /* continue until data or runaway occurs */
+        while (runaway_counter > 0);                    /* continue searching until runaway occurs */
 
-        if (runaway_counter <= 0)                       /* if a tape runaway occurred */
-            status = MTSE_RUNAWAY;                      /*   then report it */
+        if (sizeof_gap > 0                              /* if gap detection is enabled */
+          && (runaway_counter <= 0                      /*   and a tape runaway occurred */
+          || status == MTSE_EOM                         /*   or EOM/EOF was seen */
+          && runaway_counter < max_gap))                /*     while a gap was being skipped */
+            status = MTSE_RUNAWAY;                      /*       then report it */
 
-        break;                                          /* otherwise the operation succeeded */
+        break;                                          /* end of case */
+
 
     case MTUF_F_TPC:
         sim_fread (&tpcbc, sizeof (t_tpclnt), 1, uptr->fileref);
@@ -440,6 +532,7 @@ else switch (f) {                                       /* otherwise the read me
                 uptr->pos = uptr->pos + ((tpcbc + 1) & ~1); /* spc over record */
             }
         break;
+
 
     case MTUF_F_P7B:
         for (sbc = 0, all_eof = 1; ; sbc++) {           /* loop thru record */
@@ -470,6 +563,7 @@ else switch (f) {                                       /* otherwise the read me
             }
         break;
 
+
     default:
         status = MTSE_FMT;
     }
@@ -477,30 +571,74 @@ else switch (f) {                                       /* otherwise the read me
 return status;
 }
 
+
 /* Read record length reverse (internal routine).
 
    Inputs:
         uptr    =       pointer to tape unit
         bc      =       pointer to returned record length
+
    Outputs:
         status  =       operation status
 
    exit condition       tape position
    ------------------   -------------------------------------------
    unit unattached      unchanged
+   read error           unchanged, PNU set if initial read
    beginning of tape    unchanged
-   read error           unchanged
-   end of file          unchanged
-   end of medium        updated
    tape mark            updated
+   other marker         updated
    tape runaway         updated
    data record          updated, sim_fread will read record forward
 
    This routine is called to set up a record read or spacing in the reverse
-   direction.  On return, status is MTSE_OK and the tape is positioned at the
-   first data byte if a record was encountered, or status is an MTSE error code
-   giving the reason that the operation did not succeed and the tape position is
-   as indicated above.
+   direction.  On return, status is MTSE_OK if a data record, private marker, or
+   reserved marker was read, or an MTSE error code if a standard marker (e.g.
+   tape mark) was read, or an error occurred.  The file is positioned at the
+   first byte of a data record, before a tape mark or private marker, or
+   otherwise as indicated above.  In all cases, the successfully read marker or
+   data record length word is returned via the "bc" pointer.
+
+   When the extended SIMH format is enabled, then the variable addressed by the
+   "bc" parameter must be set on entry to a bitmap of the object classes to
+   return.  Each of the classes is represented by its corresponding bit, i.e.,
+   bit 0 represents class 0, bit 1 for class 1, etc.  The routine will return
+   only objects from the selected classes.  Unselected class objects will be
+   ignored by skipping over them until the first selected class object is seen.
+   This allows a simulator to declare those classes it understands (e.g.,
+   standard classes 0 and 8, plus private classes 2 and 7) and those classes it
+   wishes to ignore.  Erase gap markers are always skipped, and standard markers
+   are always returned, so specifying an empty bitmap will perform the
+   equivalent of a "space file forward," returning only when a tape mark or
+   EOM/EOF is encountered.
+
+   When standard SIMH format is enabled, standard classes 0 and 8 are
+   automatically selected, and the entry value addressed by "bc" is ignored.
+
+   The permissibility of data record lengths that are not multiples of the
+   metadatum size presents a difficulty when reading through gaps.  If such an
+   "odd length" record is written over a gap, half of a gap marker will exist
+   immediately after the trailing record length.
+
+   Reading in reverse presents a more complex problem than reading forward
+   through gaps, because half of the marker is from the preceding trailing
+   record length marker and therefore could be any of a range of values.
+   However, that range is restricted by the SIMH tape specification to permit
+   unambiguous detection of the condition.  The Class F assignments are:
+
+     F0000000 - FFFDFFFF  Reserved for future use (available)
+     FFFE0000 - FFFFFFFD  Reserved for erase gap interpretation
+     FFFFFFFE             Erase gap (primary value)
+     FFFFFFFF             End of medium
+
+   Values within the reserved erase-gap interpretation subrange are as follows:
+
+     FFFE0000 - FFFEFFFE  Illegal (would be seen as full gap in reverse reads)
+     FFFEFFFF             Interpret as half-gap in forward reads
+     FFFF0000 - FFFFFFFD  Interpret as half-gap in reverse reads
+
+   A conforming writer will never write the illegal marker values, so that a
+   conforming reader will be able to recognize the half-gap marker values.
 
 
    Implementation notes:
@@ -511,52 +649,69 @@ return status;
        least one element.  If the call returns zero, an error must have
        occurred, so the "ferror" call must succeed.
 
-    2. See the notes at "sim_tape_rdlntf" and "tape_erase_fwd" regarding tape
-       runaway and the erase gap implementation, respectively.
+    2. The "runaway_counter" cannot decrement to zero (or below) in the presence
+       of an error that terminates the gap-search loop.  Therefore, the test
+       after the loop exit need not check for error status.
+
+    3. See the notes at "sim_tape_rdlntf" regarding the implementation of tape
+       runaway detection.
 */
 
 static t_stat sim_tape_rdlntr (UNIT *uptr, t_mtrlnt *bc)
 {
-uint8    c;
-t_bool   all_eof;
-uint32   f = MT_GET_FMT (uptr);
-t_addr   ppos;
-t_mtrlnt sbc;
-t_tpclnt tpcbc;
-t_mtrlnt buffer [256];                                  /* local tape buffer */
-uint32   bufcntr, bufcap;                               /* buffer counter and capacity */
-int32    runaway_counter, sizeof_gap;                   /* bytes remaining before runaway and bytes per gap */
-t_stat   status = MTSE_OK;
+const uint32 f = MT_GET_FMT (uptr);                     /* the tape format */
+uint8        c;
+t_bool       all_eof;
+t_addr       ppos;
+t_mtrlnt     sbc;
+t_tpclnt     tpcbc;
+t_mtrlnt     buffer [256];                              /* local tape buffer */
+uint32       bufcntr, bufcap;                           /* buffer counter and capacity */
+uint32       classbit;                                  /* bit representing the object class */
+int32        runaway_counter, max_gap, sizeof_gap;      /* bytes remaining before runaway and bytes per gap */
+t_addr       next_pos;                                  /* next record position */
+t_stat       status = MTSE_OK;                          /* preset status return */
+uint32       accept = MTB_STANDARD;                     /* preset the standard class acceptance set */
 
 MT_CLR_PNU (uptr);                                      /* clear the position-not-updated flag */
 
 if ((uptr->flags & UNIT_ATT) == 0)                      /* if the unit is not attached */
     return MTSE_UNATT;                                  /*   then quit with an error */
 
-if (sim_tape_bot (uptr))                                /* if the unit is positioned at the BOT */
+else if (sim_tape_bot (uptr))                           /* otherwise if the unit is positioned at the BOT */
     status = MTSE_BOT;                                  /*   then reading backward is not possible */
 
 else switch (f) {                                       /* otherwise the read method depends on the tape format */
 
+    case MTUF_F_EXT:
+        accept = (uint32) (*bc);                        /* get the set of acceptable classes */
+
+    /* fall through into the standard SIMH and E11 handler */
+
     case MTUF_F_STD:
     case MTUF_F_E11:
-        runaway_counter = 25 * 12 * bpi [MT_DENS (uptr->dynflags)]; /* set the largest legal gap size in bytes */
+        max_gap = 25 * 12                               /* set the largest legal gap size in bytes */
+                    * bpi [MT_DENS (uptr->dynflags)];   /*   corresponding to 25 feet of tape */
 
-        if (runaway_counter == 0) {                     /* if tape density has not been not set */
+        if (max_gap == 0) {                             /* if tape density has not been not set */
             sizeof_gap = 0;                             /*   then disable runaway detection */
-            runaway_counter = INT_MAX;                  /*     to allow gaps of any size */
+            max_gap = INT_MAX;                          /*     and allow gaps of any size */
             }
 
         else                                            /* otherwise */
             sizeof_gap = sizeof (t_mtrlnt);             /*   set the size of the gap */
 
+        runaway_counter = max_gap;                      /* initialize the runaway counter */
+
         bufcntr = 0;                                    /* force an initial read */
         bufcap = 0;                                     /*   but of just one metadata marker */
 
-        do {                                            /* loop until a record, gap, or error is seen */
-            if (bufcntr == 0) {                         /* if the buffer is empty then refill it */
-                if (sim_tape_bot (uptr)) {              /* if the search has backed into the BOT */
-                    status = MTSE_BOT;                  /*   then quit with an error */
+        ppos = uptr->pos;                               /* save the initial tape position */
+
+        do {                                            /* loop until an object is accepted or an error occurs */
+            if (bufcntr == 0) {                         /*   then if the buffer is empty */
+                if (sim_tape_bot (uptr)) {              /*     then if the search has backed into the BOT */
+                    status = MTSE_BOT;                  /*       then quit with an error */
                     break;
                     }
 
@@ -571,18 +726,18 @@ else switch (f) {                                       /* otherwise the read me
                     bufcap = sizeof (buffer)            /*   to the full size of the buffer */
                                / sizeof (buffer [0]);
 
-                if (sim_fseek (uptr->fileref,                           /* seek back to the location */
-                               uptr->pos - bufcap * sizeof (t_mtrlnt),  /*   corresponding to the start */
-                               SEEK_SET)) {                             /*     of the buffer; if it fails */
-                    status = sim_tape_ioerr (uptr);                     /*         and fail with I/O error status */
-                    break;
-                    }
+                sim_fseek (uptr->fileref,                           /* seek back to the location */
+                           uptr->pos - bufcap * sizeof (t_mtrlnt),  /*   corresponding to the start */
+                           SEEK_SET);                               /*     of the buffer */
 
                 bufcntr = sim_fread (buffer, sizeof (t_mtrlnt), /* fill the buffer */
                                      bufcap, uptr->fileref);    /*   with tape metadata */
 
                 if (ferror (uptr->fileref)) {           /* if a file I/O error occurred */
-                    status = sim_tape_ioerr (uptr);     /*   then report the error and quit */
+                    if (uptr->pos == ppos)              /*   then if this is the initial read */
+                        MT_SET_PNU (uptr);              /*     then set position not updated */
+
+                    status = sim_tape_ioerr (uptr);     /* report the error and quit */
                     break;
                     }
                 }
@@ -599,34 +754,61 @@ else switch (f) {                                       /* otherwise the read me
             else if (*bc == MTR_GAP)                    /* otherwise if the marker is a full gap */
                 runaway_counter -= sizeof_gap;          /*   then decrement the gap counter */
 
-            else if ((*bc & MTR_M_RHGAP) == MTR_RHGAP           /* otherwise if the marker */
-              || *bc == MTR_RRGAP) {                            /*   is a half gap */
-                uptr->pos = uptr->pos + sizeof (t_mtrlnt) / 2;  /*     then position forward to resync */
-                bufcntr = 0;                                    /* mark the buffer as invalid to force a read */
+            else if ((*bc & MTR_RHGAP) == MTR_RHGAP) {          /* otherwise if the marker is a half gap */
+                uptr->pos = uptr->pos + sizeof (t_mtrlnt) / 2;  /*   then position forward to resync */
 
-                *bc = MTR_GAP;                                  /* reset the marker */
-                runaway_counter -= sizeof_gap / 2;              /*   and decrement the gap counter */
+                bufcntr = 0;                            /* mark the buffer as invalid to force a read */
+                runaway_counter -= sizeof_gap / 2;      /*   and decrement the gap counter by half */
                 }
 
-            else {                                              /* otherwise it's a record marker */
-                sbc = MTR_L (*bc);                              /* extract the record length */
-                uptr->pos = uptr->pos - sizeof (t_mtrlnt)       /* position to the start */
-                  - (f == MTUF_F_STD ? (sbc + 1) & ~1 : sbc);   /*   of the record */
+            else {                                      /* otherwise it is not a known marker */
+                classbit = MTR_FB (*bc);                /*   so get the bit corresponding to the class */
 
-                if (sim_fseek (uptr->fileref,                   /* seek to the start of the data area; if it fails */
-                               uptr->pos + sizeof (t_mtrlnt),   /*   then return with I/O error status */
-                               SEEK_SET)) {
-                    status = sim_tape_ioerr (uptr);
-                    break;
+                next_pos = uptr->pos - MTR_RL (*bc)     /* it it's a data record */
+                             - sizeof (t_mtrlnt);       /*   then preset to the start of the record */
+
+                if (f != MTUF_F_E11)                    /* if the format is not E11 */
+                    next_pos -= MTR_RL (*bc) & 1;       /*   then record sizes are an even number of bytes */
+
+                if (classbit & accept) {                /* if the class is accepted */
+                    if (classbit == MTB_SMARK)          /*   then if it's a SIMH-reserved marker */
+                        status = MTSE_RESERVED;         /*     then return reserved status */
+
+                    else if (classbit == MTB_PMARK)     /*   otherwise if it's a private marker */
+                        status = MTSE_OK;               /*     then return successful status */
+
+                    else if (sim_fseek (uptr->fileref,                  /*   otherwise position to the start */
+                                        next_pos + sizeof (t_mtrlnt),   /*     of the data area */
+                                        SEEK_SET) == 0)                 /*       and if the seek succeeds */
+                        uptr->pos = next_pos;                           /*         then position past the record */
+
+                    else                                /*   otherwise the seek failed */
+                        status = sim_tape_ioerr (uptr); /*     so quit with I/O error status */
+
+                    break;                              /* acceptance terminates the search */
                     }
+
+                else if (classbit & MTB_RECORDSET) {    /* otherwise if ignoring a data record */
+                    uptr->pos = next_pos;               /*   then position before the record */
+
+                    if (sim_fseek (uptr->fileref, uptr->pos, SEEK_SET)) {   /* set the new position; if it fails */
+                        status = sim_tape_ioerr (uptr);                     /*   then quit with I/O error status */
+                        break;
+                        }
+
+                    bufcntr = 0;                        /* mark the buffer as invalid to force a read */
+                    }
+
+                runaway_counter = max_gap;              /* ignoring a marker or record resets the counter */
                 }
             }
-        while (*bc == MTR_GAP && runaway_counter > 0);  /* continue until data or runaway occurs */
+        while (runaway_counter > 0);                    /* continue searching until runaway occurs */
 
         if (runaway_counter <= 0)                       /* if a tape runaway occurred */
             status = MTSE_RUNAWAY;                      /*   then report it */
 
-        break;                                          /* otherwise the operation succeeded */
+        break;                                          /* end of case */
+
 
     case MTUF_F_TPC:
         ppos = sim_tape_tpc_fnd (uptr, (t_addr *) uptr->filebuf); /* find prev rec */
@@ -646,6 +828,7 @@ else switch (f) {                                       /* otherwise the read me
                 sim_fseek (uptr->fileref, uptr->pos + sizeof (t_tpclnt), SEEK_SET);
             }
         break;
+
 
     case MTUF_F_P7B:
         for (sbc = 1, all_eof = 1; (t_addr) sbc <= uptr->pos ; sbc++) {
@@ -677,150 +860,237 @@ else switch (f) {                                       /* otherwise the read me
             }
         break;
 
+
     default:
         status = MTSE_FMT;
-        }
+    }
 
 return status;
 }
 
-/* Read record forward
+
+/* Read a data record or tape marker.
+
+   Read the data record or tape marker a the current tape position in the
+   indicated direction and return it via the supplied buffer or marker pointers,
+   respectively.
+
+   On entry, the "uptr" parameter points at the UNIT structure describing the
+   tape device, "buffer" points at a buffer large enough to receive a retrieved
+   data record, "class_count" points at a variable that receives the data record
+   length word containing the record class and length or the tape marker value,
+   "bufsize" indicates the size of the buffer in bytes, and "reverse" is TRUE if
+   the record is to be read in the reverse direction and FALSE if the record is
+   to be read in the forward direction.
+
+   If the tape format is extended SIMH, then "class_count" must point at a value
+   containing a bitmap of the desired record and marker classes to read.  Each
+   class is represented by its corresponding bit.  Classes present in the tape
+   image but not in the bitmap are skipped until an object of the specified
+   class is read.  The standard markers (tape mark, etc.) are always read and
+   interpreted.
+
+   A successful read of a data record returns the data in the buffer and the
+   record class and length via the "class_count" parameter.  A successful marker
+   read returns the marker value via the "class_count" parameter; the buffer is
+   not used.
+
+   For all other tape formats, the entry value indicated by "class_count" is
+   ignored, and all items supported by the specified format are returned.
+   Successful reads return data in the buffer and the record length via the
+   "class_count" parameter.
+
+   The result of the read is returned as the value of the function, as follows:
+
+     Status          Condition
+     -------------   ---------------------------------------------
+     MTSE_OK         Successful read of a good data record
+     MTSE_RECE       Successful read of a bad data record
+     MTSE_TMK        Successful read of a tape mark
+     MTSE_RESERVED   Successful read of a reserved marker
+
+     MTSE_UNATT      The tape unit is not attached
+     MTSE_IOERR      A host I/O error occurred
+     MTSE_FMT        An invalid tape format is selected
+     MTSE_BOT        Reading stopped at the beginning of the tape
+     MTSE_EOM        Reading stopped at the end of the tape
+     MTSE_RUNAWAY    Reading did not encounter any data
+     MTSE_INVRL      The record is larger than the supplied buffer
+                     or the record is incomplete
+*/
+
+static t_stat tape_read (UNIT *uptr, uint8 *buffer, t_mtrlnt *class_count, t_mtrlnt bufsize, t_bool reverse)
+{
+const uint32 f = MT_GET_FMT (uptr);                     /* the tape format */
+t_mtrlnt     cbc, rbc;
+t_addr       opos;
+t_stat       st;
+
+cbc = *class_count;                                     /* get the acceptance mask */
+opos = uptr->pos;                                       /*   and save the original file position */
+
+if (reverse)                                            /* for a reverse read */
+    st = sim_tape_rdlntr (uptr, &cbc);                  /*   get the preceding record length */
+else                                                    /* otherwise */
+    st = sim_tape_rdlntf (uptr, &cbc);                  /*   get the following record length */
+
+if (st != MTSE_OK                                       /* if the read failed */
+  || (MTR_FB (cbc) & MTB_MARKERSET)) {                  /*   or it returned a marker */
+    if (f == MTUF_F_EXT)                                /*     then if the format is extended SIMH */
+        *class_count = cbc;                             /*       then return the marker value */
+
+    return st;                                          /* return the status */
+    }
+
+rbc = MTR_RL (cbc);                                     /* get the record length */
+
+if (f == MTUF_F_EXT)                                    /* if the format is extended SIMH */
+    *class_count = cbc;                                 /*   then return the class and length */
+else                                                    /* otherwise */
+    *class_count = rbc;                                 /*   return just the length */
+
+if (rbc > bufsize)                                      /* if the record won't fit in the buffer */
+    st = MTSE_INVRL;                                    /*   then return invalid length status */
+
+else {                                                      /* otherwise */
+    sim_fread (buffer, sizeof (uint8), rbc, uptr->fileref); /*   read the data payload into the supplied buffer */
+
+    if (ferror (uptr->fileref))                         /* if a host I/O error occurred */
+        st = sim_tape_ioerr (uptr);                     /*    then return I/O error status */
+
+    else if (feof (uptr->fileref))                      /* otherwise if the read was incomplete */
+        st = MTSE_INVRL;                                /*   then report a record length error */
+
+    else if (f == MTUF_F_P7B)                            /* otherwise if the format is P7B */
+        buffer [0] = buffer [0] & P7B_DPAR;              /*   then strip the start-of-record flag */
+    }
+
+if (st != MTSE_OK) {                                    /* if the read failed */
+    MT_SET_PNU (uptr);                                  /*   then set the position not updated flag */
+    uptr->pos = opos;                                   /*     and restore the original position */
+    return st;                                          /*       and return the failure status */
+    }
+
+else if (MTR_CF (cbc) == MTC_BAD)                       /* otherwise if a bad record was read */
+    return MTSE_RECE;                                   /*   then report a data error */
+
+else                                                    /* otherwise */
+    return MTSE_OK;                                     /*   report a successful read */
+}
+
+
+/* Read record or marker forward.
 
    Inputs:
         uptr    =       pointer to tape unit
         buf     =       pointer to buffer
-        bc      =       pointer to returned record length
+        bc      =       pointer to returned class/record length
         max     =       maximum record size
+
    Outputs:
         status  =       operation status
-
-   exit condition       position
-
-   unit unattached      unchanged
-   read error           unchanged, PNU set
-   end of file/medium   unchanged, PNU set
-   invalid record       unchanged, PNU set
-   tape mark            updated
-   data record          updated
-   data record error    updated
 */
 
 t_stat sim_tape_rdrecf (UNIT *uptr, uint8 *buf, t_mtrlnt *bc, t_mtrlnt max)
 {
-uint32 f = MT_GET_FMT (uptr);
-t_mtrlnt i, tbc, rbc;
-t_addr opos;
-t_stat st;
-
-opos = uptr->pos;                                       /* old position */
-st = sim_tape_rdlntf (uptr, &tbc);                      /* read rec lnt */
-if (st != MTSE_OK)
-    return st;
-*bc = rbc = MTR_L (tbc);                                /* strip error flag */
-if (rbc > max) {                                        /* rec out of range? */
-    MT_SET_PNU (uptr);
-    uptr->pos = opos;
-    return MTSE_INVRL;
-    }
-i = (t_mtrlnt) sim_fread (buf, sizeof (uint8), rbc, uptr->fileref); /* read record */
-if (ferror (uptr->fileref)) {                           /* error? */
-    MT_SET_PNU (uptr);
-    uptr->pos = opos;
-    return sim_tape_ioerr (uptr);
-    }
-for ( ; i < rbc; i++)                                   /* fill with 0's */
-    buf[i] = 0;
-if (f == MTUF_F_P7B)                                    /* p7b? strip SOR */
-    buf[0] = buf[0] & P7B_DPAR;
-return (MTR_F (tbc)? MTSE_RECE: MTSE_OK);
+return tape_read (uptr, buf, bc, max, FALSE);           /* read and return the next record or marker */
 }
 
-/* Read record reverse
+
+/* Read record or marker reverse.
 
    Inputs:
         uptr    =       pointer to tape unit
         buf     =       pointer to buffer
-        bc      =       pointer to returned record length
+        bc      =       pointer to returned class/record length
         max     =       maximum record size
+
    Outputs:
         status  =       operation status
-
-   exit condition       position
-
-   unit unattached      unchanged
-   read error           unchanged
-   end of file          unchanged
-   end of medium        updated
-   invalid record       unchanged
-   tape mark            updated
-   data record          updated
-   data record error    updated
 */
 
 t_stat sim_tape_rdrecr (UNIT *uptr, uint8 *buf, t_mtrlnt *bc, t_mtrlnt max)
 {
-uint32 f = MT_GET_FMT (uptr);
-t_mtrlnt i, rbc, tbc;
-t_stat st;
-
-st = sim_tape_rdlntr (uptr, &tbc);                      /* read rec lnt */
-if (st != MTSE_OK)
-    return st;
-*bc = rbc = MTR_L (tbc);                                /* strip error flag */
-if (rbc > max)                                          /* rec out of range? */
-    return MTSE_INVRL;
-i = (t_mtrlnt) sim_fread (buf, sizeof (uint8), rbc, uptr->fileref); /* read record */
-if (ferror (uptr->fileref))                             /* error? */
-    return sim_tape_ioerr (uptr);
-for ( ; i < rbc; i++)                                   /* fill with 0's */
-    buf[i] = 0;
-if (f == MTUF_F_P7B)                                    /* p7b? strip SOR */
-    buf[0] = buf[0] & P7B_DPAR;
-return (MTR_F (tbc)? MTSE_RECE: MTSE_OK);
+return tape_read (uptr, buf, bc, max, TRUE);           /* read and return the prior record or marker */
 }
 
-/* Write record forward
 
-   Inputs:
-        uptr    =       pointer to tape unit
-        buf     =       pointer to buffer
-        bc      =       record length
-   Outputs:
-        status  =       operation status
+/* Write a data record forward.
 
-   exit condition       position
+   Write a data record at the current tape position and return the status of the
+   operation.
 
-   unit unattached      unchanged
-   write protect        unchanged
-   write error          unchanged, PNU set
-   data record          updated
+   On entry, the "uptr" parameter points at the UNIT structure describing the
+   tape device, "buf" points at the buffer containing the data, and "clbc"
+   contains the class and record length.
+
+   If the tape format is extended SIMH, then "clbc" must contain a standard or
+   private data record class and if the class is 0 (i.e., a good data record),
+   then the record length must be non-zero.  For all other tape formats, the
+   class must be 0 or 8 (good or bad data record); a record length of zero is
+   treated as a NOP for these formats.
+
+   The result of the write is returned as the value of the function, as follows:
+
+     Status          Condition
+     -------------   -------------------------------------------------
+     MTSE_OK         Successful write of the data record
+
+     MTSE_UNATT      The tape unit is not attached
+     MTSE_WRP        The tape unit is write protected
+     MTSE_IOERR      A host I/O error occurred
+     MTSE_INVRL      The record length is improper or too long
+     MTSE_RESERVED   The record class is reserved or is a marker class
+     MTSE_FMT        The tape format does not support the record class
 */
 
-t_stat sim_tape_wrrecf (UNIT *uptr, uint8 *buf, t_mtrlnt bc)
+t_stat sim_tape_wrrecf (UNIT *uptr, uint8 *buf, t_mtrlnt clbc)
 {
-uint32 f = MT_GET_FMT (uptr);
-t_mtrlnt sbc;
+const uint32 f = MT_GET_FMT (uptr);                     /* the tape format */
+t_mtrlnt     sbc;
+uint32       classbit;
 
-MT_CLR_PNU (uptr);
-sbc = MTR_L (bc);
-if ((uptr->flags & UNIT_ATT) == 0)                      /* not attached? */
-    return MTSE_UNATT;
-if (sim_tape_wrp (uptr))                                /* write prot? */
-    return MTSE_WRP;
-if (sbc == 0)                                           /* nothing to do? */
-    return MTSE_OK;
-sim_fseek (uptr->fileref, uptr->pos, SEEK_SET);         /* set pos */
-switch (f) {                                            /* case on format */
+MT_CLR_PNU (uptr);                                      /* clear the position-not-updated flag */
+
+sbc      = MTR_RL (clbc);                               /* get the record length */
+classbit = MTR_FB (clbc);                               /*   and the class field bit */
+
+if (f == MTUF_F_EXT) {                                  /* if the format is extended SIMH */
+    if (! (classbit & MTB_EXTENDED))                    /*   then if not in the extended record class */
+        return MTSE_RESERVED;                           /*     then report a reserved class error */
+    else if (sbc == 0 && classbit == MTB_GOOD)          /*   otherwise if the length of a good record is zero */
+        return MTSE_INVRL;                              /*     then report an invalid length error */
+    }
+
+else if (! (classbit & MTB_STANDARD))                   /* otherwise if the class is not a standard record */
+    return MTSE_FMT;                                    /*   then report a format error */
+
+else if (sbc == 0 && classbit == MTB_GOOD)              /* otherwise if the length of a good record is zero */
+    return MTSE_OK;                                     /*   then treat it as a NOP */
+
+else if (sbc > MTR_MAXLEN)                              /* otherwise if the record is too long */
+    return MTSE_INVRL;                                  /*   then report an invalid length error */
+
+if ((uptr->flags & UNIT_ATT) == 0)                      /* if the unit is not attached */
+    return MTSE_UNATT;                                  /*   then report it */
+
+else if (sim_tape_wrp (uptr))                           /* otherwise if the tape is write protected */
+    return MTSE_WRP;                                    /*   then report it */
+
+sim_fseek (uptr->fileref, uptr->pos, SEEK_SET);         /* set the tape position */
+
+switch (f) {                                            /* dispatch on the format */
 
     case MTUF_F_STD:                                    /* standard */
-        sbc = MTR_L ((bc + 1) & ~1);                    /* pad odd length */
-    
+    case MTUF_F_EXT:                                    /* extended standard */
+        sbc = (sbc + 1) & ~1;                           /* pad odd length */
+
     /* fall through into the E11 handler */
-    
+
     case MTUF_F_E11:                                    /* E11 */
-        sim_fwrite (&bc, sizeof (t_mtrlnt), 1, uptr->fileref);
+        sim_fwrite (&clbc, sizeof (t_mtrlnt), 1, uptr->fileref);
         sim_fwrite (buf, sizeof (uint8), sbc, uptr->fileref);
-        sim_fwrite (&bc, sizeof (t_mtrlnt), 1, uptr->fileref);
+        sim_fwrite (&clbc, sizeof (t_mtrlnt), 1, uptr->fileref);
         if (ferror (uptr->fileref)) {                   /* error? */
             MT_SET_PNU (uptr);
             return sim_tape_ioerr (uptr);
@@ -843,6 +1113,7 @@ switch (f) {                                            /* case on format */
 return MTSE_OK;
 }
 
+
 /* Write metadata forward (internal routine) */
 
 static t_stat sim_tape_wrdata (UNIT *uptr, uint32 dat)
@@ -862,7 +1133,43 @@ uptr->pos = uptr->pos + sizeof (t_mtrlnt);              /* move tape */
 return MTSE_OK;
 }
 
-/* Write tape mark */
+
+/* Write a private marker.
+
+   Write a private marker value at the current tape position and return the
+   status of the operation.
+
+   On entry, the "uptr" parameter points at the UNIT structure describing the
+   tape device, and "mk" contains the marker class and value.  The tape format
+   must be extended SIMH, and "mk" must be a member of the private marker class.
+
+   The result of the write is returned as the value of the function, as follows:
+
+     Status          Condition
+     -------------   ------------------------------------------------
+     MTSE_OK         Successful write of the marker
+
+     MTSE_UNATT      The tape unit is not attached
+     MTSE_WRP        The tape unit is write protected
+     MTSE_IOERR      A host I/O error occurred
+     MTSE_RESERVED   The class is not the private marker class
+     MTSE_FMT        The tape format does not support private markers
+*/
+
+t_stat sim_tape_wrmrk (UNIT *uptr, t_mtrlnt mk)
+{
+if (MT_GET_FMT (uptr) != MTUF_F_EXT)                    /* if the format is not extended SIMH */
+    return MTSE_FMT;                                    /*   then report a format error */
+
+else if (MTR_CF (mk) != MTC_PMARK)                      /* otherwise if the marker is not private */
+    return MTSE_RESERVED;                               /*   then report a reserved class error */
+
+else                                                    /* otherwise */
+    return sim_tape_wrdata (uptr, mk);                  /*   write the marker to the tape */
+}
+
+
+/* Write tape a mark */
 
 t_stat sim_tape_wrtmk (UNIT *uptr)
 {
@@ -873,7 +1180,8 @@ if (MT_GET_FMT (uptr) == MTUF_F_P7B) {                  /* P7B? */
 return sim_tape_wrdata (uptr, MTR_TMK);
 }
 
-/* Write end of medium */
+
+/* Write an end of medium */
 
 t_stat sim_tape_wreom (UNIT *uptr)
 {
@@ -890,10 +1198,106 @@ MT_SET_PNU (uptr);                                      /* indicate that positio
 return result;
 }
 
+
+/* Erase a gap of the specified number of bytes (internal routine).
+
+   This routine will write a gap of the requested number of bytes at the current
+   position of the file attached to the supplied unit.
+
+   On entry, the file is positioned to the start of the gap as indicated by the
+   "uptr->pos" value.  The minimum gap size allowed is four bytes (one erase gap
+   marker); smaller values will be rounded up.  As the SIMH tape format allows
+   erasures only in multiples of two bytes, an odd byte count is rounded up to
+   the next even value.
+
+   If the requested size will not accommodate an integral number of gap markers,
+   a leading half-gap marker is written first.  Then the required number of gap
+   markers are written to fill the specified gap.  To improve efficiency, each
+   "sim_fwrite" call writes multiple gaps.
+
+   If a host file I/O error occurs while writing, the file position is restored,
+   the position-not-updated flag is set, the error is reported to the console,
+   and the routine returns MTSE_IOERR.  Otherwise, the routine returns MTSE_OK.
+
+
+   Implementation notes:
+
+    1. Erase gaps are currently supported only in standard and extended SIMH
+       tape formats.
+
+    2. There is no easy way to initialize the "gaps" array statically, so we do
+       it at run-time.  However, being a static array, the initialization is
+       only performed once and the elements are guaranteed to be zero when this
+       routine is called for the first time
+
+    3. The "half_gap" array wants to be constant, but "sim_fwrite" does not
+       declare a compatible buffer pointer parameter.
+
+    4. A half-gap cannot be written by itself, as interpretation when reading
+       would be indeterminate.
+*/
+
+static t_stat tape_erase (UNIT *uptr, t_mtrlnt byte_count)
+{
+static t_mtrlnt gaps [256];                             /* a block of erase gaps */
+static uint8    half_gap [2] = { 0xFF, 0xFF };          /* upper half of an erase gap */
+const  uint32   buffer_size  = sizeof gaps / sizeof gaps [0];
+const  uint32   meta_size    = sizeof (t_mtrlnt);       /* the number of bytes per metadatum */
+const  t_addr   gap_pos      = uptr->pos;               /* the file position where the gap will start */
+uint32          count, marker_count;
+
+if (gaps [0] == 0)                                      /* if the gap block has not been initialized */
+    for (count = 0; count < buffer_size; count++)       /*   then fill the block with erase gaps */
+        gaps [count] = MTR_GAP;                         /*     to improve write performance */
+
+sim_fseek (uptr->fileref, uptr->pos, SEEK_SET);         /* seek to the start of the gap */
+
+byte_count = (byte_count + 1) & ~1;                     /* round the count to an even number */
+
+if (byte_count < meta_size)                             /* if the size is smaller than an erase gap marker */
+    byte_count = meta_size;                             /*   then increase the size to one marker */
+
+else if (byte_count % meta_size > 0) {                  /* otherwise if an integral number of markers won't fit */
+    sim_fwrite (half_gap, sizeof (uint8), 2,            /*   then start the gap */
+                uptr->fileref);                         /*     with a half-gap marker */
+
+    uptr->pos  = uptr->pos  + sizeof half_gap;          /* advance the tape position */
+    byte_count = byte_count - sizeof half_gap;          /*   and drop the byte count for the half-gap */
+    }
+
+marker_count = byte_count / meta_size;                  /* get the count of full gap markers */
+
+while (marker_count > 0) {                              /* while full gaps are needed */
+    if (marker_count > buffer_size)                     /* if more than a full block is needed */
+        count = buffer_size;                            /*   then write a full block of gaps */
+    else                                                /* otherwise */
+        count = marker_count;                           /*   write the remaining size needed */
+
+    sim_fwrite (gaps, meta_size, count, uptr->fileref); /* write the erase gap */
+
+    marker_count = marker_count - count;                /* reduce the count by the amount erased */
+    }
+
+if (ferror (uptr->fileref)) {                           /* if a host I/O error occurred */
+    uptr->pos = gap_pos;                                /*   then reposition back to the gap start */
+
+    MT_SET_PNU (uptr);                                  /* report that the position was not updated */
+    return sim_tape_ioerr (uptr);                       /*   and that an error occurred */
+    }
+
+else {                                                  /* otherwise the writes were successful */
+    uptr->pos = uptr->pos + byte_count;                 /*   so advance the tape position past the gap */
+
+    MT_CLR_PNU (uptr);                                  /* report that the position was updated */
+    return MTSE_OK;                                     /*   and return success */
+    }
+}
+
+
 /* Erase a gap in the forward direction (internal routine).
 
    An erase gap is written in the forward direction on the tape unit specified
-   by "uptr" for the number of bytes specified by "bc".  The status of the
+   by "uptr" for the number of bytes specified by "gap_size".  The status of the
    operation is returned, and the file position is altered as follows:
 
      Exit Condition       File Position
@@ -933,43 +1337,18 @@ return result;
    image is maintained.
 
    The general approach is to erase for the nominal number of bytes but to
-   increase that length, if necessary, to ensure that a partially overwritten
-   data record at the end of the gap can be altered to maintain validity.
-   Because the smallest legal tape record requires space for two metadata
-   markers plus two data bytes, an erasure that would leave less than that
-   is increased to consume the entire record.  Otherwise, the final record is
-   truncated by rewriting the leading and trailing length words appropriately.
+   increase that length if necessary to ensure that a partially overwritten data
+   record at the end of the gap can be altered to maintain validity.  Because
+   the smallest legal tape record requires space for two metadata markers plus
+   two data bytes, an erasure that would leave less than that is increased to
+   consume the entire record.  Otherwise, the final record is truncated by
+   rewriting the leading and trailing length words appropriately.
 
    When reading in either direction, gap metadata markers are ignored (skipped)
-   until a record length header, EOF marker, EOM marker, or physical EOF is
-   encountered.  Thus, tape images containing gap metadata are transparent to
-   the calling simulator (unless tape runaway support is enabled -- see the
-   notes at "sim_tape_rdlntf" for details).
-
-   The permissibility of data record lengths that are not multiples of the
-   metadatum size presents a difficulty when reading.  If such an "odd length"
-   record is written over a gap, half of a metadata marker will exist
-   immediately after the trailing record length.
-
-   This condition is detected when reading forward by the appearance of a
-   "reversed" marker.  The value appears reversed because the value is made up
-   of half of one marker and half of the next.  This is handled by seeking
-   forward two bytes to resync (the stipulation above that the overwrite cannot
-   leave only two bytes of gap means that at least one "whole" metadata marker
-   will follow).  Reading in reverse presents a more complex problem, because
-   half of the marker is from the preceding trailing record length marker and
-   therefore could be any of a range of values.  However, that range is
-   restricted by the SIMH tape specification requirement that record length
-   metadata values must have bits 30:24 set to zero.  This allows unambiguous
-   detection of the condition.
-
-   The value chosen for gap metadata and the values reserved for "half-gap"
-   detection are:
-
-     0xFFFFFFFE            - primary gap value
-     0xFFFEFFFF            - reserved (indicates half-gap in forward reads)
-     0xFFFF0000:0xFFFF00FF - reserved (indicates half-gap in reverse reads)
-     0xFFFF8000:0xFFFF80FF - reserved (indicates half-gap in reverse reads)
+   until a record length header, non-gap marker, or physical EOF is encountered.
+   Thus, tape images containing gap metadata are transparent to the calling
+   simulator (unless tape runaway support is enabled -- see the notes at
+   "sim_tape_rdlntf" for details).
 
    If the current tape format supports erase gaps, then this routine will write
    a gap of the requested size.  If the format does not, then no action will be
@@ -978,26 +1357,114 @@ return result;
    the tape format currently selected by the user.  A request for an erase gap
    of zero length also succeeds with no action taken.
 
+   Considerations when reading erase gaps are discussed in more detail in the
+   comments of the "sim_tape_rdlntf" routine.
+
+
+   The scan of an existing tape image before erasing proceeds as follows.
+
+   After preliminary access checks (i.e., image is attached and is writable),
+   the file is positioned to the start of the area to be erased.  The routine
+   then enters a loop that reads data items and accumulates the areas to be
+   erased until the required number of bytes have been examined.  When that
+   happens, the gap is written at the original position, extended as necessary
+   to maintain tape integrity.  If an error occurs, the scan is aborted, and the
+   appropriate error code is returned to the caller.
+
+   Each pass of the loop begins by reading the next metadatum in the file.  If a
+   host I/O error occurs, the scan is aborted with an appropriate error return.
+   If an EOM metadatum was read, or the physical EOF was encountered, the scan
+   is completed by allocating the remaining gap space unconditionally.
+
+   If a gap or tape mark metadatum was read, the position is advanced over the
+   marker, and the scan continues.  If a half-gap was read, the position is
+   adjusted to align with the next full metadatum, and the scan continues.  If
+   the metadatum is not one of these items, it must be a data record leading
+   length marker.  If the caller wants only a single metadatum erased, the
+   routine returns an invalid record length error.
+
+   Before adding part or all of the data record to the accumulated erase area,
+   record integrity is checked.  Verification of the trailing length marker is
+   done in two steps.  If the marker would be positioned beyond the end of the
+   file, then the tape image is considered to be invalid, and the scan is
+   terminated.  If the location is within the file, the position is temporarily
+   moved to the location of the trailing length marker, which is read and
+   compared to the leading length marker.  If the read fails, or the markers do
+   not compare, then the image is invalid, and the scan is completed by
+   allocating the remaining gap space unconditionally.
+
+   If the markers compare, then a check is made to see if the data record is
+   contained wholly within the area to be erased or if it extends beyond the end
+   of the erasure.  In the first case, the space occupied by the record is
+   simply added to the accumulated area.  In the second case, however, the
+   record must be truncated to maintain image validity.
+
+   Truncation is possible only if a valid record can be written into the
+   space occupied by the remaining part of the record.  The smallest legal
+   record is two data bytes long, and such a record occupies ten bytes,
+   including the pair of four-byte length markers.  If the remaining space is
+   too small, the gap is extended to consume the full record to avoid leaving an
+   invalid area.
+
+   If the size of the remaining record after the erasure is large enough, the
+   trailing length word is rewritten for the new, shorter size, and then the
+   leading length word immediately following the erased area is written to
+   match.
+
+   Once gap allocation is complete, the loop terminates, and the file is
+   repositioned to the start of the gap area.  If the loop terminated for an
+   error, it is returned with PNU set.  Otherwise, the new gap, lengthened if
+   necessary, is written, and PNU is cleared.
+
 
    Implementation notes:
 
-    1. Erase gaps are currently supported only in SIMH (MTUF_F_STD) tape format.
+    1. Erase gaps are currently supported only in standard and extended SIMH
+       tape formats.
+
+    2. Metadatum reads either succeed and returns 1 or fail and returns 0.  If a
+       read fails, and "ferror" returns false, then it must have read into the
+       end of the file (only these three outcomes are possible).
+
+    3. The area scan is necessary for tape image integrity to ensure that a data
+       record straddling the end of the erasure is truncated appropriately.  The
+       scan is guaranteed to succeed only if it begins at a valid metadatum.  If
+       it begins in the middle of a previously overwritten data record, then the
+       scan will interpret old data values as tape formatting markers.  The data
+       record sanity checks attempt to recover from this situation, but it is
+       still possible to corrupt valid data that follows an erasure of an
+       invalid area (e.g., if the leading and trailing length words happen
+       to match but actually represent previously recorded data rather than
+       record metadata).  If an application knows that the erased area will
+       not contain valid formatting, the "sim_tape_erase" routine should be used
+       instead, as it erases without first scanning the area.
+
+    4. Truncating an existing data record corresponds to overwriting part of a
+       record on a real tape.  Reading such a record on a real drive would
+       produce CRC errors, due to the lost portion.  In simulation, we could
+       change a good record (Class 0) to a bad record (Class 8).  However, this
+       is not possible for private or reserved record classes, as that would
+       change the classification (consider that a private class that had
+       been ignored would not be once it had been truncated and changed to Class
+       8).  Given that there is no good general solution, we do not modify
+       classes for truncated records, as reading a partially erased record is an
+       "all bets are off" operation.
 */
 
 static t_stat tape_erase_fwd (UNIT *uptr, t_mtrlnt gap_size)
 {
-size_t   xfer;
-t_stat   st;
-t_mtrlnt meta, sbc, new_len, rec_size;
-uint32   file_size, marker_count;
-int32    gap_needed = (int32) gap_size;                 /* the gap remaining to be allocated from the tape */
-uint32   gap_alloc = 0;                                 /* the gap currently allocated from the tape */
 const t_addr gap_pos = uptr->pos;                       /* the file position where the gap will start */
 const uint32 format = MT_GET_FMT (uptr);                /* the tape format */
 const uint32 meta_size = sizeof (t_mtrlnt);             /* the number of bytes per metadatum */
 const uint32 min_rec_size = 2 + sizeof (t_mtrlnt) * 2;  /* the smallest data record size */
+size_t       xfer;
+t_mtrlnt     meta, sbc, new_len, rec_size;
+uint32       file_size;
+int32        gap_needed = (int32) gap_size;             /* the gap remaining to be allocated from the tape */
+uint32       gap_alloc = 0;                             /* the gap currently allocated from the tape */
+t_stat       status = MTSE_OK;                          /* the status of the last operation */
 
-MT_CLR_PNU (uptr);
+MT_CLR_PNU (uptr);                                      /* clear the position-not-updated flag */
 
 if ((uptr->flags & UNIT_ATT) == 0)                      /* if the unit is not attached */
     return MTSE_UNATT;                                  /*   then we cannot proceed */
@@ -1005,156 +1472,122 @@ if ((uptr->flags & UNIT_ATT) == 0)                      /* if the unit is not at
 else if (sim_tape_wrp (uptr))                           /* otherwise if the unit is write protected */
     return MTSE_WRP;                                    /*   then we cannot write */
 
-else if (gap_size == 0 || format != MTUF_F_STD)         /* otherwise if zero length or gaps aren't supported */
-    return MTSE_OK;                                     /*   then take no action */
+else if (gap_size == 0                                  /* otherwise if the gap is zero length */
+ || (format != MTUF_F_STD && format != MTUF_F_EXT))     /*   or gaps are not supported */
+    return MTSE_OK;                                     /*     then take no action */
+
+MT_SET_PNU (uptr);                                      /* errors from here on do not update the position */
 
 file_size = sim_fsize (uptr->fileref);                  /* get the file size */
 
-if (sim_fseek (uptr->fileref, uptr->pos, SEEK_SET)) {   /* position the tape; if it fails */
-    MT_SET_PNU (uptr);                                  /*   then set position not updated */
-    return sim_tape_ioerr (uptr);                       /*     and quit with I/O error status */
-    }
+if (sim_fseek (uptr->fileref, uptr->pos, SEEK_SET))     /* position the tape; if it fails */
+    return sim_tape_ioerr (uptr);                       /*   then quit with I/O error status */
 
-/* Read tape records and allocate them to the gap until the amount required is
-   consumed.
 
-   Read the next metadatum from tape:
-    - EOF or EOM: allocate remainder of bytes needed.
-    - TMK or GAP: allocate sizeof(metadatum) bytes.
-    - Reverse GAP: allocate sizeof(metadatum) / 2 bytes.
-    - Data record: see below.
+do {                                                        /* scan the area to be erased */
+    xfer = sim_fread (&meta, meta_size, 1, uptr->fileref);  /*   starting with the next metadatum in the file */
 
-   Loop until the bytes needed = 0.
-*/
-
-do {
-    xfer = sim_fread (&meta, meta_size, 1, uptr->fileref);  /* read a metadatum */
-
-    if (ferror (uptr->fileref)) {                       /* read error? */
-        uptr->pos = gap_pos;                            /* restore original position */
-        MT_SET_PNU (uptr);                              /* position not updated */
-        return sim_tape_ioerr (uptr);                   /* translate error */
+    if (ferror (uptr->fileref)) {                       /* if a read error occurred */
+        status = sim_tape_ioerr (uptr);                 /*   then report an I/O error */
+        break;                                          /*     and quit the search */
         }
 
-    else if (xfer != 1 && feof (uptr->fileref) == 0) {  /* otherwise if a partial metadatum was read */
-        uptr->pos = gap_pos;                            /*   then restore the original position */
-        MT_SET_PNU (uptr);                              /* set the position-not-updated flag */
-        return MTSE_INVRL;                              /*   and return an invalid record length error */
+    else if (xfer == 1)                                 /* otherwise if we had a good read */
+        uptr->pos = uptr->pos + meta_size;              /*   then move the tape over the datum */
+
+    if ((xfer == 0) || (meta == MTR_EOM)) {             /* if the physical EOF or an EOM marker is seen */
+        gap_alloc = gap_alloc + gap_needed;             /*   then allocate the remainder of the space */
+        break;                                          /*     and terminate the search */
         }
 
-    else                                                /* otherwise we had a good read */
-        uptr->pos = uptr->pos + meta_size;              /*   so move the tape over the datum */
-
-    if (feof (uptr->fileref) || (meta == MTR_EOM)) {    /* at eof or eom? */
-        gap_alloc = gap_alloc + gap_needed;             /* allocate remainder */
-        gap_needed = 0;
-        }
-
-    else if ((meta == MTR_GAP) || (meta == MTR_TMK)) {  /* gap or tape mark? */
-        gap_alloc = gap_alloc + meta_size;              /* allocate marker space */
-        gap_needed = gap_needed - meta_size;            /* reduce requirement */
+    else if ((meta == MTR_GAP) || (meta == MTR_TMK)) {  /* otherwise if a gap or tape mark is seen */
+        gap_alloc = gap_alloc + meta_size;              /*   then allocate the marker space */
+        gap_needed = gap_needed - meta_size;            /*     and reduce the amount remaining */
         }
 
     else if (gap_size == meta_size) {                   /* otherwise if the request is for a single metadatum */
-        uptr->pos = gap_pos;                            /*   then restore the original position */
-        MT_SET_PNU (uptr);                              /* set the position-not-updated flag */
-        return MTSE_INVRL;                              /*   and return an invalid record length error */
+        status = MTSE_INVRL;                            /*   then report an invalid record length error */
+        break;                                          /*     as we're not erasing a metadatum as required */
         }
 
-    else if (meta == MTR_FHGAP) {                       /* half gap? */
-        uptr->pos = uptr->pos - meta_size / 2;          /* backup to resync */
+    else if (meta == MTR_FHGAP) {                       /* otherwise if a half-gap is seen */
+        uptr->pos = uptr->pos - meta_size / 2;          /*   then back up to resync */
 
-        if (sim_fseek (uptr->fileref, uptr->pos, SEEK_SET)) /* position the tape; if it fails */
-            return sim_tape_ioerr (uptr);                   /*   then quit with I/O error status */
-
-        gap_alloc = gap_alloc + meta_size / 2;          /* allocate marker space */
-        gap_needed = gap_needed - meta_size / 2;        /* reduce requirement */
-        }
-
-    else if (uptr->pos + MTR_L (meta) + meta_size > file_size) {    /* rec len out of range? */
-        gap_alloc = gap_alloc + gap_needed;                         /* presume overwritten tape */
-        gap_needed = 0;                                             /* allocate remainder */
-        }
-
-/* Allocate a data record:
-    - Determine record size in bytes (including metadata)
-    - If record size - bytes needed < smallest allowed record size,
-      allocate entire record to gap, else allocate needed amount and
-      truncate data record to reflect remainder.
-*/
-
-    else {                                              /* data record */
-        sbc = MTR_L (meta);                             /* get record data length */
-        rec_size = ((sbc + 1) & ~1) + meta_size * 2;    /* overall size in bytes */
-
-        if (rec_size < gap_needed + min_rec_size) {         /* rec too small? */
-            uptr->pos = uptr->pos - meta_size + rec_size;   /* position past record */
-
-            if (sim_fseek (uptr->fileref, uptr->pos, SEEK_SET)) /* position the tape; if it fails */
-                return sim_tape_ioerr (uptr);                   /*   then quit with I/O error status */
-
-            gap_alloc = gap_alloc + rec_size;               /* allocate record */
-            gap_needed = gap_needed - rec_size;             /* reduce requirement */
+        if (sim_fseek (uptr->fileref, uptr->pos, SEEK_SET)) {   /* position the tape; if it fails */
+            status = sim_tape_ioerr (uptr);                     /*   then report an I/O error */
+            break;                                              /*     and quit the search */
             }
 
-        else {                                              /* record size OK */
-            uptr->pos = uptr->pos - meta_size + gap_needed; /* position to end of gap */
-            new_len = MTR_F (meta) | (sbc - gap_needed);    /* truncate to new len */
-            st = sim_tape_wrdata (uptr, new_len);           /* write new rec len */
+        gap_alloc = gap_alloc + meta_size / 2;          /* allocate the marker space */
+        gap_needed = gap_needed - meta_size / 2;        /*   and reduce the amount remaining */
+        }
 
-            if (st != MTSE_OK) {                            /* write OK? */
-                uptr->pos = gap_pos;                        /* restore orig pos */
-                return st;                                  /* PNU was set by wrdata */
-                }
+    else if (uptr->pos + MTR_RL (meta) + meta_size > file_size) {   /* otherwise if it cannot be a data record */
+        gap_alloc = gap_alloc + gap_needed;                         /*   then presume an overwritten tape */
+        break;                                                      /*     and allocate the remainder of the space */
+        }
 
-            uptr->pos = uptr->pos + sbc - gap_needed;       /* position to end of data */
-            st = sim_tape_wrdata (uptr, new_len);           /* write new rec len */
+    else {                                              /* otherwise it may be a data record */
+        sbc = MTR_RL (meta);                            /*   so get the data length */
+        rec_size = ((sbc + 1) & ~1) + meta_size * 2;    /*     and the overall record size in bytes */
 
-            if (st != MTSE_OK) {                            /* write OK? */
-                uptr->pos = gap_pos;                        /* restore orig pos */
-                return st;                                  /* PNU was set by wrdata */
-                }
+        uptr->pos = uptr->pos + (sbc + 1) & ~1;         /* position to the trailing length marker */
 
-            gap_alloc = gap_alloc + gap_needed;             /* allocate remainder */
-            gap_needed = 0;
+        if (sim_fseek (uptr->fileref, uptr->pos, SEEK_SET)) {   /* position the tape; if it fails */
+            status = sim_tape_ioerr (uptr);                     /*   then report an I/O error */
+            break;                                              /*     and quit the search */
+            }
+
+        xfer = sim_fread (&meta, meta_size, 1, uptr->fileref);  /* read the metadatum */
+
+        if (ferror (uptr->fileref)) {                   /* if a read error occurred */
+            status = sim_tape_ioerr (uptr);             /*   then report an I/O error */
+            break;                                      /*     and quit the search */
+            }
+
+        else if ((xfer != 1) || (sbc != MTR_RL (meta))) {   /* otherwise if the marker is bad or does not compare */
+            gap_alloc = gap_alloc + gap_needed;             /*   then presume an overwritten tape */
+            break;                                          /*     and allocate the remainder of the space */
+            }
+
+        else if (rec_size < gap_needed + min_rec_size) {    /* otherwise if the record is smaller than needed */
+            uptr->pos = uptr->pos + meta_size;              /*   then skip over the record */
+            gap_alloc = gap_alloc + rec_size;               /*     and allocate the record space */
+            gap_needed = gap_needed - rec_size;             /*       and reduce the amount remaining */
+            }
+
+        else {                                              /* otherwise the size is larger than needed */
+            new_len = MTR_CF (meta) | (sbc - gap_needed);   /*   so get the shortened record length */
+
+            status = sim_tape_wrdata (uptr, new_len);   /* rewrite the trailing length marker */
+
+            uptr->pos = uptr->pos - 2 * meta_size       /* move the position */
+                          - sbc + gap_needed;           /*   back to the leading length marker */
+
+            if (status == MTSE_OK)                          /* if the trailing write succeeded */
+                status = sim_tape_wrdata (uptr, new_len);   /*   then rewrite the leading length marker */
+
+            gap_alloc = gap_alloc + gap_needed;         /* the record provides the rest of the gap */
+            break;                                      /*   and no more space is needed */
             }
         }
     }
 while (gap_needed > 0);                                 /* loop until all of the gap has been allocated */
 
-uptr->pos = gap_pos;                                    /* reposition to gap start */
 
-if (gap_alloc & (meta_size - 1)) {                      /* gap size "odd?" */
-    st = sim_tape_wrdata (uptr, MTR_FHGAP);             /* write half gap marker */
+uptr->pos = gap_pos;                                    /* reposition to the start of the gap */
 
-    if (st != MTSE_OK) {                                /* write OK? */
-        uptr->pos = gap_pos;                            /* restore orig pos */
-        return st;                                      /* PNU was set by wrdata */
-        }
-
-    uptr->pos = uptr->pos - meta_size / 2;              /* realign position */
-    gap_alloc = gap_alloc - 2;                          /* decrease gap to write */
-    }
-
-marker_count = gap_alloc / meta_size;                   /* count of gap markers */
-
-do {
-    st = sim_tape_wrdata (uptr, MTR_GAP);               /* write gap markers */
-
-    if (st != MTSE_OK) {                                /* write OK? */
-        uptr->pos = gap_pos;                            /* restore orig pos */
-        return st;                                      /* PNU was set by wrdata */
-        }
-    }
-while (--marker_count > 0);
-
-return MTSE_OK;
+if (status == MTSE_OK)                                  /* if the scan was successful */
+    return tape_erase (uptr, gap_alloc);                /*   then return the status of the erasure */
+else                                                    /* otherwise the search failed */
+    return status;                                      /*   so return the status code with PNU */
 }
+
 
 /* Erase a gap in the reverse direction (internal routine).
 
    An erase gap is written in the reverse direction on the tape unit specified
-   by "uptr" for the number of bytes specified by "bc".  The status of the
+   by "uptr" for the number of bytes specified by "gap_size".  The status of the
    operation is returned, and the file position is altered as follows:
 
      Exit Condition       File Position
@@ -1167,14 +1600,16 @@ return MTSE_OK;
      gap written          updated
 
    If the requested byte count equals the metadatum size, then the routine
-   succeeds only if it can overlay a single metadatum (i.e., a tape mark or an
-   existing erase gap marker); otherwise, the file position is not altered, and
-   MTSE_INVRL (invalid record length) status is returned.
+   succeeds only if it can overlay a single metadatum (i.e., a tape mark, an
+   end-of-medium marker, or an existing erase gap marker); otherwise, the file
+   position is not altered, PNU is set, and MTSE_INVRL (invalid record length)
+   status is returned.
 
 
    Implementation notes:
 
-    1. Erase gaps are currently supported only in SIMH (MTUF_F_STD) tape format.
+    1. Erase gaps are currently supported only in standard and extended SIMH
+       tape formats.
 
     2. Erasing a record in the reverse direction currently succeeds only if the
        gap requested occupies the same space as the record located immediately
@@ -1192,10 +1627,10 @@ static t_stat tape_erase_rev (UNIT *uptr, t_mtrlnt gap_size)
 {
 const uint32 format = MT_GET_FMT (uptr);                /* the tape format */
 const uint32 meta_size = sizeof (t_mtrlnt);             /* the number of bytes per metadatum */
-t_stat   status;
-t_mtrlnt rec_size, metadatum;
-t_addr   gap_pos;
-size_t   xfer;
+t_stat       status;
+t_mtrlnt     rec_size, metadatum;
+t_addr       gap_pos;
+size_t       xfer;
 
 MT_CLR_PNU (uptr);                                      /* clear the position-not-updated flag */
 
@@ -1205,8 +1640,9 @@ if ((uptr->flags & UNIT_ATT) == 0)                      /* if the unit is not at
 else if (sim_tape_wrp (uptr))                           /* otherwise if the unit is write protected */
     return MTSE_WRP;                                    /*   then we cannot write */
 
-else if (gap_size == 0 || format != MTUF_F_STD)         /* otherwise if the gap length is zero or unsupported */
-    return MTSE_OK;                                     /*   then take no action */
+else if (gap_size == 0                                  /* otherwise if the gap is zero length */
+ || (format != MTUF_F_STD && format != MTUF_F_EXT))     /*   or gaps are not supported */
+    return MTSE_OK;                                     /*     then take no action */
 
 gap_pos = uptr->pos;                                    /* save the starting position */
 
@@ -1256,7 +1692,7 @@ else {                                                  /* otherwise it's an era
       && gap_size == rec_size + 2 * meta_size) {        /*   and the gap will exactly overlay the record */
         gap_pos = uptr->pos;                            /*     then save the gap start position */
 
-        status = tape_erase_fwd (uptr, gap_size);       /* erase the record */
+        status = tape_erase (uptr, gap_size);           /* erase the record */
 
         if (status == MTSE_OK)                          /* if the gap write succeeded */
             uptr->pos = gap_pos;                        /*   the reposition back to the start of the gap */
@@ -1275,13 +1711,14 @@ else {                                                  /* otherwise it's an era
 return status;                                          /* return the status of the erase operation */
 }
 
+
 /* Write an erase gap.
 
-   An erase gap is written in on the tape unit specified by "uptr" for the
-   length specified by "gap_size" in tenths of an inch, and the status of the
-   operation is returned.  The tape density must have been set via a previous
-   sim_tape_set_dens call; if it has not, then no action is taken, and
-   MTSE_IOERR is returned.
+   An erase gap is written on the tape unit specified by "uptr" for the length
+   specified by "gap_size" in tenths of an inch, and the status of the operation
+   is returned.  The tape density must have been set by a previous
+   sim_tape_set_dens call; if it has not, then no action is taken, and MTSE_FMT
+   is returned.
 
    If the requested gap length is zero, or the tape format currently selected
    does not support erase gaps, the call succeeds with no action taken.  This
@@ -1303,10 +1740,11 @@ const uint32 density = bpi [MT_DENS (uptr->dynflags)];  /* the tape density in b
 const uint32 byte_length = (gaplen * density) / 10;     /* the size of the requested gap in bytes */
 
 if (density == 0)                                       /* if the density has not been set */
-    return MTSE_IOERR;                                  /*   then report an I/O error */
+    return MTSE_FMT;                                    /*   then report a format error */
 else                                                    /* otherwise */
     return tape_erase_fwd (uptr, byte_length);          /*   erase the requested gap size in bytes */
 }
+
 
 /* Erase a record forward.
 
@@ -1335,6 +1773,7 @@ else                                                    /* otherwise */
     return tape_erase_fwd (uptr, gap_size);             /*   erase the requested gap */
 }
 
+
 /* Erase a record reverse.
 
    An erase gap is written in the reverse direction on the tape unit specified
@@ -1362,65 +1801,172 @@ else                                                    /* otherwise */
     return tape_erase_rev (uptr, gap_size);             /*   erase the requested gap */
 }
 
-/* Space record forward
+
+/* Erase a specified number of bytes.
+
+   An erase gap is written on the tape unit specified by "uptr" for the number
+   of bytes specified by "bc", and the status of the operation is returned.  No
+   checking is done to preserve the tape structure while erasing, so the caller
+   is responsible for ensuring that the format remains valid.
+
+   If the requested byte count is zero, or the tape format currently selected
+   does not support erase gaps, the call succeeds with no action taken.  This
+   allows a device simulator that supports writing erase gaps to use the same
+   code without worrying about the tape format currently selected by the user.
+*/
+
+t_stat sim_tape_erase (UNIT *uptr, t_mtrlnt bc)
+{
+const uint32 format = MT_GET_FMT (uptr);                /* the tape format */
+
+MT_CLR_PNU (uptr);                                      /* clear the position-not-updated flag */
+
+if ((uptr->flags & UNIT_ATT) == 0)                      /* if the unit is not attached */
+    return MTSE_UNATT;                                  /*   then we cannot proceed */
+
+else if (sim_tape_wrp (uptr))                           /* otherwise if the unit is write protected */
+    return MTSE_WRP;                                    /*   then we cannot write */
+
+else if (bc == 0                                        /* if the count is zero */
+ || (format != MTUF_F_STD && format != MTUF_F_EXT))     /*   or gaps are not supported */
+    return MTSE_OK;                                     /*     then take no action */
+
+else                                                    /* otherwise */
+    return tape_erase (uptr, bc);                       /*   erase the requested number of bytes */
+}
+
+
+/* Space record forward.
 
    Inputs:
         uptr    =       pointer to tape unit
-        bc      =       pointer to size of record skipped
+        bc      =       pointer to returned record length or marker
+
    Outputs:
         status  =       operation status
 
-   exit condition       position
-
+   exit condition       tape position
+   ------------------   -----------------------------------------------------
    unit unattached      unchanged
-   read error           unchanged, PNU set
-   end of file/medium   unchanged, PNU set
+   read error           unchanged, PNU set if initial read
+   end of file/medium   updated if a gap precedes, else unchanged and PNU set
    tape mark            updated
+   other marker         updated
+   tape runaway         updated
    data record          updated
-   data record error    updated
+
+   This routine is called to space over a record or metadatum marker in the
+   forward direction.  On return, status is MTSE_OK if a data record, private
+   marker, or reserved marker was read, or an MTSE error code if a standard
+   marker (e.g. tape mark) was read, or an error occurred.  In all cases, the
+   successfully read marker or data record length word is returned via the "bc"
+   pointer.
+
+   When the extended SIMH format is enabled, then the variable addressed by the
+   "bc" parameter must be set on entry to a bitmap of the object classes to
+   return.  Each of the classes is represented by its corresponding bit, i.e.,
+   bit 0 represents class 0, bit 1 for class 1, etc.  The routine will return
+   only objects from the selected classes.  Unselected class objects will be
+   ignored by skipping over them until the first selected class object is seen.
+   This allows a simulator to declare those classes it understands (e.g.,
+   standard classes 0 and 8, plus private classes 2 and 7) and those classes it
+   wishes to ignore.  Erase gap markers are always skipped, and standard markers
+   are always returned, so specifying an empty bitmap will perform the
+   equivalent of a "space file forward," returning only when a tape mark or
+   EOM/EOF is encountered.
+
+   When standard SIMH format is enabled, standard classes 0 and 8 are
+   automatically selected, and the entry value addressed by "bc" is ignored.
+
+   If the PNU ("position not updated") flag is set, then an error prevented a
+   preceding tape read or write command from moving the tape position.  A space
+   command immediately following such a failed command is assumed to be part of
+   a reposition-and-retry error recovery sequence.  Because the tape was not
+   actually moved, we skip the corresponding reposition here, so that the tape
+   will be correctly positioned for the retry.
+
+
+   Implementation notes:
+
+    1. PNU is set by both read and write positioning failures.  A retry sequence
+       would match a space reverse with a forward read, and vice versa.  We do
+       not maintain separate PNUs for forward and reverse operations, so a space
+       forward following a failed read forward would not move the tape.
+       However, this condition is deemed so unlikely as not to warrant keeping
+       direction-specific PNU flags.
 */
 
 t_stat sim_tape_sprecf (UNIT *uptr, t_mtrlnt *bc)
 {
-t_stat st;
+const uint32 f = MT_GET_FMT (uptr);
+t_stat       st;
 
-st = sim_tape_rdlntf (uptr, bc);                        /* get record length */
-*bc = MTR_L (*bc);
+if (MT_TST_PNU (uptr)) {                                /* if the PNU flag is set */
+    MT_CLR_PNU (uptr);                                  /*   then clear it */
+
+    *bc = 0;                                            /* report the record length as zero */
+    return MTSE_OK;                                     /*   and return with no tape motion */
+    }
+
+st = sim_tape_rdlntf (uptr, bc);                        /* get the record length */
+
+if (f != MTUF_F_EXT)                                    /* if the format is not extended SIMH */
+    *bc = MTR_RL (*bc) & MTR_MAXLEN;                    /*   then return just the record length */
+
 return st;
 }
 
-/* Space record reverse
+
+/* Space record reverse.
 
    Inputs:
         uptr    =       pointer to tape unit
-        bc      =       pointer to size of records skipped
+        bc      =       pointer to returned record length or marker
+
    Outputs:
         status  =       operation status
 
-   exit condition       position
-
+   exit condition       tape position
+   ------------------   -----------------------------------------------------
    unit unattached      unchanged
    beginning of tape    unchanged
-   read error           unchanged
-   end of file          unchanged
-   end of medium        updated
+   read error           unchanged, PNU set if initial read
    tape mark            updated
+   other marker         updated
+   tape runaway         updated
    data record          updated
+
+   This routine is called to space over a record or metadatum marker in the
+   reverse direction.  On return, status is MTSE_OK if a data record, private
+   marker, or reserved marker was read, or an MTSE error code if a standard
+   marker (e.g. tape mark) was read, or an error occurred.  In all cases, the
+   successfully read marker or data record length word is returned via the "bc"
+   pointer.
+
+   See the comments for the "sim_tape_sprecr" routine above for additional
+   considerations.
 */
 
 t_stat sim_tape_sprecr (UNIT *uptr, t_mtrlnt *bc)
 {
-t_stat st;
+const uint32 f = MT_GET_FMT (uptr);
+t_stat       st;
 
-if (MT_TST_PNU (uptr)) {
-    MT_CLR_PNU (uptr);
-    *bc = 0;
-    return MTSE_OK;
+if (MT_TST_PNU (uptr)) {                                /* if the PNU flag is set */
+    MT_CLR_PNU (uptr);                                  /*   then clear it */
+
+    *bc = 0;                                            /* report the record length as zero */
+    return MTSE_OK;                                     /*   and return with no tape motion */
     }
-st = sim_tape_rdlntr (uptr, bc);                        /* get record length */
-*bc = MTR_L (*bc);
+
+st = sim_tape_rdlntr (uptr, bc);                        /* get the record length */
+
+if (f != MTUF_F_EXT)                                    /* if the format is not extended SIMH */
+    *bc = MTR_RL (*bc) & MTR_MAXLEN;                    /*   then return just the record length */
+
 return st;
 }
+
 
 /* Rewind tape */
 
@@ -1436,7 +1982,7 @@ return MTSE_OK;
 t_stat sim_tape_reset (UNIT *uptr)
 {
 MT_CLR_PNU (uptr);
-return SCPE_OK;
+return MTSE_OK;
 }
 
 /* Test for BOT */
@@ -1445,21 +1991,21 @@ t_bool sim_tape_bot (UNIT *uptr)
 {
 uint32 f = MT_GET_FMT (uptr);
 
-return (uptr->pos <= fmts[f].bot)? TRUE: FALSE;
+return (uptr->pos <= fmts[f].bot) ? TRUE : FALSE;
 }
 
 /* Test for end of tape */
 
 t_bool sim_tape_eot (UNIT *uptr)
 {
-return (uptr->capac && (uptr->pos >= uptr->capac))? TRUE: FALSE;
+return (uptr->capac && (uptr->pos >= uptr->capac)) ? TRUE : FALSE;
 }
 
 /* Test for write protect */
 
 t_bool sim_tape_wrp (UNIT *uptr)
 {
-return ((uptr->flags & MTUF_WRP) || (MT_GET_FMT (uptr) == MTUF_F_TPC))? TRUE: FALSE;
+return ((uptr->flags & MTUF_WRP) || (MT_GET_FMT (uptr) == MTUF_F_TPC)) ? TRUE : FALSE;
 }
 
 /* Process I/O error */
@@ -1471,27 +2017,89 @@ clearerr (uptr->fileref);
 return MTSE_IOERR;
 }
 
-/* Set tape format */
+
+/* Set the tape format.
+
+   This validation routine is called to change the tape format of the unit
+   addressed by "uptr".  If "desc" is NULL, then the string pointed to by "cptr"
+   must contain one of the defined format names, and "val" is ignored.
+   Otherwise, "desc" must point to a "uint32" variable that receives the current
+   tape format code, "val" must contain one of the MTUF_F_* constants in
+   sim_tape.h that specifies the new format code, and "cptr" is ignored.
+
+   If "cptr" specifies the new format name, the "fmts" table is searched for a
+   matching entry; if one is not found, SCPE_ARG is returned.  The "SIMH" name
+   is used for both SIMH Standard and SIMH Extended format; which is selected
+   depends on whether the unit was set for extended format when the routine was
+   first entered.  A unit declared with the MT_F_EXT flag indicates that it is
+   prepared to handle the extended-format calling sequence, so switching back to
+   "SIMH" format from another format returns the unit to SIMH Extended format.
+   In contrast, a unit originally declared with another format, including
+   MT_F_STD, indicates that it is not prepared to handle the extended format, so
+   switching back returns to SIMH Standard format.
+
+   If "val" specifies the new format, this check is skipped.  This allows a
+   simulator to change to SIMH Extended format temporarily, e.g., to run
+   diagnostics, while ensuring that extended-format records are ignored during
+   normal simulator operation.
+
+
+   Implementation notes:
+
+    1. "fmts" table entries with blank (not NULL) names correspond to format
+       codes that are reserved for future use.  They are skipped automatically
+       during the name search because the "cptr" string is stripped of blanks
+       before entry and thus will never match a table entry with a blank name.
+
+    2. While the "fmts" table contains entries for both SIMH Standard and SIMH
+       Extended formats, both entries use the same "SIMH" name.  Therefore, only
+       the first (standard format) entry will match during the search.
+*/
 
 t_stat sim_tape_set_fmt (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-uint32 f;
+uint32 *old_fmt = (uint32 *) desc;                      /* a pointer to receive the current format */
 
-if (uptr == NULL)
-    return SCPE_IERR;
-if (uptr->flags & UNIT_ATT)
-    return SCPE_ALATT;
-if (cptr == NULL)
-    return SCPE_ARG;
-for (f = 0; f < MTUF_N_FMT; f++) {
-    if (fmts[f].name && (strcmp (cptr, fmts[f].name) == 0)) {
-        uptr->flags = (uptr->flags & ~MTUF_FMT) |
-            (f << MTUF_V_FMT) | fmts[f].uflags;
-        return SCPE_OK;
-        }
+if (uptr == NULL)                                       /* if the unit is not supplied */
+    return SCPE_IERR;                                   /*   then report an internal error */
+
+else if (uptr->flags & UNIT_ATT)                        /* otherwise if the unit is attached */
+    return SCPE_ALATT;                                  /*   then report an already attached error */
+
+else if (desc == NULL) {                                /* otherwise if the format is set interactively */
+    if (cptr == NULL || *cptr == '\0')                  /*   then if there is no format keyword */
+        return SCPE_ARG;                                /*     then report an argument error */
+
+    if (MT_GET_FMT (uptr) == MTUF_F_EXT)                /* if the unit accepts extended SIMH format */
+        uptr->dynflags |= UNIT_EXTEND;                  /*   then enable changing back to that format */
+
+    for (val = 0; val < (int32) FMT_COUNT; val++)       /* loop through the format name table */
+        if (MATCH_CMD (cptr, fmts [val].name) == 0) {   /* if the name matches */
+            if (val == MTUF_F_STD                       /*   then if it's SIMH format */
+              && (uptr->dynflags & UNIT_EXTEND))        /*     and the unit handles extended format */
+                val = MTUF_F_EXT;                       /*       then request extended format */
+
+            uptr->flags = (uptr->flags & ~MTUF_FMT)     /*  change to the new format */
+                            | fmts [val].uflags;        /*    including any required unit flags */
+            return SCPE_OK;                             /*     and return success */
+            }
+
+    return SCPE_ARG;                                    /* the name is not in the format table */
     }
-return SCPE_ARG;
+
+else                                                    /* otherwise set the format programmatically */
+    if (val < 0 || val >= (int32) FMT_COUNT)            /*   then the supplied value is out of range */
+        return SCPE_ARG;                                /*     then report an argument error */
+
+    else {                                              /* otherwise the format code is valid */
+        *old_fmt = MT_GET_FMT (uptr);                   /*   so return the current code */
+
+        uptr->flags = (uptr->flags & ~MTUF_FMT)         /* change to the new format */
+                        | fmts [val].uflags;            /*   including any required unit flags */
+        return SCPE_OK;                                 /*     and return success */
+        }
 }
+
 
 /* Show tape format */
 
@@ -1499,11 +2107,13 @@ t_stat sim_tape_show_fmt (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
 int32 f = MT_GET_FMT (uptr);
 
-if (fmts[f].name)
-    fprintf (st, "%s format", fmts[f].name);
-else fprintf (st, "invalid format");
+if (f < (int32) FMT_COUNT && fmts [f].name [0] != ' ')
+    fprintf (st, "%s format", fmts [f].name);
+else
+    fprintf (st, "invalid format");
 return SCPE_OK;
 }
+
 
 /* Map a TPC format tape image */
 
@@ -1535,7 +2145,6 @@ static t_addr sim_tape_tpc_fnd (UNIT *uptr, t_addr *map)
 {
 uint32 lo, hi, p;
 
-
 if (map == NULL)
     return 0;
 lo = 0;
@@ -1543,13 +2152,13 @@ hi = uptr->hwmark - 1;
 do {
     p = (lo + hi) >> 1;
     if (uptr->pos == map[p])
-        return ((p == 0)? map[p]: map[p - 1]);
+        return ((p == 0) ? map[p] : map[p - 1]);
     else if (uptr->pos < map[p])
         hi = p - 1;
     else lo = p + 1;
     }
 while (lo <= hi);
-return ((p == 0)? map[p]: map[p - 1]);
+return ((p == 0) ? map[p] : map[p - 1]);
 }
 
 /* Set tape capacity */
@@ -1563,7 +2172,7 @@ if ((cptr == NULL) || (*cptr == 0))
     return SCPE_ARG;
 if (uptr->flags & UNIT_ATT)
     return SCPE_ALATT;
-cap = (t_addr) get_uint (cptr, 10, sim_taddr_64? 2000000: 2000, &r);
+cap = (t_addr) get_uint (cptr, 10, sim_taddr_64 ? 2000000 : 2000, &r);
 if (r != SCPE_OK)
     return SCPE_ARG;
 uptr->capac = cap * ((t_addr) 1000000);
@@ -1584,6 +2193,7 @@ if (uptr->capac) {
 else fprintf (st, "unlimited capacity");
 return SCPE_OK;
 }
+
 
 /* Set the tape density.
 
@@ -1641,6 +2251,7 @@ else {                                                          /* otherwise a v
 
 return result;                                                  /* return the result of the operation */
 }
+
 
 /* Show the tape density */
 
