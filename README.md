@@ -5,6 +5,7 @@
 [![AppVeyor](https://ci.appveyor.com/api/projects/status/github/simh/simh)](https://ci.appveyor.com/project/simh/simh/history)
 
 ## Table of Contents:
+[WHAT'S NEW since the Open SIMH fork](#whats-new-since-the-open-simh-fork)  
 [WHAT'S NEW since simh v3.9](#whats-new-since-simh-v39)  
 . . [New Simulators](#new-simulators)  
 . . [Simulator Front Panel API](#simulator-front-panel-api)  
@@ -44,6 +45,41 @@
 . . . . . . . . [MinGW32](#mingw32)  
 . . . . . . [VMS](#vms)  
 . . [Problem Reports](#problem-reports)  
+
+## WHAT'S NEW since the Open SIMH fork
+
+All Simulator updates on Open SIMH will be present in this repository, and any changes to the master branch code in this repository authored by anyone except Mark Pizzolato will be posted as pull requestss on the Open simh repo.
+
+### Mark Pizzolato's changes not present in the Open SIMH repo:
+
+#### Changes to SCP (the simulator framework or command execution environment)
+
+- Add descriptive messages for cases when NOPARAM status is returned.
+- Avoid excessive DO command context lines when commands produce multiple lines of output.
+- Support has been added to allow for optional per device unit tests to exist and to invoke them at simulator startup.
+- Add support for generic bit field packing and unpacking during buffer copying.
+- Display count of units when all units are disabled.
+- Support to display all SCP visible filenames via relative paths and use those in SAVEd state.
+- ZAP command can be aborted by a Control-C
+
+#### Changes to the PDP-11 and VAX simulators
+
+- All VAXen: Correct HELP CPU to properly describe model specific LOAD options for ROM and NVRAM.
+- Add 2.11 BSD and NetBSD file system recognizers.
+- Add memory details and behavior description to the MicroVAX 3900 HELP CPU output.
+- Unibus and Qbus autoconfiguration disabling has been relaxed somewhat.  Previously, any "SET <device> ADDRESS= (or VECTOR=)" command would automatically disable autoconfigure for the rest of the simulator session.  This behavior has been relaxed so that autoconfigure will only be disabled if the specified ADDRESS or VECTOR value is different from the value previously set by the initial autoconfigure.
+- Aggressive validation of Unibus and Qbus ADDRESS and VECTOR values prior to execution starting due to a BOOT command.
+- Fixed bug in devices that use sim_disk which deallocated a file transfer buffer on detach.
+- Metadata is implemented on all VAX and PDP11 disk devices when NOAUTOSIZE is not specified.
+- Full support for using disk containers with metadata between different system and device types where it makes sense.
+- VHD disk formats are available on all disk types (including floppy or DECtape devices).
+
+### Updates to the Unibus DUP & Qbus DPV device by Trevor Warwick
+
+Support for Phase V DECnet connections on VAX Unibus and Qbus systems and the addition of support for the DPV11 for Qbus VAX systems.
+
+### Bill Beech has made significant enhancements and bug fixes to the SWTP simulators along with a new disk controller from Roberto Sancho Villa
+
 
 ## WHAT'S NEW since simh v3.9
 
