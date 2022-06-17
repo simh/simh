@@ -1,6 +1,6 @@
 /* scp.c: simulator control program
 
-   Copyright (c) 1993-2016, Robert M Supnik
+   Copyright (c) 1993-2022, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   21-Oct-21    RMS     Fixed bug in byte deposits if aincr > 1
    08-Mar-16    RMS     Added shutdown flag for detach_all
    20-Mar-12    MP      Fixes to "SHOW <x> SHOW" commands
    06-Jan-12    JDB     Fixed "SHOW DEVICE" with only one enabled unit (Dave Bryan)  
@@ -550,7 +551,7 @@ t_stat ex_reg (FILE *ofile, t_value val, int32 flag, REG *rptr, uint32 idx);
 t_stat dep_reg (int32 flag, CONST char *cptr, REG *rptr, uint32 idx);
 t_stat exdep_addr_loop (FILE *ofile, SCHTAB *schptr, int32 flag, const char *cptr,
     t_addr low, t_addr high, DEVICE *dptr, UNIT *uptr);
-t_stat ex_addr (FILE *ofile, int32 flag, t_addr addr, DEVICE *dptr, UNIT *uptr);
+t_stat ex_addr (FILE *ofile, int32 flag, t_addr addr, DEVICE *dptr, UNIT *uptr, int32 dfltinc);
 t_stat dep_addr (int32 flag, const char *cptr, t_addr addr, DEVICE *dptr,
     UNIT *uptr, int32 dfltinc);
 void fprint_fields (FILE *stream, t_value before, t_value after, BITFIELD* bitdefs);
@@ -9802,7 +9803,7 @@ t_stat exdep_addr_loop (FILE *ofile, SCHTAB *schptr, int32 flag, const char *cpt
     t_addr low, t_addr high, DEVICE *dptr, UNIT *uptr)
 {
 t_addr i, mask;
-t_stat reason;
+t_stat reason, dfltinc;
 int32 saved_switches = sim_switches;
 
 if (uptr->flags & UNIT_DIS)                             /* disabled? */
@@ -9810,22 +9811,25 @@ if (uptr->flags & UNIT_DIS)                             /* disabled? */
 mask = (t_addr) width_mask[dptr->awidth];
 if ((low > mask) || (high > mask) || (low > high))
     return SCPE_ARG;
+dfltinc =  parse_sym ("0", 0, uptr, sim_eval, sim_switches);
+if (dfltinc > 0)                                        /* parse_sym doing nums? */
+    dfltinc = 1 - dptr->aincr;                          /* no, use std dflt incr */
 for (i = low; i <= high; ) {                            /* all paths must incr!! */
     reason = get_aval (i, dptr, uptr);                  /* get data */
     sim_switches = saved_switches;
     if (reason != SCPE_OK)                              /* return if error */
         return reason;
     if (schptr && !test_search (sim_eval, schptr))
-        i = i + dptr->aincr;                            /* sch fails, incr */
+        i = i + (1 - dfltinc);                          /* sch fails, incr */
     else {                                              /* no sch or success */
         if (flag != EX_D) {                             /* ex, ie, or id? */
-            reason = ex_addr (ofile, flag, i, dptr, uptr);
+            reason = ex_addr (ofile, flag, i, dptr, uptr, dfltinc);
             sim_switches = saved_switches;
             if (reason > SCPE_OK)
                 return reason;
             }
         else
-            reason = 1 - dptr->aincr;                   /* no, dflt incr */
+            reason = dfltinc;                           /* no, dflt incr */
         if (flag != EX_E) {                             /* ie, id, or d? */
             reason = dep_addr (flag, cptr, i, dptr, uptr, reason);
             sim_switches = saved_switches;
@@ -10090,12 +10094,13 @@ put_rval_pcchk (rptr, idx, val, TRUE);
         addr    =       address to examine
         dptr    =       pointer to device
         uptr    =       pointer to unit
+        dfltinc =       default increment
    Outputs:
         return  =       if > 0, error status
                         if <= 0,-number of extra addr units retired
 */
 
-t_stat ex_addr (FILE *ofile, int32 flag, t_addr addr, DEVICE *dptr, UNIT *uptr)
+t_stat ex_addr (FILE *ofile, int32 flag, t_addr addr, DEVICE *dptr, UNIT *uptr, int32 dfltinc)
 {
 t_stat reason;
 int32 rdx;
@@ -10105,12 +10110,12 @@ if (sim_vm_fprint_addr)
 else fprint_val (ofile, addr, dptr->aradix, dptr->awidth, PV_LEFT);
 fprintf (ofile, ":\t");
 if (!(flag & EX_E))
-    return (1 - dptr->aincr);
+    return dfltinc;
 
 GET_RADIX (rdx, dptr->dradix);
 if ((reason = fprint_sym (ofile, addr, sim_eval, uptr, sim_switches)) > 0) {
     fprint_val (ofile, sim_eval[0], rdx, dptr->dwidth, PV_RZRO);
-    reason = 1 - dptr->aincr;
+    reason = dfltinc;
     }
 if (flag & EX_I)
     fprintf (ofile, "\t");
