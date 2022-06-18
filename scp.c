@@ -6701,6 +6701,7 @@ if (flag) {
         fprintf (st, "\n        Virtual Hard Disk (VHD) support");
     if (sim_disk_raw_support())
         fprintf (st, "\n        RAW disk and CD/DVD ROM support");
+    fprintf (st, "\n        Autosizing of disks is %s", sim_disk_autosize_disabled() ? "disabled" : "enabled");
 #if defined (SIM_ASYNCH_IO)
     fprintf (st, "\n        Asynchronous I/O support (%s)", AIO_QUEUE_MODE);
 #endif

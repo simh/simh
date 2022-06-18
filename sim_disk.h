@@ -139,6 +139,7 @@ t_bool sim_disk_raw_support (void);
 void sim_disk_data_trace (UNIT *uptr, const uint8 *data, size_t lba, size_t len, const char* txt, int detail, uint32 reason);
 t_stat sim_disk_info_cmd (int32 flag, CONST char *ptr);
 t_stat sim_disk_set_noautosize (int32 flag, CONST char *cptr);
+t_bool sim_disk_autosize_disabled (void);
 t_stat sim_disk_set_drive_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat sim_disk_set_drive_type_by_name (UNIT *uptr, const char *drive_type);
 t_stat sim_disk_show_drive_type (FILE *st, UNIT *uptr, int32 val, CONST void *desc);

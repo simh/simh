@@ -619,6 +619,11 @@ sim_disk_no_autosize = flag;
 return SCPE_OK;
 }
 
+t_bool sim_disk_autosize_disabled (void)
+{
+return sim_disk_no_autosize;
+}
+
 /* Test for write protect */
 
 t_bool sim_disk_wrp (UNIT *uptr)
