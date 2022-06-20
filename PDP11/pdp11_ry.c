@@ -72,7 +72,7 @@
 
 #define RY_DRV(d,a)                                     \
   { RX_NUMSC, RX_NUMSF, RX_NUMTR, (RX_NUMSC * RX_NUMTR),\
-    #d,       d##_NUMBY*2, DRVFL_RMV,                   \
+    #d,       d##_NUMBY, DRVFL_RMV,                   \
     "DY",     0,        0,        #a }
 
 static DRVTYP drv_tab[] = {
@@ -598,7 +598,7 @@ t_stat ry_attach (UNIT *uptr, CONST char *cptr)
 {
 return sim_disk_attach_ex (uptr, cptr, uptr->drvtyp->sectsize, 
                            sizeof (uint8), TRUE, 0, 
-                           uptr->drvtyp->name, RX_NUMSC, 0,
+                           uptr->drvtyp->name, 0, 0,
                            NULL);
 }
 
