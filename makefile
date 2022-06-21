@@ -2042,12 +2042,13 @@ KI10_LDFLAGS = -lusb-1.0
 endif
 
 KL10D = ${SIMHD}/PDP10
-KL10 = ${KL10D}/kx10_cpu.c ${KL10D}/kx10_sys.c ${KL10D}/kx10_df.c \
-	${KL10D}/kx10_mt.c ${KL10D}/kx10_dc.c ${KL10D}/kx10_rh.c \
-	${KL10D}/kx10_rp.c ${KL10D}/kx10_tu.c ${KL10D}/kx10_rs.c \
-	${KL10D}/kx10_imp.c ${KL10D}/kl10_fe.c ${KL10D}/ka10_pd.c \
-	${KL10D}/ka10_ch10.c ${KL10D}/kx10_lp.c ${KL10D}/kl10_nia.c \
-	${KL10D}/kx10_disk.c
+KL10 =  ${KL10D}/kx10_cpu.c ${KL10D}/kx10_sys.c ${KL10D}/kx10_df.c \
+    ${KA10D}/kx10_dp.c ${KA10D}/kx10_mt.c ${KA10D}/kx10_lp.c \
+    ${KA10D}/kx10_pt.c ${KA10D}/kx10_dc.c ${KL10D}/kx10_rh.c \
+    ${KA10D}/kx10_dt.c ${KA10D}/kx10_cr.c ${KA10D}/kx10_cp.c \
+    ${KL10D}/kx10_rp.c ${KL10D}/kx10_tu.c ${KL10D}/kx10_rs.c \
+    ${KL10D}/kx10_imp.c ${KL10D}/kl10_fe.c ${KL10D}/ka10_pd.c \
+    ${KL10D}/ka10_ch10.c ${KL10D}/kl10_nia.c ${KL10D}/kx10_disk.c
 KL10_OPT = -DKL=1 -DUSE_INT64 -I $(KL10D) -DUSE_SIM_CARD ${NETWORK_OPT} 
 
 KS10D = ${SIMHD}/PDP10
