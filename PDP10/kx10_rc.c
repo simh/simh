@@ -78,6 +78,7 @@
 #define NXM_ERR         0000000000400LL   /* Non existant memory */
 #define ILL_WR          0000000000200LL   /* Write to protected area */
 #define OVRRUN          0000000000100LL   /* Over run */
+#define CCW_COMP        0000000000040LL   /* Control word written */
 
 #define RD10_DTYPE      0
 #define RD10_WDS        32
@@ -172,7 +173,6 @@ REG                 rca_reg[] = {
     {ORDATA(DEVNUM, rc_df10[0].devnum, 9), REG_HRO},
     {ORDATA(BUF, rc_df10[0].buf, 36), REG_HRO},
     {ORDATA(NXM, rc_df10[0].nxmerr, 8), REG_HRO},
-    {ORDATA(COMP, rc_df10[0].ccw_comp, 8), REG_HRO},
     {0}
 };
 
@@ -196,7 +196,6 @@ REG                 rcb_reg[] = {
     {ORDATA(DEVNUM, rc_df10[1].devnum, 9), REG_HRO},
     {ORDATA(BUF, rc_df10[1].buf, 36), REG_HRO},
     {ORDATA(NXM, rc_df10[1].nxmerr, 8), REG_HRO},
-    {ORDATA(COMP, rc_df10[1].ccw_comp, 8), REG_HRO},
     {0}
 };
 
@@ -238,7 +237,9 @@ t_stat rc_devio(uint32 dev, uint64 *data) {
      case CONI:
         *data = df10->status;
 #if KI_22BIT
-        *data |= B22_FLAG;
+        if (cpu_unit[0].flags & UNIT_DF10C) {
+            *data |= B22_FLAG;
+        }
 #endif
         *data |= PRTLT;
         sim_debug(DEBUG_CONI, dptr, "HK %03o CONI %06o PC=%o\n", dev,
@@ -268,6 +269,7 @@ t_stat rc_devio(uint32 dev, uint64 *data) {
 
          if ((df10->status & BUSY) != 0 && (*data & CCW_COMP) != 0) {
             df10_writecw(df10);
+            df10->status |= CCW_COMP;
          } else
             df10->status &= ~CCW_COMP;
          sim_debug(DEBUG_CONO, dptr, "HK %03o CONO %06o PC=%o %06o\n", dev,
@@ -308,6 +310,7 @@ t_stat rc_devio(uint32 dev, uint64 *data) {
             return SCPE_OK;
          }
          df10_setup(df10, (uint32)*data);
+         df10->status &= ~CCW_COMP;
          tmp = (uint32)(*data >> 15) & ~07;
          cyl = (tmp >> 10) & 0777;
          if (((cyl & 017) > 9) || (((cyl >> 4) & 017) > 9)) {
@@ -488,10 +491,7 @@ rc_reset(DEVICE * dptr)
     }
     for (ctlr = 0; ctlr < NUM_DEVS_RC; ctlr++) {
         rc_ipr[ctlr] = 0;
-        rc_df10[ctlr].status = 0;
-        rc_df10[ctlr].devnum = rc_dib[ctlr].dev_num;
-        rc_df10[ctlr].nxmerr = 8;
-        rc_df10[ctlr].ccw_comp = 5;
+        df10_init(&rc_df10[ctlr], rc_dib[ctlr].dev_num, 8);
     }
     return SCPE_OK;
 }

@@ -1207,7 +1207,7 @@ if (len == 0)
 #endif
 #if !KS
     rhc->reg = 040;
-    rhc->status |= CCW_COMP_1|PI_ENABLE;
+    rhc->status |= PI_ENABLE;
 #endif
     rhc->drive = uptr - dptr->units;
     PC = word & RMASK;

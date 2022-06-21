@@ -650,7 +650,7 @@ rs_boot(int32 unit_num, DEVICE * rptr)
     word = rs_buf[0][ptr++];
     rhc->reg = 040;
     rhc->drive = uptr - dptr->units;
-    rhc->status |= CCW_COMP_1|PI_ENABLE;
+    rhc->status |= PI_ENABLE;
     PC = word & RMASK;
     return SCPE_OK;
 

@@ -30,6 +30,14 @@
 
 #if (NUM_DEVS_DP > 0)
 
+#if KL
+#define DP_DIS DEV_DIS
+#endif
+
+#ifndef DP_DIS
+#define DP_DIS 0
+#endif
+
 #define BUF_EMPTY(u)  (u->hwmark == 0xFFFFFFFF)
 #define CLR_BUF(u)     u->hwmark = 0xFFFFFFFF
 
@@ -60,6 +68,7 @@
 
 
 /* CONI/CONO Flags */
+#define CCW_COMP        0000000000040LL
 #define SUF_ERR         0000000000100LL
 #define SEC_ERR         0000000000200LL
 #define ILL_CMD         0000000000400LL
@@ -287,7 +296,6 @@ REG                 dpa_reg[] = {
     {ORDATA(DEVNUM, dp_df10[0].devnum, 9), REG_HRO},
     {ORDATA(BUF, dp_df10[0].buf, 36), REG_HRO},
     {ORDATA(NXM, dp_df10[0].nxmerr, 8), REG_HRO},
-    {ORDATA(COMP, dp_df10[0].ccw_comp, 8), REG_HRO},
     {0}
 };
 
@@ -295,7 +303,7 @@ DEVICE              dpa_dev = {
     "DPA", dp_unit, dpa_reg, dp_mod,
     NUM_UNITS_DP, 8, 18, 1, 8, 36,
     NULL, NULL, &dp_reset, &dp_boot, &dp_attach, &dp_detach,
-    &dp_dib[0], DEV_DISABLE | DEV_DEBUG, 0, dev_debug,
+    &dp_dib[0], DEV_DISABLE | DEV_DEBUG | DP_DIS, 0, dev_debug,
     NULL, NULL, &dp_help, NULL, NULL, &dp_description
 };
 
@@ -311,7 +319,6 @@ REG                 dpb_reg[] = {
     {ORDATA(DEVNUM, dp_df10[1].devnum, 9), REG_HRO},
     {ORDATA(BUF, dp_df10[1].buf, 36), REG_HRO},
     {ORDATA(NXM, dp_df10[1].nxmerr, 8), REG_HRO},
-    {ORDATA(COMP, dp_df10[1].ccw_comp, 8), REG_HRO},
     {0}
 };
 
@@ -319,7 +326,7 @@ DEVICE              dpb_dev = {
     "DPB", &dp_unit[010], dpb_reg, dp_mod,
     NUM_UNITS_DP, 8, 18, 1, 8, 36,
     NULL, NULL, &dp_reset, &dp_boot, &dp_attach, &dp_detach,
-    &dp_dib[1], DEV_DISABLE | DEV_DEBUG, 0, dev_debug,
+    &dp_dib[1], DEV_DISABLE | DEV_DEBUG | DP_DIS, 0, dev_debug,
     NULL, NULL, &dp_help, NULL, NULL, &dp_description
 };
 
@@ -335,7 +342,6 @@ REG                 dpc_reg[] = {
     {ORDATA(DEVNUM, dp_df10[2].devnum, 9), REG_HRO},
     {ORDATA(BUF, dp_df10[2].buf, 36), REG_HRO},
     {ORDATA(NXM, dp_df10[2].nxmerr, 8), REG_HRO},
-    {ORDATA(COMP, dp_df10[2].ccw_comp, 8), REG_HRO},
     {0}
 };
 
@@ -343,7 +349,7 @@ DEVICE              dpc_dev = {
     "DPC", &dp_unit[020], dpc_reg, dp_mod,
     NUM_UNITS_DP, 8, 18, 1, 8, 36,
     NULL, NULL, &dp_reset, &dp_boot, &dp_attach, &dp_detach,
-    &dp_dib[2], DEV_DISABLE | DEV_DEBUG, 0, dev_debug,
+    &dp_dib[2], DEV_DISABLE | DEV_DEBUG | DP_DIS, 0, dev_debug,
     NULL, NULL, &dp_help, NULL, NULL, &dp_description
 };
 
@@ -359,7 +365,6 @@ REG                 dpd_reg[] = {
     {ORDATA(DEVNUM, dp_df10[3].devnum, 9), REG_HRO},
     {ORDATA(BUF, dp_df10[3].buf, 36), REG_HRO},
     {ORDATA(NXM, dp_df10[3].nxmerr, 8), REG_HRO},
-    {ORDATA(COMP, dp_df10[3].ccw_comp, 8), REG_HRO},
     {0}
 };
 
@@ -367,7 +372,7 @@ DEVICE              dpd_dev = {
     "DPD", &dp_unit[030], dpd_reg, dp_mod,
     NUM_UNITS_DP, 8, 18, 1, 8, 36,
     NULL, NULL, &dp_reset, &dp_boot, &dp_attach, &dp_detach,
-    &dp_dib[3], DEV_DISABLE | DEV_DEBUG, 0, dev_debug,
+    &dp_dib[3], DEV_DISABLE | DEV_DEBUG | DP_DIS, 0, dev_debug,
     NULL, NULL, &dp_help, NULL, NULL, &dp_description
 };
 
@@ -411,7 +416,9 @@ t_stat dp_devio(uint32 dev, uint64 *data) {
      case CONI:
         *data = (uint64)(df10->status | uptr->STATUS);
 #if KI_22BIT
-        *data |= B22_FLAG;
+        if (cpu_unit[0].flags & UNIT_DF10C) {
+            *data |= B22_FLAG;
+        }
 #endif
         sim_debug(DEBUG_CONI, dptr, "DP %03o CONI %012llo %d PC=%o\n", dev,
                            *data, ctlr, PC);
@@ -433,7 +440,7 @@ t_stat dp_devio(uint32 dev, uint64 *data) {
             uptr->STATUS &= ~(CLRMSK2);
          if (*data & CCW_COMP) {
             df10_writecw(df10);
-            df10->status &= ~CCW_COMP;
+            df10->status |= CCW_COMP;
          }
          if (*data & PI_ENABLE) {
              uptr->UFLAGS &= ~DONE;
@@ -904,10 +911,7 @@ dp_reset(DEVICE * dptr)
          uptr++;
     }
     for (ctlr = 0; ctlr < NUM_DEVS_DP; ctlr++) {
-        dp_df10[ctlr].status = 0;
-        dp_df10[ctlr].devnum = dp_dib[ctlr].dev_num;
-        dp_df10[ctlr].nxmerr = 12;
-        dp_df10[ctlr].ccw_comp = 5;
+        df10_init(&dp_df10[ctlr], dp_dib[ctlr].dev_num, 12);
     }
     return SCPE_OK;
 }
