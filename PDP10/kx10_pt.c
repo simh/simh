@@ -109,8 +109,8 @@ UNIT ptr_unit = {
     };
 
 REG ptr_reg[] = {
-    { DRDATA (STATUS, ptr_unit.STATUS, 18), PV_LEFT | REG_UNIT},
-    { DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT | REG_UNIT},
+    { URDATA (STATUS, ptr_unit.STATUS, 8, 18, 0, 1, PV_LEFT) },
+    { URDATA (TIME, ptr_unit.wait, 10, 24, 0, 1, PV_LEFT) },
     { NULL }
     };
 
