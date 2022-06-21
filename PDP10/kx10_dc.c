@@ -35,6 +35,14 @@
 
 #if (NUM_DEVS_DC > 0)
 
+#if KL
+#define DC_DIS DEV_DIS
+#endif
+
+#ifndef DC_DIS
+#define DC_DIS 0
+#endif
+
 #define DC_DEVNUM 0240
 
 #define DC10_LINES    8
@@ -147,7 +155,7 @@ DEVICE dc_dev = {
     1, 10, 31, 1, 8, 8,
     &tmxr_ex, &tmxr_dep, &dc_reset,
     NULL, &dc_attach, &dc_detach,
-    &dc_dib, DEV_MUX | DEV_DISABLE | DEV_DEBUG, 0, dev_debug,
+    &dc_dib, DEV_MUX | DEV_DISABLE | DEV_DEBUG | DC_DIS, 0, dev_debug,
     NULL, NULL, &dc_help, NULL, NULL, &dc_description
     };
 

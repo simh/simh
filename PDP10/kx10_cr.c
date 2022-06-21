@@ -38,6 +38,14 @@
 
 #define CR_DEVNUM        0150
 
+#if KL
+#define CR_DIS DEV_DIS
+#endif
+
+#ifndef CR_DIS
+#define CR_DIS 0
+#endif
+
 
 /* std devices. data structures
 
@@ -119,7 +127,7 @@ DEVICE              cr_dev = {
     "CR", &cr_unit, cr_reg, cr_mod,
     NUM_DEVS_CR, 8, 15, 1, 8, 8,
     NULL, NULL, NULL, NULL, &cr_attach, &cr_detach,
-    &cr_dib, DEV_DISABLE | DEV_DEBUG | DEV_CARD, 0, crd_debug,
+    &cr_dib, DEV_DISABLE | DEV_DEBUG | DEV_CARD | CR_DIS, 0, crd_debug,
     NULL, NULL, &cr_help, NULL, NULL, &cr_description
 };
 

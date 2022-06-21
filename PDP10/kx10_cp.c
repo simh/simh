@@ -38,6 +38,14 @@
 
 #define CP_DEVNUM        0110
 
+#if KL
+#define CP_DIS DEV_DIS
+#endif
+
+#ifndef CP_DIS
+#define CP_DIS  0
+#endif
+
 
 /* std devices. data structures
 
@@ -115,7 +123,7 @@ DEVICE              cp_dev = {
     "CP", &cp_unit, cp_reg, cp_mod,
     NUM_DEVS_CP, 8, 15, 1, 8, 8,
     NULL, NULL, NULL, NULL, &cp_attach, &cp_detach,
-    &cp_dib, DEV_DISABLE | DEV_DEBUG | DEV_CARD, 0, crd_debug,
+    &cp_dib, DEV_DISABLE | DEV_DEBUG | DEV_CARD | CP_DIS, 0, crd_debug,
     NULL, NULL, &cp_help, NULL, NULL, &cp_description
 };
 

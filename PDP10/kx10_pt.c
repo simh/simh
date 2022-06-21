@@ -32,6 +32,14 @@
 
 #if (NUM_DEVS_PT > 0)
 
+#if KL
+#define PT_DIS  DEV_DIS
+#endif
+
+#ifndef PT_DIS
+#define PT_DIS 0
+#endif
+
 #define PP_DEVNUM 0100
 #define PR_DEVNUM 0104
 #define STATUS   u3
@@ -77,8 +85,8 @@ UNIT ptp_unit = {
     };
 
 REG ptp_reg[] = {
-    { DRDATA (STATUS, ptp_unit.STATUS, 18), PV_LEFT | REG_UNIT},
-    { DRDATA (TIME, ptp_unit.wait, 24), PV_LEFT | REG_UNIT},
+    { URDATA (STATUS, ptp_unit.STATUS, 8, 18, 0, 1, PV_LEFT) },
+    { URDATA (TIME, ptp_unit.wait, 10, 24, 0, 1, PV_LEFT) },
     { NULL }
     };
 
@@ -90,7 +98,7 @@ DEVICE ptp_dev = {
     "PTP", &ptp_unit, ptp_reg, ptp_mod,
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &ptp_reset, NULL, &ptp_attach, &ptp_detach,
-    &ptp_dib, DEV_DISABLE | DEV_DEBUG, 0, dev_debug,
+    &ptp_dib, DEV_DISABLE | DEV_DEBUG | PT_DIS, 0, dev_debug,
     NULL, NULL, &ptp_help, NULL, NULL, &ptp_description
     };
 
@@ -114,7 +122,7 @@ DEVICE ptr_dev = {
     "PTR", &ptr_unit, ptr_reg, ptr_mod,
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &ptr_reset, &ptr_boot, &ptr_attach, &ptr_detach,
-    &ptr_dib, DEV_DISABLE | DEV_DEBUG, 0, dev_debug,
+    &ptr_dib, DEV_DISABLE | DEV_DEBUG | PT_DIS, 0, dev_debug,
     NULL, NULL, &ptr_help, NULL, NULL, &ptr_description
     };
 
