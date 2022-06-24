@@ -24,6 +24,9 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    21-Oct-21    RMS     Fixed bug in byte deposits if aincr > 1
+   16-Feb-21    JDB     Rewrote get_rval, put_rval to support arrays of structures
+   25-Jan-21    JDB     REG "size" field now determines access size
+                        REG "maxval" field now determines maximum allowed value
    08-Mar-16    RMS     Added shutdown flag for detach_all
    20-Mar-12    MP      Fixes to "SHOW <x> SHOW" commands
    06-Jan-12    JDB     Fixed "SHOW DEVICE" with only one enabled unit (Dave Bryan)  
@@ -8770,7 +8773,7 @@ void *mbuf = NULL;
 int32 j, blkcnt, limit, unitno, time, flg;
 uint32 us, depth;
 t_addr k, high, old_capac;
-t_value val, mask;
+t_value val, max;
 t_stat r;
 size_t sz;
 t_bool v40, v35, v32;
@@ -9039,10 +9042,13 @@ for ( ;; ) {                                            /* device loop */
             if (depth > rptr->depth)
                 depth = rptr->depth;
             }
-        mask = width_mask[rptr->width];                 /* get mask */
+        if (rptr->maxval > 0)                           /* if a maximum value is defined */
+            max = rptr->maxval;                         /*   then use it */
+        else                                            /* otherwise */
+            max = width_mask[rptr->width];              /*   the mask defines the maximum value */
         for (us = 0; us < depth; us++) {                /* loop thru values */
             READ_I (val);                               /* read value */
-            if (val > mask) {                           /* value ok? */
+            if (val > max) {                            /* value ok? */
                 sim_printf ("Invalid register value: %s %s\n", sim_dname (dptr), buf);
                 }
             else {
@@ -9206,7 +9212,9 @@ if ((flag == RU_RUN) || (flag == RU_GO)) {              /* run or go */
             else
                 new_pcv = strtotv (gbuf, &tptr, sim_PC->radix);/* parse PC */
             if ((tptr == gbuf) || (*tptr != 0) ||       /* error? */
-                (new_pcv > width_mask[sim_PC->width]))
+                (new_pcv > ((sim_PC->maxval > 0)
+                            ? sim_PC->maxval
+                            : (width_mask[sim_PC->width]))))
                 return SCPE_ARG;
             new_pc = TRUE;
             }
@@ -9895,53 +9903,50 @@ return SCPE_OK;
         idx     =       index
    Outputs:
         return  =       register value
+
+   Implementation notes:
+
+    1. The stride is the size of the element spacing for arrays, which is
+       equivalent to the addressing increment for array subscripting.  For
+       scalar registers, the stride will be zero (as will the idx value), so the
+       access pointer is same as the specified location pointer.
+
+    2. The size of the t_value type is determined by the USE_INT64 symbol and
+       will be either a 32-bit or a 64-bit type.  It represents the largest
+       value that can be returned and so is the default if one of the smaller
+       sizes is not indicated.  If USE_INT64 is not defined, t_value will be
+       identical to uint32.  In this case, compilers are generally smart enough
+       to eliminate the 32-bit size test and combine the two assignments into a
+       single default assignment.
 */
 
 t_value get_rval (REG *rptr, uint32 idx)
 {
-size_t sz;
 t_value val;
-uint32 *ptr;
+void    *ptr;
 
-sz = SZ_R (rptr);
-if ((rptr->depth > 1) && (rptr->flags & REG_CIRC)) {
-    idx = idx + rptr->qptr;
-    if (idx >= rptr->depth) idx = idx - rptr->depth;
+if ((rptr->depth > 1) && (rptr->flags & REG_CIRC)) {    /* if the register is a circular queue */
+    idx = idx + rptr->qptr;                             /*   then adjust the index relative to the queue */
+    if (idx >= rptr->depth)                             /* if the index is beyond the end of the array */
+        idx = idx - rptr->depth;                        /*   then wrap it around */
     }
-if ((rptr->depth > 1) && (rptr->flags & REG_UNIT)) {
-    ptr = (uint32 *)(((UNIT *) rptr->loc) + idx);
-#if defined (USE_INT64)
-    if (sz <= sizeof (uint32))
-        val = *ptr;
-    else val = *((t_uint64 *) ptr);
-#else
-    val = *ptr;
-#endif
-    }
-else if ((rptr->depth > 1) && (rptr->flags & REG_STRUCT)) {
-    ptr = (uint32 *)(((size_t) rptr->loc) + (idx * rptr->str_size));
-#if defined (USE_INT64)
-    if (sz <= sizeof (uint32))
-        val = *ptr;
-    else val = *((t_uint64 *) ptr);
-#else
-    val = *ptr;
-#endif
-    }
-else if (((rptr->depth > 1) || (rptr->flags & REG_FIT)) &&
-    (sz == sizeof (uint8)))
-    val = *(((uint8 *) rptr->loc) + idx);
-else if (((rptr->depth > 1) || (rptr->flags & REG_FIT)) &&
-    (sz == sizeof (uint16)))
-    val = *(((uint16 *) rptr->loc) + idx);
-#if defined (USE_INT64)
-else if (sz <= sizeof (uint32))
-     val = *(((uint32 *) rptr->loc) + idx);
-else val = *(((t_uint64 *) rptr->loc) + idx);
-#else
-else val = *(((uint32 *) rptr->loc) + idx);
-#endif
-val = (val >> rptr->offset) & width_mask[rptr->width];
+
+ptr = ((char *) rptr->loc) + (idx * rptr->stride);      /* point at the starting byte of the item */
+
+if (rptr->size == sizeof (uint8))                       /* get the value */
+    val = *((uint8 *) ptr);                             /*   using a size */
+                                                        /*     appropriate to */
+else if (rptr->size == sizeof (uint16))                 /*       the size of */
+    val = *((uint16 *) ptr);                            /*         the underlying type */
+
+else if (rptr->size == sizeof (uint32))
+    val = *((uint32 *) ptr);
+
+else                                                    /* if the element size is non-standard */
+    val = *((t_value *) ptr);                           /*   then access using the largest size permitted */
+
+val = (val >> rptr->offset) & width_mask[rptr->width];  /* shift and mask to obtain the final value */
+
 return val;
 }
 
@@ -9959,7 +9964,7 @@ return val;
 t_stat dep_reg (int32 flag, CONST char *cptr, REG *rptr, uint32 idx)
 {
 t_stat r;
-t_value val, mask;
+t_value val, max;
 int32 rdx;
 CONST char *tptr;
 char gbuf[CBUFSIZE];
@@ -9971,24 +9976,27 @@ if (rptr->flags & REG_RO)
 if (flag & EX_I) {
     cptr = read_line (gbuf, sizeof(gbuf), stdin);
     if (sim_log)
-        fprintf (sim_log, "%s\n", cptr? cptr: "");
+        fprintf (sim_log, "%s\n", cptr? cptr: "");      /* fix clang error */
     if (cptr == NULL)                                   /* force exit */
         return 1;
     if (*cptr == 0)                                     /* success */
         return SCPE_OK;
     }
-mask = width_mask[rptr->width];
+if (rptr->maxval > 0)                                   /* if a maximum value is defined */
+    max = rptr->maxval;                                 /*   then use it */
+else                                                    /* otherwise */
+    max = width_mask[rptr->width];                      /*   the mask defines the maximum value */
 GET_RADIX (rdx, rptr->radix);
 if ((rptr->flags & REG_VMAD) && sim_vm_parse_addr) {    /* address form? */
     val = sim_vm_parse_addr (sim_dflt_dev, cptr, &tptr);
-    if ((tptr == cptr) || (*tptr != 0) || (val > mask))
+    if ((tptr == cptr) || (*tptr != 0) || (val > max))
         return SCPE_ARG;
     }
 else
     if (!(rptr->flags & REG_VMFLAGS) ||                 /* dont use sym? */
         (parse_sym ((CONST char *)cptr, (rptr->flags & REG_UFMASK) | rdx, NULL,
                     &val, sim_switches | SIM_SW_REG) > SCPE_OK)) {
-    val = get_uint (cptr, rdx, mask, &r);
+    val = get_uint (cptr, rdx, max, &r);
     if (r != SCPE_OK)
         return SCPE_ARG;
     }
@@ -10007,76 +10015,59 @@ return SCPE_OK;
         mask    =       mask
    Outputs:
         none
+
+
+   Implementation notes:
+
+    1. mask and val are of type t_value, so an explicit cast is not needed for
+       that type of assignment.
+
+    2. See the notes for the get_rval routine for additional information
+       regarding the stride calculation and the t_value default assignment,
 */
 
 void put_rval_pcchk (REG *rptr, uint32 idx, t_value val, t_bool pc_chk)
 {
-size_t sz;
 t_value mask;
-uint32 *ptr;
+void    *ptr;
 t_value prev_val = 0;
 
 if ((!(sim_switches & SWMASK ('Z'))) && 
     (rptr->flags & REG_DEPOSIT) && sim_vm_reg_update)
     prev_val = get_rval (rptr, idx);
 
-#define PUT_RVAL(sz,rp,id,v,m) \
-    *(((sz *) rp->loc) + id) = \
-            (sz)((*(((sz *) rp->loc) + id) & \
-            ~((m) << (rp)->offset)) | ((v) << (rp)->offset))
+if (pc_chk && (rptr == sim_PC))                         /* if the PC is changing */
+    sim_brk_npc (0);                                    /*   then notify the breakpoint package */
 
-if (pc_chk && (rptr == sim_PC))
-    sim_brk_npc (0);
-sz = SZ_R (rptr);
-mask = width_mask[rptr->width];
-if ((rptr->depth > 1) && (rptr->flags & REG_CIRC)) {
-    idx = idx + rptr->qptr;
-    if (idx >= rptr->depth)
-        idx = idx - rptr->depth;
+mask = ~(width_mask [rptr->width] << rptr->offset);     /* set up a mask to produce a hole in the element */
+val  = val << rptr->offset;                             /*   and position the new value to fit the hole */
+
+if ((rptr->depth > 1) && (rptr->flags & REG_CIRC)) {    /* if the register is a circular queue */
+    idx = idx + rptr->qptr;                             /*   then adjust the index relative to the queue */
+    if (idx >= rptr->depth)                             /* if the index is beyond the end of the array */
+        idx = idx - rptr->depth;                        /*   then wrap it around */
     }
-if ((rptr->depth > 1) && (rptr->flags & REG_UNIT)) {
-    ptr = (uint32 *)(((UNIT *) rptr->loc) + idx);
-#if defined (USE_INT64)
-    if (sz <= sizeof (uint32))
-        *ptr = (*ptr &
-        ~(((uint32) mask) << rptr->offset)) |
-        (((uint32) val) << rptr->offset);
-    else *((t_uint64 *) ptr) = (*((t_uint64 *) ptr)
-        & ~(mask << rptr->offset)) | (val << rptr->offset);
-#else
-    *ptr = (*ptr &
-        ~(((uint32) mask) << rptr->offset)) |
-        (((uint32) val) << rptr->offset);
-#endif
-    }
-else if ((rptr->depth > 1) && (rptr->flags & REG_STRUCT)) {
-    ptr = (uint32 *)(((size_t)rptr->loc) + (idx * rptr->str_size));
-#if defined (USE_INT64)
-    if (sz <= sizeof (uint32))
-        *((uint32 *) ptr) = (*((uint32 *) ptr) &
-        ~(((uint32) mask) << rptr->offset)) |
-        (((uint32) val) << rptr->offset);
-    else *((t_uint64 *) ptr) = (*((t_uint64 *) ptr)
-        & ~(mask << rptr->offset)) | (val << rptr->offset);
-#else
-    *ptr = (*ptr &
-        ~(((uint32) mask) << rptr->offset)) |
-        (((uint32) val) << rptr->offset);
-#endif
-    }
-else if (((rptr->depth > 1) || (rptr->flags & REG_FIT)) &&
-    (sz == sizeof (uint8)))
-    PUT_RVAL (uint8, rptr, idx, (uint32) val, (uint32) mask);
-else if (((rptr->depth > 1) || (rptr->flags & REG_FIT)) &&
-    (sz == sizeof (uint16)))
-    PUT_RVAL (uint16, rptr, idx, (uint32) val, (uint32) mask);
-#if defined (USE_INT64)
-else if (sz <= sizeof (uint32))
-    PUT_RVAL (uint32, rptr, idx, (int32) val, (uint32) mask);
-else PUT_RVAL (t_uint64, rptr, idx, val, mask);
-#else
-else PUT_RVAL (uint32, rptr, idx, val, mask);
-#endif
+
+ptr = ((char *) rptr->loc) + (idx * rptr->stride);      /* point at the starting byte of the item */
+
+if (rptr->size == sizeof (uint8))                       /* store the value */
+    *((uint8 *) ptr) =                                  /*   using a size */
+      (uint8) (*((uint8 *) ptr) & mask | val);          /*     appropriate to */
+                                                        /*       the size of */
+else
+    if (rptr->size == sizeof (uint16))                  /*         the underlying type */
+        *((uint16 *) ptr) =
+          (uint16) (*((uint16 *) ptr) & mask | val);
+
+    else 
+        if (rptr->size == sizeof (uint32))
+            *((uint32 *) ptr) =
+              (uint32) (*((uint32 *) ptr) & mask | val);
+
+        else                                            /* if the element size is non-standard */
+            *((t_value *) ptr) =                        /*   then access using the largest size permitted */
+              *((t_value *) ptr) & mask | val;
+
 if ((!(sim_switches & SWMASK ('Z'))) && 
     (rptr->flags & REG_DEPOSIT) && sim_vm_reg_update)
     sim_vm_reg_update (rptr, idx, prev_val, val);
@@ -16159,19 +16150,8 @@ for (i = 0; (dptr = devices[i]) != NULL; i++) {
             bytes <<= 1;
 
         if (rptr->depth > 1)
-            bytes = rptr->ele_size;
+            bytes = rptr->size;
 
-        if (rptr->flags & REG_UNIT) {
-            DEVICE **d;
-
-            for (d = devices; *d != NULL; d++) {
-                if (((UNIT *)rptr->loc >= (*d)->units) &&
-                    ((UNIT *)rptr->loc < (*d)->units + (*d)->numunits)) {
-                    udptr = *d;
-                    break;
-                    }
-                }
-            }
         if (((rptr->width + rptr->offset + CHAR_BIT - 1) / CHAR_BIT) >= sizeof(size_map) / sizeof(size_map[0])) {
             Bad = TRUE;
             rsz = 0;
@@ -16182,10 +16162,10 @@ for (i = 0; (dptr = devices[i]) != NULL; i++) {
             }
 
         if (sim_switches & SWMASK ('R'))            /* Debug output */
-            sim_printf ("%5s:%-9.9s %s(rdx=%u, wd=%u, off=%u, dep=%u, strsz=%u, objsz=%u, elesz=%u, rsz=%u, %s %s%s%s membytes=%u)\n", dptr->name, rptr->name, rptr->macro, 
-                        rptr->radix, rptr->width, rptr->offset, rptr->depth, (uint32)rptr->str_size, (uint32)rptr->obj_size, (uint32)rptr->ele_size, rsz, rptr->desc ? rptr->desc : "",
-                        (rptr->flags & REG_FIT) ? "REG_FIT" : "", (rptr->flags & REG_VMIO) ? " REG_VMIO" : "", (rptr->flags & REG_STRUCT) ? " REG_STRUCT" : "",
-                        memsize);
+            sim_printf ("%5s:%-9.9s %s(rdx=%u, wd=%u, off=%u, dep=%u, strsz=%u, objsz=%u, elesz=%u, rsz=%u, %s %s%s membytes=%u, macro=%s)\n", dptr->name, rptr->name, rptr->macro, 
+                        rptr->radix, rptr->width, rptr->offset, rptr->depth, (uint32)rptr->stride, (uint32)rptr->obj_size, (uint32)rptr->size, rsz, rptr->desc ? rptr->desc : "",
+                        (rptr->flags & REG_FIT) ? "REG_FIT" : "", (rptr->flags & REG_VMIO) ? " REG_VMIO" : "",
+                        memsize, rptr->macro ? rptr->macro : "");
 
         MFlush (f);
         if (rptr->depth == 1) {
@@ -16204,42 +16184,6 @@ for (i = 0; (dptr = devices[i]) != NULL; i++) {
             Bad = TRUE;
             Mprintf (f, "a 0 bit wide register is meaningless\n");
             }
-        if ((rptr->obj_size != 0) && (rptr->ele_size != 0) && (rptr->depth != 0) && (rptr->macro != NULL)) {
-            if (rptr->flags & REG_UNIT) {
-                if (udptr == NULL) {
-                    Bad = TRUE;
-                    Mprintf (f, "\tthe indicated UNIT can't be found for this %u depth array\n", rptr->depth);
-                    }
-                else {
-                    if (rptr->depth > udptr->numunits) {
-                        Bad = TRUE;
-                        Mprintf (f, "\tthe depth of the UNIT array exceeds the number of units on the %s device which is %u\n", dptr->name, udptr->numunits);
-                        }
-                    if (rptr->obj_size > sizeof (t_value)) {
-                        Bad = TRUE;
-                        Mprintf (f, "\t%u is larger than the size of the t_value type (%u)\n", (uint32)rptr->obj_size, (uint32)sizeof (t_value));
-                        }
-                    }
-                }
-            else {
-                bytes *= rptr->depth;
-                if (!Bad) 
-                    if ((rsz * rptr->depth == rptr->obj_size)                                       ||
-                        ((rptr->flags & REG_STRUCT) && (rsz <= rptr->obj_size))                     ||
-                        ((rptr->depth == 1) && 
-                         ((rptr->obj_size == sizeof (t_value)) || (rsz < rptr->obj_size)))          ||
-                        ((rptr->depth != 1) && (bytes == rptr->obj_size))                           ||
-                        ((rptr->depth != 1) && (rptr->offset == 0) && (rptr->width == 8) &&
-                         ((rptr->depth == rptr->obj_size) || (rptr->depth == rptr->obj_size - 1)))  ||
-                        ((rptr->depth != 1) && (rptr->offset == 0) && (rptr->obj_size == rptr->ele_size)))
-                    continue;
-                Bad = TRUE;
-                Mprintf (f, "\ttherefore SAVE/RESTORE operations will affect %u byte%s of memory\n", bytes, (bytes != 1) ? "s" : "");
-                Mprintf (f, "\twhile the variable lives in %u bytes of memory\n", (uint32)rptr->obj_size);
-                }
-            }
-        else
-            Mprintf (f, "\tthis register entry is not properly initialized\n");
         if (Bad) {
             FMwrite (stdout, f);
             stat = SCPE_IERR;
