@@ -293,7 +293,9 @@
     else                                                        \
         (void)0
 
+/* Size of a DEVICE's data element */
 #define SZ_D(dp) (size_map[((dp)->dwidth + CHAR_BIT - 1) / CHAR_BIT])
+/* Size of a REGister's data element */
 #define SZ_R(rp) \
     (size_map[((rp)->width + (rp)->offset + CHAR_BIT - 1) / CHAR_BIT])
 #if defined (USE_INT64)
@@ -9925,11 +9927,8 @@ t_value get_rval (REG *rptr, uint32 idx)
 t_value val;
 void    *ptr;
 
-if ((rptr->depth > 1) && (rptr->flags & REG_CIRC)) {    /* if the register is a circular queue */
-    idx = idx + rptr->qptr;                             /*   then adjust the index relative to the queue */
-    if (idx >= rptr->depth)                             /* if the index is beyond the end of the array */
-        idx = idx - rptr->depth;                        /*   then wrap it around */
-    }
+if ((rptr->depth > 1) && (rptr->flags & REG_CIRC))      /* if the register is a circular queue */
+    idx = (idx + rptr->qptr) % rptr->depth;             /*   then adjust the index relative to the queue (wrapped as needed) */
 
 ptr = ((char *) rptr->loc) + (idx * rptr->stride);      /* point at the starting byte of the item */
 
@@ -10042,11 +10041,8 @@ if (pc_chk && (rptr == sim_PC))                         /* if the PC is changing
 mask = ~(width_mask [rptr->width] << rptr->offset);     /* set up a mask to produce a hole in the element */
 val  = val << rptr->offset;                             /*   and position the new value to fit the hole */
 
-if ((rptr->depth > 1) && (rptr->flags & REG_CIRC)) {    /* if the register is a circular queue */
-    idx = idx + rptr->qptr;                             /*   then adjust the index relative to the queue */
-    if (idx >= rptr->depth)                             /* if the index is beyond the end of the array */
-        idx = idx - rptr->depth;                        /*   then wrap it around */
-    }
+if ((rptr->depth > 1) && (rptr->flags & REG_CIRC))      /* if the register is a circular queue */
+    idx = (idx + rptr->qptr) % rptr->depth;             /*   then adjust the index relative to the queue (wrapped as needed) */
 
 ptr = ((char *) rptr->loc) + (idx * rptr->stride);      /* point at the starting byte of the item */
 
@@ -16142,7 +16138,7 @@ for (i = 0; (dptr = devices[i]) != NULL; i++) {
     for (rptr = dptr->registers; (rptr != NULL) && (rptr->name != NULL); rptr++) {
         uint32 bytes = 1;
         uint32 rsz = SZ_R(rptr);
-        uint32 memsize = ((rptr->flags & REG_FIT) || (rptr->depth > 1)) ? rptr->depth * rsz : 4;
+        uint32 memsize = (rptr->depth >= 1) ? rptr->depth * rsz : rsz;
         DEVICE *udptr = NULL;
         t_bool Bad;
 
@@ -16152,6 +16148,17 @@ for (i = 0; (dptr = devices[i]) != NULL; i++) {
         if (rptr->depth > 1)
             bytes = rptr->size;
 
+        if (rptr->macro && (strstr (rptr->macro, "URDATA") != NULL)) {
+            DEVICE **d;
+
+            for (d = devices; *d != NULL; d++) {
+                if (((UNIT *)rptr->loc >= (*d)->units) &&
+                    ((UNIT *)rptr->loc < (*d)->units + (*d)->numunits)) {
+                    udptr = *d;
+                    break;
+                    }
+                }
+            }
         if (((rptr->width + rptr->offset + CHAR_BIT - 1) / CHAR_BIT) >= sizeof(size_map) / sizeof(size_map[0])) {
             Bad = TRUE;
             rsz = 0;
@@ -16162,10 +16169,11 @@ for (i = 0; (dptr = devices[i]) != NULL; i++) {
             }
 
         if (sim_switches & SWMASK ('R'))            /* Debug output */
-            sim_printf ("%5s:%-9.9s %s(rdx=%u, wd=%u, off=%u, dep=%u, strsz=%u, objsz=%u, elesz=%u, rsz=%u, %s %s%s membytes=%u, macro=%s)\n", dptr->name, rptr->name, rptr->macro, 
-                        rptr->radix, rptr->width, rptr->offset, rptr->depth, (uint32)rptr->stride, (uint32)rptr->obj_size, (uint32)rptr->size, rsz, rptr->desc ? rptr->desc : "",
-                        (rptr->flags & REG_FIT) ? "REG_FIT" : "", (rptr->flags & REG_VMIO) ? " REG_VMIO" : "",
-                        memsize, rptr->macro ? rptr->macro : "");
+            sim_printf ("%5s:%-9.9s %s%s%s(rdx=%u, wd=%u, off=%u, dep=%u, strsz=%u, objsz=%u, elesz=%u, rsz=%u, %s%s%s membytes=%u)\n", 
+            dptr->name, rptr->name, rptr->desc ? rptr->desc : "", rptr->desc ? "\n\t" : "", rptr->macro ? rptr->macro : "", 
+                        rptr->radix, rptr->width, rptr->offset, rptr->depth, (uint32)rptr->stride, (uint32)rptr->obj_size, (uint32)rptr->size, rsz,
+                        (rptr->flags & REG_VMAD) ? " REG_VMAD" : "", (rptr->flags & REG_VMIO) ? " REG_VMIO" : "",
+                        (rptr->flags & REG_DEPOSIT) ? " REG_DEPOSIT" : "", memsize);
 
         MFlush (f);
         if (rptr->depth == 1) {
@@ -16184,6 +16192,49 @@ for (i = 0; (dptr = devices[i]) != NULL; i++) {
             Bad = TRUE;
             Mprintf (f, "a 0 bit wide register is meaningless\n");
             }
+        if ((rptr->obj_size != 0) && (rptr->size != 0) && (rptr->depth != 0) && (rptr->macro != NULL)) {
+            if (strstr (rptr->macro, "URDATA") != NULL) {
+                if (udptr == NULL) {
+                    Bad = TRUE;
+                    Mprintf (f, "\tthe indicated UNIT can't be found for this %u depth array\n", rptr->depth);
+                    }
+                else {
+                    UNIT *uptr;
+
+                    for (uptr = udptr->units; (uint32)(uptr - udptr->units) < udptr->numunits; uptr++) {
+                        if (((char *)rptr->loc) < (char *)(uptr + 1))
+                            break;
+                        }
+                    if ((rptr->depth + (uptr - udptr->units)) > udptr->numunits) {
+                        Bad = TRUE;
+                        Mprintf (f, "\tthe %u depth of the UNIT array exceeds the number of units on the %s device which is %u\n", rptr->depth, dptr->name, udptr->numunits);
+                        }
+                    if (rptr->obj_size > sizeof (t_value)) {
+                        Bad = TRUE;
+                        Mprintf (f, "\t%u is larger than the size of the t_value type (%u)\n", (uint32)rptr->obj_size, (uint32)sizeof (t_value));
+                        }
+                    }
+                }
+            else {
+                bytes *= rptr->depth;
+                if (!Bad) 
+                    if ((rsz * rptr->depth == rptr->obj_size)                                                   ||
+                        ((rptr->macro && (strstr (rptr->macro, "STRDATA") != NULL)) && (rsz <= rptr->obj_size)) ||
+                        ((rptr->depth == 1) && 
+                         ((rptr->obj_size == sizeof (t_value)) || (rsz < rptr->obj_size)))          ||
+                        ((rptr->depth != 1) && (bytes == rptr->obj_size))                           ||
+                        ((rptr->depth != 1) && (rptr->offset == 0) && (rptr->width == 8) &&
+                         ((rptr->depth == rptr->obj_size) || (rptr->depth == rptr->obj_size - 1)))  ||
+                        ((rptr->depth != 1) && (rptr->offset == 0) && (rptr->obj_size == rptr->size)))
+                    continue;
+                Bad = TRUE;
+                Mprintf (f, "\ttherefore EXAMINE and SAVE operations will reference %u byte%s\n", bytes, (bytes != 1) ? "s" : "");
+                Mprintf (f, "\tand DEPOSIT and RESTORE operations will affect %u byte%s of memory\n", bytes, (bytes != 1) ? "s" : "");
+                Mprintf (f, "\twhile the variable lives in %u bytes of memory\n", (uint32)rptr->obj_size);
+                }
+            }
+        else
+            Mprintf (f, "\tthis register entry is not properly initialized\n");
         if (Bad) {
             FMwrite (stdout, f);
             stat = SCPE_IERR;
@@ -16214,27 +16265,94 @@ uint8 treg8;
 uint16 treg16;
 uint32 treg32;
 t_value tregval;
+uint16 treg16array[5];
+uint16 treg16arrayx2[5][4];
 
-static struct validation_test {
-    REG reg[5];
-    t_stat expected_result;
-    } validations[] = {
-        { { { ORDATAD (REG8,   treg8,   8*sizeof(treg8),   "8 bit register") },
-            { ORDATAD (REG16,  treg16,  8*sizeof(treg16),  "16 bit register") },
-            { ORDATAD (REG32,  treg32,  8*sizeof(treg32),  "32 bit register") },
-            { ORDATAD (REGVAL, tregval, 8*sizeof(tregval), "value register") },
-            {NULL} },
-         SCPE_OK},
-        { { { ORDATAD (REG8,   treg8,   8*sizeof(treg8),   "8 bit register") },
-            { ORDATAD (REG16,  treg16,  8*sizeof(treg16),  "16 bit register") },
-            { ORDATAD (REG32,  treg32,  8*sizeof(treg32),  "32 bit register") },
-            { ORDATAD (REGVAL, tregval, 8*sizeof(tregval), "value register") },
-            {NULL} },
-         SCPE_OK},
-        { { {NULL} } }
-    };
 
 static UNIT validate_units[3];
+
+static struct validation_test {
+    REG reg[7];
+    t_stat expected_result;
+    } validations[] = {
+        { { { ORDATAD (OREG8,   treg8,   8*sizeof(treg8),   "8 bit register") },
+            { ORDATAD (OREG16,  treg16,  8*sizeof(treg16),  "16 bit register") },
+            { ORDATAD (OREG32,  treg32,  8*sizeof(treg32),  "32 bit register") },
+            { ORDATAD (OREGVAL, tregval, 8*sizeof(tregval), "value register") },
+            {NULL} },
+         SCPE_OK},
+        { { { DRDATAD (DREG8,   treg8,   8*sizeof(treg8),   "8 bit register") },
+            { DRDATAD (DREG16,  treg16,  8*sizeof(treg16),  "16 bit register") },
+            { DRDATAD (DREG32,  treg32,  8*sizeof(treg32),  "32 bit register") },
+            { DRDATAD (DREGVAL, tregval, 8*sizeof(tregval), "value register") },
+            {NULL} },
+         SCPE_OK},
+        { { { HRDATAD (HREG8,   treg8,   8*sizeof(treg8),   "8 bit register") },
+            { HRDATAD (HREG16,  treg16,  8*sizeof(treg16),  "16 bit register") },
+            { HRDATAD (HREG32,  treg32,  8*sizeof(treg32),  "32 bit register") },
+            { HRDATAD (HREGVAL, tregval, 8*sizeof(tregval), "value register") },
+            {NULL} },
+         SCPE_OK},
+        { { { BINRDATAD (BINREG8,   treg8,   8*sizeof(treg8),   "8 bit register") },
+            { BINRDATAD (BINREG16,  treg16,  8*sizeof(treg16),  "16 bit register") },
+            { BINRDATAD (BINREG32,  treg32,  8*sizeof(treg32),  "32 bit register") },
+            { BINRDATAD (BINREGVAL, tregval, 8*sizeof(tregval), "value register") },
+            {NULL} },
+         SCPE_OK},
+        { { { FLDATAD (FLREG8,   treg8,   0,                    "Flag in 0'th bit of 8 bit register") },
+            { FLDATAD (FLREG8,   treg8,   (8*sizeof(treg8)-1),  "Flag in 7'th bit of 8 bit register") },
+            { FLDATAD (FLREG160, treg16,  0,                    "Flag in 0'th bit of 16 bit register") },
+            { FLDATAD (FLREG1615,treg16,  (8*sizeof(treg16)-1), "Flag in 15'th bit of 16 bit register") },
+            { FLDATAD (FLREG320, treg32,  0,                    "Flag in 0'th bit of 32 bit register") },
+            { FLDATAD (FLREG3231,treg32,  (8*sizeof(treg32)-1), "Flag in 31'st bit of 32 bit register") },
+            {NULL} },
+         SCPE_OK},
+        { { { GRDATAD (FLREG8,   treg8,   16, (8*sizeof(treg8))/2,  (8*sizeof(treg8))/4,  "2 bit field starting at offset 4 in an 8 bit register") },
+            { GRDATAD (FLREG16,  treg16,  16, (8*sizeof(treg16))/2, (8*sizeof(treg16))/4, "4 bit field starting at offset 8 in a 16 bit register") },
+            { GRDATAD (FLREG32,  treg32,  16, (8*sizeof(treg32))/2, (8*sizeof(treg32))/4, "8 bit field starting at offset 16 in a 32 bit register") },
+            {NULL} },
+         SCPE_OK},
+        { { { XRDATA (FLREG32,  &treg32,  16, 8, 0,  sizeof(treg32), 1, 1) },
+            {NULL} },
+         SCPE_OK},
+        { { { BRDATAD (FLREG16,  treg16array,  16, 16, 5,  "array of 5 uint16's") },
+            {NULL} },
+         SCPE_OK},
+        { { { CRDATAD (FLREG16,  treg16arrayx2,  16, 16, 20,  "array of 5x4 uint16's") },
+            {NULL} },
+         SCPE_OK},
+        { { { VBRDATAD (FLREG16,  treg16array,  16, 16, 5,  "5 Successive scalar values") },
+            {NULL} },
+         SCPE_OK},
+        { { { URDATAD (FLREG32,  validate_units[0].pos,  16, 32, 0,  3, PV_LEFT,  "Unit POS register array for 3 units") },
+            {NULL} },
+         SCPE_OK},
+        { { { URDATAD (FLREG32,  validate_units[2].pos,  16, 32, 0,  3, PV_LEFT,  "Unit POS register array for 3 units out of bounds") },
+            {NULL} },
+         SCPE_IERR},
+        { { { STRDATAD (STRPOS,  validate_units[0].pos,  16, 32, 0, 3,  sizeof(UNIT), PV_LEFT, "Structure") },
+            {NULL} },
+         SCPE_OK},
+        { { { SAVEDATA (ALLUNITS,  validate_units) },
+            {NULL} },
+         SCPE_OK},
+        { { { FLDATAD (FLREG8,   treg8,   0,                    "Flag in 0'th bit of 8 bit register") },
+            { FLDATAD (FLREG8,   treg8,   (8*sizeof(treg8)-1),  "Flag in 7'th bit of 8 bit register") },
+            { FLDATAD (FLREG8,   treg8,   8*sizeof(treg8),      "Flag outside of 8 bit register") },
+            {NULL} },
+         SCPE_IERR},
+        { { { FLDATAD (FLREG16,  treg16,  0,                    "Flag in 0'th bit of 16 bit register") },
+            { FLDATAD (FLREG16,  treg16,  (8*sizeof(treg16)-1), "Flag in 15'th bit of 16 bit register") },
+            { FLDATAD (FLREG16,  treg16,  8*sizeof(treg16),     "Flag outside of 16 bit register") },
+            {NULL} },
+         SCPE_IERR},
+        { { { FLDATAD (FLREG32,  treg32,  0,                    "Flag in 0'th bit of 32 bit register") },
+            { FLDATAD (FLREG32,  treg32,  (8*sizeof(treg32)-1), "Flag in 31'st bit of 32 bit register") },
+            { FLDATAD (FLREG32,  treg32,  8*sizeof(treg32),     "Flag outside of 32 bit register") },
+            {NULL} },
+         SCPE_IERR},
+        { { {NULL} } }
+    };
 
 static DEVICE validate_test = {
     "TEST-REG", validate_units, NULL, NULL, 
@@ -16245,17 +16363,19 @@ static t_stat test_register_validation (void)
 struct validation_test *v;
 DEVICE *v_devs[] = {&validate_test, 
                    NULL};
+t_stat tstat, stat = SCPE_OK;
 
 if (sim_switches & SWMASK ('T'))
     sim_messagef (SCPE_OK, "test_register_validation - starting\n");
 for (v = validations; v->reg[0].name != NULL; v++) {
     validate_test.registers = v->reg;
-    if (SCPE_OK != sim_sanity_check_register_declarations (v_devs))
-        break;
+    tstat = sim_sanity_check_register_declarations (v_devs);
+    if (tstat != v->expected_result)
+        stat = tstat;
     }
 if (sim_switches & SWMASK ('T'))
     sim_messagef (SCPE_OK, "test_register_validation - done\n");
-return SCPE_OK;
+return stat;
 }
 
 typedef const char *(*parse_function)(const char *input, char *output, char end_char);

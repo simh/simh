@@ -1026,7 +1026,7 @@ struct MEMFILE {
     _RegCheck(#nm,&(loc),rdx,wd,off,dep,desc,flds,qptr,siz,sizeof((loc)),REGDATA),(fl)
 /* v3 compatible macro */
 #define XRDATA(nm,loc,rdx,wd,off,dep,siz,str) \
-    _RegCheck(#nm,loc,rdx,wd,off,dep,NULL,NULL,0,siz,sizeof((loc)),XRDATA),(fl)
+    _RegCheck(#nm,loc,rdx,wd,off,dep,NULL,NULL,0,siz,sizeof((loc)),XRDATA)
 
 /* Right Justified Octal Register Data */
 #define ORDATA(nm,loc,wd) \
@@ -1079,11 +1079,11 @@ struct MEMFILE {
     _RegCheck(#nm,aloc,rdx,wd,0,dep,desc,flds,0,0,sizeof(*(aloc)),BRDATADF)
 /* Arrayed register whose data is kept in a standard C array Register */
 #define CRDATA(nm,aloc,rdx,wd,dep) \
-    _RegCheck(#nm,aloc,rdx,wd,0,dep,NULL,NULL,0,0,sizeof(**(aloc)),CRDATA)
+    _RegCheck(#nm,aloc,rdx,wd,0,dep,NULL,NULL,0,0,sizeof(**(&aloc)),CRDATA)
 #define CRDATAD(nm,aloc,rdx,wd,dep,desc) \
-    _RegCheck(#nm,aloc,rdx,wd,0,dep,desc,NULL,0,0,sizeof(**(aloc)),CRDATAD)
+    _RegCheck(#nm,aloc,rdx,wd,0,dep,desc,NULL,0,0,sizeof(**(&aloc)),CRDATAD)
 #define CRDATADF(nm,aloc,rdx,wd,dep,desc,flds) \
-    _RegCheck(#nm,aloc,rdx,wd,0,dep,desc,flds,0,0,sizeof(**(aloc)),CRDATADF)
+    _RegCheck(#nm,aloc,rdx,wd,0,dep,desc,flds,0,0,sizeof(**(&aloc)),CRDATADF)
 
 /* Range of memory whose data is successive scalar values accessed like an array Register */
 #define VBRDATA(nm,loc,rdx,wd,dep) \
