@@ -25,6 +25,9 @@
 
    dp           moving head disk pack controller
 
+   28-Jun-22    RMS     Fixed off-by-1 error in DP_SEEK definition (Ken Rector)
+   07-Jun-22    RMS     Removed unused variables (V4)
+   06-Jun-22    RMS     Fixed incorrect return in TIO status (Ken Rector)
    06-Jun-22    RMS     Fixed missing loop increment in TDV (Ken Rector)
    13-Mar-17    RMS     Fixed bug in selecting 3281 unit F (COVERITY)
 
@@ -73,7 +76,7 @@
 #define DP_WDSC         256                             /* words/sector */
 #define DP_BYHD         8                               /* byte/header */
 #define DP_NUMDR        ((uint32) ((DP_Q10B (ctx->dp_ctype))? DP_NUMDR_10B: DP_NUMDR_16B))
-#define DP_SEEK         (DP_CONT)                       /* offset to seek units */
+#define DP_SEEK         (DP_CONT + 1)                   /* offset to seek units */
 
 /* Address bytes */
 
@@ -964,14 +967,14 @@ uint32 stat = DVS_AUTO;
 
 for (i = 0; i < DP_NUMDR; i++) {
     if (sim_is_active (&dp_unit[i])) {
-        stat |= (DVS_CBUSY|(CC2 << DVT_V_CC));
+        stat |= (DVS_CBUSY | (CC2 << DVT_V_CC));
         break;
         }
     }
 if (sim_is_active (&dp_unit[un]) ||
     sim_is_active (&dp_unit[un + DP_SEEK]))
-    stat |= (DVS_DBUSY|(CC2 << DVT_V_CC));
-return DVS_AUTO;
+    stat |= (DVS_DBUSY | (CC2 << DVT_V_CC));
+return stat;
 }
 
 uint32 dp_tdv_status (uint32 cidx, uint32 un)
@@ -1194,7 +1197,16 @@ else if (chan_chk_chi (dp_dib[cidx].dva) < 0)           /* any int? */
 return;
 }
 
-/* Reset routine */
+/* Reset routines */
+
+void dp_reset_unit (UNIT *uptr, uint32 cidx)
+{
+sim_cancel (uptr);                                      /* stop dev thread */
+uptr->UDA = 0;
+uptr->UCMD = 0;
+uptr->UCTX = cidx;
+return;
+}
 
 t_stat dp_reset (DEVICE *dptr)
 {
@@ -1207,12 +1219,10 @@ if (cidx >= DP_NUMCTL)
     return SCPE_IERR;
 dp_unit = dptr->units;
 ctx = &dp_ctx[cidx];
-for (i = 0; i < DP_NUMDR_16B; i++) {
-    sim_cancel (&dp_unit[i]);                           /* stop dev thread */
-    sim_cancel (&dp_unit[i + DP_SEEK]);                 /* stop seek thread */
-    dp_unit[i].UDA = 0;
-    dp_unit[i].UCMD = 0;
-    dp_unit[i].UCTX = cidx;
+dp_reset_unit (&dp_unit[DP_CONT], cidx);                /* reset controller */
+for (i = 0; i < DP_NUMDR_16B; i++) {                    /* reset drives */
+    dp_reset_unit (&dp_unit[i], cidx);
+    dp_reset_unit (&dp_unit[i + DP_SEEK], cidx);        /* reset seek thread */
     }
 ctx->dp_flags = 0;
 ctx->dp_ski = 0;

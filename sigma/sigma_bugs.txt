@@ -111,6 +111,9 @@
 105. RAD: write check was reading words off disk instead of bytes.
 106. RAD: end of transfer routine checking for address error incorrectly.
 107. DK: end of transfer routine checking for address error incorrectly.
+108. DP: TIO status routine always returns DVS_AUTO instead of proper status.
+109. DP: DP_SEEK definition is off by 1.
+110. DP: reset does not properly initialize controller, seek threads.
 
 
 Diagnostic Notes
