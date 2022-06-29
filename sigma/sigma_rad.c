@@ -429,7 +429,7 @@ else if ((rad_unit[un].flags & UNIT_ATT) == 0)          /* not att => offl */
     st |= DVS_DOFFL;                                 
 for (i = 0; i < RAD_NUMDR; i++) {                       /* loop thru units */
     if (sim_is_active (&rad_unit[i])) {                 /* active? */
-        st |= (DVS_CBUSY |(CC2 << DVT_V_CC));           /* ctrl is busy */
+        st |= (DVS_CBUSY | (CC2 << DVT_V_CC));          /* ctrl is busy */
         return st;
         }
     }
