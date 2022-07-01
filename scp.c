@@ -7008,10 +7008,20 @@ return SCPE_OK;
 
 t_stat show_dev_logicals (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr)
 {
+uint32 u;
+t_bool found = FALSE;
+
+for (u = 0; u < dptr->numunits; u++) {
+    if (dptr->units[u].lname) {
+        found = TRUE;
+        fprintf (st, "%s -> %s%u\n", dptr->units[u].lname, dptr->name, u);
+        }
+    }
 if (dptr->lname)
     fprintf (st, "%s -> %s\n", dptr->lname, dptr->name);
-else if (!flag)
-    fputs ("no logical name assigned\n", st);
+else
+    if ((!flag) && (!found))
+        fputs ("no logical name assigned\n", st);
 return SCPE_OK;
 }
 
