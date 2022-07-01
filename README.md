@@ -60,7 +60,9 @@ All Simulator updates on Open SIMH will be present in this repository, and any c
 - Add support for generic bit field packing and unpacking during buffer copying.
 - Display count of units when all units are disabled.
 - Support to display all SCP visible filenames via relative paths and use those in SAVEd state.
-- ZAP command can be aborted by a Control-C
+- ZAP command can be aborted by a Control-C.
+- Display current NOAUTOSIZE status in SHOW VERSION output.
+- Extend logical name support to include optional unique names for units as well as devices.
 
 #### Changes to the PDP-11 and VAX simulators
 
@@ -73,6 +75,8 @@ All Simulator updates on Open SIMH will be present in this repository, and any c
 - Metadata is implemented on all VAX and PDP11 disk devices when NOAUTOSIZE is not specified.
 - Full support for using disk containers with metadata between different system and device types where it makes sense.
 - VHD disk formats are available on all disk types (including floppy or DECtape devices).
+- Properly size RY drives which also don't have DEC144
+- Properly name extended units beyond the initial default units.
 
 ### Updates to the Unibus DUP & Qbus DPV device by Trevor Warwick
 
