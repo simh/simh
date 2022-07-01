@@ -421,8 +421,9 @@ typedef uint32          t_addr;
 #define SCPE_FSSIZE     (SCPE_BASE + 49)                /* File System size larger than disk size */
 #define SCPE_RUNTIME    (SCPE_BASE + 50)                /* Run Time Limit Exhausted */
 #define SCPE_INCOMPDSK  (SCPE_BASE + 51)                /* Incompatible Disk Container */
+#define SCPE_AMBASSIGN  (SCPE_BASE + 52)                /* ambiguous logical name */
 
-#define SCPE_MAX_ERR    (SCPE_BASE + 51)                /* Maximum SCPE Error Value */
+#define SCPE_MAX_ERR    (SCPE_BASE + 52)                /* Maximum SCPE Error Value */
 #define SCPE_KFLAG      0x10000000                      /* tti data flag */
 #define SCPE_BREAK      0x20000000                      /* tti break flag */
 #define SCPE_NOMESSAGE  0x40000000                      /* message display supression flag */
@@ -612,6 +613,7 @@ struct UNIT {
     char                *uname;                         /* Unit name */
     DEVICE              *dptr;                          /* DEVICE linkage (backpointer) */
     uint32              dctrl;                          /* debug control */
+    char                *lname;                         /* logical name */
 #ifdef SIM_ASYNCH_IO
     void                (*a_check_completion)(UNIT *);
     t_bool              (*a_is_active)(UNIT *);

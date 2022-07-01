@@ -548,7 +548,9 @@ t_bool qdisable (DEVICE *dptr);
 t_stat attach_err (UNIT *uptr, t_stat stat);
 t_stat detach_all (int32 start_device, t_bool shutdown);
 t_stat assign_device (DEVICE *dptr, const char *cptr);
+t_stat assign_unit (UNIT *uptr, const char *cptr);
 t_stat deassign_device (DEVICE *dptr);
+t_stat deassign_unit (UNIT *uptr);
 t_stat ssh_break_one (FILE *st, int32 flg, t_addr lo, int32 cnt, CONST char *aptr);
 t_stat exdep_reg_loop (FILE *ofile, SCHTAB *schptr, int32 flag, CONST char *cptr,
     REG *lowr, REG *highr, uint32 lows, uint32 highs);
@@ -830,6 +832,7 @@ const struct scp_error {
          {"FSSIZE",    "File System size larger than disk size"},
          {"RUNTIME",   "Run time limit exhausted"},
          {"INCOMPDSK", "Incompatible Disk Container"},
+         {"AMBASSIGN", "Ambiguous logical name"},
     };
 
 const size_t size_map[] = { sizeof (int8),
@@ -1653,12 +1656,13 @@ static const char simh_help2[] =
       "2Logical Names\n"
       " The standard device names can be supplemented with logical names.  Logical\n"
       " names must be unique within a simulator (that is, they cannot be the same\n"
-      " as an existing device name).  To assign a logical name to a device:\n\n"
-      "++ASSIGN <device> <log-name>      assign log-name to device\n\n"
+      " as an existing device or logical name).  To assign a logical name to a\n"
+      " device or unit:\n\n"
+      "++ASSIGN <device>|<unit> <log-name>   assign log-name to device\n\n"
       " To remove a logical name:\n\n"
-      "++DEASSIGN <device>               remove logical name\n\n"
+      "++DEASSIGN <device>|<unit>            remove logical name\n\n"
       " To show the current logical name assignment:\n\n"
-      "++SHOW <device> NAMES            show logical name, if any\n\n"
+      "++SHOW <device> NAMES                 show logical name, if any\n\n"
       " To show all logical names:\n\n"
       "++SHOW NAMES\n\n"
        /***************** 80 character line width template *************************/
@@ -8468,13 +8472,14 @@ return SCPE_OK;
 
 /* Assign command
 
-   as[sign] device name assign logical name to device
+   as[sign] device name assign logical name to device or unit
 */
 
 t_stat assign_cmd (int32 flag, CONST char *cptr)
 {
 char gbuf[CBUFSIZE];
 DEVICE *dptr;
+UNIT *uptr, *tuptr;
 
 GET_SWITCHES (cptr);                                    /* get switches */
 if (*cptr == 0)                                         /* must be more */
@@ -8483,24 +8488,35 @@ cptr = get_glyph (cptr, gbuf, 0);                       /* get next glyph */
 GET_SWITCHES (cptr);                                    /* get switches */
 if (*cptr == 0)                                         /* now eol? */
     return SCPE_2FARG;
-dptr = find_dev (gbuf);                                 /* locate device */
+dptr = find_unit (gbuf, &uptr);                         /* locate device */
 if (dptr == NULL)                                       /* found dev? */
     return sim_messagef (SCPE_NXDEV, "Non-existent device: %s\n", gbuf);
 cptr = get_glyph (cptr, gbuf, 0);                       /* get next glyph */
 if (*cptr != 0)                                         /* must be eol */
-    return SCPE_2MARG;
-if (find_dev (gbuf))                                    /* name in use */
-    return SCPE_ARG;
-deassign_device (dptr);                                 /* release current */
+    return sim_messagef (SCPE_2MARG, "Unexpected additional arguments: %s\n", cptr);
+if ((find_dev (gbuf) != NULL) ||                        /* name in use? */
+    (find_unit (gbuf, &tuptr) != NULL))
+    return sim_messagef (SCPE_AMBASSIGN, "%s is already in use\n", gbuf);
+if ((dptr->numunits > 1) || (uptr != dptr->units))
+    return assign_unit (uptr, gbuf);
 return assign_device (dptr, gbuf);
 }
 
 t_stat assign_device (DEVICE *dptr, const char *cptr)
 {
-dptr->lname = (char *) calloc (1 + strlen (cptr), sizeof (char));
+dptr->lname = (char *) realloc (dptr->lname, (1 + strlen (cptr)) * sizeof (char));
 if (dptr->lname == NULL)
     return SCPE_MEM;
 strcpy (dptr->lname, cptr);
+return SCPE_OK;
+}
+
+t_stat assign_unit (UNIT *uptr, const char *cptr)
+{
+uptr->lname = (char *) realloc (uptr->lname, (1 + strlen (cptr)) * sizeof (char));
+if (uptr->lname == NULL)
+    return SCPE_MEM;
+strcpy (uptr->lname, cptr);
 return SCPE_OK;
 }
 
@@ -8513,6 +8529,7 @@ t_stat deassign_cmd (int32 flag, CONST char *cptr)
 {
 char gbuf[CBUFSIZE];
 DEVICE *dptr;
+UNIT *uptr;
 
 GET_SWITCHES (cptr);                                    /* get switches */
 if (*cptr == 0)                                         /* must be more */
@@ -8520,16 +8537,26 @@ if (*cptr == 0)                                         /* must be more */
 cptr = get_glyph (cptr, gbuf, 0);                       /* get next glyph */
 if (*cptr != 0)                                         /* now eol? */
     return SCPE_2MARG;
-dptr = find_dev (gbuf);                                 /* locate device */
+dptr = find_unit (gbuf, &uptr);                         /* locate device or unit */
 if (dptr == NULL)                                       /* found dev? */
     return sim_messagef (SCPE_NXDEV, "Non-existent device: %s\n", gbuf);
-return deassign_device (dptr);
+if (uptr == NULL)
+    return deassign_device (dptr);
+else
+    return deassign_unit (uptr);
 }
 
 t_stat deassign_device (DEVICE *dptr)
 {
 free (dptr->lname);
 dptr->lname = NULL;
+return SCPE_OK;
+}
+
+t_stat deassign_unit (UNIT *uptr)
+{
+free (uptr->lname);
+uptr->lname = NULL;
 return SCPE_OK;
 }
 
@@ -8549,6 +8576,8 @@ char uname[CBUFSIZE];
 
 if (!uptr)
     return "";
+if (uptr->lname)
+    return uptr->lname;             /* Prefer user defined Logical Name defined? */
 if (uptr->uname)
     return uptr->uname;
 d = find_dev_from_unit(uptr);
@@ -10945,6 +10974,13 @@ if ((dptr = find_dev (cptr))) {                         /* exact match? */
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* base + unit#? */
     if (qdisable (dptr))                                /* device disabled? */
         continue;
+    for (u = 0; u < dptr->numunits; u++) {              /* Look for user defined unit names first */
+        if ((dptr->units[u].lname == NULL) ||
+            (strcmp (cptr, dptr->units[u].lname) != 0))
+            continue;
+        *uptr = &dptr->units[u];
+        return dptr;
+        }
     if (dptr->numunits &&                               /* any units? */
         (((nptr = dptr->name) &&
           (strncmp (cptr, nptr, strlen (nptr)) == 0)) ||
