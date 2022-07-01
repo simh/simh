@@ -10048,17 +10048,17 @@ ptr = ((char *) rptr->loc) + (idx * rptr->stride);      /* point at the starting
 
 if (rptr->size == sizeof (uint8))                       /* store the value */
     *((uint8 *) ptr) =                                  /*   using a size */
-      ((uint8) (*((uint8 *) ptr) & mask) | val);        /*     appropriate to */
+       (uint8) ((*((uint8 *) ptr) & mask) | val);        /*     appropriate to */
                                                         /*       the size of */
 else
     if (rptr->size == sizeof (uint16))                  /*         the underlying type */
         *((uint16 *) ptr) =
-          ((uint16) (*((uint16 *) ptr) & mask) | val);
+          (uint16) ((*((uint16 *) ptr) & mask) | val);
 
     else 
         if (rptr->size == sizeof (uint32))
             *((uint32 *) ptr) =
-              ((uint32) (*((uint32 *) ptr) & mask) | val);
+              (uint32) ((*((uint32 *) ptr) & mask) | val);
 
         else                                            /* if the element size is non-standard */
             *((t_value *) ptr) =                        /*   then access using the largest size permitted */
