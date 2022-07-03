@@ -25,6 +25,7 @@
 
    dp           moving head disk pack controller
 
+   02-Jul-2022  RMS     Fixed bugs in multi-unit operation
    29-Jun-22    RMS     Fixed initialization errors in ctrl, seek units (Ken Rector)
    28-Jun-22    RMS     Fixed off-by-1 error in DP_SEEK definition (Ken Rector)
    07-Jun-22    RMS     Removed unused variables (V4)
@@ -549,7 +550,11 @@ DEVICE dp_dev[] = {
     }
     };
 
-/* DP: IO dispatch routine */
+/* DP: IO dispatch routine
+
+   For all calls except AIO, dva is the full channel/device/unit address
+   For AIO, the handler must return the unit number
+*/
 
 uint32 dpa_disp (uint32 op, uint32 dva, uint32 *dvst)
 {
@@ -613,7 +618,7 @@ switch (op) {                                           /* case on op */
             for (i = 0; i < DP_NUMDR; i++) {            /* do every unit */
                 if (sim_is_active (&dp_unit[i])) {      /* chan active? */
                     sim_cancel (&dp_unit[i]);           /* cancel */
-                    chan_uen (dva);                     /* uend */
+                    chan_uen ((dva & ~DVA_M_UNIT) | i); /* uend */
                     }
                 dp_clr_ski (cidx, i);                   /* clear seek int */
                 sim_cancel (&dp_unit[i] + DP_SEEK);     /* cancel seek compl */
@@ -636,16 +641,16 @@ switch (op) {                                           /* case on op */
 return 0;
 }
 
-/* Unit service */
+/* Unit service - reconstruct full device address on entry */
 
 t_stat dp_svc (UNIT *uptr)
 {
 uint32 i, da, wd, wd1, c[DPS_NBY_16B];
 uint32 cidx = uptr->UCTX;
-uint32 dva = dp_dib[cidx].dva;
-uint32 dtype = GET_DTYPE (uptr->flags);
 UNIT *dp_unit = dp_dev[cidx].units;
 uint32 un = uptr - dp_unit;
+uint32 dva = dp_dib[cidx].dva | un;
+uint32 dtype = GET_DTYPE (uptr->flags);
 DP_CTX *ctx = &dp_ctx[cidx];
 int32 t, dc;
 uint32 st, cmd, sc;
@@ -933,7 +938,8 @@ return SCPE_OK;
 t_bool dp_end_sec (UNIT *uptr, uint32 lnt, uint32 exp, uint32 st)
 {
 uint32 cidx = uptr->UCTX;
-uint32 dva = dp_dib[cidx].dva;
+uint32 un = uptr - dp_dev[cidx].units;
+uint32 dva = dp_dib[cidx].dva | un;
 DP_CTX *ctx = &dp_ctx[cidx];
 
 if (st != CHS_ZBC) {                                    /* end record? */
@@ -1113,7 +1119,8 @@ return SCPE_OK;
 t_stat dp_ioerr (UNIT *uptr)
 {
 uint32 cidx = uptr->UCTX;
-uint32 dva = dp_dib[cidx].dva;
+uint32 un = uptr - dp_dev[cidx].units;
+uint32 dva = dp_dib[cidx].dva | un;
 
 perror ("DP I/O error");
 clearerr (uptr->fileref);

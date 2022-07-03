@@ -114,6 +114,10 @@
 108. DP: TIO status routine always returns DVS_AUTO instead of proper status.
 109. DP: DP_SEEK definition is off by 1.
 110. DP: reset does not properly initialize controller, seek threads.
+111. DP: device address must include unit identifier everywhere, for interrupt generation.
+112. DK: device address must include unit identifier everywhere, for interrupt generation.
+113. MT: device address must include unit identifier everywhere, for interrupt generation.
+114: RAD: device address must include unit identifier everywhere, for interrupt generation.
 
 
 Diagnostic Notes

@@ -1,6 +1,6 @@
 /* sigma_dk.c: 7250/7251-7252 cartridge disk simulator
 
-   Copyright (c) 2007-2008, Robert M Supnik
+   Copyright (c) 2007-2022, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,8 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    dk           7250/7251-7252 cartridge disk
+
+   02-Jul-2022  RMS     Fixed bugs in multi-unit operation
 
    Transfers are always done a sector at a time.
 */
@@ -91,7 +93,7 @@ extern uint32 chan_ctl_time;
 uint32 dk_disp (uint32 op, uint32 dva, uint32 *dvst);
 uint32 dk_tio_status (uint32 un);
 uint32 dk_tdv_status (uint32 un);
-t_stat dk_chan_err (uint32 st);
+t_stat dk_chan_err (uint32 dva, uint32 st);
 t_stat dk_svc (UNIT *uptr);
 t_stat dk_reset (DEVICE *dptr);
 t_bool dk_inv_ad (uint32 *da);
@@ -149,12 +151,17 @@ DEVICE dk_dev = {
     &dk_dib, DEV_DISABLE
     };
 
-/* DK: IO dispatch routine */
+/* DK: IO dispatch routine 
+
+   For all calls except AIO, dva is the full channel/device/unit address
+   For AIO, the handler must return the unit number
+*/
 
 uint32 dk_disp (uint32 op, uint32 dva, uint32 *dvst)
 {
 uint32 i;
 uint32 un = DVA_GETUNIT (dva);
+int32 iu;
 UNIT *uptr;
 
 if ((un >= DK_NUMDR) ||                                 /* inv unit num? */
@@ -179,23 +186,28 @@ switch (op) {                                           /* case on op */
         break;
 
     case OP_HIO:                                        /* halt I/O */
-        chan_clr_chi (dk_dib.dva);                      /* clr int */
+        chan_clr_chi (dva);                             /* clr int */
         *dvst = dk_tio_status (un);                     /* get status */
         if ((*dvst & DVS_CST) != 0) {                   /* ctrl busy? */
             for (i = 0; i < DK_NUMDR; i++) {            /* find busy unit */
                 uptr = &dk_unit[i];
                 if (sim_is_active (uptr)) {             /* active? */
                     sim_cancel (uptr);                  /* stop */
-                    chan_uen (dk_dib.dva);              /* uend */
+                    chan_uen (dk_dib.dva | i);          /* uend on unit */
                     }                                   /* end if active */
                 }                                       /* end for */
             }
         break;
 
     case OP_AIO:                                        /* acknowledge int */
-        chan_clr_chi (dk_dib.dva);                      /* clr int */
-        *dvst = dk_tdv_status (un);                     /* status like TDV */
-        break;
+        iu = chan_clr_chi (dk_dib.dva);                 /* clr int */
+        if (iu < 0) {                                   /* no int? */
+            *dvst = 0;
+            return SCPE_IERR;
+            }
+        *dvst = dk_tdv_status (iu) |                    /* get status */
+            (iu << DVT_V_UN);                           /* or in unit */
+            break;
 
     default:
         *dvst = 0;
@@ -211,18 +223,20 @@ t_stat dk_svc (UNIT *uptr)
 {
 uint32 i, sc, da, wd, wd1, cmd, c[3];
 uint32 *fbuf = (uint32 *) uptr->filebuf;
+uint32 un = uptr - dk_unit;
+uint32 dva = dk_dib.dva | un;
 int32 t, dc;
 uint32 st;
 
 switch (dk_cmd) {
 
     case DKS_INIT:                                      /* init state */
-        st = chan_get_cmd (dk_dib.dva, &cmd);           /* get command */
+        st = chan_get_cmd (dva, &cmd);                  /* get command */
         if (CHS_IFERR (st))                             /* channel error? */
-            return dk_chan_err (st);
+            return dk_chan_err (dva,st);
         if ((cmd == 0) ||                               /* invalid cmd? */
             ((cmd > DKS_CHECK) && (cmd != DKS_RDEES) && (cmd != DKS_TEST))) {
-            chan_uen (dk_dib.dva);                      /* uend */
+            chan_uen (dva);                             /* uend */
             return SCPE_OK;
             }
         dk_flags = 0;                                   /* clear status */
@@ -241,9 +255,9 @@ switch (dk_cmd) {
         return SCPE_OK;
 
     case DKS_END:                                       /* end state */
-        st = chan_end (dk_dib.dva);                     /* set channel end */
+        st = chan_end (dva);                            /* set channel end */
         if (CHS_IFERR (st))                             /* channel error? */
-            return dk_chan_err (st);
+            return dk_chan_err (dva,st);
         if (st == CHS_CCH) {                            /* command chain? */
             dk_cmd = DKS_INIT;                          /* restart thread */
             sim_activate (uptr, chan_ctl_time);
@@ -253,13 +267,13 @@ switch (dk_cmd) {
     case DKS_SEEK:                                      /* seek */
         c[0] = c[1] = 0;
         for (i = 0, st = 0; (i < 2) && (st != CHS_ZBC); i++) {
-            st = chan_RdMemB (dk_dib.dva, &c[i]);       /* get byte */
+            st = chan_RdMemB (dva, &c[i]);              /* get byte */
             if (CHS_IFERR (st))                         /* channel error? */
-                return dk_chan_err (st);
+                return dk_chan_err (dva,st);
             }
         dk_ad = ((c[0] & 0x7F) << 8) | c[1];            /* new address */
         if (((i != 2) || (st != CHS_ZBC)) &&            /* length error? */
-            chan_set_chf (dk_dib.dva, CHF_LNTE))        /* care? */
+            chan_set_chf (dva, CHF_LNTE))               /* care? */
             return SCPE_OK;
         dc = DKA_GETTK (dk_ad);                         /* desired track */
         t = abs (uptr->UTRK - dc);                      /* get track diff */
@@ -273,7 +287,7 @@ switch (dk_cmd) {
     case DKS_SEEK2:                                     /* seek complete */
         if (uptr->UTRK >= DK_TKUN) {
             dk_flags |= DKV_BADS;
-            chan_uen (dk_dib.dva);
+            chan_uen (dva);
             return SCPE_OK;
             }
         break;                                          /* seek done */
@@ -283,31 +297,31 @@ switch (dk_cmd) {
         c[1] = dk_ad & 0xFF;                            /* address */
         c[2] = GET_PSC (dk_time);                       /* curr sector */
         for (i = 0, st = 0; (i < DKS_NBY) && (st != CHS_ZBC); i++) {
-            st = chan_WrMemB (dk_dib.dva, c[i]);        /* store char */
+            st = chan_WrMemB (dva, c[i]);               /* store char */
             if (CHS_IFERR (st))                         /* channel error? */
-                return dk_chan_err (st);
+                return dk_chan_err (dva,st);
             }
         if (((i != DKS_NBY) || (st != CHS_ZBC)) &&
-            chan_set_chf (dk_dib.dva, CHF_LNTE))        /* length error? */
+            chan_set_chf (dva, CHF_LNTE))               /* length error? */
             return SCPE_OK;
         break;
 
     case DKS_WRITE:                                     /* write */
         if (uptr->flags & UNIT_RO) {                    /* write locked? */
             dk_flags |= DKV_WPE;                        /* set status */
-            chan_uen (dk_dib.dva);                      /* uend */
+            chan_uen (dva);                             /* uend */
             return SCPE_OK;
             }
         if (dk_inv_ad (&da)) {                          /* invalid addr? */
-            chan_uen (dk_dib.dva);                      /* uend */
+            chan_uen (dva);                             /* uend */
             return SCPE_OK;
             }
         for (i = 0, st = 0; i < DK_WDSC; da++, i++) {   /* sector loop */
             if (st != CHS_ZBC) {                        /* chan not done? */
-                st = chan_RdMemW (dk_dib.dva, &wd);     /* read word */
+                st = chan_RdMemW (dva, &wd);            /* read word */
                 if (CHS_IFERR (st)) {                   /* channel error? */
                     dk_inc_ad ();                       /* da increments */
-                    return dk_chan_err (st);
+                    return dk_chan_err (dva,st);
                     }
                 }
             else wd = 0;
@@ -323,20 +337,20 @@ switch (dk_cmd) {
 
     case DKS_CHECK:                                     /* write check */
         if (dk_inv_ad (&da)) {                          /* invalid addr? */
-            chan_uen (dk_dib.dva);                      /* uend */
+            chan_uen (dva);                             /* uend */
             return SCPE_OK;
             }
         for (i = 0, st = 0; (i < (DK_WDSC * 4)) && (st != CHS_ZBC); ) {
-            st = chan_RdMemB (dk_dib.dva, &wd);         /* read byte */
+            st = chan_RdMemB (dva, &wd);                /* read byte */
             if (CHS_IFERR (st)) {                       /* channel error? */
                 dk_inc_ad ();                           /* da increments */
-                return dk_chan_err (st);
+                return dk_chan_err (dva,st);
                 }
             wd1 = (fbuf[da] >> (24 - ((i % 4) * 8))) & 0xFF; /* byte */
             if (wd != wd1) {                            /* check error? */
                 dk_inc_ad ();                           /* da increments */
-                chan_set_chf (dk_dib.dva, CHF_XMDE);    /* set xmt err flag */
-                chan_uen (dk_dib.dva);                  /* force uend */
+                chan_set_chf (dva, CHF_XMDE);           /* set xmt err flag */
+                chan_uen (dva);                         /* force uend */
                 return SCPE_OK;
                 }
             da = da + ((++i % 4) == 0);                 /* every 4th byte */
@@ -347,14 +361,14 @@ switch (dk_cmd) {
 
     case DKS_READ:                                      /* read */
         if (dk_inv_ad (&da)) {                          /* invalid addr? */
-            chan_uen (dk_dib.dva);                      /* uend */
+            chan_uen (dva);                             /* uend */
                 return SCPE_OK;
             }
         for (i = 0, st = 0; (i < DK_WDSC) && (st != CHS_ZBC); da++, i++) {
-            st = chan_WrMemW (dk_dib.dva, fbuf[da]);    /* store in mem */
+            st = chan_WrMemW (dva, fbuf[da]);           /* store in mem */
             if (CHS_IFERR (st)) {                       /* channel error? */
                 dk_inc_ad ();                           /* da increments */
-                return dk_chan_err (st);
+                return dk_chan_err (dva,st);
                 }
             }
         if (dk_end_sec (uptr, i, DK_WDSC, st))          /* transfer done? */
@@ -377,15 +391,18 @@ return SCPE_OK;
 
 t_bool dk_end_sec (UNIT *uptr, uint32 lnt, uint32 exp, uint32 st)
 {
+uint32 un = uptr - dk_unit;
+uint32 dva = dk_dib.dva | un;
+
 if (st != CHS_ZBC) {                                    /* end record? */
     if (dk_inc_ad ())                                   /* inc addr, ovf? */
-        chan_uen (dk_dib.dva);                          /* uend */
+        chan_uen (dva);                                 /* uend */
     else sim_activate (uptr, dk_time * 16);             /* no, next sector */
     return TRUE;
     }
 dk_inc_ad ();                                           /* just incr addr */
 if ((lnt != exp) &&                                     /* length error? */
-    chan_set_chf (dk_dib.dva, CHF_LNTE))                /* do we care? */
+    chan_set_chf (dva, CHF_LNTE))                       /* do we care? */
     return TRUE;
 return FALSE;                                           /* cmd done */
 }
@@ -444,9 +461,9 @@ return FALSE;
 
 /* Channel error */
 
-t_stat dk_chan_err (uint32 st)
+t_stat dk_chan_err (uint32 dva, uint32 st)
 {
-chan_uen (dk_dib.dva);                                 /* uend */
+chan_uen (dva);                                         /* uend */
 if (st < CHS_ERR)
     return st;
 return SCPE_OK;
