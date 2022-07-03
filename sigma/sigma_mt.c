@@ -25,6 +25,8 @@
 
    mt           7320 and 7322/7323 magnetic tape
 
+   02-Jul-2022  RMS     Fixed bugs in multi-unit operation
+   07-Jun-22    RMS     Removed unused variables (V4)
    26-Mar-22    RMS     Added extra case points for new MTSE definitions
    13-Mar-17    RMS     Annotated fall through in switch
 
@@ -129,7 +131,7 @@ extern uint8 ebcdic_to_ascii[256];
 uint32 mt_disp (uint32 op, uint32 dva, uint32 *dvst);
 uint32 mt_tio_status (uint32 un);
 uint32 mt_tdv_status (uint32 un);
-t_stat mt_chan_err (uint32 st);
+t_stat mt_chan_err (uint32 dva, uint32 st);
 t_stat mtu_svc (UNIT *uptr);
 t_stat mtr_svc (UNIT *uptr);
 t_stat mt_reset (DEVICE *dptr);
@@ -215,7 +217,11 @@ DEVICE mt_dev = {
     &mt_dib, DEV_DISABLE | DEV_TAPE
     };
 
-/* Magtape: IO dispatch routine */
+/* Magtape: IO dispatch routine
+
+   For all calls except AIO, dva is the full channel/device/unit address
+   For AIO, the handler must return the unit number
+*/
 
 uint32 mt_disp (uint32 op, uint32 dva, uint32 *dvst)
 {
@@ -256,7 +262,7 @@ switch (op) {                                           /* case on op */
         break;
 
     case OP_AIO:                                        /* acknowledge int */
-        un = mt_clr_int (mt_dib.dva);                   /* clr int, get unit */
+        un = mt_clr_int (mt_dib.dva);                   /* clr int, get unit and flag */
         *dvst = (mt_tdv_status (un) & MTAI_MASK) |      /* device status */
             (un & MTAI_INT) |                           /* device int flag */
             ((un & DVA_M_UNIT) << DVT_V_UN);            /* unit number */
@@ -270,12 +276,13 @@ switch (op) {                                           /* case on op */
 return 0;
 }
 
-/* Unit service */
+/* Unit service - reconstruct full unit address at entry */
 
 t_stat mtu_svc (UNIT *uptr)
 {
 uint32 cmd = uptr->UCMD;
 uint32 un = uptr - mt_unit;
+uint32 dva = mt_dib.dva | un;
 uint32 c;
 uint32 st;
 int32 t;
@@ -287,9 +294,9 @@ if (cmd == MCM_INIT) {                                  /* init state */
         sim_activate (uptr, t);                         /* retry later */
         return SCPE_OK;
         }
-    st = chan_get_cmd (mt_dib.dva, &cmd);               /* get command */
+    st = chan_get_cmd (dva, &cmd);                      /* get command */
     if (CHS_IFERR (st))                                 /* channel error? */
-        return mt_chan_err (st);
+        return mt_chan_err (dva, st);
     if ((cmd & 0x80) ||                                 /* invalid cmd? */
         (mt_op[cmd] == 0)) {
         uptr->UCMD = MCM_END;                           /* end state */
@@ -299,7 +306,7 @@ if (cmd == MCM_INIT) {                                  /* init state */
     else {                                              /* valid cmd */
         if ((mt_op[cmd] & O_REV) &&                     /* reverse op */
             (mt_unit[un].UST & MTDV_BOT)) {             /* at load point? */
-            chan_uen (mt_dib.dva);                      /* channel end */
+            chan_uen (dva);                             /* uend */
             return SCPE_OK;
             }
         uptr->UCMD = cmd;                               /* unit state */
@@ -312,9 +319,9 @@ if (cmd == MCM_INIT) {                                  /* init state */
     }
 
 if (cmd == MCM_END) {                                   /* end state */
-    st = chan_end (mt_dib.dva);                         /* set channel end */
+    st = chan_end (dva);                                /* set channel end */
     if (CHS_IFERR (st))                                 /* channel error? */
-        return mt_chan_err (st);
+        return mt_chan_err (dva, st);
     if (st == CHS_CCH) {                                /* command chain? */
         uptr->UCMD = MCM_INIT;                          /* restart thread */
         sim_activate (uptr, chan_ctl_time);
@@ -331,7 +338,7 @@ if ((mt_op[cmd] & O_ATT) &&                             /* op req att and */
 if ((mt_op[cmd] & O_WRE) &&                             /* write op and */
     sim_tape_wrp (uptr)) {                              /* write protected? */
     uptr->UST |= MTDV_WLE;                              /* set status */
-    chan_uen (mt_dib.dva);                              /* unusual end */
+    chan_uen (dva);                                     /* uend */
     return SCPE_OK;
     }
 
@@ -390,15 +397,15 @@ switch (cmd) {                                          /* case on command */
             mt_bptr = 0;                                /* init rec ptr */
             }
         c = mt_xb[mt_bptr++];                           /* get char */
-        st = chan_WrMemB (mt_dib.dva, c);               /* write to memory */
+        st = chan_WrMemB (dva, c);                      /* write to memory */
         if (CHS_IFERR (st))                             /* channel error? */
-            return mt_chan_err (st);
+            return mt_chan_err (dva, st);
         if ((st != CHS_ZBC) && (mt_bptr != mt_blim)) {  /* not done? */
             sim_activate (uptr, mt_time);               /* continue thread */
             return SCPE_OK;
             }
         if (((st == CHS_ZBC) ^ (mt_bptr == mt_blim)) && /* length err? */ 
-              chan_set_chf (mt_dib.dva, CHF_LNTE))      /* uend taken? */
+              chan_set_chf (dva, CHF_LNTE))             /* uend taken? */
             return SCPE_OK;                             /* finished */
         break;                                          /* normal end */
 
@@ -412,23 +419,23 @@ switch (cmd) {                                          /* case on command */
             mt_bptr = mt_blim;                          /* init rec ptr */
             }
         c = mt_xb[--mt_bptr];                           /* get char */
-        st = chan_WrMemBR (mt_dib.dva, c);              /* write mem rev */
+        st = chan_WrMemBR (dva, c);                     /* write mem rev */
         if (CHS_IFERR (st))                             /* channel error? */
-            return mt_chan_err (st);
+            return mt_chan_err (dva, st);
         if ((st != CHS_ZBC) && (mt_bptr != 0)) {        /* not done? */
             sim_activate (uptr, mt_time);               /* continue thread */
             return SCPE_OK;
             }
         if (((st == CHS_ZBC) ^ (mt_bptr == 0)) &&       /* length err? */
-              chan_set_chf (mt_dib.dva, CHF_LNTE))      /* uend taken? */
+              chan_set_chf (dva, CHF_LNTE))             /* uend taken? */
             return SCPE_OK;                             /* finished */
         break;                                          /* normal end */
 
     case MCM_WRITE:                                     /* write */
-        st = chan_RdMemB (mt_dib.dva, &c);              /* read char */
+        st = chan_RdMemB (dva, &c);                     /* read char */
         if (CHS_IFERR (st)) {                           /* channel error? */
             mt_flush_buf (uptr);                        /* flush buffer */
-            return mt_chan_err (st);
+            return mt_chan_err (dva, st);
             }
         mt_xb[mt_blim++] = c;                           /* store in buffer */
         if (st != CHS_ZBC) {                            /* end record? */
@@ -473,42 +480,45 @@ return SCPE_OK;
 
 t_stat mt_map_err (UNIT *uptr, t_stat st)
 {
+uint32 un = uptr - mt_unit;
+uint32 dva = mt_dib.dva | un;
+
 switch (st) {
 
     case MTSE_FMT:                                      /* illegal fmt */
     case MTSE_UNATT:                                    /* not attached */
     case MTSE_WRP:                                      /* write protect */
     default:                                            /* unknown error*/
-        chan_set_chf (mt_dib.dva, CHF_XMME);            /* set err, fall through */
+        chan_set_chf (dva, CHF_XMME);                   /* set err, fall through */
     case MTSE_OK:                                       /* no error */
-        chan_uen (mt_dib.dva);                          /* uend */
+        chan_uen (dva);                                 /* uend */
         return SCPE_IERR;
 
     case MTSE_TMK:                                      /* end of file */
         uptr->UST |= MTDV_EOF;                          /* set eof flag */
-        chan_uen (mt_dib.dva);                          /* uend */
+        chan_uen (dva);                                 /* uend */
         return CHS_INACTV;
 
     case MTSE_IOERR:                                    /* IO error */
         uptr->UST |= MTDV_DTE;                          /* set DTE flag */
-        chan_set_chf (mt_dib.dva, CHF_XMDE);
-        chan_uen (mt_dib.dva);                          /* force uend */
+        chan_set_chf (dva, CHF_XMDE);
+        chan_uen (dva);                                 /* uend */
         return SCPE_IOERR;
 
     case MTSE_INVRL:                                    /* invalid rec lnt */
         uptr->UST |= MTDV_DTE;                          /* set DTE flag */
-        chan_set_chf (mt_dib.dva, CHF_XMDE);
-        chan_uen (mt_dib.dva);                          /* force uend */
+        chan_set_chf (dva, CHF_XMDE);
+        chan_uen (dva);                                 /* uend */
         return SCPE_MTRLNT;
 
     case MTSE_RECE:                                     /* record in error */
     case MTSE_EOM:                                      /* end of medium */
         uptr->UST |= MTDV_DTE;                          /* set DTE flag */
-        return chan_set_chf (mt_dib.dva, CHF_XMDE);     /* possible error */
+        return chan_set_chf (dva, CHF_XMDE);            /* possible error */
 
     case MTSE_BOT:                                      /* reverse into BOT */
         uptr->UST |= MTDV_BOT;                          /* set BOT */
-        chan_uen (mt_dib.dva);                          /* uend */
+        chan_uen (dva);                                 /* uend */
         return CHS_INACTV;
         }                                               /* end switch */
 
@@ -555,9 +565,9 @@ return st;
 
 /* Channel error */
 
-t_stat mt_chan_err (uint32 st)
+t_stat mt_chan_err (uint32 dva, uint32 st)
 {
-chan_uen (mt_dib.dva);                                  /* uend */
+chan_uen (dva);                                         /* uend */
 if (st < CHS_ERR)
     return st;
 return SCPE_OK;

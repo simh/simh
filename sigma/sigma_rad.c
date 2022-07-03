@@ -1,6 +1,6 @@
 /* sigma_rad.c: Sigma 7211/7212 or 7231/7232 fixed head disk simulator
 
-   Copyright (c) 2007-2008, Robert M Supnik
+   Copyright (c) 2007-2022, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,8 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    rad          7211/7212 or 7231/7232 fixed head disk
+
+   02-Jul-2022  RMS     Fixed bugs in multi-unit operation
 
    The RAD is a head-per-track disk.  To minimize overhead, the entire RAD
    is buffered in memory.
@@ -121,7 +123,7 @@ extern uint32 chan_ctl_time;
 uint32 rad_disp (uint32 op, uint32 dva, uint32 *dvst);
 uint32 rad_tio_status (uint32 un);
 uint32 rad_tdv_status (uint32 un);
-t_stat rad_chan_err (uint32 st);
+t_stat rad_chan_err (uint32 dva, uint32 st);
 t_stat rad_svc (UNIT *uptr);
 t_stat rad_reset (DEVICE *dptr);
 t_stat rad_settype (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
@@ -189,12 +191,17 @@ DEVICE rad_dev = {
     &rad_dib, DEV_DISABLE
     };
 
-/* RAD: IO dispatch routine */
+/* RAD: IO dispatch routine
+
+   For all calls except AIO, dva is the full channel/device/unit address
+   For AIO, the handler must return the unit number
+*/
 
 uint32 rad_disp (uint32 op, uint32 dva, uint32 *dvst)
 {
 uint32 i;
 uint32 un = DVA_GETUNIT (dva);
+int32 iu;
 UNIT *uptr;
 
 if ((un >= RAD_NUMDR) ||                                /* inv unit num? */
@@ -219,22 +226,27 @@ switch (op) {                                           /* case on op */
         break;
 
     case OP_HIO:                                        /* halt I/O */
-        chan_clr_chi (rad_dib.dva);                     /* clr int*/
+        chan_clr_chi (dva);                             /* clr int */
         *dvst = rad_tio_status (un);                    /* get status */
         if ((*dvst & DVS_CST) != 0) {                   /* ctrl busy? */
             for (i = 0; i < RAD_NUMDR; i++) {           /* find busy unit */
                 uptr = &rad_unit[i];
                 if (sim_is_active (uptr)) {             /* active? */
                     sim_cancel (uptr);                  /* stop */
-                    chan_uen (rad_dib.dva);             /* uend */
+                    chan_uen (rad_dib.dva | i);         /* uend on drive */
                     }                                   /* end if active */
                 }                                       /* end for */
             }
         break;
 
     case OP_AIO:                                        /* acknowledge int */
-        chan_clr_chi (rad_dib.dva);                     /* clr int */
-        *dvst = rad_tdv_status (0);                     /* status like TDV */
+        iu = chan_clr_chi (rad_dib.dva);                /* clr int */
+        if (iu < 0) {                                   /* no int? */
+            *dvst = 0;
+            return SCPE_IERR;
+            }
+        *dvst = rad_tdv_status (iu) |                   /* status like TDV */
+            (iu << DVT_V_UN);                           /* or in unit */
         break;
 
     default:
@@ -251,18 +263,20 @@ t_stat rad_svc (UNIT *uptr)
 {
 uint32 i, sc, da, cmd, wd, wd1, c[4], gp;
 uint32 *fbuf = (uint32 *) uptr->filebuf;
+uint32 un = uptr - rad_unit;
+uint32 dva = rad_dib.dva | un;
 uint32 st;
 int32 t;
 
 switch (rad_cmd) {
 
     case RADS_INIT:                                     /* init state */
-        st = chan_get_cmd (rad_dib.dva, &cmd);          /* get command */
+        st = chan_get_cmd (dva, &cmd);                  /* get command */
         if (CHS_IFERR (st))                             /* channel error? */
-            return rad_chan_err (st);
+            return rad_chan_err (dva, st);
         if ((cmd == 0) ||                               /* invalid cmd? */
             ((cmd > RADS_CHECK) && (cmd != RADS_RDEES))) {
-            chan_uen (rad_dib.dva);                     /* uend */
+            chan_uen (dva);                             /* uend */
             return SCPE_OK;
             }
         rad_flags = 0;                                  /* clear status */
@@ -279,9 +293,9 @@ switch (rad_cmd) {
         return SCPE_OK;
 
     case RADS_END:                                      /* end state */
-        st = chan_end (rad_dib.dva);                    /* set channel end */
+        st = chan_end (dva);                            /* set channel end */
         if (CHS_IFERR (st))                             /* channel error? */
-            return rad_chan_err (st);
+            return rad_chan_err (dva, st);
         if (st == CHS_CCH) {                            /* command chain? */
             rad_cmd = RADS_INIT;                        /* restart thread */
             sim_activate (uptr, chan_ctl_time);
@@ -291,13 +305,13 @@ switch (rad_cmd) {
     case RADS_SEEK:                                     /* seek */
         c[0] = c[1] = 0;
         for (i = 0, st = 0; (i < 2) && (st != CHS_ZBC); i++) {
-            st = chan_RdMemB (rad_dib.dva, &c[i]);      /* get byte */
+            st = chan_RdMemB (dva, &c[i]);              /* get byte */
             if (CHS_IFERR (st))                         /* channel error? */
-                return rad_chan_err (st);
+                return rad_chan_err (dva, st);
             }
         rad_ad = ((c[0] & 0x7F) << 8) | c[1];           /* new address */
         if (((i != 2) || (st != CHS_ZBC)) &&            /* length error? */
-            chan_set_chf (rad_dib.dva, CHF_LNTE))       /* care? */
+            chan_set_chf (dva, CHF_LNTE))               /* care? */
             return SCPE_OK;
         break;
 
@@ -307,12 +321,12 @@ switch (rad_cmd) {
         c[2] = GET_PSC (rad_time);                      /* curr sector */
         c[3] = 0;
         for (i = 0, st = 0; (i < rad_tab[rad_model].nbys) && (st != CHS_ZBC); i++) {
-            st = chan_WrMemB (rad_dib.dva, c[i]);       /* store char */
+            st = chan_WrMemB (dva, c[i]);               /* store char */
             if (CHS_IFERR (st))                         /* channel error? */
-                return rad_chan_err (st);
+                return rad_chan_err (dva, st);
             }
         if (((i != rad_tab[rad_model].nbys) || (st != CHS_ZBC)) &&
-            chan_set_chf (rad_dib.dva, CHF_LNTE))       /* length error? */
+            chan_set_chf (dva, CHF_LNTE))               /* length error? */
             return SCPE_OK;
         break;
 
@@ -321,19 +335,19 @@ switch (rad_cmd) {
             rad_tab[rad_model].tkun;
         if ((rad_wlk >> gp) & 1) {                      /* write lock set? */
             rad_flags |= RADV_WPE;                      /* set status */
-            chan_uen (rad_dib.dva);                     /* uend */
+            chan_uen (dva);                             /* uend */
             return SCPE_OK;
             }                                           /* fall through */
         if (rad_inv_ad (&da)) {                         /* invalid addr? */
-            chan_uen (rad_dib.dva);                     /* uend */
+            chan_uen (dva);                             /* uend */
             return SCPE_OK;
             }
         for (i = 0, st = 0; i < RAD_WDSC; da++, i++) {  /* write */
             if (st != CHS_ZBC) {                        /* chan active? */
-                st = chan_RdMemW (rad_dib.dva, &wd);    /* get data */
+                st = chan_RdMemW (dva, &wd);            /* get data */
                 if (CHS_IFERR (st)) {                   /* channel error? */
                     rad_inc_ad ();                      /* da increments */
-                    return rad_chan_err (st);
+                    return rad_chan_err (dva, st);
                     }
                 }
             else wd = 0;
@@ -349,20 +363,20 @@ switch (rad_cmd) {
 
     case RADS_CHECK:                                    /* write check */
         if (rad_inv_ad (&da)) {                         /* invalid addr? */
-            chan_uen (rad_dib.dva);                     /* uend */
+            chan_uen (dva);                             /* uend */
             return SCPE_OK;
             }
         for (i = 0, st = 0; (i < (RAD_WDSC * 4)) && (st != CHS_ZBC); ) {
-            st = chan_RdMemB (rad_dib.dva, &wd);        /* read sector */
+            st = chan_RdMemB (dva, &wd);                /* read sector */
             if (CHS_IFERR (st)) {                       /* channel error? */
                 rad_inc_ad ();                          /* da increments */
-                return rad_chan_err (st);
+                return rad_chan_err (dva, st);
                 }
             wd1 = (fbuf[da] >> (24 - ((i % 4) * 8))) & 0xFF; /* byte */
             if (wd != wd1) {                            /* check error? */
                 rad_inc_ad ();                          /* da increments */
-                chan_set_chf (rad_dib.dva, CHF_XMDE);   /* set xmt err flag */
-                chan_uen (rad_dib.dva);                 /* force uend */
+                chan_set_chf (dva, CHF_XMDE);           /* set xmt err flag */
+                chan_uen (dva);                         /* force uend */
                 return SCPE_OK;
                 }
             da = da + ((++i % 4) == 0);                 /* every 4th byte */
@@ -373,14 +387,14 @@ switch (rad_cmd) {
 
     case RADS_READ:                                     /* read */
         if (rad_inv_ad (&da)) {                         /* invalid addr? */
-            chan_uen (rad_dib.dva);                     /* uend */
+            chan_uen (dva);                             /* uend */
             return SCPE_OK;
             }
         for (i = 0, st = 0; (i < RAD_WDSC) && (st != CHS_ZBC); da++, i++) {
-            st = chan_WrMemW (rad_dib.dva, fbuf[da]);   /* store in mem */
+            st = chan_WrMemW (dva, fbuf[da]);           /* store in mem */
             if (CHS_IFERR (st)) {                       /* channel error? */
                 rad_inc_ad ();                          /* da increments */
-                return rad_chan_err (st);
+                return rad_chan_err (dva, st);
                 }
             }
         if (rad_end_sec (uptr, i, RAD_WDSC, st))        /* transfer done? */
@@ -403,15 +417,18 @@ return SCPE_OK;
 
 t_bool rad_end_sec (UNIT *uptr, uint32 lnt, uint32 exp, uint32 st)
 {
+uint32 un = uptr - rad_unit;
+uint32 dva = rad_dib.dva | un;
+
 if (st != CHS_ZBC) {                                    /* end record? */
     if (rad_inc_ad ())                                  /* inc addr, ovf? */
-        chan_uen (rad_dib.dva);                         /* uend */
+        chan_uen (dva);                                 /* uend */
     else sim_activate (uptr, rad_time * 16);            /* no, next sector */
     return TRUE;
     }
 rad_inc_ad ();                                          /* just incr addr */
 if ((lnt != exp) &&                                     /* length error? */
-    chan_set_chf (rad_dib.dva, CHF_LNTE))               /* do we care? */
+    chan_set_chf (dva, CHF_LNTE))                       /* do we care? */
     return TRUE;
 return FALSE;                                           /* cmd done */
 }
@@ -483,9 +500,9 @@ return FALSE;
 
 /* Channel error */
 
-t_stat rad_chan_err (uint32 st)
+t_stat rad_chan_err (uint32 dva, uint32 st)
 {
-chan_uen (rad_dib.dva);                                 /* uend */
+chan_uen (dva);                                         /* uend */
 if (st < CHS_ERR)
     return st;
 return SCPE_OK;
