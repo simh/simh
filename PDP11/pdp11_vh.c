@@ -1692,6 +1692,10 @@ static t_stat vh_reset (    DEVICE  *dptr   )
         }
     for (i = 0; i < VH_MUXES; i++) {
         if (i < vh_desc.lines/VH_LINES) {
+            char uname[16];
+
+            snprintf (uname, sizeof (uname), "%s%d", vh_dev.name, i);
+            sim_set_uname (&vh_unit[i], uname);
             /* if Unibus, force DHU mode */
             if (UNIBUS)
                 vh_unit[i].flags |= UNIT_MODEDHU;
