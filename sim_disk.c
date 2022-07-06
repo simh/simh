@@ -3144,6 +3144,7 @@ if (sim_switches & SWMASK ('C')) {                      /* create new disk conta
             sim_disk_detach (uptr);
             return SCPE_MEM;
             }
+        errno = 0;
         sim_messagef (SCPE_OK, "Copying %u sectors each %u bytes in size\n", (uint32)total_sectors, (uint32)sector_size);
         if (source_capac > target_capac) {
             sim_messagef (SCPE_OK, "The source container is %u sectors larger than the destination disk container\n", 
@@ -3172,6 +3173,9 @@ if (sim_switches & SWMASK ('C')) {                      /* create new disk conta
                 sim_messagef (SCPE_OK, "%s: Copied %u/%u sectors.  %d%% complete.\r", sim_uname (uptr), (uint32)(lba + sects_read), (uint32)total_sectors, (int)((((float)lba)*100)/total_sectors));
                 }
             }
+        if ((errno == ERANGE) &&    /* If everything was read before the end of the disk */
+            (sects_read == 0))
+            r = SCPE_OK;            /* That's OK */
         if (r == SCPE_OK)
             sim_messagef (SCPE_OK, "\n%s: Copied %u sectors. Done.\n", sim_uname (uptr), (uint32)total_sectors);
         else
@@ -3428,10 +3432,12 @@ if ((DK_GET_FMT (uptr) == DKUF_F_VHD) || (ctx->footer)) {
                 if (can_autosize) {
                     int32 saved_show_message = sim_show_message;
                     int32 saved_switches = sim_switches;
+                    uint32 saved_RO_flags = (uptr->flags & UNIT_RO);
 
                     snprintf (cmd, sizeof (cmd), "%s %s", sim_uname (uptr), container_dtype);
                     set_cmd (0, "NOMESSAGE");
                     r = set_cmd (0, cmd);
+                    uptr->flags |= saved_RO_flags;    /* While autosizing, retain the unit Read Only state */
                     sim_show_message = saved_show_message;
                     if (r != SCPE_OK) {
                         if (size_settable_drive_type != NULL) {
