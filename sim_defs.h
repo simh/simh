@@ -705,6 +705,8 @@ struct REG {
     size_t              obj_size;                       /* sizeof(*loc) */
     size_t              size;                           /* sizeof(**loc) or sizeof(*loc) if depth == 1 */
     const char          *macro;                         /* Initializer Macro Name */
+    const char          *source_file;                   /* source file used macro */
+    int                 source_line;                    /* source line used macro */
     /* NOTE: Flags and maxval MUST always be last since they are initialized outside of macro definitions */
     uint32              flags;                          /* flags */
     t_value             maxval;                         /* maximum value */
@@ -1019,7 +1021,7 @@ struct MEMFILE {
 
 /* Internal use ONLY (see below) Generic Register declaration for all fields */
 #define _RegCheck(nm,loc,rdx,wd,off,dep,desc,flds,qptr,siz,elesiz,macro) \
-    nm, (loc), (rdx), (wd), (off), (dep), (desc), (flds), (qptr), (siz), sizeof(*(loc)), (elesiz), #macro
+    nm, (loc), (rdx), (wd), (off), (dep), (desc), (flds), (qptr), (siz), sizeof(*(loc)), (elesiz), #macro, __FILE__, __LINE__
 
 /* Generic Register declaration for all fields.  
    If the register structure is extended, this macro will be retained and a 

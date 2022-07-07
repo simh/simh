@@ -16252,7 +16252,9 @@ for (i = 0; (dptr = devices[i]) != NULL; i++) {
             }
         if (arptr != NULL) {
             Bad = TRUE;
-            Mprintf (f, "\tThe %s DEVICE %d REGister entry has an identical name\n", dptr->name, amb_entry);
+            if (rptr->source_file != NULL)
+                Mprintf (f, "\tIn %s at line %d:\n", rptr->source_file, rptr->source_line);
+            Mprintf (f, "\tThe %s DEVICE's REGister entry #%d has an identical name\n", dptr->name, amb_entry + 1);
             Mprintf (f, "\ttherefore EXAMINE and SAVE operations will reference %u byte%s\n", bytes, (bytes != 1) ? "s" : "");
             Mprintf (f, "\tand DEPOSIT and RESTORE operations will affect %u byte%s of memory\n", bytes, (bytes != 1) ? "s" : "");
             Mprintf (f, "\tinconsistently.\n");
