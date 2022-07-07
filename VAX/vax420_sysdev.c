@@ -189,7 +189,7 @@ REG sysd_reg[] = {
     { HRDATAD (CONPC,  conpc,     32, "console PD") },
     { HRDATAD (CONPSL, conpsl,    32, "console PSL") },
     { HRDATAD (HLTCOD, ka_hltcod, 16, "KA420 halt code") },
-    { HRDATAD (MSER,   ka_mser,    8, "KA420 mem sys err") },
+    { HRDATAD (MSERKA, ka_mser,    8, "KA420 mem sys err") },
     { HRDATAD (MEAR,   ka_mear,    8, "KA420 mem err") },
     { HRDATAD (CFGTST, ka_cfgtst,  8, "KA420 config/test register") },
     { NULL }
