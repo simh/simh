@@ -25,7 +25,7 @@
 
    dk           7250/7251-7252 cartridge disk
 
-   02-Jul-2022  RMS     Fixed bugs in multi-unit operation
+   02-Jul-22    RMS     Fixed bugs in multi-unit operation
 
    Transfers are always done a sector at a time.
 */

@@ -25,7 +25,7 @@
 
    mt           7320 and 7322/7323 magnetic tape
 
-   02-Jul-2022  RMS     Fixed bugs in multi-unit operation
+   02-Jul-22    RMS     Fixed bugs in multi-unit operation
    07-Jun-22    RMS     Removed unused variables (V4)
    26-Mar-22    RMS     Added extra case points for new MTSE definitions
    23-Mar-20    RMS     Unload should call sim_tape_detach (Mark Pizzolato)

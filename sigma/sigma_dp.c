@@ -25,7 +25,7 @@
 
    dp           moving head disk pack controller
 
-   02-Jul-2022  RMS     Fixed bugs in multi-unit operation
+   02-Jul-22    RMS     Fixed bugs in multi-unit operation
    29-Jun-22    RMS     Fixed initialization errors in ctrl, seek units (Ken Rector)
    28-Jun-22    RMS     Fixed off-by-1 error in DP_SEEK definition (Ken Rector)
    07-Jun-22    RMS     Removed unused variables (V4)

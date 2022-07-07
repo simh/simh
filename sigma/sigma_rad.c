@@ -25,7 +25,7 @@
 
    rad          7211/7212 or 7231/7232 fixed head disk
 
-   02-Jul-2022  RMS     Fixed bugs in multi-unit operation
+   02-Jul-22    RMS     Fixed bugs in multi-unit operation
 
    The RAD is a head-per-track disk.  To minimize overhead, the entire RAD
    is buffered in memory.
@@ -337,7 +337,7 @@ switch (rad_cmd) {
             rad_flags |= RADV_WPE;                      /* set status */
             chan_uen (dva);                             /* uend */
             return SCPE_OK;
-            }                                           /* fall through */
+            }
         if (rad_inv_ad (&da)) {                         /* invalid addr? */
             chan_uen (dva);                             /* uend */
             return SCPE_OK;
