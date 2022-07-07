@@ -705,24 +705,48 @@ int Shift_Digits(t_int64 * d, int nDigits)
            
 */
 
-// load card file fn and add its cards to 
-// DeckImage array, up to a max of nMaxCards
-// increment nCards with the number of added cards
-// uses cdr0 device/unit
-t_stat deck_load(CONST char *fn, uint16 * DeckImage, int * nCards)
+/*
+ * Allocate space for a card deck of nCards cards.
+ */
+uint16 *deck_alloc(int nCards)
+{
+    return malloc(nCards * 80 * sizeof(uint16));
+}
+
+/*
+ * Free a deck previously obtained from deck_alloc().
+ */
+void deck_free(uint16 *deck)
+{
+    free(deck);
+}
+
+// Load card file fn and add its cards to
+// DeckImage array, up to a max of MAX_CARDS_IN_DECK.
+// If DeckImagePtr is NULL, allocates a deck (for now, fixed at
+// MAX_CARDS_IN_DECK, but there is potential to make this flexible
+// and reduce the size to actually used size).
+// Uses cdr0 device/unit.
+t_stat deck_load(CONST char *fn, uint16 ** DeckImagePtr, int * nCards)
 {
     UNIT *              uptr = &cdr_unit[0];
-    uint16 image[80];    
+    uint16 * DeckImage;
+    uint16 image[80];
     t_stat              r, r2;
     int i;
     uint16 c;
 
     // set flags for read only
-    uptr->flags |= UNIT_RO; 
+    uptr->flags |= UNIT_RO;
 
     // attach file to cdr unit 0
     r = (cdr_dev.attach)(uptr, fn);
     if (r != SCPE_OK) return r;
+
+    DeckImage = *DeckImagePtr;
+    if (!DeckImage) {
+        DeckImage = deck_alloc(MAX_CARDS_IN_DECK);
+    }
 
     // read all cards from file
     while (1) {
@@ -745,10 +769,17 @@ t_stat deck_load(CONST char *fn, uint16 * DeckImage, int * nCards)
         *nCards = *nCards + 1;
     }
 
+    *DeckImagePtr = DeckImage;
+
     // deattach file from cdr unit 0
     r2 = (cdr_dev.detach)(uptr);
-    if (r == SCPE_OK) r = r2; 
-    if (r != SCPE_OK) return r;
+    if (r == SCPE_OK) r = r2;
+    if (r != SCPE_OK) {
+        // Special case: allow caller to bail out without needing to free the deck.
+        deck_free(DeckImage);
+        *DeckImagePtr = NULL;
+        return r;
+    }
 
     return SCPE_OK;
 }
@@ -840,7 +871,7 @@ static t_stat deck_split_cmd(CONST char *cptr)
     int bSplit5CD = 0;
     int bSplitPAT = 0;
 
-    uint16 DeckImage[80 * MAX_CARDS_IN_DECK];
+    uint16 *DeckImage = NULL;
     int nCards, nCards1, tail; 
 
     while (sim_isspace (*cptr)) cptr++;                     // trim leading spc 
@@ -887,7 +918,7 @@ static t_stat deck_split_cmd(CONST char *cptr)
 
     // read source deck
     nCards = 0;
-    r = deck_load(fn0, DeckImage, &nCards);
+    r = deck_load(fn0, &DeckImage, &nCards);
     if (r != SCPE_OK) return sim_messagef (r, "Cannot read source deck (%s)\n", fn0);
 
     // calc nCards1 = cards in first deck
@@ -907,8 +938,8 @@ static t_stat deck_split_cmd(CONST char *cptr)
     
     if (bSplit5CD ) {
         // separate 5cd deck 
-        uint16 DeckImage1[80 * MAX_CARDS_IN_DECK];
-        uint16 DeckImage2[80 * MAX_CARDS_IN_DECK]; 
+        uint16 *DeckImage1 = deck_alloc(nCards);
+        uint16 *DeckImage2 = deck_alloc(nCards);
         int i, nc, nc1, nc2, bFound;
         uint16 hol;
 
@@ -947,11 +978,20 @@ static t_stat deck_split_cmd(CONST char *cptr)
                 nc2++;
             }
         }
+        // input deck is no longer needed
+        deck_free(DeckImage);
         // save output decks
         r = deck_save(fn1, DeckImage1, 0, nc1);
-        if (r != SCPE_OK) return sim_messagef (r, "Cannot write destination deck1 (%s)\n", fn0);
+        deck_free(DeckImage1);
+        if (r != SCPE_OK) {
+            deck_free(DeckImage2);
+            return sim_messagef (r, "Cannot write destination deck1 (%s)\n", fn1);
+        }
         r = deck_save(fn2, DeckImage2, 0, nc2);
-        if (r != SCPE_OK) return sim_messagef (r, "Cannot write destination deck2 (%s)\n", fn0);
+        deck_free(DeckImage2);
+        if (r != SCPE_OK) {
+            return sim_messagef (r, "Cannot write destination deck2 (%s)\n", fn2);
+        }
         if (nc2 == 0) remove(fn2);  // delete file2 if empty
         if ((sim_switches & SWMASK ('Q')) == 0) {
            sim_messagef (SCPE_OK, "Deck with 5 words-per-card splitted %d/%d cards\n", nc1, nc2);
@@ -961,8 +1001,8 @@ static t_stat deck_split_cmd(CONST char *cptr)
 
     if (bSplitPAT)  {
         // separate pat deck 
-        uint16 DeckImage1[80 * MAX_CARDS_IN_DECK];
-        uint16 DeckImage2[80 * MAX_CARDS_IN_DECK]; 
+        uint16 *DeckImage1 = deck_alloc(nCards);
+        uint16 *DeckImage2 = deck_alloc(nCards);
         int i, nc, nc1, nc2, bFound;
         uint16 hol;
 
@@ -990,24 +1030,39 @@ static t_stat deck_split_cmd(CONST char *cptr)
                 nc2++;
             }
         }
+        deck_free(DeckImage);
         // save output decks
         r = deck_save(fn1, DeckImage1, 0, nc1);
-        if (r != SCPE_OK) return sim_messagef (r, "Cannot write destination deck1 (%s)\n", fn0);
+        deck_free(DeckImage1);
+        if (r != SCPE_OK) {
+            deck_free(DeckImage2);
+            return sim_messagef (r, "Cannot write destination deck1 (%s)\n", fn1);
+        }
         r = deck_save(fn2, DeckImage2, 0, nc2);
-        if (r != SCPE_OK) return sim_messagef (r, "Cannot write destination deck2 (%s)\n", fn0);
+        deck_free(DeckImage2);
+        if (r != SCPE_OK) {
+            return sim_messagef (r, "Cannot write destination deck2 (%s)\n", fn2);
+        }
         if (nc2 == 0) remove(fn2);  // delete file2 if empty
         if ((sim_switches & SWMASK ('Q')) == 0) {
            sim_messagef (SCPE_OK, "Deck with availability-card splitted %d/%d cards\n", nc1, nc2);
         }
+
         return SCPE_OK;
     }
 
     // split based on card count
     r = deck_save(fn1, DeckImage, 0, nCards1);
-    if (r != SCPE_OK) return sim_messagef (r, "Cannot write destination deck1 (%s)\n", fn0);
+    if (r != SCPE_OK) {
+        deck_free(DeckImage);
+        return sim_messagef (r, "Cannot write destination deck1 (%s)\n", fn0);
+    }
 
     r = deck_save(fn2, DeckImage, nCards1, nCards-nCards1);
-    if (r != SCPE_OK) return sim_messagef (r, "Cannot write destination deck2 (%s)\n", fn0);
+    deck_free(DeckImage);
+    if (r != SCPE_OK) {
+        return sim_messagef (r, "Cannot write destination deck2 (%s)\n", fn0);
+    }
 
     if ((sim_switches & SWMASK ('Q')) == 0) {
         sim_messagef (SCPE_OK, "Deck splitted to %d/%d cards\n", nCards1, nCards-nCards1);
@@ -1026,7 +1081,7 @@ static t_stat deck_join_cmd(CONST char *cptr)
     char gbuf[4*CBUFSIZE];
     t_stat r;
 
-    uint16 DeckImage[80 * MAX_CARDS_IN_DECK];
+    uint16 *DeckImage = NULL;
     int i,nDeck, nCards, nCards1;
 
     cptr0 = cptr;
@@ -1047,7 +1102,6 @@ static t_stat deck_join_cmd(CONST char *cptr)
 
     cptr = cptr0;                                           // restore cptr to scan source filenames
     nDeck = nCards = 0;
-    memset(DeckImage, 0, sizeof(DeckImage));
     while (1) {
 
         while (sim_isspace (*cptr)) cptr++;                 // trim leading spc 
@@ -1057,7 +1111,7 @@ static t_stat deck_join_cmd(CONST char *cptr)
 
         // read source deck
         nCards1 = nCards;
-        r = deck_load(fnSrc, DeckImage, &nCards);
+        r = deck_load(fnSrc, &DeckImage, &nCards);
         if (r != SCPE_OK) return sim_messagef (r, "Cannot read source deck (%s)\n", fnSrc);
         nDeck++;
 
@@ -1066,6 +1120,7 @@ static t_stat deck_join_cmd(CONST char *cptr)
         }
     }
     r = deck_save(fnDest, DeckImage, 0, nCards);
+    deck_free(DeckImage);
     if (r != SCPE_OK) return sim_messagef (r, "Cannot write destination deck (%s)\n", fnDest);
 
     if ((sim_switches & SWMASK ('Q')) == 0) {
@@ -1081,7 +1136,7 @@ static t_stat deck_print_cmd(CONST char *cptr)
     char fn[4*CBUFSIZE];
     t_stat r;
 
-    uint16 DeckImage[80 * MAX_CARDS_IN_DECK];
+    uint16 *DeckImage = NULL;
     int nCards;
 
     while (sim_isspace (*cptr)) cptr++;                     // trim leading spc 
@@ -1091,7 +1146,7 @@ static t_stat deck_print_cmd(CONST char *cptr)
 
     // read deck to be printed (-1 to convert to ascii value, not hol)
     nCards = 0;
-    r = deck_load(fn, DeckImage, &nCards);
+    r = deck_load(fn, &DeckImage, &nCards);
     if (r != SCPE_OK) return sim_messagef (r, "Cannot read deck to print (%s)\n", fn);
 
     deck_print_echo(DeckImage, nCards, 1,1);
@@ -1099,6 +1154,8 @@ static t_stat deck_print_cmd(CONST char *cptr)
     if ((sim_switches & SWMASK ('Q')) == 0) {
         sim_messagef (SCPE_OK, "Printed Deck with %d cards (%s)\n", nCards, fn);
     }
+
+    deck_free(DeckImage);
     
     return SCPE_OK;
 }
@@ -1109,7 +1166,7 @@ static t_stat deck_echolast_cmd(CONST char *cptr)
     char gbuf[4*CBUFSIZE];
     t_stat r;
 
-    uint16 DeckImage[80 * MAX_CARDS_IN_DECK];
+    uint16 *DeckImage = NULL;
     int i,nc,nCards, ic, nh, ncdr;
 
     while (sim_isspace (*cptr)) cptr++;                     // trim leading spc 
@@ -1135,6 +1192,7 @@ static t_stat deck_echolast_cmd(CONST char *cptr)
 
     // get nCards form read card take hopper buffer
     // that is, print last nCards read
+    DeckImage = deck_alloc(nCards);
 
     // get last nCards cards, so
     // first card to echo is count ones before last one
@@ -1149,6 +1207,7 @@ static t_stat deck_echolast_cmd(CONST char *cptr)
     }
 
     deck_print_echo(DeckImage, nCards, 0,1);
+    deck_free(DeckImage);
 
     if ((sim_switches & SWMASK ('Q')) == 0) {
         sim_messagef (SCPE_OK, "Last %d cards from Read take Hopper\n", nCards);
