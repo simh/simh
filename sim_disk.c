@@ -3680,21 +3680,23 @@ if (container_size && (container_size != (t_offset)-1) &&
     char cmd[CBUFSIZE];
 
     if (!created && (ctx->footer == NULL) && (filesystem_size == (t_offset)-1)) {
-        sim_messagef (SCPE_OK, "%s: Amount of data in use in disk container '%s' cannot be determined, skipping autosizing\n", sim_uname (uptr), cptr);
-        if (container_size > current_unit_size) {
-            t_stat r = SCPE_FSSIZE;
-            char *capac1;
+        if (container_size != current_unit_size) {  /* container doesn't precisely matches unit size */
+            sim_messagef (SCPE_OK, "%s: Amount of data in use in disk container '%s' cannot be determined, skipping autosizing\n", sim_uname (uptr), cptr);
+            if (container_size > current_unit_size) {
+                t_stat r = SCPE_FSSIZE;
+                char *capac1;
 
-            uptr->capac = (t_addr)(container_size/(ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? ctx->sector_size : 1)));
-            capac1 = strdup (sprint_capac (dptr, uptr));
-            uptr->capac = saved_capac;
-            r = sim_messagef (r, "%s: The disk container '%s' is larger than simulated device (%s > %s)\n", 
-                                sim_uname (uptr), cptr, capac1, sprint_capac (dptr, uptr));
-            free (capac1);
-            sim_disk_detach (uptr);
-            return r;
+                uptr->capac = (t_addr)(container_size/(ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? ctx->sector_size : 1)));
+                capac1 = strdup (sprint_capac (dptr, uptr));
+                uptr->capac = saved_capac;
+                r = sim_messagef (r, "%s: The disk container '%s' is larger than simulated device (%s > %s)\n", 
+                                    sim_uname (uptr), cptr, capac1, sprint_capac (dptr, uptr));
+                free (capac1);
+                sim_disk_detach (uptr);
+                return r;
+                }
             }
-        /* Fall through and skip autosizing for a container we can't determine anything about */
+        /* Fall through and skip autosizing for a container we can't determine anything about but happens to be the same size as the unit */
         }
     else {      /* Active autosizing */
         /* Prefer capacity change over drive type change for the same drive type container */
@@ -3847,7 +3849,9 @@ if ((uptr->flags & UNIT_RO) == 0) {     /* Opened Read/Write? */
         }
     sim_quiet = saved_quiet;
     }
-if (dtype && (created || (autosized && (ctx->footer == NULL))))
+if (dtype && (created                                                       || 
+              (autosized && (ctx->footer == NULL))                          || 
+              (!created && (ctx->container_size == 0) && (ctx->footer == NULL))))
     store_disk_footer (uptr, (uptr->drvtyp == NULL) ? dtype : uptr->drvtyp->name);
 
 #if defined (SIM_ASYNCH_IO)
