@@ -118,6 +118,7 @@
 112. DK: device address must include unit identifier everywhere, for interrupt generation.
 113. MT: device address must include unit identifier everywhere, for interrupt generation.
 114: RAD: device address must include unit identifier everywhere, for interrupt generation.
+115. MT: error handling not consistent.
 
 
 Diagnostic Notes

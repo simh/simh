@@ -25,6 +25,7 @@
 
    mt           7320 and 7322/7323 magnetic tape
 
+   03-Jul-22    RMS     Fixed error in handling of channel errors (Ken Rector)
    02-Jul-22    RMS     Fixed bugs in multi-unit operation
    07-Jun-22    RMS     Removed unused variables (V4)
    26-Mar-22    RMS     Added extra case points for new MTSE definitions
@@ -276,7 +277,20 @@ switch (op) {                                           /* case on op */
 return 0;
 }
 
-/* Unit service - reconstruct full unit address at entry */
+/* Unit service
+
+   1. The full unit address must be reconstructed at entry, for use in interrupt/error routines
+   2. The magtape error library returns status code 'r' that overlaps SCP error codes. mt_map_err
+      translates/acts upon these code and returns 'st'. This can incude channel error codes,
+      so mt_chan_err finally resolves the errors to machine-specific actions (UEND) or an
+      error code to return to SCP.
+   3. Channel routines always return channel error codes and must invoke mt_chan_err.
+   4. Tape mark can be encountered on any read or space command. Except for space file,
+      it is treated as an error and causes a UEND.
+
+   The macro CHS_IFERR is TRUE if the error code is a channel error or a fatal SCP error
+   and FALSE if the error code is a chennel information code or 0.
+*/
 
 t_stat mtu_svc (UNIT *uptr)
 {
@@ -284,14 +298,13 @@ uint32 cmd = uptr->UCMD;
 uint32 un = uptr - mt_unit;
 uint32 dva = mt_dib.dva | un;
 uint32 c;
-uint32 st;
 int32 t;
 t_mtrlnt tbc;
-t_stat r;
+t_stat r, st;
 
 if (cmd == MCM_INIT) {                                  /* init state */
     if ((t = sim_activate_time (uptr + MT_REW)) != 0) { /* rewinding? */
-        sim_activate (uptr, t);                         /* retry later */
+        sim_activate (uptr, t);                         /* retry when done */
         return SCPE_OK;
         }
     st = chan_get_cmd (dva, &cmd);                      /* get command */
@@ -342,58 +355,75 @@ if ((mt_op[cmd] & O_WRE) &&                             /* write op and */
     return SCPE_OK;
     }
 
-r = SCPE_OK;
 switch (cmd) {                                          /* case on command */
 
     case MCM_SFWR:                                      /* space forward */
-        if ((r = sim_tape_sprecf (uptr, &tbc)))         /* spc rec fwd, err? */
-            r = mt_map_err (uptr, r);                   /* map error */
+        if ((r = sim_tape_sprecf (uptr, &tbc))) {       /* spc rec fwd, err? */
+            st = mt_map_err (uptr, r);                  /* map error */
+            if (CHS_IFERR (st))                         /* chan or SCP err? */
+                return mt_chan_err (dva, st);           /* uend and stop */
+            }
         break;
 
     case MCM_SBKR:                                      /* space reverse */
-        if ((r = sim_tape_sprecr (uptr, &tbc)))         /* spc rec rev, err? */
-            r = mt_map_err (uptr, r);                   /* map error */
+        if ((r = sim_tape_sprecr (uptr, &tbc))) {       /* spc rec rev, err? */
+            st = mt_map_err (uptr, r);                  /* map error */
+            if (CHS_IFERR (st))                         /* chan or SCP err? */
+                return mt_chan_err (dva, st);           /* uend and stop */
+            }
         break;
 
     case MCM_SFWF:                                      /* space fwd file */
         while ((r = sim_tape_sprecf (uptr, &tbc)) == MTSE_OK) ;
-        if (r != MTSE_TMK)                              /* stopped by tmk? */
-            r = mt_map_err (uptr, r);                   /* no, map error */
-        else r = SCPE_OK;
+        if (r != MTSE_TMK) {                            /* no tmk? */
+            st = mt_map_err (uptr, r);                  /* map error */
+            if (CHS_IFERR (st))                         /* chan or SCP err? */
+                return mt_chan_err (dva, st);           /* uend and stop */
+            }
         break;
 
     case MCM_SBKF:                                       /* space rev file */
         while ((r = sim_tape_sprecr (uptr, &tbc)) == MTSE_OK) ;
-        if (r != MTSE_TMK)                              /* stopped by tmk? */
-            r = mt_map_err (uptr, r);                   /* no, map error */
-        else r = SCPE_OK;
+        if (r != MTSE_TMK) {                            /* no tmk? */
+            st = mt_map_err (uptr, r);                  /* map error */
+            if (CHS_IFERR (st))                         /* chan or SCP err? */
+                return mt_chan_err (dva, st);           /* uend and stop */
+            }
         break;
 
     case MCM_WTM:                                       /* write eof */
-        if ((r = sim_tape_wrtmk (uptr)))                /* write tmk, err? */
-            r = mt_map_err (uptr, r);                   /* map error */
+        if ((r = sim_tape_wrtmk (uptr))) {              /* write tmk, err? */
+            st = mt_map_err (uptr, r);                  /* map error */
+            if (CHS_IFERR (st))                         /* chan or SCP err? */
+                return mt_chan_err (dva, st);           /* uend and stop */
+            }
         uptr->UST |= MTDV_EOF;                          /* set eof */
         break;
 
     case MCM_RWU:                                       /* rewind unload */
-        r = sim_tape_detach (uptr);
+        sim_tape_detach (uptr);                         /* detach tape */
         break;
 
     case MCM_REW:                                       /* rewind */
     case MCM_RWI:                                       /* rewind and int */
-        if ((r = sim_tape_rewind (uptr)))               /* rewind */
-            r = mt_map_err (uptr, r);                   /* map error */
+        if ((r = sim_tape_rewind (uptr))) {             /* rewind */
+            st = mt_map_err (uptr, r);                  /* map error */
+            if (CHS_IFERR (st))                         /* chan or SCP err? */
+                return mt_chan_err (dva, st);           /* uend and stop */
+            }
         mt_unit[un + MT_REW].UCMD = uptr->UCMD;         /* copy command */
         sim_activate (uptr + MT_REW, mt_rwtime);        /* sched compl */
         break;
 
     case MCM_READ:                                      /* read */
         if (mt_blim == 0) {                             /* first read? */
-            r = sim_tape_rdrecf (uptr, mt_xb, &mt_blim, MT_MAXFR);
-            if (r != MTSE_OK) {                         /* tape error? */
-                r = mt_map_err (uptr, r);               /* map error */
-                break;
+            if ((r = sim_tape_rdrecf (uptr, mt_xb, &mt_blim, MT_MAXFR))) {
+                st = mt_map_err (uptr, r);              /* map error */
+                if (CHS_IFERR (st))                     /* chan or SCP err? */
+                    return mt_chan_err (dva, st);       /* uend and stop */
                 }
+            if (mt_blim == 0)                           /* no data? */
+                return mt_chan_err (dva, SCPE_IERR);    /* should NOT happen */
             mt_bptr = 0;                                /* init rec ptr */
             }
         c = mt_xb[mt_bptr++];                           /* get char */
@@ -411,11 +441,13 @@ switch (cmd) {                                          /* case on command */
 
     case MCM_RDBK:                                      /* read reverse */
         if (mt_blim == 0) {                             /* first read? */
-            r = sim_tape_rdrecr (uptr, mt_xb, &mt_blim, MT_MAXFR);
-            if (r != MTSE_OK) {                         /* tape error? */
-                r = mt_map_err (uptr, r);               /* map error */
-                break;
+            if ((r = sim_tape_rdrecr (uptr, mt_xb, &mt_blim, MT_MAXFR))) {
+                st = mt_map_err (uptr, r);              /* map error */
+                if (CHS_IFERR (st))                     /* chan or SCP err? */
+                    return mt_chan_err (dva, st);       /* uend and stop */
                 }
+            if (mt_blim == 0)                           /* no data? */
+                return mt_chan_err (dva, SCPE_IERR);    /* should NOT happen */
             mt_bptr = mt_blim;                          /* init rec ptr */
             }
         c = mt_xb[--mt_bptr];                           /* get char */
@@ -442,12 +474,14 @@ switch (cmd) {                                          /* case on command */
              sim_activate (uptr, mt_time);              /* continue thread */
              return SCPE_OK;
              }
-        r = mt_flush_buf (uptr);                        /* flush buffer */
+        if (r = mt_flush_buf (uptr)) {                  /* flush buffer */
+            st = mt_map_err (uptr, r);                  /* map error */
+            if (CHS_IFERR (st))                         /* chan or SCP err? */
+                return mt_chan_err (dva, st);           /* uend and stop */
+            }
         break;
         }
 
-if (r != SCPE_OK)                                       /* error? abort */
-    return CHS_IFERR(r)? SCPE_OK: r;
 uptr->UCMD = MCM_END;                                   /* end state */
 sim_activate (uptr, mt_ctime);                          /* sched ctlr */
 return SCPE_OK;
@@ -467,16 +501,12 @@ return SCPE_OK;
 
 t_stat mt_flush_buf (UNIT *uptr)
 {
-t_stat st;
-
 if (mt_blim == 0)                                       /* any output? */
     return SCPE_OK;
-if ((st = sim_tape_wrrecf (uptr, mt_xb, mt_blim)))      /* write, err? */
-    return mt_map_err (uptr, st);                       /* map error */
-return SCPE_OK;
+return sim_tape_wrrecf (uptr, mt_xb, mt_blim);          /* write, err? */
 }
 
-/* Map tape error status - returns chan error or SCP status */
+/* Map tape error status - returns channel inactive, SCPE_OK, or SCP error */
 
 t_stat mt_map_err (UNIT *uptr, t_stat st)
 {
@@ -491,34 +521,29 @@ switch (st) {
     default:                                            /* unknown error*/
         chan_set_chf (dva, CHF_XMME);                   /* set err, fall through */
     case MTSE_OK:                                       /* no error */
-        chan_uen (dva);                                 /* uend */
         return SCPE_IERR;
 
     case MTSE_TMK:                                      /* end of file */
+    case MTSE_EOM:                                      /* end of medium */
         uptr->UST |= MTDV_EOF;                          /* set eof flag */
-        chan_uen (dva);                                 /* uend */
         return CHS_INACTV;
 
     case MTSE_IOERR:                                    /* IO error */
         uptr->UST |= MTDV_DTE;                          /* set DTE flag */
         chan_set_chf (dva, CHF_XMDE);
-        chan_uen (dva);                                 /* uend */
         return SCPE_IOERR;
 
     case MTSE_INVRL:                                    /* invalid rec lnt */
         uptr->UST |= MTDV_DTE;                          /* set DTE flag */
         chan_set_chf (dva, CHF_XMDE);
-        chan_uen (dva);                                 /* uend */
         return SCPE_MTRLNT;
 
     case MTSE_RECE:                                     /* record in error */
-    case MTSE_EOM:                                      /* end of medium */
         uptr->UST |= MTDV_DTE;                          /* set DTE flag */
         return chan_set_chf (dva, CHF_XMDE);            /* possible error */
 
     case MTSE_BOT:                                      /* reverse into BOT */
         uptr->UST |= MTDV_BOT;                          /* set BOT */
-        chan_uen (dva);                                 /* uend */
         return CHS_INACTV;
         }                                               /* end switch */
 
