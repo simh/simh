@@ -1101,6 +1101,14 @@ struct MEMFILE {
     _RegCheck(#nm,&(loc),rdx,wd,off,dep,desc,NULL,0,sizeof(UNIT),sizeof((loc)),URDATAD),(fl)
 #define URDATADF(nm,loc,rdx,wd,off,dep,fl,desc,flds) \
     _RegCheck(#nm,&(loc),rdx,wd,off,dep,desc,flds,0,sizeof(UNIT),sizeof((loc)),URDATADF),(fl)
+/* Arrayed register whose data is a field in a structure */
+#define SRDATA(nm,aloc,floc,rdx,wd,off,dep) \
+    _RegCheck(#nm,&((aloc)->floc),(rdx),(wd),(off),(dep),NULL,NULL,0,sizeof(*(&aloc)),sizeof((aloc)->floc),SRDATA)
+#define SRDATAD(nm,aloc,floc,rdx,wd,off,dep,desc) \
+    _RegCheck(#nm,&((aloc)->floc),(rdx),(wd),(off),(dep),desc,NULL,0,sizeof(*(&aloc)),sizeof((aloc)->floc),SRDATAD)
+#define SRDATADF(nm,aloc,floc,rdx,wd,off,dep,desc,flds) \
+    _RegCheck(#nm,&((aloc)->floc),(rdx),(wd),(off),(dep),desc,flds,0,sizeof(*(&aloc)),sizeof((aloc)->floc),SRDATADF)
+
 /* Arrayed register whose data is part of an arbitrary structure */
 #define STRDATA(nm,loc,rdx,wd,off,dep,siz,fl) \
     _RegCheck(#nm,&(loc),rdx,wd,off,dep,NULL,NULL,0,siz,sizeof((loc)),STRDATA),(fl)
