@@ -16252,8 +16252,6 @@ for (i = 0; (dptr = devices[i]) != NULL; i++) {
             }
         if (arptr != NULL) {
             Bad = TRUE;
-            if (rptr->source_file != NULL)
-                Mprintf (f, "\tIn %s at line %d:\n", rptr->source_file, rptr->source_line);
             Mprintf (f, "\tThe %s DEVICE's REGister entry #%d has an identical name\n", dptr->name, amb_entry + 1);
             Mprintf (f, "\ttherefore EXAMINE and SAVE operations will reference %u byte%s\n", bytes, (bytes != 1) ? "s" : "");
             Mprintf (f, "\tand DEPOSIT and RESTORE operations will affect %u byte%s of memory\n", bytes, (bytes != 1) ? "s" : "");
@@ -16307,6 +16305,8 @@ for (i = 0; (dptr = devices[i]) != NULL; i++) {
                 }
             }
         if (Bad) {
+            if (rptr->source_file != NULL)
+                fprintf (stdout, "In %s at line %d:\n", rptr->source_file, rptr->source_line);
             FMwrite (stdout, f);
             stat = SCPE_IERR;
             }
