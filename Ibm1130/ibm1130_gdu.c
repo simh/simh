@@ -87,7 +87,7 @@ REG gdu_reg[] = {
     { HRDATA (GDUFKEY,  gdu_fkey,       16) },              /* function keyboard register */
     { HRDATA (GDUAKEY,  gdu_akey,       16) },              /* alphanumeric keyboard register */
     { HRDATA (GDUREVERT,gdu_revert,     16) },              /* revert address register */
-    { HRDATA (GDUAKEY,  gdu_indicators, 32) },              /* programmed indicators */
+    { HRDATA (GDUIND,   gdu_indicators, 32) },              /* programmed indicators */
     { DRDATA (GDUTHRESH,gdu_threshold,  32) },              /* mouse closeness threshhold */
     { DRDATA (GDURATE,  gdu_rate,       32) },              /* refresh rate in frames/sec */
     { NULL }  };
