@@ -1129,12 +1129,14 @@ static const char simh_help1[] =
       "5Removing Breakpoints\n"
       " Breakpoints can be cleared by the NOBREAK or the SET NOBREAK commands.\n"
       "5Examples\n"
-      "++BREAK                      set E break at current PC\n"
-      "++BREAK -e 200               set E break at 200\n"
-      "++BREAK 2000/2[2]            set E breaks at 2000,2001 with count = 2\n"
-      "++BREAK 100;EX AC;D MQ 0     set E break at 100 with actions EX AC and\n"
-      "+++++++++D MQ 0\n"
-      "++BREAK 100;                 delete action on break at 100\n\n"
+      "++BREAK                       set E break at current PC\n"
+      "++BREAK -e 200                set E break at 200\n"
+      "++BREAK 2000/2[2]             set E breaks at 2000,2001 with count = 2\n"
+      "++BREAK 100;EX AC;D MQ 0      set E break at 100 with actions EX AC\n"
+      "+++++++++and D MQ 0\n"
+      "++BREAK 100;                  delete action on break at 100\n"
+      "++HELP CPU BREAK              display the breakpoint types supported\n"
+      "+++++++++by the CPU device\n\n"
        /***************** 80 character line width template *************************/
 #define HLP_DEBUG       "*Commands Stopping_The_Simulator User_Specified_Stop_Conditions DEBUG"
 #define HLP_NODEBUG     "*Commands Stopping_The_Simulator User_Specified_Stop_Conditions DEBUG"
@@ -3722,6 +3724,11 @@ while (brkt->btyp) {
     ++brkt;
     }
 fprintf (st, "The default breakpoint type is: %s\n", put_switches (gbuf, sizeof(gbuf), sim_brk_dflt));
+}
+
+void fprint_brk_help (FILE *st, DEVICE *dptr)
+{
+fprint_brk_help_ex (st, dptr, TRUE);
 }
 
 t_stat help_dev_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
