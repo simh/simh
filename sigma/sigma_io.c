@@ -1,6 +1,6 @@
 /* sigma_io.c: XDS Sigma IO simulator
 
-   Copyright (c) 2007-2020, Robert M Supnik
+   Copyright (c) 2007-2022, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   07-Jul-2022  RMS     Fixed dangling else in read/write direct (Ken Rector)
    05-Mar-2020  RMS     Fixed s5x0_ireg size declaration (Mark Pizzolato)
    09-Mar-2017  RMS     Fixed unspecified return value in HIO (COVERITY)
 */
@@ -1109,13 +1110,15 @@ uint32 i, beg, end, mask, sc;
 uint32 grp = DIO_GET1GRP (ad);
 uint32 fnc = DIO_GET1FNC (ad);
 
+if (grp == 1)                                           /* group 1? */
+    return 0;                                           /* not there */
 if (grp == 0) {                                         /* overrides? */
     beg = INTG_OVR;
     end = INTG_IO;
     }
-else if (grp == 1)                                      /* group 1? */
-    return 0;                                           /* not there */
-else beg = end = grp + 1;
+else {                                                  /* all others */
+    beg = end = grp + 1;
+    }
 
 if (op == OP_RD) {                                      /* read direct? */
     if (!QCPU_S89_5X0)                                  /* S89, 5X0 only */
