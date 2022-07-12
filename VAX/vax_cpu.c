@@ -4019,14 +4019,14 @@ fprintf (st, "   sim> SHOW CPU INSTRUCTIONS     display the instructoin groups t
 fprintf (st, "                                  implemented and emulated\n");
 fprintf (st, "   sim> SHOW CPU -V INSTRUCTIONS  disable the list of instructions implemented\n");
 fprintf (st, "                                  and emulated\n\n");
-fprintf (st, "I/O Device Addressing\n\n");
 if (bus) {
+    fprintf (st, "I/O Device Addressing\n\n");
     fprintf (st, "%s I/O space and vector space are not large enough to allow all\n", (strcmp (bus->name, "QBA") == 0) ? "Qbus" : "Unibus");
     fprintf (st, "theoretically possible devices to be configured simultaneously at\n");
     fprintf (st, "fixed addresses.  Instead, many devices have floating addresses and\n");
     fprintf (st, "vectors; that is, the assigned device address and vector depend on the\n");
     fprintf (st, "presence of other devices in the configuration:\n\n");
-    fprintf (st, "       DZ11           all instances have floating addresses\n");
+    fprintf (st, "       DZ11/DZV11     all instances have floating addresses\n");
     fprintf (st, "       DHU11/DHQ11    all instances have floating addresses\n");
     fprintf (st, "       RL11           first instance has fixed address, rest floating\n");
     fprintf (st, "       RX11/RX211     first instance has fixed address, rest floating\n");
@@ -4060,7 +4060,8 @@ if (bus) {
     fprintf (st, "Addresses that have set by autoconfiguration in floating address space are\n");
     fprintf (st, "marked with an asterisk (*).\n\n");
     fprintf (st, "All devices support the SHOW <device> ADDRESS and SHOW <device> VECTOR\n");
-    fprintf (st, "commands, which display the device address and vector, respectively.\n\n");
+    fprintf (st, "commands, which display the device address and vector, respectively.\n");
     }
+fprint_brk_help (st, dptr);
 return SCPE_OK;
 }

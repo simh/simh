@@ -3754,7 +3754,7 @@ fprintf (st, "theoretically possible devices to be configured simultaneously at\
 fprintf (st, "fixed addresses.  Instead, many devices have floating addresses and\n");
 fprintf (st, "vectors; that is, the assigned device address and vector depend on the\n");
 fprintf (st, "presence of other devices in the configuration:\n\n");
-fprintf (st, "       DZ11           all instances have floating addresses\n");
+fprintf (st, "       DZ11/DZV11     all instances have floating addresses\n");
 fprintf (st, "       DHU11/DHQ11    all instances have floating addresses\n");
 fprintf (st, "       RL11           first instance has fixed address, rest floating\n");
 fprintf (st, "       RX11/RX211     first instance has fixed address, rest floating\n");
@@ -3786,6 +3786,7 @@ fprintf (st, "be restored for the entire system with the SET CPU AUTOCONFIGURE c
 fprintf (st, "The current I/O map can be displayed with the SHOW CPU IOSPACE command.\n");
 fprintf (st, "Addresses that have set by autoconfiguration are marked with an asterisk (*).\n");
 fprintf (st, "All devices support the SHOW <device> ADDRESS and SHOW <device> VECTOR\n");
-fprintf (st, "commands, which display the device address and vector, respectively.\n\n");
+fprintf (st, "commands, which display the device address and vector, respectively.\n");
+fprint_brk_help (st, dptr);
 return SCPE_OK;
 }
