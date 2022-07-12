@@ -120,6 +120,7 @@
 114: RAD: device address must include unit identifier everywhere, for interrupt generation.
 115. MT: error handling not consistent.
 116: IO: dangling else in write direct mode 1 code causes incorrect behavior.
+117: CPU: sim_interval is decremented before breakpoint test, which is incorrect.
 
 
 Diagnostic Notes
