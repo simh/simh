@@ -1,6 +1,6 @@
 /* id_idc.c: Interdata MSM/IDC disk controller simulator
 
-   Copyright (c) 2001-2008, Robert M. Supnik
+   Copyright (c) 2001-2022, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    idc          MSM/IDC disk controller
 
+   12-Jul-22    RMS     Fixed duplicate register names (Mark Pizzolato)
    03-Apr-06    RMS     Fixed WD/WH handling (Davis Johnson)
    30-Mar-06    RMS     Fixed bug, nop command should be ignored (Davis Johnson)
    25-Apr-03    RMS     Revised for extended file support
@@ -256,10 +257,10 @@ UNIT idc_unit[] = {
 
 REG idc_reg[] = {
     { HRDATA (STA, idc_sta, 8) },
-    { HRDATA (BUF, idc_db, 8) },
+    { HRDATA (BUFC, idc_db, 8) },
     { HRDATA (SEC, idc_sec, 8) },
     { HRDATA (HCYL, idc_hcyl, 16) },
-    { HRDATA (BUF, idd_db, 8) },
+    { HRDATA (BUFD, idd_db, 8) },
     { HRDATA (SVUN, idc_svun, 2), REG_HIDDEN },
     { BRDATA (DBUF, idcxb, 16, 8, IDC_NUMBY * 3) },
     { HRDATA (DBPTR, idc_bptr, 10), REG_RO },
