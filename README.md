@@ -64,6 +64,7 @@ All Simulator updates on Open SIMH will be present in this repository, and any c
 - Display current NOAUTOSIZE status in SHOW VERSION output.
 - Extend logical name support to include optional unique names for units as well as devices.
 - Add extended register sanity checks including duplicate name detection.  Fixed simulator devices with duplicate register names.
+- Simulators with video devices that may be enabled, no longer disable the screen saver until the video display is presented.
 
 #### Changes to the PDP-11 and VAX simulators
 
@@ -78,6 +79,7 @@ All Simulator updates on Open SIMH will be present in this repository, and any c
 - VHD disk formats are available on all disk types (including floppy or DECtape devices).
 - Properly size RY drives which also don't have DEC144
 - Properly name RQ extended units beyond the initial default units.
+- HELP CPU shows supported breakpoint types.
 
 ### Updates to the Unibus DUP & Qbus DPV device by Trevor Warwick
 
