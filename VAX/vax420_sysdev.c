@@ -1111,7 +1111,7 @@ if (MATCH_CMD(gbuf, "MICROVAX") == 0) {
 #else   /* VAX_41D */
     strcpy (sim_name, "MicroVAX 3100 M10e/M20e (KA41-D)");
 #endif
-    reset_all (0);                                       /* reset everything */
+    reset_all_p (0);                                     /* powerup reset everything */
     }
 else if (MATCH_CMD(gbuf, "VAXSERVER") == 0) {
     sys_model = 1;
@@ -1120,7 +1120,7 @@ else if (MATCH_CMD(gbuf, "VAXSERVER") == 0) {
 #else   /* VAX_41D */
     strcpy (sim_name, "VAXserver 3100 M10e/M20e (KA41-D)");
 #endif
-    reset_all (0);                                       /* reset everything */
+    reset_all_p (0);                                     /* powerup reset everything */
     }
 else
     return SCPE_ARG;
@@ -1141,7 +1141,7 @@ if ((MATCH_CMD(gbuf, "VAXSERVER") == 0) ||
 #else   /* VAX_42B */
     strcpy (sim_name, "VAXserver 3100 M38 (KA42-B)");
 #endif
-    reset_all (0);                                       /* reset everything */
+    reset_all_p (0);                                     /* powerup reset everything */
     }
 else if (MATCH_CMD(gbuf, "VAXSTATION") == 0) {
 #if defined (USE_SIM_VIDEO) && defined (HAVE_LIBSDL)
@@ -1156,7 +1156,7 @@ else if (MATCH_CMD(gbuf, "VAXSTATION") == 0) {
 #else   /* VAX_42B */
     strcpy (sim_name, "VAXstation 3100 M38 (KA42-B)");
 #endif
-    reset_all (0);                                       /* reset everything */
+    reset_all_p (0);                                     /* powerup reset everything */
 #else
     return sim_messagef (SCPE_ARG, "Simulator built without Graphic Device Support\n");
 #endif
@@ -1174,7 +1174,7 @@ else if (MATCH_CMD(gbuf, "VAXSTATIONGPX") == 0) {
 #else   /* VAX_42B */
     strcpy (sim_name, "VAXstation 3100 M38/GPX (KA42-B)");
 #endif
-    reset_all (0);                                       /* reset everything */
+    reset_all_p (0);                                     /* powerup reset everything */
 #else
     return sim_messagef (SCPE_ARG, "Simulator built without Graphic Device Support\n");
 #endif
@@ -1192,7 +1192,7 @@ else if (MATCH_CMD(gbuf, "VAXSTATIONSPX") == 0) {
 #else   /* VAX_42B */
     strcpy (sim_name, "VAXstation 3100 M38/SPX (KA42-B)");
 #endif
-    reset_all (0);                                       /* reset everything */
+    reset_all_p (0);                                     /* powerup reset everything */
 #else
     return sim_messagef (SCPE_ARG, "Simulator built without Graphic Device Support\n");
 #endif

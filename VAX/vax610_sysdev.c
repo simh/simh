@@ -553,7 +553,7 @@ if (MATCH_CMD(gbuf, "MICROVAX") == 0) {
     vs_dev.flags = vs_dev.flags | DEV_DIS;               /* disable mouse */
 #endif
     strcpy (sim_name, "MicroVAX I (KA610)");
-    reset_all (0);                                       /* reset everything */
+    reset_all_p (0);                                     /* powerup reset everything */
     }
 else if (MATCH_CMD(gbuf, "VAXSTATION") == 0) {
 #if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
@@ -562,7 +562,7 @@ else if (MATCH_CMD(gbuf, "VAXSTATION") == 0) {
     lk_dev.flags = lk_dev.flags & ~DEV_DIS;              /* enable keyboard */
     vs_dev.flags = vs_dev.flags & ~DEV_DIS;              /* enable mouse */
     strcpy (sim_name, "VAXstation I (KA610)");
-    reset_all (0);                                       /* reset everything */
+    reset_all_p (0);                                     /* powerup reset everything */
 #else
     return sim_messagef(SCPE_ARG, "Simulator built without Graphic Device Support\n");
 #endif
