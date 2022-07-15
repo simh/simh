@@ -685,7 +685,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
         ifeq (/opt/local/bin/port,$(shell which port))
           $(info *** Info *** Install the MacPorts libSDL2 package to provide this)
           $(info *** Info *** functionality for your OS X system:)
-          $(info *** Info ***       # port install libsdl2 libpng zlib)
+          $(info *** Info ***       # port install libsdl2 libpng zlib pcre)
         endif
         ifeq (/usr/local/bin/brew,$(shell which brew))
           ifeq (/opt/local/bin/port,$(shell which port))
@@ -695,7 +695,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
           endif
           $(info *** Info *** Install the HomeBrew libSDL2 package to provide this)
           $(info *** Info *** functionality for your OS X system:)
-          $(info *** Info ***       $$ brew install sdl2 libpng zlib)
+          $(info *** Info ***       $$ brew install sdl2 libpng zlib pcre)
         else
           ifeq (,$(shell which port))
             $(info *** Info *** Install MacPorts or HomeBrew and rerun this make for)

@@ -577,17 +577,13 @@ functionality.
 
 The MacPorts package manager is available to provide these external packages.  Once MacPorts is installed, these commands will install the required dependent packages:
 
-    # port install vde2
-    # port install libsdl2
-    # port install libsdl2_ttf
-    # port install libpng
-    # port install zlib
+    # port install vde2 libsdl2 libsdl2_ttf libpng zlib pcre
 
 OR
 
 The HomeBrew package manager can be used to provide these packages:
 
-    $ brew install vde sdl2 sdl2_ttf libpng zlib
+    $ brew install vde sdl2 sdl2_ttf libpng zlib pcre
 
 ###### Linux - Dependencies
 
@@ -595,11 +591,7 @@ Different Linux distributions have different package management systems:
 
 Ubuntu:
 
-    # apt-get install libpcap-dev
-    # apt-get install libpcre3-dev
-    # apt-get install vde2
-    # apt-get install libsdl2-dev
-    # apt-get install libsdl2_ttf-dev
+    # apt-get install libpcap-dev libpcre3-dev vde2 libsdl2-dev libsdl2_ttf-dev
 
 #### Windows
 
