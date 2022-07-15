@@ -29,7 +29,7 @@ rem
 rem Everything implicitly requires BUILD to also be set to have 
 rem any meaning, it always gets set.
 set _X_BUILD=BUILD
-set _X_REQUIRED_WINDOWS_BUILD=20220119
+set _X_REQUIRED_WINDOWS_BUILD=20220714
 call :FindVCVersion _VC_VER
 
 set _PDB=%~dpn1.pdb
