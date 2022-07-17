@@ -579,10 +579,12 @@ if (!sim_is_running) {                                  /* RESET (not IORESET)? 
     tmr_poll = t;                                       /* set tmr poll */
     tmxr_poll = t * TMXR_MULT;                          /* set mux poll */
     }
-if (clk_unit.filebuf == NULL) {                         /* make sure the TODR is initialized */
-    clk_unit.filebuf = calloc(sizeof(TOY), 1);
+if ((clk_unit.filebuf == NULL) ||                       /* make sure the TODR is initialized */
+    (sim_switches & SWMASK ('P'))) {
+    clk_unit.filebuf = realloc(clk_unit.filebuf, sizeof(TOY));
     if (clk_unit.filebuf == NULL)
         return SCPE_MEM;
+    memset (clk_unit.filebuf, 0, sizeof(TOY));
     todr_resync ();
     }
 return SCPE_OK;

@@ -767,10 +767,12 @@ else
 
 t_stat clk_reset (DEVICE *dptr)
 {
-if (clk_unit.filebuf == NULL) {                         /* make sure the TODR is initialized */
-    clk_unit.filebuf = calloc(sizeof(TOY), 1);
+if ((clk_unit.filebuf == NULL) ||                       /* make sure the TODR is initialized */
+    (sim_switches & SWMASK ('P'))) {
+    clk_unit.filebuf = realloc(clk_unit.filebuf, sizeof(TOY));
     if (clk_unit.filebuf == NULL)
         return SCPE_MEM;
+    memset (clk_unit.filebuf, 0, sizeof(TOY));
     }
 todr_resync ();
 if (clk_unit.flags & UNIT_ATT)              /* battery backup hooked up? */
