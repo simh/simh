@@ -13905,7 +13905,7 @@ char pc_s[MAX_WIDTH + 33] = "";
 struct timespec time_now;
 
 if (sim_deb_switches & (SWMASK ('T') | SWMASK ('R') | SWMASK ('A'))) {
-    sim_rtcn_get_time(&time_now, 0);
+    sim_rtcn_debug_time(&time_now);
     if (sim_deb_switches & SWMASK ('R'))
         sim_timespec_diff (&time_now, &time_now, &sim_deb_basetime);
     if (sim_deb_switches & SWMASK ('T')) {

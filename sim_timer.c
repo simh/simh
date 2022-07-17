@@ -2200,6 +2200,11 @@ t_stat sim_timer_stop_svc (UNIT *uptr)
 return SCPE_STOP;
 }
 
+void sim_rtcn_debug_time (struct timespec *now)
+{
+clock_gettime (CLOCK_REALTIME, now);
+}
+
 void sim_rtcn_get_time (struct timespec *now, int tmr)
 {
 sim_debug (DBG_GET, &sim_timer_dev, "sim_rtcn_get_time(tmr=%d)\n", tmr);
