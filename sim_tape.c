@@ -186,8 +186,8 @@ if ((callback == NULL) || !(ctx->asynch_io))
         sim_debug_unit (ctx->dbit, uptr,                                \
       "sim_tape AIO_CALL(op=%d, unit=%d)\n", op, (int)(uptr-ctx->dptr->units));\
                                                                         \
-        if (ctx->callback)                                              \
-            abort(); /* horrible mistake, stop */                       \
+        if (ctx->callback)      /* horrible mistake, stop */            \
+            sim_abort ("AIO_CALL error", __FILE__, __LINE__);           \
         ctx->io_top = op;                                               \
         ctx->buf = _buf;                                                \
         ctx->bc = _bc;                                                  \
@@ -325,7 +325,7 @@ TAPE_PCALLBACK callback = ctx->callback;
 sim_debug_unit (ctx->dbit, uptr, "_tape_completion_dispatch(unit=%d, top=%d, callback=%p)\n", (int)(uptr-ctx->dptr->units), ctx->io_top, ctx->callback);
 
 if (ctx->io_top != TOP_DONE)
-    abort();                                            /* horribly wrong, stop */
+    sim_abort ("_tape_completion_dispatch()", __FILE__, __LINE__); /* horribly wrong, stop */
 
 if (ctx->asynch_io)
     pthread_mutex_lock (&ctx->io_lock);

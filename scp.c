@@ -12316,10 +12316,9 @@ if (sim_clock_queue != QUEUE_LIST_END)
 else
     sim_interval = noqueue_time = NOQUEUE_WAIT;
 if (uptr->next) {
-    sim_printf ("Cancel failed for %s\n", sim_uname(uptr));
-    if (sim_deb)
-        fclose(sim_deb);
-    abort ();
+    char buf[128];
+    snprintf (buf, sizeof (buf), "Cancel failed for %s\n", sim_uname(uptr));
+    sim_abort (buf, __FILE__, __LINE__);
     }
 return SCPE_OK;
 }
@@ -13683,6 +13682,15 @@ if (cond == (1+SCPE_MAX_ERR-SCPE_BASE)) {       /* not found? */
 if (cond > SCPE_MAX_ERR)
     return SCPE_ARG;
 return SCPE_OK;    
+}
+
+/* Abort and sanely close output files */
+/* This routine should ONLY be called from SCP modules */
+void sim_abort (const char *msg, const char *file, int linenum)
+{
+sim_printf ("%s - aborting from %s:%d\n", msg, file, linenum);
+sim_flush_buffered_files ();
+abort ();
 }
 
 /* Debug printout routines, from Dave Hittner */

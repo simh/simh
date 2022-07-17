@@ -1142,9 +1142,11 @@ struct MEMFILE {
 /* This replaces any references to "assert()" which should never be invoked */
 /* with an expression which causes side effects (i.e. must be executed for */
 /* the program to work correctly) */
-#define ASSURE(_Expression) while (!(_Expression)) {fprintf(stderr, "%s failed at %s line %d\n", #_Expression, __FILE__, __LINE__);  \
-                                                    sim_printf("%s failed at %s line %d\n", #_Expression, __FILE__, __LINE__);       \
-                                                    abort();}
+#define ASSURE(_Expression) while (!(_Expression)) {                                    \
+                                char buf[512];                                          \
+                                snprintf(buf, sizeof (buf), "%s failed", #_Expression); \
+                                sim_abort (buf, __FILE__, __LINE__);                    \
+                                }
 
 /* Asynch/Threaded I/O support */
 
@@ -1190,15 +1192,9 @@ extern int32 sim_asynch_inst_latency;
         for (_cptr = que;                                       \
             (_cptr != QUEUE_LIST_END);                          \
             _cptr = _cptr->next)                                \
-            if (!_cptr->next) {                                 \
-                if (sim_deb) {                                  \
-                    sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Queue Corruption detected\n");\
-                    fclose(sim_deb);                            \
-                    }                                           \
-                sim_printf("Queue Corruption detected in %s line %d\n",\
-                           __FILE__, __LINE);                   \
-                abort();                                        \
-                }                                               \
+            if (!_cptr->next)                                   \
+                sim_abort ("Queue Corruption detected",         \
+                           __FILE__, __LINE__);                 \
         if (lock)                                               \
             pthread_mutex_unlock (lock);                        \
         } while (0)
@@ -1352,9 +1348,8 @@ extern int32 sim_asynch_inst_latency;
 #endif /* USE_AIO_INTRINSICS */
 #define AIO_VALIDATE(uptr)                                             \
     if (!pthread_equal ( pthread_self(), sim_asynch_main_threadid )) { \
-      sim_printf("Improper thread context for operation on %s in %s line %d\n", \
-                   sim_uname(uptr), __FILE__, __LINE__);               \
-      abort();                                                         \
+      sim_abort ("Improper thread context for operation detected",     \
+                 __FILE__, __LINE__);                                  \
       } else (void)0
 #define AIO_CHECK_EVENT                                                \
     if (0 > --sim_asynch_check) {                                      \
