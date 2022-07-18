@@ -150,9 +150,9 @@ return real_sim_os_ms_sleep (msec);
 t_bool sim_idle_enab = FALSE;                       /* global flag */
 volatile t_bool sim_idle_wait = FALSE;              /* global flag */
 
-int32 sim_vm_initial_ips = SIM_INITIAL_IPS;
+uint32 sim_vm_initial_ips = SIM_INITIAL_IPS;
 
-static int32 sim_precalibrate_ips = SIM_INITIAL_IPS;
+static uint32 sim_precalibrate_ips = SIM_INITIAL_IPS;
 static int32 sim_calb_tmr = -1;                     /* the system calibrated timer */
 static int32 sim_calb_tmr_last = -1;                /* shadow value when at sim> prompt */
 static double sim_inst_per_sec_last = 0;            /* shadow value when at sim> prompt */
