@@ -2722,15 +2722,18 @@ else if (strcmp (gbuf, "STDERR") == 0) {                /* output to stderr? */
     *pref = NULL;
     }
 else {
+    char *fullpath = NULL;
+
     *pref = (FILEREF *)calloc (1, sizeof(**pref));
     if (!*pref)
         return SCPE_MEM;
-    get_glyph_nc (filename, gbuf, 0);                   /* reparse */
-    strlcpy ((*pref)->name, gbuf, sizeof((*pref)->name));
+    fullpath = sim_filepath_parts (filename, "f");      /* reparse */
+    strlcpy ((*pref)->name, fullpath, sizeof((*pref)->name));
     if (sim_switches & SWMASK ('N'))                    /* if a new log file is requested */
-        *pf = sim_fopen (gbuf, (binary ? "w+b" : "w+"));/*   then open an empty file */
+        *pf = sim_fopen (fullpath, (binary ? "w+b" : "w+"));/*   then open an empty file */
     else                                                /* otherwise */
-        *pf = sim_fopen (gbuf, (binary ? "a+b" : "a+"));/*   append to an existing file */
+        *pf = sim_fopen (fullpath, (binary ? "a+b" : "a+"));/*   append to an existing file */
+    free (fullpath);
     if (*pf == NULL) {                                  /* error? */
         free (*pref);
         *pref = NULL;
