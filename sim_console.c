@@ -2389,10 +2389,11 @@ if (sim_deb_switches & SWMASK ('B')) {
 
     while (sim_debug_buffer_inuse > 0) {
         size_t write_size = MIN (sim_deb_buffer_size - offset, sim_debug_buffer_inuse);
+        size_t written;
 
-        fwrite (sim_deb_buffer + offset, 1, write_size, sim_deb);
-        sim_debug_buffer_inuse -= write_size;
-        offset += write_size;
+        written = fwrite (sim_deb_buffer + offset, 1, write_size, sim_deb);
+        sim_debug_buffer_inuse -= written;
+        offset += written;
         if (offset == sim_deb_buffer_size)
             offset = 0;
         }
@@ -2403,6 +2404,7 @@ if (sim_deb_switches & SWMASK ('B')) {
 sim_close_logfile (&sim_deb_ref);
 sim_deb = NULL;
 sim_deb_switches = 0;
+errno = 0;
 return sim_messagef (SCPE_OK, "Debug output disabled\n");
 }
 

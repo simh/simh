@@ -13841,7 +13841,6 @@ int32 saved_quiet = sim_quiet;
 int32 saved_sim_switches = sim_switches;
 int32 saved_deb_switches = sim_deb_switches;
 struct timespec saved_deb_basetime = sim_deb_basetime;
-char saved_debug_filename[CBUFSIZE];
 
 if (sim_deb == NULL)                                    /* no debug? */
     return SCPE_OK;
@@ -13853,9 +13852,11 @@ if (sim_deb == sim_log) {                               /* debug is log */
     return SCPE_OK;
     }
 
-if (!(saved_deb_switches & SWMASK ('B'))) {
-    strcpy (saved_debug_filename, sim_logfile_name (sim_deb, sim_deb_ref));
-
+if ((saved_deb_switches & SWMASK ('B')) != 0) {
+    char saved_debug_filename[CBUFSIZE];
+    
+    snprintf (saved_debug_filename, sizeof (saved_debug_filename), "%u %s", 
+                           (uint32)(sim_deb_buffer_size / (1024 * 1024)), sim_logfile_name (sim_deb, sim_deb_ref));
     sim_quiet = 1;
     sim_set_deboff (0, NULL);
     sim_switches = saved_deb_switches;
