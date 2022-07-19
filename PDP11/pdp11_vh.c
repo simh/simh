@@ -1663,6 +1663,15 @@ static t_stat vh_reset (    DEVICE  *dptr   )
 
     tmxr_set_port_speed_control (&vh_desc);
     tmxr_set_modem_control_passthru (&vh_desc);
+    /* If the number of lines on a Qbus system has previously been changed */
+    /* to an odd multiple of and then the bus type changed to Unibus, we   */
+    /* to change the number of lines to a multiple of 16 for the DHU */
+    if (vh_desc.lines%VH_LINES != 0) {
+        char lines[12];
+
+        snprintf (lines, sizeof (lines), "%d", vh_desc.lines + (VH_LINES / 2));
+        return vh_setnl (dptr->units, 0, lines, NULL);
+        }
     if (vh_desc.lines > VH_MUXES*VH_LINES)
         vh_desc.lines = VH_MUXES*VH_LINES;
     vh_dev.numunits = (vh_desc.lines / VH_LINES) + 3;
