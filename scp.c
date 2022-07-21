@@ -16800,6 +16800,8 @@ if (sim_switches & SWMASK ('D')) {
     sim_switches = saved_switches;
     }
 if ((strcmp (gbuf, "ALL") == 0) || (strcmp (gbuf, "SCP") == 0)) {
+    if (sim_fio_test (cptr) != SCPE_OK)
+        return sim_messagef (SCPE_IERR, "SCP fio test failed\n");
     if (test_register_validation () != SCPE_OK)
         return sim_messagef (SCPE_IERR, "SCP register validation test failed\n");
     if (test_scp_parsing () != SCPE_OK)

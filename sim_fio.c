@@ -522,15 +522,20 @@ static struct pack_test {
 static struct relative_path_test {
     const char  *input;
     t_bool      prepend_cwd;
+    const char  *working_dir;
     const char  *result;
     } r_test[] = {
-        {"file.dat",             FALSE, "./file.dat"},
-        {"\\file.dat",           TRUE,  "./file.dat"},
-        {"C:/XXX/yyy/file.dat",  FALSE, "C:/XXX/yyy/file.dat"},
-        {"C:/Users/yyy/file.dat",FALSE, "C:/Users/yyy/file.dat"},
-        {"W:/XXX/yyy/file.dat",  FALSE, "W:/XXX/yyy/file.dat"},
-        {"/file.dat",            TRUE,  "./file.dat"},
-        {"/x/filepath/file.dat", FALSE, "/x/filepath/file.dat"},
+        {"/xx.dat",                 TRUE,  "xx",     "../xx.dat"},
+        {"/file.dat",               TRUE,  "xx/t",   "../../file.dat"},
+        {"/../../xxx/file.dat",     TRUE,  NULL,     "../../xxx/file.dat"},
+        {"\\..\\..\\xxx\\file.dat", TRUE,  NULL,     "../../xxx/file.dat"},
+        {"file.dat",                FALSE, NULL,     "./file.dat"},
+        {"\\file.dat",              TRUE,  NULL,     "./file.dat"},
+        {"C:/XXX/yyy/file.dat",     FALSE, NULL,     "C:/XXX/yyy/file.dat"},
+        {"C:/Users/yyy/file.dat",   FALSE, NULL,     "C:/Users/yyy/file.dat"},
+        {"W:/XXX/yyy/file.dat",     FALSE, NULL,     "W:/XXX/yyy/file.dat"},
+        {"/file.dat",               TRUE,  NULL,     "./file.dat"},
+        {"/x/filepath/file.dat",    FALSE, NULL,     "/x/filepath/file.dat"},
         {NULL},
         };
 
@@ -569,22 +574,31 @@ for (pt = p_test; pt->src; ++pt) {
     else
         r = sim_messagef (SCPE_IERR, "%s - BAD Status - Expected: %s got %s\n", test_desc, pt->exp_stat ? "True" : "False", res ? "True" : "False");
     }
+sim_messagef (SCPE_OK, "Testing relative path logic:\n");
 for (rt = r_test; rt->input; ++rt) {
     char input[PATH_MAX + 1];
     char cmpbuf[PATH_MAX + 1];
     char cwd[PATH_MAX + 1];
+    char origcwd[PATH_MAX + 1];
     char *wd = sim_getcwd(cwd, sizeof (cwd));
     char *cp;
     const char *result;
     static const char seperators[] = "/\\";
     const char *sep;
+    t_stat mkdir_stat = SCPE_OK;
 
+    strlcpy (origcwd, cwd, sizeof (origcwd));
     if (rt->prepend_cwd) {
         strlcpy (input, cwd, sizeof (input));
         strlcat (input, rt->input, sizeof (input));
         }
     else
         strlcpy (input, rt->input, sizeof (input));
+    if (rt->working_dir != NULL) {
+        mkdir_stat = mkdir_cmd (0, rt->working_dir);
+        sim_chdir (rt->working_dir);
+        wd = sim_getcwd(cwd, sizeof (cwd));
+        }
     for (sep = seperators; *sep != '\0'; ++sep) {
         while ((cp = strchr (input, *sep)))
             *cp = (*sep == '/') ? '\\' : '/';
@@ -608,6 +622,17 @@ for (rt = r_test; rt->input; ++rt) {
             sim_messagef (SCPE_OK, "    input: %s\n", input);
             sim_messagef (SCPE_OK, "   result: %s\n", result);
             }
+        }
+    sim_chdir (origcwd);
+    if ((rt->working_dir != NULL) && (mkdir_stat == SCPE_OK)) {
+        char *xdir = strdup (rt->working_dir);
+        
+        sim_rmdir (rt->working_dir);
+        while ((cp = strrchr (xdir, '/')) != NULL) {
+            *cp = '\0';
+            sim_rmdir (xdir);
+            }
+        free (xdir);
         }
     }
 return r;
@@ -1432,6 +1457,14 @@ free (fullpath);
 return result;
 }
 
+/*
+ * relative file path processing
+ *
+ *    Input is a filepath which may contain either / or \ directory 
+ *    separators (or both) and always returns a relative or complete path
+ *    with / directory separators.
+ */
+
 const char *sim_relative_path (const char *filenamepath)
 {
 char dir[PATH_MAX+1] = "";
@@ -1460,6 +1493,8 @@ cp = dir - 1;
 cwd_dirs = (isalpha(dir[0]) && (dir[1] == ':')) ? 1 : 0;
 while ((cp = strchr (cp + 1, fsep)) != NULL)
     cwd_dirs++;
+if (dir[strlen (dir) - 1] != fsep)
+    cwd_dirs++;
 buf[0] = '\0';
 while ((dir[offset] != '\0') && (filepath[offset] != '\0')) {
     if (dir[offset] == dsep) {
@@ -1470,7 +1505,7 @@ while ((dir[offset] != '\0') && (filepath[offset] != '\0')) {
             }
         }
 
-#if defined(_WIN32)         /* Windows has case independent file names */
+#if defined(_WIN32)                     /* Windows has case independent file names */
 #define _CMP(x) toupper (x)
 #else
 #define _CMP(x) (x)
@@ -1479,9 +1514,23 @@ while ((dir[offset] != '\0') && (filepath[offset] != '\0')) {
         break;
     ++offset;
     }
-while (dir[++lastdir] != '\0') {
-    if (dir[lastdir] == dsep)
-        ++updirs;
+if (dir[offset] == '\0') {
+    if (filepath[offset] == fsep) {
+        lastdir = offset;
+        ++offset;
+        updirs = 0;
+        }
+    else {
+        offset = lastdir + 1;
+        updirs = 1;
+        }
+    }
+else {
+    updirs = 1;
+    while (dir[++lastdir] != '\0') {
+        if (dir[lastdir] == fsep)
+            ++updirs;
+        }
     }
 if (updirs > 0) {
     if ((offset == 3) &&                /* if only match windows drive letter? */
@@ -1489,7 +1538,7 @@ if (updirs > 0) {
         (dir[2] == dsep))
         offset = 0;                     /* */
     if ((offset > 0) && (updirs != cwd_dirs)) {
-        for (up = 0; up <= updirs; up++)
+        for (up = 0; up < updirs; up++)
             strlcat (buf, updir, sizeof (buf));
         if (strlen (buf) > offset) {    /* if relative path prefix is longer than input path? */
             offset = 0;                 /* revert to original path */
@@ -1498,8 +1547,11 @@ if (updirs > 0) {
         }
     }
 else
-    strlcpy (buf, ".", sizeof (buf));
+    strlcpy (buf, "./", sizeof (buf));
 strlcat (buf, &filepath[offset], sizeof (buf));
+if (dsep != '/')
+    while ((cp = strchr (buf, dsep)) != NULL)
+        *cp = '/';                      /* Always return with / as the directory separator */
 free (filepath);
 return buf;
 }
