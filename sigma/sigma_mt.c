@@ -25,6 +25,7 @@
 
    mt           7320 and 7322/7323 magnetic tape
 
+   20-Jul-22    RMS     Space record must set EOF flag on tape mark (Ken Rector)
    03-Jul-22    RMS     Fixed error in handling of channel errors (Ken Rector)
    02-Jul-22    RMS     Fixed bugs in multi-unit operation
    07-Jun-22    RMS     Removed unused variables (V4)
@@ -380,6 +381,7 @@ switch (cmd) {                                          /* case on command */
             if (CHS_IFERR (st))                         /* chan or SCP err? */
                 return mt_chan_err (dva, st);           /* uend and stop */
             }
+        uptr->UST |= MTDV_EOF;                          /* set eof */
         break;
 
     case MCM_SBKF:                                       /* space rev file */
@@ -389,6 +391,7 @@ switch (cmd) {                                          /* case on command */
             if (CHS_IFERR (st))                         /* chan or SCP err? */
                 return mt_chan_err (dva, st);           /* uend and stop */
             }
+        uptr->UST |= MTDV_EOF;                          /* set eof */
         break;
 
     case MCM_WTM:                                       /* write eof */
