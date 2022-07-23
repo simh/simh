@@ -123,6 +123,7 @@
 117: CPU: sim_interval is decremented before breakpoint test, which is incorrect.
 118. MT: revised error handling failed to set tape mark status on space file forward/reverse.
 119. IO: UEND flag in the wrong bit position in status word.
+120. DP: SEEK(I), RECAL(I) must be coded as fast operations.
 
 
 Diagnostic Notes
