@@ -25,6 +25,7 @@
 
    dp           moving head disk pack controller
 
+   23-Jul-22    RMS     SEEK(I), RECAL(I) should be fast operations (Ken Rector)
    02-Jul-22    RMS     Fixed bugs in multi-unit operation
    28-Jun-22    RMS     Fixed off-by-1 error in DP_SEEK definition (Ken Rector)
    07-Jun-22    RMS     Removed unused variables (V4)
@@ -337,13 +338,13 @@ static DP_SNSTAB dp_sense_16B[] = {
 #define C_C             (1u << (DP_CTYPE + 1))          /* ctrl cmd */
 
 static uint16 dp_cmd[256] = {
-   0, C_A, C_A, C_A, C_A|C_F, C_A, 0, C_16B|C_F,
+   0, C_A, C_A, C_A|C_F, C_A|C_F, C_A, 0, C_16B|C_F,
    0, C_A, C_A, 0, 0, 0, 0, C_16B|C_F|C_C,
    0, 0, C_A, C_A|C_F, 0, 0, 0, C_16B|C_F,
    0, 0, 0, 0, 0, 0, 0, C_16B|C_F|C_C,
    0, 0, 0, C_10B|C_F, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
-   0, 0, 0, C_A, 0, 0, 0, 0,
+   0, 0, 0, C_A|C_F, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
@@ -353,13 +354,13 @@ static uint16 dp_cmd[256] = {
    0, 0, 0, 0, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
-   0, 0, 0, C_A, 0, 0, 0, 0,
+   0, 0, 0, C_A|C_F, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
-   0, 0, 0, C_16B, 0, 0, 0, 0,
+   0, 0, 0, C_16B|C_F, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
