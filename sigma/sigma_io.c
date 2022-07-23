@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   23-Jul-2022  RMS     Made chan_ctl_time accessible as a register
    21-Jul-2022  RMS     Added numeric channel numbers to SET/SHOW
    07-Jul-2022  RMS     Fixed dangling else in read/write direct (Ken Rector)
    05-Mar-2020  RMS     Fixed s5x0_ireg size declaration (Mark Pizzolato)
@@ -177,6 +178,7 @@ REG chana_reg[] = {
     { BRDATA (CHF, chan[0].chf, 16, 16, CHAN_N_DEV) },
     { BRDATA (CHI, chan[0].chi, 16, 8, CHAN_N_DEV) },
     { BRDATA (CHSF, chan[0].chsf, 16, 8, CHAN_N_DEV) },
+    { DRDATA (CTIME, chan_ctl_time, 4), REG_NZ+REG_HIDDEN+PV_LEFT },
     { NULL }
     };
 
