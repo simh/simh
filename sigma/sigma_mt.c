@@ -474,7 +474,7 @@ switch (cmd) {                                          /* case on command */
              sim_activate (uptr, mt_time);              /* continue thread */
              return SCPE_OK;
              }
-        if (r = mt_flush_buf (uptr)) {                  /* flush buffer */
+        if ((r = mt_flush_buf (uptr))) {                /* flush buffer */
             st = mt_map_err (uptr, r);                  /* map error */
             if (CHS_IFERR (st))                         /* chan or SCP err? */
                 return mt_chan_err (dva, st);           /* uend and stop */
