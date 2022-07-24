@@ -496,7 +496,7 @@ DEVICE wcnsls_dev = {
     NUM_DEVS_WCNSLS, 0, 0, 0, 0, 0,
     NULL, NULL, wcnsls_reset,
     NULL, NULL, NULL,
-    &wcnsls_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG, 0, dev_debug,
+    &wcnsls_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG | DEV_DISPLAY, 0, dev_debug,
     NULL, NULL, NULL, NULL, NULL, &wcnsls_description
     };
 

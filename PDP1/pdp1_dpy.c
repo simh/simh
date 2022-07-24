@@ -81,7 +81,7 @@ DEVICE dpy_dev = {
         1, 10, 31, 1, 8, 8,
         NULL, NULL, &dpy_reset,
         NULL, NULL, NULL,
-        NULL, DEV_DIS | DEV_DISABLE | DEV_DEBUG,
+        NULL, DEV_DIS | DEV_DISABLE | DEV_DEBUG | DEV_DISPLAY,
         0, dpy_deb};
 
 /* Display IOT routine */

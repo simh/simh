@@ -87,7 +87,7 @@ DEVICE dpy_dev = {
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &dpy_reset,
     NULL, NULL, NULL,
-    NULL, DEV_DISABLE | DEV_DIS | DEV_DEBUG, 0, dpy_deb };
+    NULL, DEV_DISABLE | DEV_DIS | DEV_DEBUG | DEV_DISPLAY, 0, dpy_deb };
 
 /* Display Routine */
 int32 dpy (int32 ac)

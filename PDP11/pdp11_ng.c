@@ -104,7 +104,7 @@ DEVICE ng_dev = {
     1, 8, 16, 1, 8, 16,
     NULL, NULL, &ng_reset,
     &ng_boot, NULL, NULL,
-    &ng_dib, DEV_DIS | DEV_DISABLE | DEV_UBUS | DEV_DEBUG,
+    &ng_dib, DEV_DIS | DEV_DISABLE | DEV_UBUS | DEV_DEBUG | DEV_DISPLAY,
     0, ng_deb, NULL, NULL, NULL, &ng_help, NULL, 
     &ng_description
 };

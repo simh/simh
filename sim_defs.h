@@ -562,7 +562,7 @@ struct DEVICE {
 #define DEV_MUX         (4 << DEV_V_TYPE)               /* sim_tmxr Attach */
 #define DEV_CARD        (5 << DEV_V_TYPE)               /* sim_card Attach */
 #define DEV_ETHER       (6 << DEV_V_TYPE)               /* Ethernet Device */
-#define DEV_DISPLAY     (7 << DEV_V_TYPE)               /* Display Device */
+#define DEV_DISPLAY     (7 << DEV_V_TYPE)               /* Display Device (sim_video) */
 #define DEV_TYPE(dptr)  ((dptr)->flags & DEV_TYPEMASK)
 
 #define DEV_UFMASK_31   (((1u << DEV_V_RSV) - 1) & ~((1u << DEV_V_UF_31) - 1))

@@ -346,7 +346,7 @@ DEVICE vc_dev = {
     1, DEV_RDX, 20, 1, DEV_RDX, 8,
     NULL, NULL, &vc_reset,
     NULL, NULL, &vc_detach,
-    &vc_dib, DEV_DIS | DEV_QBUS | DEV_DEBUG, 0,
+    &vc_dib, DEV_DIS | DEV_QBUS | DEV_DEBUG | DEV_DISPLAY, 0,
     vc_debug, NULL, NULL, &vc_help, NULL, NULL, 
     &vc_description
     };

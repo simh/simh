@@ -238,7 +238,7 @@ DEVICE ve_dev = {
     2, 10, 31, 1, DEV_RDX, 8,
     NULL, NULL, &ve_reset,
     NULL, NULL, &ve_detach,
-    &ve_dib, DEV_DIS | DEV_DEBUG, 0,
+    &ve_dib, DEV_DIS | DEV_DEBUG | DEV_DISPLAY, 0,
     ve_debug, NULL, NULL, &ve_help, NULL, NULL,
     &ve_description
     };
