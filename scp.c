@@ -6228,7 +6228,7 @@ if (0 == sim_fseek (uptr->fileref, 0, SEEK_END)) {
     return SCPE_OK;
     }
 
-return sim_messagef (SCPE_IERR, "%s Can't seek to end of file: %s - %s\n", sim_uname (uptr), sim_relative_path (uptr->filename), strerror (errno));
+return sim_messagef (SCPE_IERR, "%s Can't seek to end of file: %s - %s\n", sim_uname (uptr), sim_attach_name (uptr), strerror (errno));
 }
 
 /* Show command */
@@ -6527,7 +6527,7 @@ if (uptr->flags & UNIT_FIX) {
     }
 if (uptr->flags & UNIT_ATT) {
     fprint_sep (st, &toks);
-    fprintf (st, "attached to %s", sim_relative_path (uptr->filename));
+    fprintf (st, "attached to %s", sim_attach_name (uptr));
     if (uptr->flags & UNIT_RO)
         fprintf (st, ", read only");
     }
@@ -8459,7 +8459,7 @@ if ((uptr->flags & UNIT_BUF) && (uptr->filebuf)) {
     uint32 cap = (uptr->hwmark + dptr->aincr - 1) / dptr->aincr;
     if (((uptr->flags & UNIT_RO) == 0) && 
         (memcmp (uptr->filebuf, uptr->filebuf2, (size_t)(SZ_D (dptr) * (uptr->capac / dptr->aincr))) != 0)) {
-        sim_messagef (SCPE_OK, "%s: writing buffer to file: %s\n", sim_uname (uptr), sim_relative_path (uptr->filename));
+        sim_messagef (SCPE_OK, "%s: writing buffer to file: %s\n", sim_uname (uptr), sim_attach_name (uptr));
         rewind (uptr->fileref);
         sim_fwrite (uptr->filebuf, SZ_D (dptr), cap, uptr->fileref);
         if (ferror (uptr->fileref))
@@ -8613,6 +8613,21 @@ free (uptr->uname);
 return uptr->uname = strcpy ((char *)malloc (1 + strlen (uname)), uname);
 }
 
+/* Get attach display name */
+
+const char *sim_attach_name (UNIT *uptr)
+{
+DEVICE *dptr = find_dev_from_unit (uptr);
+
+if ((uptr == NULL) || ((uptr->flags & UNIT_ATT) == 0))
+    return "";
+if ((DEV_TYPE (uptr->dptr) != DEV_MUX) &&
+    (DEV_TYPE (uptr->dptr) != DEV_ETHER))
+    return sim_relative_path (uptr->filename);
+else
+    return uptr->filename;
+}
+
 
 /* Save command
 
@@ -8712,7 +8727,7 @@ for (i = 0; i < (device_count + sim_internal_device_count); i++) {/* loop thru d
         if (uptr->flags & UNIT_ATT) {
             if ((uptr->drvtyp != NULL) && (sim_disk_drive_type_set_string (uptr) != NULL))
                 fprintf (sfile, "\001DriveType=%s\001", sim_disk_drive_type_set_string (uptr));
-            fputs (sim_relative_path (uptr->filename), sfile);
+            fputs (sim_attach_name (uptr), sfile);
             if ((uptr->flags & UNIT_BUF) &&             /* writable buffered */
                 uptr->hwmark &&                         /* files need to be */
                 ((uptr->flags & UNIT_RO) == 0)) {       /* written on save */
@@ -8915,7 +8930,7 @@ else {
             for (j = 0; j < dptr->numunits; j++) {      /* loop thru units */
                 uptr = (dptr->units) + j;
                 if (uptr->flags & UNIT_ATT) {           /* attached? */
-                    sim_printf ("warning - leaving %s attached to '%s'\n", sim_uname (uptr), sim_relative_path (uptr->filename));
+                    sim_printf ("warning - leaving %s attached to '%s'\n", sim_uname (uptr), sim_attach_name (uptr));
                     warned = TRUE;
                     }
                 }
@@ -8994,7 +9009,7 @@ for ( ;; ) {                                            /* device loop */
             (!dont_detach_attach)) {
             r = scp_detach_unit (dptr, uptr);           /* detach it */
             if (r != SCPE_OK) {
-                sim_printf ("Error detaching %s from %s: %s\n", sim_uname (uptr), sim_relative_path (uptr->filename), sim_error_text (r));
+                sim_printf ("Error detaching %s from %s: %s\n", sim_uname (uptr), sim_attach_name (uptr), sim_error_text (r));
                 r = SCPE_INCOMP;
                 goto Cleanup_Return;
                 }
@@ -9385,7 +9400,7 @@ for (i = 1; (dptr = sim_devices[i]) != NULL; i++) {     /* reposition all */
         if ((uptr->flags & (UNIT_ATT + UNIT_SEQ)) == (UNIT_ATT + UNIT_SEQ))
             if (sim_can_seek (uptr->fileref) &&
                 (0 != sim_fseek (uptr->fileref, uptr->pos, SEEK_SET)))
-                return sim_messagef (SCPE_IERR, "Can't seek to %u in %s for %s\n", (unsigned)uptr->pos, sim_relative_path (uptr->filename), sim_uname (uptr));
+                return sim_messagef (SCPE_IERR, "Can't seek to %u in %s for %s\n", (unsigned)uptr->pos, sim_attach_name (uptr), sim_uname (uptr));
         }
     }
 if ((r = sim_ttrun ()) != SCPE_OK) {                    /* set console mode */
@@ -10270,7 +10285,7 @@ if (uptr->flags & UNIT_RO)                              /* read only? */
     return sim_messagef (SCPE_RO, "%s is read only.\n"
                                   "%sse a writable device to change %s\n", 
                                   sim_uname (uptr), (uptr->flags & UNIT_ROABLE) ? "Attach Read/Write or u" : "U",
-                                  uptr->filename ? sim_relative_path (uptr->filename) : "it");
+                                  uptr->filename ? sim_attach_name (uptr) : "it");
 mask = width_mask[dptr->dwidth];
 
 GET_RADIX (rdx, dptr->dradix);
