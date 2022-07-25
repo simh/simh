@@ -153,7 +153,7 @@ DEVICE *sim_devices[] = {
     &dci_dev,
     &dco_dev,
     &dz_dev,
-//    &vh_dev,
+    &vh_dev,
     &rc_dev,
     &rf_dev,
     &rk_dev,

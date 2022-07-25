@@ -26,6 +26,29 @@
 
    vh           DHQ11 asynch multiplexor for SIMH
 
+   23-Jul-22    JAD     Correct RBUF_GETLINE & RBUF_PUTLINE: these are both
+                        sensitive to modeling DHU vs. DHV; the correct bit
+                        mask was not generated for DHU.
+                        Make certain the device presents 16 lines when
+                        modeling a DHU.
+                        In vh_reset(), make certain the number of lines
+                        makes sense in the context of the current bus
+                        and adjust if not appropriate; mark each unit
+                        correctly for DHU vs. DHV; mark each unit
+                        enabled or disabled as appropriate; reset
+                        the vector length; reset the number of units.
+
+                        Retrofit updates from V4 SIMH: (Mark Pizzolato)
+                        VH_LINES must be set according to the bus type
+                        (Unibus: 16, Qbus: 8).
+                        Define VH_LINES_ALLOC at 16 lines/unit to reserve
+                        the maximum space for lines.
+                        SET VH LINES=n is now sensitive to mode; appropriate
+                        values are DHV: 8, 16, 24, 32; DHU: 16, 32, 48, 64
+                        In fifo_get(), sense immediately when the FIFO
+                        empties, rather than the next time through.
+                        In vh_setnl(), call vh_reset () to adjust the state
+                        of the units and lines, and invoke auto_config().
    28-May-18    RMS     Changed to avoid nested comment warnings (Mark Pizzolato)
    02-Jun-11    MP      Added debugging support to trace register, interrupt 
                         and data traffic (SET VH DEBUG[=REG;INT;XMT;RCV])
@@ -96,7 +119,17 @@ extern int32    tmxr_poll, clk_tps;
 #endif
 #define VH_MNOMASK  (VH_MUXES - 1)
 
+#if defined(VM_VAX)
+#if VEC_QBUS
 #define VH_LINES    (8)
+#else
+#define VH_LINES    (16)
+#endif
+#else
+#define VH_LINES    (UNIBUS?16:8)
+#endif
+
+#define VH_LINES_ALLOC (16)
 
 #define UNIT_V_MODEDHU  (UNIT_V_UF + 0)
 #define UNIT_V_FASTDMA  (UNIT_V_UF + 1)
@@ -137,8 +170,11 @@ extern int32    tmxr_poll, clk_tps;
 #define RBUF_FRAME_ERR      (1 << 13)
 #define RBUF_OVERRUN_ERR    (1 << 14)
 #define RBUF_DATA_VALID     (1 << 15)
-#define RBUF_GETLINE(x)     (((x) >> RBUF_V_RX_LINE) & RBUF_M_RX_LINE)
-#define RBUF_PUTLINE(x)     ((x) << RBUF_V_RX_LINE)
+#define RBUF_GETLINE(u,x)     \
+        (((x) >> RBUF_V_RX_LINE) & \
+         ((vh_unit[(u)].flags & UNIT_MODEDHU) ? 017 : 07))
+#define RBUF_PUTLINE(u,x)     \
+        (((x) & ((vh_unit[(u)].flags & UNIT_MODEDHU) ? 017 : 07)) << RBUF_V_RX_LINE)
 #define RBUF_DIAG       \
     (RBUF_PARITY_ERR|RBUF_FRAME_ERR|RBUF_OVERRUN_ERR)
 #define XON         (021)
@@ -287,9 +323,9 @@ typedef struct {
     uint16  txchar;     /* single character I/O */
 } TMLX;
 
-static TMLN vh_ldsc[VH_MUXES * VH_LINES] = { { 0 } };
-static TMXR vh_desc = { VH_MUXES * VH_LINES, 0, 0, vh_ldsc };
-static TMLX vh_parm[VH_MUXES * VH_LINES] = { { 0 } };
+static TMLN vh_ldsc[VH_MUXES * VH_LINES_ALLOC] = { { 0 } };
+static TMXR vh_desc = { VH_MUXES * VH_LINES_ALLOC, 0, 0, vh_ldsc };
+static TMLX vh_parm[VH_MUXES * VH_LINES_ALLOC] = { { 0 } };
 
 /* debugging bitmaps */
 #define DBG_REG  0x0001                                 /* trace read/write registers */
@@ -324,8 +360,6 @@ static t_stat vh_setnl (UNIT *uptr, int32 val, char *cptr, void *desc);
 static t_stat vh_set_log (UNIT *uptr, int32 val, char *cptr, void *desc);
 static t_stat vh_set_nolog (UNIT *uptr, int32 val, char *cptr, void *desc);
 static t_stat vh_show_log (FILE *st, UNIT *uptr, int32 val, void *desc);
-
-int32 tmxr_send_buffered_data (TMLN *lp);
 
 /* SIMH I/O Structures */
 
@@ -362,7 +396,7 @@ static const MTAB vh_mod[] = {
     { UNIT_HANGUP, UNIT_HANGUP, "hangup", "HANGUP", NULL },
     { MTAB_XTD|MTAB_VDV, 020, "ADDRESS", "ADDRESS",
         &set_addr, &show_addr, NULL },
-    { MTAB_XTD|MTAB_VDV, VH_LINES, "VECTOR", "VECTOR",
+    { MTAB_XTD|MTAB_VDV, 8, "VECTOR", "VECTOR",
         &set_vec, &show_vec_mux, (void *) &vh_desc },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "AUTOCONFIGURE",
         &set_addr_flt, NULL, NULL },
@@ -532,7 +566,7 @@ override:
         vh_rbuf[vh][rbuf_idx[vh]] = data;
         rbuf_idx[vh] += 1;
     } else {
-        vh_ovrrun[vh] |= (1 << RBUF_GETLINE (data));
+        vh_ovrrun[vh] |= (1 << RBUF_GETLINE (vh, data));
         status = -1;
     }
     if (vh_csr[vh] & CSR_RXIE) {
@@ -561,7 +595,7 @@ override:
     if (lp != NULL) {
         if ((lp->lnctrl & LNCTRL_FORCE_XOFF) || 
               ((vh_crit & (1 << vh)) && (lp->lnctrl & LNCTRL_IAUTO))) {
-            int32   chan = RBUF_GETLINE(data);
+            int32   chan = RBUF_GETLINE(vh, data);
             vh_stall[vh] ^= (1 << chan);
             /* send XOFF every other character received */
             if (vh_stall[vh] & (1 << chan))
@@ -575,10 +609,9 @@ static int32 fifo_get ( int32   vh  )
 {
     int32   data, i;
 
-    if (rbuf_idx[vh] == 0) {
-        vh_csr[vh] &= ~CSR_RX_DATA_AVAIL;
+    if (rbuf_idx[vh] == 0)
         return (0);
-    }
+
     /* pick off the first character, mark valid */
     data = vh_rbuf[vh][0] | RBUF_DATA_VALID;
     /* move the remainder up */
@@ -591,7 +624,7 @@ static int32 fifo_get ( int32   vh  )
         for (i = 0; i < VH_LINES; i++) {
             if (vh_ovrrun[vh] & (1 << i)) {
                 fifo_put (vh, NULL, RBUF_OVERRUN_ERR |
-                      RBUF_PUTLINE (i));
+                      RBUF_PUTLINE (vh, i));
                 vh_ovrrun[vh] &= ~(1 << i);
                 break;
             }
@@ -611,6 +644,10 @@ static int32 fifo_get ( int32   vh  )
             }
         }
     }
+
+    if (rbuf_idx[vh] == 0)                  /* FIFO just became empty? */
+        vh_csr[vh] &= ~CSR_RX_DATA_AVAIL;   /* clear CSR bit to indicate this */
+
     return (data & 0177777);
 }
 /* TX Q manipulation */
@@ -653,7 +690,7 @@ static void HangupModem (   int32   vh,
     if (lp->lnctrl & LNCTRL_LINK_TYPE)
         /* RBUF<0> = 0 for modem status */
         fifo_put (vh, lp, RBUF_DIAG |
-                  RBUF_PUTLINE (chan) |
+                  RBUF_PUTLINE (vh, chan) |
                   ((lp->lstat >> 8) & 0376));
         /* BUG: check for overflow above */
 }
@@ -695,10 +732,10 @@ static t_stat vh_putc ( int32   vh,
     case 2:     /* local loopback */
         if (lp->lnctrl & LNCTRL_BREAK)
             val = fifo_put (vh, lp,
-                RBUF_FRAME_ERR | RBUF_PUTLINE (chan));
+                RBUF_FRAME_ERR | RBUF_PUTLINE (vh, chan));
         else
             val = fifo_put (vh, lp,
-                RBUF_PUTLINE (chan) | data);
+                RBUF_PUTLINE (vh, chan) | data);
         status = (val < 0) ? SCPE_TTMO : SCPE_OK;
         break;
     default:    /* remote loopback */
@@ -719,12 +756,12 @@ static void vh_getc (   int32   vh  )
         while ((c = tmxr_getc_ln (lp->tmln)) != 0) {
             if (c & SCPE_BREAK) {
                 fifo_put (vh, lp,
-                    RBUF_FRAME_ERR | RBUF_PUTLINE (i));
+                    RBUF_FRAME_ERR | RBUF_PUTLINE (vh, i));
                 /* BUG: check for overflow above */
             } else {
                 c &= bitmask[(lp->lpr >> LPR_V_CHAR_LGTH) &
                     LPR_M_CHAR_LGTH];
-                fifo_put (vh, lp, RBUF_PUTLINE (i) | c);
+                fifo_put (vh, lp, RBUF_PUTLINE (vh, i) | c);
                 /* BUG: check for overflow above */
             }
         }
@@ -934,7 +971,7 @@ static t_stat vh_wr (   int32   data,
         if (((lp->lpr >> LPR_V_DIAG) & LPR_M_DIAG) == 1) {
             fifo_put (vh, lp,
                 RBUF_DIAG |
-                RBUF_PUTLINE (CSR_GETCHAN (vh_csr[vh])) |
+                RBUF_PUTLINE (vh, CSR_GETCHAN (vh_csr[vh])) |
                 BMP_OK);
             /* BUG: check for overflow above */
             lp->lpr &= ~(LPR_M_DIAG << LPR_V_DIAG);
@@ -1152,7 +1189,7 @@ static t_stat vh_svc (  UNIT    *uptr   )
             lp->lstat |= STAT_RI;
         if (lp->lnctrl & LNCTRL_LINK_TYPE)
             fifo_put (vh, lp, RBUF_DIAG |
-                      RBUF_PUTLINE (line) |
+                      RBUF_PUTLINE (vh, line) |
                       ((lp->lstat >> 8) & 0376));
             /* BUG: should check for overflow above */
     }
@@ -1239,26 +1276,26 @@ static t_stat vh_clear (    int32   vh,
     rbuf_idx[vh] = 0;
     /* put 8 diag bytes in FIFO: 6 SELF_x, 2 circuit revision codes */
     if (vh_csr[vh] & CSR_SKIP) {
-        fifo_put (vh, NULL, RBUF_DIAG | RBUF_PUTLINE(0) | SELF_SKIP);
-        fifo_put (vh, NULL, RBUF_DIAG | RBUF_PUTLINE(1) | SELF_SKIP);
-        fifo_put (vh, NULL, RBUF_DIAG | RBUF_PUTLINE(2) | SELF_SKIP);
-        fifo_put (vh, NULL, RBUF_DIAG | RBUF_PUTLINE(3) | SELF_SKIP);
-        fifo_put (vh, NULL, RBUF_DIAG | RBUF_PUTLINE(4) | SELF_SKIP);
-        fifo_put (vh, NULL, RBUF_DIAG | RBUF_PUTLINE(5) | SELF_SKIP);
-        fifo_put (vh, NULL, RBUF_DIAG | RBUF_PUTLINE(6) | 0107);
-        fifo_put (vh, NULL, RBUF_DIAG | RBUF_PUTLINE(7) | 0105);
+        fifo_put (vh, NULL, RBUF_DIAG | RBUF_PUTLINE(vh, 0) | SELF_SKIP);
+        fifo_put (vh, NULL, RBUF_DIAG | RBUF_PUTLINE(vh, 1) | SELF_SKIP);
+        fifo_put (vh, NULL, RBUF_DIAG | RBUF_PUTLINE(vh, 2) | SELF_SKIP);
+        fifo_put (vh, NULL, RBUF_DIAG | RBUF_PUTLINE(vh, 3) | SELF_SKIP);
+        fifo_put (vh, NULL, RBUF_DIAG | RBUF_PUTLINE(vh, 4) | SELF_SKIP);
+        fifo_put (vh, NULL, RBUF_DIAG | RBUF_PUTLINE(vh, 5) | SELF_SKIP);
+        fifo_put (vh, NULL, RBUF_DIAG | RBUF_PUTLINE(vh, 6) | 0107);
+        fifo_put (vh, NULL, RBUF_DIAG | RBUF_PUTLINE(vh, 7) | 0105);
     } else {
-        fifo_put (vh, NULL, RBUF_DIAG | RBUF_PUTLINE(0) | SELF_NULL);
-        fifo_put (vh, NULL, RBUF_DIAG | RBUF_PUTLINE(1) | SELF_NULL);
-        fifo_put (vh, NULL, RBUF_DIAG | RBUF_PUTLINE(2) | SELF_NULL);
-        fifo_put (vh, NULL, RBUF_DIAG | RBUF_PUTLINE(3) | SELF_NULL);
-        fifo_put (vh, NULL, RBUF_DIAG | RBUF_PUTLINE(4) | SELF_NULL);
-        fifo_put (vh, NULL, RBUF_DIAG | RBUF_PUTLINE(5) | SELF_NULL);
+        fifo_put (vh, NULL, RBUF_DIAG | RBUF_PUTLINE(vh, 0) | SELF_NULL);
+        fifo_put (vh, NULL, RBUF_DIAG | RBUF_PUTLINE(vh, 1) | SELF_NULL);
+        fifo_put (vh, NULL, RBUF_DIAG | RBUF_PUTLINE(vh, 2) | SELF_NULL);
+        fifo_put (vh, NULL, RBUF_DIAG | RBUF_PUTLINE(vh, 3) | SELF_NULL);
+        fifo_put (vh, NULL, RBUF_DIAG | RBUF_PUTLINE(vh, 4) | SELF_NULL);
+        fifo_put (vh, NULL, RBUF_DIAG | RBUF_PUTLINE(vh, 5) | SELF_NULL);
         /* PROC2 ver. 1 */
-        fifo_put (vh, NULL, RBUF_DIAG | RBUF_PUTLINE(6) | 0107);
+        fifo_put (vh, NULL, RBUF_DIAG | RBUF_PUTLINE(vh, 6) | 0107);
         /* PROC1 ver. 1 */
-        fifo_put (vh, NULL, RBUF_DIAG | RBUF_PUTLINE(7) | 0105);
-    }
+        fifo_put (vh, NULL, RBUF_DIAG | RBUF_PUTLINE(vh, 7) | 0105);
+   }
     vh_csr[vh] &= ~(CSR_TX_ACTION|CSR_DIAG_FAIL|CSR_MASTER_RESET);
     if (flag)
         vh_csr[vh] &= ~(CSR_TXIE|CSR_RXIE|CSR_SKIP);
@@ -1280,23 +1317,44 @@ static t_stat vh_clear (    int32   vh,
 
 static t_stat vh_reset (    DEVICE  *dptr   )
 {
-    int32   i;
+    int32   i, lines, maxlines;
 
     for (i = 0; i < vh_desc.lines; i++)
         vh_parm[i].tmln = &vh_ldsc[i];
-    for (i = 0; i < vh_desc.lines/VH_LINES; i++) {
-#if     defined (VM_PDP11)
-        /* if Unibus, force DHU mode */
-        if (UNIBUS)
-            vh_unit[i].flags |= UNIT_MODEDHU;
-#endif
-        vh_clear (i, TRUE);
+
+    /* re-establish lines per unit and lower bounds */
+    lines = VH_LINES;
+    /* enforce multiples; find next if necessary */
+    while ((vh_desc.lines % lines) != 0)
+        vh_desc.lines++;
+    /* establish upper bounds */
+    maxlines = lines * VH_MUXES;
+    /* enforce bounds */
+    if (vh_desc.lines > maxlines)
+        vh_desc.lines = maxlines;
+    if (vh_desc.lines < lines)
+        vh_desc.lines = lines;
+
+    for (i = 0; i < VH_MUXES; i++) {
+        if (i < vh_desc.lines/VH_LINES) {
+            /* if Unibus, force DHU mode */
+            if (UNIBUS)
+                vh_unit[i].flags |= UNIT_MODEDHU;
+            else
+                vh_unit[i].flags &= ~UNIT_MODEDHU;
+            vh_unit[i].flags &= ~UNIT_DIS;
+            vh_clear (i, TRUE);
+        } else {
+            vh_unit[i].flags |= UNIT_DIS;
+        }
     }
     vh_rxi = vh_txi = 0;
     CLR_INT (VHRX);
     CLR_INT (VHTX);
     sim_cancel (&vh_unit[0]);
-    return (auto_config (dptr->name, (dptr->flags & DEV_DIS) ? 0 : vh_desc.lines/VH_LINES));
+    vh_dib.lnt = (vh_desc.lines / lines) * IOLN_VH;      /* set length */
+    vh_dev.numunits = vh_desc.lines / lines;
+    return auto_config (dptr->name, (dptr->flags & DEV_DIS) ? 0 : vh_desc.lines/lines);
 }
 
 
@@ -1378,7 +1436,7 @@ static t_stat vh_show_txq ( FILE    *st,
 
 static t_stat vh_setnl (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-int32 newln, i, t, ndev;
+int32 newln, i, t;
 t_stat r;
 
 if (cptr == NULL)
@@ -1402,11 +1460,8 @@ if (newln < vh_desc.lines) {
             vh_clear (i / VH_LINES, TRUE);              /* reset mux */
         }
     }
-vh_dib.lnt = (newln / VH_LINES) * IOLN_VH;              /* set length */
 vh_desc.lines = newln;
-ndev = ((vh_dev.flags & DEV_DIS)? 0: (vh_desc.lines / VH_LINES));
-vh_dev.numunits = (newln / VH_LINES);
-return auto_config (vh_dev.name, ndev);                 /* auto config */
+return vh_reset (&vh_dev);
 }
 
 /* SET LOG processor */
