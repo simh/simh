@@ -535,7 +535,7 @@ void put_rval (REG *rptr, uint32 idx, t_value val);
 void fprint_help (FILE *st);
 void fprint_stopped (FILE *st, t_stat r);
 void fprint_capac (FILE *st, DEVICE *dptr, UNIT *uptr);
-void fprint_sep (FILE *st, int32 *tokens);
+void fprint_sep (FILE *st, int32 *tokens, int32 flag);
 REG *find_reg_glob (CONST char *ptr, CONST char **optr, DEVICE **gdptr);
 REG *find_reg_glob_reason (CONST char *cptr, CONST char **optr, DEVICE **gdptr, t_stat *stat);
 const char *sim_eval_expression (const char *cptr, t_svalue *value, t_bool parens_required, t_stat *stat);
@@ -6415,12 +6415,17 @@ const char *_sim_dname_space (void)
 return _sim_dname_prefix (NULL, "");
 }
 
+const char *_sim_uname_space (void)
+{
+return _sim_uname_prefix (NULL, "");
+}
+
 void _set_dname_len (DEVICE *dptr)
 {
 uint32 i;
 
-if (dev_name_len < strlen (dptr->name))
-    dev_name_len = strlen (dptr->name);
+if (dev_name_len < strlen (sim_dname (dptr)))
+    dev_name_len = strlen (sim_dname (dptr));
 for (i = 0; i < dptr->numunits; i++) {
     UNIT *uptr = &dptr->units[i];
 
@@ -6454,7 +6459,7 @@ else {
     }
 if (qdisable (dptr)) {                                  /* disabled? */
     fprintf (st, "%s\n", "disabled");
-    return SCPE_OK;
+    goto Cleanup_Return;
     }
 for (j = ucnt = udbl = 0; j < dptr->numunits; j++) {    /* count units */
     uptr = dptr->units + j;
@@ -6471,12 +6476,12 @@ if (dptr->numunits == 0) {
     }
 else {
     if (ucnt == 0) {
-        fprint_sep (st, &toks);
+        fprint_sep (st, &toks, MTAB_VDV);
         fprintf (st, "all %d units disabled\n", udbl);
         }
     else {
         if ((ucnt > 1) || (udbl > 0)) {
-            fprint_sep (st, &toks);
+            fprint_sep (st, &toks, MTAB_VDV);
             fprintf (st, "%d units\n", ucnt + udbl);
             }
         else {
@@ -6491,20 +6496,21 @@ else {
     toks = 0;
     }
 if (flag)                                               /* dev only? */
-    return SCPE_OK;
+    goto Cleanup_Return;
 for (j = 0; j < dptr->numunits; j++) {                  /* loop thru units */
     uptr = dptr->units + j;
     if ((uptr->flags & UNIT_DIS) == 0)
         show_unit (st, dptr, uptr, ucnt + udbl);
     }
+Cleanup_Return:
 if (did_set_dname_len)
     dev_name_len = unit_name_len = 0;
 return SCPE_OK;
 }
 
-void fprint_sep (FILE *st, int32 *tokens)
+void fprint_sep (FILE *st, int32 *tokens, int32 flag)
 {
-fprintf (st, "%s", (*tokens > 0) ? ", " : ((*tokens < 0) ? "" : _sim_dname_space ()));
+fprintf (st, "%s", (*tokens > 0) ? ", " : ((*tokens < 0) ? "" : ((flag == MTAB_VDV) ? _sim_dname_space () : _sim_uname_space ())));
 *tokens += 1;
 if (*tokens == 0)
     *tokens = 1;
@@ -6522,18 +6528,18 @@ else
     else
         toks = 0;
 if (uptr->flags & UNIT_FIX) {
-    fprint_sep (st, &toks);
+    fprint_sep (st, &toks, MTAB_VUN);
     fprint_capac (st, dptr, uptr);
     }
 if (uptr->flags & UNIT_ATT) {
-    fprint_sep (st, &toks);
+    fprint_sep (st, &toks, MTAB_VUN);
     fprintf (st, "attached to %s", sim_attach_name (uptr));
     if (uptr->flags & UNIT_RO)
         fprintf (st, ", read only");
     }
 else {
     if (uptr->flags & UNIT_ATTABLE) {
-        fprint_sep (st, &toks);
+        fprint_sep (st, &toks, MTAB_VUN);
         fprintf (st, "not attached");
         }
     }
@@ -7305,7 +7311,7 @@ for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
             *toks = 0;
             }
         if (r == SCPE_OK)
-            fprint_sep (st, toks);
+            fprint_sep (st, toks, flag);
         r = show_one_mod (st, dptr, uptr, mptr, NULL, 0);
         }
     }
