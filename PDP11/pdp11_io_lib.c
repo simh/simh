@@ -37,6 +37,10 @@
 #include "sim_tmxr.h"
 #include "sim_ether.h"
 
+#if !defined(DEV_MBUS)
+#define DEV_MBUS 0
+#endif
+
 extern int32 int_vec[IPL_HLVL][32];
 #if !defined(VEC_SET)
 #define VEC_SET 0
@@ -321,6 +325,7 @@ int32 i, idx, vec, hivec, ilvl, ibit;
 DEVICE *cdptr;
 size_t j;
 const char *cdname;
+t_stat r = SCPE_OK;
 
 if ((dptr == NULL) || (dibp == NULL))                   /* validate args */
     return SCPE_IERR;
@@ -369,10 +374,10 @@ if (vec && !(sim_switches & SWMASK ('P'))) {
         if (!cdname) {
             cdname = "CPU";
         }
-        return sim_messagef (SCPE_STOP, (DEV_RDX == 16) ? 
-                                        "Device %s interrupt vector conflict with %s at 0x%X\n" :
-                                        "Device %s interrupt vector conflict with %s at 0%o\n",
-                             sim_dname (dptr), cdname, (int)dibp->vec);
+        r = sim_messagef (SCPE_STOP, (DEV_RDX == 16) ? 
+                                     "Device %s interrupt vector at 0x%X through 0x%X conflict with %s at 0x%X through 0x%X\n" :
+                                     "Device %s interrupt vector at 0%o through 0%o conflict with %s at 0%o through 0%o\n",
+                          sim_dname (dptr), vec, hivec, cdname, (int)dibp->vec, (int)cdhivec);
         }
     }
 /* Interrupt slot assignment and conflict check. */
@@ -389,8 +394,8 @@ for (i = 0; i < dibp->vnum; i++) {                      /* loop thru vec */
         (int_ack[ilvl][ibit] != dibp->ack[i])) ||
         (int_vec[ilvl][ibit] && vec &&
         (int_vec[ilvl][ibit] != vec))) {
-        return sim_messagef (SCPE_STOP, "Device %s interrupt slot conflict at %d\n",
-                             sim_dname (dptr), idx);
+        r = sim_messagef (SCPE_STOP, "Device %s interrupt slot conflict at %d\n",
+                          sim_dname (dptr), idx);
         }
     if (dibp->ack[i])
         int_ack[ilvl][ibit] = dibp->ack[i];
@@ -424,10 +429,10 @@ for (i = 0; i < (int32) dibp->lnt; i = i + 2) {         /* create entries */
         if (!cdname) {
             cdname = "CPU";
             }
-        return sim_messagef (SCPE_STOP, (DEV_RDX == 16) ? 
-                                        "Device %s address conflict with %s at 0x%X\n" :
-                                        "Device %s address conflict with %s at 0%o\n",
-                             sim_dname (dptr), cdname, (int)dibp->ba);
+        r = sim_messagef (SCPE_STOP, (DEV_RDX == 16) ? 
+                                     "Device %s address conflict with %s at 0x%X\n" :
+                                     "Device %s address conflict with %s at 0%o\n",
+                          sim_dname (dptr), cdname, (int)dibp->ba);
         }
     if ((dibp->rd == NULL) && (dibp->wr == NULL) && (dibp->vnum == 0)) {
         iodibp[idx] = NULL;                         /* deregister DIB */
@@ -449,12 +454,13 @@ for (j = 0; (cdptr = sim_devices[j]) != NULL; j++) { /* Look for enabled but una
         (cdptr->flags & DEV_DIS)                      || 
         (cdibp == NULL)                               || 
         ((cdptr->flags & (DEV_UBUS | DEV_QBUS)) == 0) ||
+        ((cdptr->flags & DEV_MBUS) != 0)              ||
         ((cdptr->flags & DEV_NOAUTOCON) != 0)         ||
         (cdibp->ba != IOBA_AUTO))
         continue;
-    return sim_messagef (SCPE_STOP, "%s: Missing Address\n", cdptr->name);
+    r = sim_messagef (SCPE_STOP, "%s: Missing Address\n", cdptr->name);
     }
-return SCPE_OK;
+return r;
 }
 
 /* Show IO space */
@@ -478,8 +484,7 @@ if ((sim_switches & SWMASK('H')) || (sim_switch_number == 16))
     rdx = 16;
 vec_fmt = (rdx == 16) ? "X" : "o";
 
-if (build_dib_tab ())                                   /* build IO page */
-    return SCPE_OK;
+build_dib_tab ();                                       /* build IO page */
 
 maxaddr = 0;
 maxvec = 0;
