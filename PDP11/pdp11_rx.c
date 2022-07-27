@@ -190,14 +190,14 @@ MTAB rx_mod[] = {
         &set_writelock, NULL,   NULL, "Write lock floppy drive" },
 #if defined (VM_PDP11)
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 004, "ADDRESS", "ADDRESS",
-      &set_addr, &show_addr, NULL },
+      &set_addr, &show_addr, NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", "VECTOR",
-      &set_vec, &show_vec, NULL },
+      &set_vec, &show_vec, NULL, "Interrupt vector" },
 #else
     { MTAB_XTD|MTAB_VDV, 004, "ADDRESS", NULL,
-      NULL, &show_addr, NULL },
+      NULL, &show_addr, NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
-      NULL, &show_vec, NULL },
+      NULL, &show_vec, NULL, "Interrupt vector" },
 #endif
     { 0 }
     };

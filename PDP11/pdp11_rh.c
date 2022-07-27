@@ -227,9 +227,9 @@ REG mba0_reg[] = {
 
 MTAB mba0_mod[] = {
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0100, "ADDRESS", "ADDRESS",
-      &set_addr, &show_addr, NULL },
+      &set_addr, &show_addr, NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", "VECTOR",
-      &set_vec, &show_vec, NULL },
+      &set_vec, &show_vec, NULL, "Interrupt vector" },
     { 0 }
     };
 
@@ -260,9 +260,9 @@ REG mba1_reg[] = {
 
 MTAB mba1_mod[] = {
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0040, "ADDRESS", "ADDRESS",
-      &set_addr, &show_addr, NULL },
+      &set_addr, &show_addr, NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", "VECTOR",
-      &set_vec, &show_vec, NULL },
+      &set_vec, &show_vec, NULL, "Interrupt vector" },
     { 0 }
     };
 
@@ -293,9 +293,9 @@ REG mba2_reg[] = {
 
 MTAB mba2_mod[] = {
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0040, "ADDRESS", "ADDRESS",
-      &set_addr, &show_addr, NULL },
+      &set_addr, &show_addr, NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", "VECTOR",
-      &set_vec, &show_vec, NULL },
+      &set_vec, &show_vec, NULL, "Interrupt vector" },
     { 0 }
     };
 

@@ -140,9 +140,9 @@ REG uca_reg[] = {
 
 MTAB uc15_mod[] = {
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 006, "ADDRESS", NULL,
-      NULL, &show_addr, NULL },
+      NULL, &show_addr, NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", NULL,
-      NULL, &show_vec, NULL },
+      NULL, &show_vec, NULL, "Interrupt vector" },
     { 0 }
     };
 

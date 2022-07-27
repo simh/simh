@@ -587,7 +587,7 @@ REG cpu_reg[] = {
 
 MTAB cpu_mod[] = {
     { MTAB_XTD|MTAB_VDV, 0, "TYPE", NULL,
-      NULL, &cpu_show_model },
+      NULL, &cpu_show_model, NULL, "Display current model features" },
 #if !defined (UC15)
     { MTAB_XTD|MTAB_VDV, MOD_1103, NULL, "11/03", &cpu_set_model, NULL, NULL, "Set CPU type to 11/03" },
     { MTAB_XTD|MTAB_VDV, MOD_1104, NULL, "11/04", &cpu_set_model, NULL, NULL, "Set CPU type to 11/04" },

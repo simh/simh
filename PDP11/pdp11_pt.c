@@ -111,9 +111,9 @@ REG ptr_reg[] = {
 
 MTAB ptr_mod[] = {
     { MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
-      NULL, &show_addr, NULL },
+      NULL, &show_addr, NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
-      NULL, &show_vec, NULL },
+      NULL, &show_vec, NULL, "Interrupt vector" },
     { 0 }
     };
 
@@ -162,9 +162,9 @@ REG ptp_reg[] = {
 
 MTAB ptp_mod[] = {
     { MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
-      NULL, &show_addr, NULL },
+      NULL, &show_addr, NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
-      NULL, &show_vec, NULL },
+      NULL, &show_vec, NULL, "Interrupt vector" },
     { 0 }
     };
 
