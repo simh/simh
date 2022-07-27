@@ -485,7 +485,8 @@ typedef struct {
 
 #define DZ_MUXES        4                               /* default # of DZ muxes */
 #define VH_MUXES        4                               /* max # of VH muxes */
-#define DLX_LINES       16                              /* max # of KL11/DL11's */
+#define DLX_LINES       16                              /* max # of KL11/DL11-A/DL11-B/DLV11-E/DLV11-F's */
+#define DLCJ_LINES      31                              /* max # of DL11-C/DL11-D/DL11-E/DLV11-J's */
 #define DCX_LINES       16                              /* max # of DC11's */
 #define DUP_LINES       8                               /* max # of DUP11/DPV11's */
 #define KMC_UNITS       2                               /* max # of KMC11s */
@@ -658,6 +659,8 @@ typedef struct pdp_dib DIB;
 #define INT_V_LK        17
 #define INT_V_TDRX      18
 #define INT_V_TDTX      19
+#define INT_V_DLCJI     20
+#define INT_V_DLCJO     21
 
 #define INT_V_PIR3      0                               /* BR3 */
 #define INT_V_PIR2      0                               /* BR2 */
@@ -722,6 +725,8 @@ typedef struct pdp_dib DIB;
 #define INT_TDTX        (1u << INT_V_TDTX)
 #define INT_CH          (1u << INT_V_CH)
 #define INT_NG          (1u << INT_V_NG)
+#define INT_DLCJI       (1u << INT_V_DLCJI)
+#define INT_DLCJO       (1u << INT_V_DLCJO)
 
 #define INT_INTERNAL7   (INT_PIR7)
 #define INT_INTERNAL6   (INT_PIR6 | INT_CLK)
@@ -783,6 +788,8 @@ typedef struct pdp_dib DIB;
 #define IPL_LK          4           /* XXX just a guess */
 #define IPL_TDRX        4
 #define IPL_TDTX        4
+#define IPL_DLCJI       4
+#define IPL_DLCJO       4
 
 #define IPL_PIR7        7
 #define IPL_PIR6        6

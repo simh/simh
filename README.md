@@ -64,7 +64,8 @@ All Simulator updates on Open SIMH will be present in this repository, and any c
 - Display current NOAUTOSIZE status in SHOW VERSION output.
 - Extend logical name support to include optional unique names for units as well as devices.
 - Add extended register sanity checks including duplicate name detection.  Fixed simulator devices with duplicate register names.
-- Simulators with video devices that may be enabled, no longer disable the screen saver until the video display is presented.
+- Simulators with video devices that may be enabled, no longer disable the screen saver until the video display is presented.  Optionally enabling or disabling the OS screen saver by an environment variable.
+- More readable output of SHOW <dev>|<unit> with variable sized DEVICE and UNIT names.
 
 #### Changes to the PDP-11 and VAX simulators
 
@@ -80,6 +81,7 @@ All Simulator updates on Open SIMH will be present in this repository, and any c
 - Properly size RY drives which also don't have DEC144
 - Properly name RQ extended units beyond the initial default units.
 - HELP CPU shows supported breakpoint types.
+- Add device support for DL11-C/DL11-D/DL11-E/DLV11-J in addition to the original KL11/DL11-A/DL11-B/DL11-E/DL11-F support.  These new devices have different bus address ranges and can coexist with the original DL devices.  The new devices are DLCJI and DLCJO and are managed identically to the original DLI and DLO devices.
 
 ### Updates to the Unibus DUP & Qbus DPV device by Trevor Warwick
 
