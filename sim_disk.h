@@ -121,6 +121,8 @@ t_stat sim_disk_set_fmt (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat sim_disk_show_fmt (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat sim_disk_set_capac (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat sim_disk_show_capac (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat sim_disk_set_autosize (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat sim_disk_show_autosize (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat sim_disk_set_asynch (UNIT *uptr, int latency);
 t_stat sim_disk_clr_asynch (UNIT *uptr);
 t_stat sim_disk_reset (UNIT *uptr);

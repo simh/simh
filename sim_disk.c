@@ -50,6 +50,8 @@ Public routines:
    sim_disk_show_fmt         show disk format
    sim_disk_set_capac        set disk capacity
    sim_disk_show_capac       show disk capacity
+   sim_disk_set_autosize     MTAB set autosize
+   sim_disk_show_autosize    MTAB display autosize
    sim_disk_set_async        enable asynchronous operation
    sim_disk_clr_async        disable asynchronous operation
    sim_disk_data_trace       debug support
@@ -594,25 +596,41 @@ t_stat sim_disk_set_noautosize (int32 flag, CONST char *cptr)
 {
 DEVICE *dptr;
 uint32 dev, unit, count = 0;
+int32 saved_sim_show_message = sim_show_message;
 
 if (flag == sim_disk_no_autosize)
     return sim_messagef (SCPE_ARG, "Autosizing is already %sabled!\n", 
                                     sim_disk_no_autosize ? "dis" : "en");
+sim_show_message = FALSE;
 for (dev = 0; (dptr = sim_devices[dev]) != NULL; dev++) {
-    if (((DEV_TYPE (dptr) != DEV_DISK) && (DEV_TYPE (dptr) != DEV_SCSI)) ||
-        ((dptr->flags & DEV_DIS) != 0))
-        continue;
+    t_bool device_disabled = ((dptr->flags & DEV_DIS) != 0);
+
+    if ((DEV_TYPE (dptr) != DEV_DISK) &&
+        (DEV_TYPE (dptr) != DEV_SCSI))                          /* If not a sim_disk device? */
+        continue;                                               /*   skip this device */
+
+    if (device_disabled)
+        dptr->flags &= ~DEV_DIS;                                /* Temporarily enable device */
     ++count;
     for (unit = 0; unit < dptr->numunits; unit++) {
         char cmd[CBUFSIZE];
-        int32 saved_sim_show_message = sim_show_message;
+        t_bool unit_disabled = ((dptr->units[unit].flags & UNIT_DIS) != 0);
 
-        sim_show_message = FALSE;
+        if (unit_disabled &&                                    /* disabled and */
+            ((dptr->units[unit].flags & UNIT_DISABLE) == 0))    /* can't be enabled? */
+             continue;                                          /*  Not a drive unit, so skip. */
+
+        if (unit_disabled)
+            dptr->units[unit].flags &= ~UNIT_DIS;               /* Temporarily enable unit */
         sprintf (cmd, "%s %sAUTOSIZE", sim_uname (&dptr->units[unit]), (flag != 0) ? "NO" : "");
         set_cmd (0, cmd);
-        sim_show_message = saved_sim_show_message;
+        if (unit_disabled)
+            dptr->units[unit].flags |= ~UNIT_DIS;               /* leave unit disabled again */
         }
+    if (device_disabled)
+        dptr->flags |= DEV_DIS;                                 /* leave device the way we found it */
     }
+sim_show_message = saved_sim_show_message;
 if (count == 0)
     return sim_messagef (SCPE_ARG, "No disk devices support autosizing\n");
 sim_disk_no_autosize = flag;
@@ -621,8 +639,40 @@ return SCPE_OK;
 
 t_bool sim_disk_autosize_disabled (void)
 {
-return sim_disk_no_autosize;
+return (sim_disk_no_autosize != 0);
 }
+
+/* Set disk autosize */
+
+t_stat sim_disk_set_autosize (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+if (uptr == NULL)
+    return SCPE_IERR;
+if (cptr != NULL)
+    return sim_messagef (SCPE_ARG, "%s: Unexpected autosize argument: %s\n", sim_uname (uptr), cptr);
+if (sim_disk_no_autosize)
+    return sim_messagef (SCPE_ARG, "%s: Disk autosizing is globally disabled\n", sim_uname (uptr));
+if (val ^ ((uptr->flags & DKUF_NOAUTOSIZE) != 0))
+    return SCPE_OK;
+if (val)
+    uptr->flags &= ~DKUF_NOAUTOSIZE;
+else
+    uptr->flags |= DKUF_NOAUTOSIZE;
+return SCPE_OK;
+}
+
+/* Show disk autosize */
+
+t_stat sim_disk_show_autosize (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+if (sim_disk_no_autosize)
+    fprintf (st, "global noautosize");
+else
+    fprintf (st, "%sautosize", ((uptr->flags & DKUF_NOAUTOSIZE) != 0) ? "no" : "");
+return SCPE_OK;
+}
+
+
 
 /* Test for write protect */
 
@@ -3038,7 +3088,8 @@ if (!(uptr->flags & UNIT_ATTABLE))                      /* not attachable? */
     return SCPE_NOATT;
 if ((dptr = find_dev_from_unit (uptr)) == NULL)
     return SCPE_NOATT;
-if (sim_disk_no_autosize) {
+if ((sim_disk_autosize_disabled ()) ||                  /* global autosize disabled OR */
+    ((uptr->flags & DKUF_NOAUTOSIZE) != 0)) {           /* unit autosize disabled? */
     dontchangecapac = TRUE;
     drivetypes = NULL;
     }
@@ -7067,11 +7118,21 @@ sim_disk_set_noautosize (FALSE, NULL);
 sim_show_message = saved_sim_show_message;
 for (i = 0; NULL != (dptr = sim_devices[i]); i++) {
     DRVTYP *drive;
+    MTAB autos[] = {
+        { MTAB_XTD|MTAB_VUN,        1,  NULL, "AUTOSIZE", 
+            &sim_disk_set_autosize,  NULL, NULL, "Enable disk autosize on attach" },
+        { MTAB_XTD|MTAB_VUN,        0,  NULL, "NOAUTOSIZE", 
+            &sim_disk_set_autosize,  NULL, NULL, "Disable disk autosize on attach"  },
+        { MTAB_XTD|MTAB_VUN,        0,  "AUTOSIZE", NULL, 
+            NULL, &sim_disk_show_autosize, NULL, "Display disk autosize on attach setting" }};
+
     MTAB *mtab = dptr->modifiers;
     MTAB *nmtab = NULL;
     t_stat (*validator)(UNIT *up, int32 v, CONST char *cp, void *dp) = NULL;
     uint32 modifiers = 0;
     uint32 setters = 0;
+    uint32 dumb_autosizers = 0;
+    uint32 smart_autosizers = 0;
     uint32 drives = 0;
     uint32 aliases = 0;
 
@@ -7089,6 +7150,16 @@ for (i = 0; NULL != (dptr = sim_devices[i]); i++) {
     /* find device type modifier entries */
     for (j = 0; mtab[j].mask != 0; j++) {
         ++modifiers;
+        if (((mtab[j].pstring != NULL) && 
+             ((strcasecmp (mtab[j].pstring, "AUTOSIZE") == 0)   ||
+              (strcasecmp (mtab[j].pstring, "NOAUTOSIZE") == 0))) ||
+            ((mtab[j].mstring != NULL) && 
+             ((strcasecmp (mtab[j].mstring, "AUTOSIZE") == 0)   ||
+              (strcasecmp (mtab[j].mstring, "NOAUTOSIZE") == 0))))
+             if ((mtab[j].mask & (MTAB_XTD|MTAB_VUN)) == 0)
+                 ++dumb_autosizers;
+             else
+                 ++smart_autosizers;
         for (k = 0; drive[k].name != NULL; k++) {
             if ((mtab[j].mstring == NULL) || 
                 (strncasecmp (mtab[j].mstring, drive[k].name, strlen (drive[k].name))))
@@ -7103,8 +7174,21 @@ for (i = 0; NULL != (dptr = sim_devices[i]); i++) {
             continue;
         ++setters;
         }
-    nmtab = (MTAB *)calloc (2 + drives + aliases + (modifiers - setters), sizeof (MTAB));
-    for (j = l = 0; mtab[j].mask != 0; j++) {
+    nmtab = (MTAB *)calloc (2 + ((smart_autosizers == 0) * (sizeof (autos)/sizeof (autos[0]))) + drives + aliases + (modifiers - (setters + dumb_autosizers)), sizeof (MTAB));
+    l = 0;
+    if (smart_autosizers == 0) {
+        for (k = 0; k < (sizeof (autos)/sizeof (autos[0])); k++)
+            nmtab[l++] = autos[k];
+        }
+    for (j = 0; mtab[j].mask != 0; j++) {
+        if ((((mtab[j].pstring != NULL) && 
+              ((strcasecmp (mtab[j].pstring, "AUTOSIZE") == 0)   ||
+               (strcasecmp (mtab[j].pstring, "NOAUTOSIZE") == 0))) ||
+             ((mtab[j].mstring != NULL) && 
+              ((strcasecmp (mtab[j].mstring, "AUTOSIZE") == 0)   ||
+               (strcasecmp (mtab[j].mstring, "NOAUTOSIZE") == 0)))) &&
+            ((mtab[j].mask & (MTAB_XTD|MTAB_VUN)) == 0))
+             continue;          /* skip dumb autosizers */
         for (k = 0; drive[k].name != NULL; k++) {
             if ((mtab[j].mstring == NULL) || 
                 (strncasecmp (mtab[j].mstring, drive[k].name, strlen (drive[k].name))))
