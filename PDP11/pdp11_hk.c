@@ -95,7 +95,6 @@ static DRVTYP drv_tab[] = {
 
 #define UNIT_V_DUMMY    (DKUF_V_UF + 0)                 /* dummy flag */
 #define UNIT_DUMMY      (1 << UNIT_V_DUMMY)
-#define UNIT_NOAUTO     DKUF_NOAUTOSIZE
 
 /* Parameters in the unit descriptor */
 
@@ -632,15 +631,11 @@ REG hk_reg[] = {
 
 MTAB hk_mod[] = {
     { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
-        &set_writelock, &show_writelock,   NULL, "Write enable tape drive" },
+        &set_writelock, &show_writelock,   NULL, "Write enable disk drive" },
     { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
-        &set_writelock, NULL,   NULL, "Write lock tape drive" },
+        &set_writelock, NULL,   NULL, "Write lock disk drive" },
     { UNIT_DUMMY,      0, NULL,            "BADBLOCK", 
         &hk_set_bad, NULL, NULL, "write bad block table on last track" },
-    { UNIT_NOAUTO,       0, "autosize", "AUTOSIZE", 
-      NULL, NULL, NULL, "Set type based on file size at attach" },
-    { UNIT_NOAUTO, UNIT_NOAUTO, "noautosize",   "NOAUTOSIZE",   
-      NULL, NULL, NULL, "Disable disk autosize on attach" },
     { MTAB_XTD|MTAB_VUN|MTAB_VALR, 0, "FORMAT", "FORMAT={AUTO|SIMH|VHD|RAW}",
       &sim_disk_set_fmt, &sim_disk_show_fmt, NULL, "Set/Display disk format" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0040, "ADDRESS", "ADDRESS",

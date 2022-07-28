@@ -135,7 +135,6 @@ static DRVTYP drv_tab[] = {
 #define UNIT_BRUSH      (1u << UNIT_V_BRUSH)
 #define UNIT_OFFL       (1u << UNIT_V_OFFL)
 #define UNIT_DUMMY      (1u << UNIT_V_DUMMY)
-#define UNIT_NOAUTO     DKUF_NOAUTOSIZE                 /* autosize disable */
 
 /* Parameters in the unit descriptor */
 
@@ -359,10 +358,6 @@ static const MTAB rl_mod[] = {
         &set_writelock, NULL,   NULL, "Write lock disk drive" },
     { UNIT_DUMMY, 0, NULL, "BADBLOCK", 
         &rl_set_bad, NULL, NULL, "Write bad block table on last track" },
-    { UNIT_NOAUTO,           0, "autosize", "AUTOSIZE", 
-      NULL, NULL, NULL, "Set type based on file size at attach" },
-    { UNIT_NOAUTO, UNIT_NOAUTO, "noautosize",   "NOAUTOSIZE",   
-      NULL, NULL, NULL, "Disable disk autosize on attach" },
     { MTAB_XTD|MTAB_VUN|MTAB_VALR, 0, "FORMAT", "FORMAT={AUTO|SIMH|VHD|RAW}",
       &sim_disk_set_fmt, &sim_disk_show_fmt, NULL, "Set/Display disk format" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 010, "ADDRESS", "ADDRESS",

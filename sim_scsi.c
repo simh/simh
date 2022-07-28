@@ -1685,7 +1685,7 @@ if (uptr->drvtyp == NULL)
 switch (uptr->drvtyp->devtype) {
     case SCSI_DISK:
     case SCSI_WORM:
-        return sim_disk_attach_ex (uptr, cptr, uptr->drvtyp->sectsize, sizeof (uint16), (uptr->flags & SCSI_NOAUTO), SCSI_DBG_DSK, uptr->drvtyp->name, 0, 0, drivetypes);
+        return sim_disk_attach_ex (uptr, cptr, uptr->drvtyp->sectsize, sizeof (uint16), 0, SCSI_DBG_DSK, uptr->drvtyp->name, 0, 0, drivetypes);
     case SCSI_CDROM:
         sim_switches |= SWMASK ('R');       /* Force Read Only Attach for CDROM */
         return sim_disk_attach_ex (uptr, cptr, uptr->drvtyp->sectsize, sizeof (uint16), FALSE, SCSI_DBG_DSK, uptr->drvtyp->name, 0, 0, drivetypes);

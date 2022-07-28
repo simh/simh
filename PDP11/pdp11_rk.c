@@ -126,7 +126,6 @@ static DRVTYP drv_tab[] = {
 #define UNIT_V_SWLK     (DKUF_V_UF + 0)                 /* swre write lock */
 #define UNIT_HWLK       UNIT_WPRT
 #define UNIT_SWLK       (1u << UNIT_V_SWLK)
-#define UNIT_NOAUTO     DKUF_NOAUTOSIZE                 /* autosize disabled */
 
 /* Parameters in the unit descriptor */
 
@@ -405,10 +404,6 @@ MTAB rk_mod[] = {
         &set_writelock, &show_writelock,   NULL, "Write enable tape drive" },
     { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
         &set_writelock, NULL,   NULL, "Write lock tape drive" },
-    { UNIT_NOAUTO,           0, "autosize", "AUTOSIZE", 
-      NULL, NULL, NULL, "Set type based on file size at attach" },
-    { UNIT_NOAUTO, UNIT_NOAUTO, "noautosize",   "NOAUTOSIZE",   
-      NULL, NULL, NULL, "Disable disk autosize on attach" },
     { MTAB_XTD|MTAB_VUN|MTAB_VALR, 0, "FORMAT", "FORMAT={AUTO|SIMH|VHD|RAW}",
       &sim_disk_set_fmt, &sim_disk_show_fmt, NULL, "Set/Display disk format" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 010, "ADDRESS", "ADDRESS",

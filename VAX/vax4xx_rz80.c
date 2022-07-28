@@ -180,8 +180,6 @@ MTAB rz_mod[] = {
         &scsi_set_wlk, &scsi_show_wlk,   NULL, "Write enable drive" },
     { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
         &scsi_set_wlk, NULL,   NULL, "Write lock drive" },
-    { SCSI_NOAUTO, SCSI_NOAUTO, "noautosize", "NOAUTOSIZE", NULL, NULL, NULL, "Disables disk autosize on attach" },
-    { SCSI_NOAUTO,           0, "autosize",   "AUTOSIZE",   NULL, NULL, NULL, "Enables disk autosize on attach" },
     { MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
       &scsi_set_fmt, &scsi_show_fmt, NULL, "Set/Display unit format" },
     { 0 }

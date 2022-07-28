@@ -218,8 +218,6 @@
 #define RD54_MED        0x25644036
 #define RD54_FLGS       DRVFL_NORMV
 
-#define UNIT_NOAUTO     DKUF_NOAUTOSIZE
-
 struct drvtyp {
     int32       sect;                                   /* sectors */
     int32       surf;                                   /* surfaces */
@@ -338,8 +336,6 @@ MTAB rd_mod[] = {
         &set_writelock, &show_writelock,   NULL, "Write enable drive" },
     { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
         &set_writelock, NULL,   NULL, "Write lock drive" },
-    { UNIT_NOAUTO, UNIT_NOAUTO, "noautosize", "NOAUTOSIZE", NULL, NULL, NULL, "Disable disk autosize on attach" },
-    { UNIT_NOAUTO,           0, "autosize",   "AUTOSIZE",   NULL, NULL, NULL, "Enable disk autosize on attach" },
     { MTAB_XTD|MTAB_VUN | MTAB_VALR, 0, "FORMAT", "FORMAT={SIMH|VHD|RAW}",
       &sim_disk_set_fmt, &sim_disk_show_fmt, NULL, "Display disk format" },
     { 0 }

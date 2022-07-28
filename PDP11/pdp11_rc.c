@@ -78,7 +78,6 @@
 #include <math.h>
 
 #define UNIT_GETP(u)    ((u)->capac / (RC_NUMWD * RC_NUMSC * RC_NUMCY))
-#define UNIT_NOAUTO     DKUF_NOAUTOSIZE
 #define UNIT_PLAT       (UNIT_M_PLAT << UNIT_V_PLAT)
 
 /* Constants */
@@ -227,10 +226,12 @@ static const REG rc_reg[] = {
 static const MTAB rc_mod[] = {
     { MTAB_XTD|MTAB_VUN, 0, "PLATTERS", NULL,
         NULL, &sim_disk_show_drive_type, NULL, "Display Platters" },
-    { UNIT_NOAUTO, 0, "autosize", "AUTOSIZE", 
-        NULL, NULL, NULL, "set platters based on file size at ATTACH" },
-    { UNIT_NOAUTO, UNIT_NOAUTO, "noautosize", "NOAUTOSIZE", 
-        NULL, NULL, NULL, "set platters based explicit platter setting" },
+    { MTAB_XTD|MTAB_VUN,        1,  NULL, "AUTOSIZE", 
+        &sim_disk_set_autosize,  NULL, NULL, "set platters based on file size at attach" },
+    { MTAB_XTD|MTAB_VUN,        0,  NULL, "NOAUTOSIZE", 
+        &sim_disk_set_autosize,  NULL, NULL, "set platters based explicit platter setting"  },
+    { MTAB_XTD|MTAB_VUN,        0,  "AUTOSIZE", NULL, 
+        NULL, &sim_disk_show_autosize, NULL, "Display disk autosize on attach setting" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0020, "ADDRESS", "ADDRESS",
       &set_addr, &show_addr, NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR,    0, "VECTOR", "VECTOR",

@@ -159,7 +159,6 @@ extern int32 MMR2;
 #define UNIT_V_ATP      (UNIT_V_ONL + 1)                /* attn pending */
 #define UNIT_ONL        (1 << UNIT_V_ONL)
 #define UNIT_ATP        (1 << UNIT_V_ATP)
-#define UNIT_NOAUTO     DKUF_NOAUTOSIZE                 /* noautosize */
 #define cpkt            us9                             /* current packet */
 #define pktq            us10                            /* packet queue */
 #define uf              buf                             /* settable unit flags */
@@ -1017,7 +1016,7 @@ REG rq_reg[] = {
     };
 
 MTAB rq_mod[] = {
-    { MTAB_XTD|MTAB_VUN,        0,  "write enable", "WRITEENABLED", 
+    { MTAB_XTD|MTAB_VUN,        0,  "writeenable", "WRITEENABLED", 
         &rq_set_wlk, &rq_show_wlk, NULL, "Write enable disk drive" },
     { MTAB_XTD|MTAB_VUN,        1,  NULL, "LOCKED", 
         &rq_set_wlk, NULL, NULL, "Write lock disk drive"  },
@@ -1051,8 +1050,6 @@ MTAB rq_mod[] = {
       &rq_set_plug, &rq_show_plug, NULL, "Set/Display Unit plug value" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, NULL, "DRIVES=val (4-254)",
       &rq_set_drives, NULL, NULL, "Set Number of Drives" },
-    { UNIT_NOAUTO, UNIT_NOAUTO, "noautosize", "NOAUTOSIZE", NULL, NULL, NULL, "Disable disk autosize on attach" },
-    { UNIT_NOAUTO,           0, "autosize",   "AUTOSIZE",   NULL, NULL, NULL, "Enable disk autosize on attach" },
     { MTAB_XTD|MTAB_VUN|MTAB_VALR, 0, "FORMAT", "FORMAT={AUTO|SIMH|VHD|RAW}",
       &sim_disk_set_fmt, &sim_disk_show_fmt, NULL, "Set/Display disk format" },
 #if defined (VM_PDP11)
@@ -2828,13 +2825,11 @@ t_stat rq_attach (UNIT *uptr, CONST char *cptr)
 {
 MSC *cp = rq_ctxmap[uptr->cnum];
 t_stat r;
-t_bool dontchangecapac = (uptr->flags & UNIT_NOAUTO);
 
-if (uptr->drvtyp->flags & RQDF_RO) {
+if (uptr->drvtyp->flags & RQDF_RO)
     sim_switches |= SWMASK ('R');
-    dontchangecapac = FALSE;
-    }
-r = sim_disk_attach_ex (uptr, cptr, RQ_NUMBY, sizeof (uint16), dontchangecapac, DBG_DSK, 
+r = sim_disk_attach_ex (uptr, cptr, RQ_NUMBY, sizeof (uint16), 
+                        ((uptr->drvtyp->flags & RQDF_RO) != 0), DBG_DSK, 
                         uptr->drvtyp->name, 0, 0, NULL);
 if (r != SCPE_OK)
     return r;
