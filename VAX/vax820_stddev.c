@@ -786,8 +786,8 @@ return SCPE_OK;
 
 t_stat clk_svc (UNIT *uptr)
 {
-sim_activate_after (uptr, 10000);
 tmr_poll = sim_rtcn_calb (100, TMR_CLK);
+sim_activate_after (uptr, 10000);
 tmxr_poll = tmr_poll * TMXR_MULT;                       /* set mux poll */
 return SCPE_OK;
 }
