@@ -915,7 +915,7 @@ static const char *devices[] = {
     "KL11/DL11-A/DL11-B",
     "DL11-C/DL11-D/DL11-E",
     "DLV11-E/DLV11-F",
-    "DLV11-J",
+    "DLV11-J/DLV11-E/DLV11-F",
     };
 return devices[((UNIBUS == 0) << 1) + ((dptr != &dli_dev) & (dptr != &dlo_dev))];
 }
