@@ -3721,7 +3721,7 @@ switch (dev->eth_api) {
     break;
   default:
     bpf_used = to_me = 0;                           /* Should NEVER happen */
-    sim_abort ("_eth_callback()", __FILE__, __LINE__);
+    SIM_SCP_ABORT ("_eth_callback()");
     break;
   }
 

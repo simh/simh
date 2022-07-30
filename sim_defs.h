@@ -1145,7 +1145,7 @@ struct MEMFILE {
 #define ASSURE(_Expression) while (!(_Expression)) {                                    \
                                 char buf[512];                                          \
                                 snprintf(buf, sizeof (buf), "%s failed", #_Expression); \
-                                sim_abort (buf, __FILE__, __LINE__);                    \
+                                SIM_SCP_ABORT (buf);                                    \
                                 }
 
 /* Asynch/Threaded I/O support */
@@ -1193,8 +1193,7 @@ extern int32 sim_asynch_inst_latency;
             (_cptr != QUEUE_LIST_END);                          \
             _cptr = _cptr->next)                                \
             if (!_cptr->next)                                   \
-                sim_abort ("Queue Corruption detected",         \
-                           __FILE__, __LINE__);                 \
+                SIM_SCP_ABORT ("Queue Corruption detected");    \
         if (lock)                                               \
             pthread_mutex_unlock (lock);                        \
         } while (0)
@@ -1348,8 +1347,7 @@ extern int32 sim_asynch_inst_latency;
 #endif /* USE_AIO_INTRINSICS */
 #define AIO_VALIDATE(uptr)                                             \
     if (!pthread_equal ( pthread_self(), sim_asynch_main_threadid )) { \
-      sim_abort ("Improper thread context for operation detected",     \
-                 __FILE__, __LINE__);                                  \
+      SIM_SCP_ABORT ("Improper thread context for operation detected");\
       } else (void)0
 #define AIO_CHECK_EVENT                                                \
     if (0 > --sim_asynch_check) {                                      \

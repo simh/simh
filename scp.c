@@ -12339,7 +12339,7 @@ else
 if (uptr->next) {
     char buf[128];
     snprintf (buf, sizeof (buf), "Cancel failed for %s\n", sim_uname(uptr));
-    sim_abort (buf, __FILE__, __LINE__);
+    SIM_SCP_ABORT (buf);
     }
 return SCPE_OK;
 }
@@ -13707,7 +13707,7 @@ return SCPE_OK;
 
 /* Abort and sanely close output files */
 /* This routine should ONLY be called from SCP modules */
-void sim_abort (const char *msg, const char *file, int linenum)
+void _sim_scp_abort (const char *msg, const char *file, int linenum)
 {
 sim_printf ("%s - aborting from %s:%d\n", msg, file, linenum);
 sim_flush_buffered_files ();

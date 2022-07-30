@@ -1154,8 +1154,7 @@ else { /* Bottom End (After I/O processing) */
         case FNC_SEARCH:                                /* search */
         case FNC_SEEK:                                  /* seek */
         case FNC_WRITEH:                                /* write headers stub */
-            sim_abort ("rp_svc() error", __FILE__, __LINE__); /* should NEVER happen */
-            break;
+            return SCPE_IERR;                           /* should NEVER happen */
 
         case FNC_WRITE:                                 /* write */
         case FNC_WCHK:                                  /* write check */

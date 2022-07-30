@@ -234,7 +234,7 @@ if ((!callback) || !ctx->asynch_io)
                 op, (int)(uptr - ctx->dptr->units), _lba, _sects);\
                                                                 \
         if (ctx->callback)      /* horrible mistake, stop */    \
-            sim_abort ("AIO_CALL error", __FILE__, __LINE__);   \
+            SIM_SCP_ABORT ("AIO_CALL error");                   \
         ctx->io_dop = op;                                       \
         ctx->lba = _lba;                                        \
         ctx->buf = _buf;                                        \
@@ -316,7 +316,7 @@ DISK_PCALLBACK callback = ctx->callback;
 sim_debug_unit (ctx->dbit, uptr, "_disk_completion_dispatch(unit=%d, dop=%d, callback=%p)\n", (int)(uptr - ctx->dptr->units), ctx->io_dop, (void *)(ctx->callback));
 
 if (ctx->io_dop != DOP_DONE)
-    sim_abort ("_disk_completion_dispatch()", __FILE__, __LINE__); /* horribly wrong, stop */
+    SIM_SCP_ABORT ("_disk_completion_dispatch()"); /* horribly wrong, stop */
 
 if (ctx->callback && ctx->io_dop == DOP_DONE) {
     ctx->callback = NULL;

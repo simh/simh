@@ -3898,7 +3898,7 @@ while (sim_asynch_enabled) {
             if (select_errno == EINTR)
                 break;
             sim_printf ("select() returned -1, errno=%d - %s\r\n", select_errno, strerror(select_errno));
-            sim_abort ("", __FILE__, __LINE__);
+            SIM_SCP_ABORT ("");
             break;
         default:
             wait_count = 0;
@@ -4015,7 +4015,7 @@ while (sim_asynch_enabled) {
     switch (status) {
         case WAIT_FAILED:
             sim_printf ("WaitForMultipleObjects() Failed, LastError=%d\r\n", GetLastError());
-            sim_abort ("", __FILE__, __LINE__);
+            SIM_SCP_ABORT ("");
             break;
         case WAIT_TIMEOUT:
             sim_debug (TMXR_DBG_ASY, dptr, "_tmxr_serial_poll() - Poll Timeout - %dms\n", timeout_usec/1000);
@@ -4126,7 +4126,7 @@ while (sim_asynch_enabled) {
                        &iosb, 0, 0, buf, 1, 1, term, 0, 0);
     if (status != SS$_NORMAL) {
         sim_printf ("_tmxr_serial_line_poll() - QIO Failed, Status=%d\r\n", status);
-        sim_abort ("", __FILE__, __LINE__);
+        SIM_SCP_ABORT ("");
         }
     wait_count = 0;
     sys$synch (0, &iosb);
