@@ -7155,11 +7155,12 @@ for (i = 0; NULL != (dptr = sim_devices[i]); i++) {
               (strcasecmp (mtab[j].pstring, "NOAUTOSIZE") == 0))) ||
             ((mtab[j].mstring != NULL) && 
              ((strcasecmp (mtab[j].mstring, "AUTOSIZE") == 0)   ||
-              (strcasecmp (mtab[j].mstring, "NOAUTOSIZE") == 0))))
+              (strcasecmp (mtab[j].mstring, "NOAUTOSIZE") == 0)))) {
              if ((mtab[j].mask & (MTAB_XTD|MTAB_VUN)) == 0)
                  ++dumb_autosizers;
              else
                  ++smart_autosizers;
+            }
         for (k = 0; drive[k].name != NULL; k++) {
             if ((mtab[j].mstring == NULL) || 
                 (strncasecmp (mtab[j].mstring, drive[k].name, strlen (drive[k].name))))
