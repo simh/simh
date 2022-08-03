@@ -510,7 +510,7 @@ t_stat vu_event (UNIT *u)
                 while (ch == '\n' || ch == EOF);
                 
             }
-            if (0 == strncmp(vu_gost[num], DISP_END, 7)) {
+            if (0 == strncmp((char *)vu_gost[num], DISP_END, 7)) {
                 // The "dispatcher's end" card, end of card image mode.
                 memset(vu_image[num], 0, 160);
                 vu_image[num][0] = vu_image[num][40] = 0xFFF;
