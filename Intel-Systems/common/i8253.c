@@ -53,6 +53,29 @@ int     i8253_num = 0;
 int     i8253_baseport[] = { -1, -1, -1, -1 }; //base port
 uint8   i8253_intnum[4] = { 0, 0, 0, 0 }; //interrupt number
 uint8   i8253_verb[4] = { 0, 0, 0, 0 }; //verbose flag
+
+uint8   i8253_T0_control_word[4];
+uint8   i8253_T0_flag[4];
+uint16  i8253_T0_load[4];
+uint16  i8253_T0_latch[4];
+uint16  i8253_T0_count[4];
+int     i8253_T0_gate[4];
+int     i8253_T0_out[4];
+uint8   i8253_T1_control_word[4];
+uint8   i8253_T1_flag[4];
+uint16  i8253_T1_load[4];
+uint16  i8253_T1_latch[4];
+uint16  i8253_T1_count[4];
+int     i8253_T1_gate[4];
+int     i8253_T1_out[4];
+uint8   i8253_T2_control_word[4];
+uint8   i8253_T2_flag[4];
+uint16  i8253_T2_load[4];
+uint16  i8253_T2_latch[4];
+uint16  i8253_T2_count[4];
+int     i8253_T2_gate[4];
+int     i8253_T2_out[4];
+
 /* function prototypes */
 
 t_stat i8253_cfg(uint16 base, uint16 devnum, uint8 dummy);
@@ -76,14 +99,10 @@ UNIT i8253_unit[] = {
 };
 
 REG i8253_reg[] = {
-    { HRDATA (T0, i8253_unit[0].u3, 8) },
-    { HRDATA (T1, i8253_unit[0].u4, 8) },
-    { HRDATA (T2, i8253_unit[0].u5, 8) },
-    { HRDATA (CMD, i8253_unit[0].u6, 8) },
-    { HRDATA (T0, i8253_unit[1].u3, 8) },
-    { HRDATA (T1, i8253_unit[1].u4, 8) },
-    { HRDATA (T2, i8253_unit[1].u5, 8) },
-    { HRDATA (CMD, i8253_unit[1].u6, 8) },
+    { URDATAD(T0,i8253_unit[0].u3,16,8,0,4,0,"Timer 0") },
+    { URDATAD(T1,i8253_unit[0].u4,16,8,0,4,0,"Timer 1") },
+    { URDATAD(T2,i8253_unit[0].u5,16,8,0,4,0,"Timer 2") },
+    { URDATAD(CMD,i8253_unit[0].u6,16,8,0,4,0,"Command") },
     { NULL }
 };
 
@@ -92,14 +111,13 @@ DEBTAB i8253_debug[] = {
     { "FLOW", DEBUG_flow },
     { "READ", DEBUG_read },
     { "WRITE", DEBUG_write },
-    { "LEV1", DEBUG_level1 },
-    { "LEV2", DEBUG_level2 },
+    { "XACK", DEBUG_xack },
     { NULL }
 };
 
 MTAB i8253_mod[] = {
     { MTAB_XTD | MTAB_VDV, 0, "PARAM", NULL, NULL, i8253_show_param, NULL, 
-        "show configured parametes for i8253" },
+        "show configured parameters for i8253" },
     { 0 }
 };
 
@@ -110,7 +128,7 @@ DEVICE i8253_dev = {
     i8253_unit,         //units
     i8253_reg,          //registers
     i8253_mod,          //modifiers
-    I8253_NUM,         //numunits
+    4,                  //numunits
     16,                 //aradix
     16,                 //awidth
     1,                  //aincr
@@ -140,16 +158,23 @@ DEVICE i8253_dev = {
 
 t_stat i8253_cfg(uint16 base, uint16 devnum, uint8 dummy)
 {
-    i8253_baseport[devnum] = base & 0xff;
+    UNIT *uptr;
+
+    uptr = i8253_dev.units;
+    i8253_baseport[devnum] = base & BYTEMASK;
     sim_printf("    i8253%d: installed at base port 0%02XH\n",
         devnum, i8253_baseport[devnum]);
     reg_dev(i8253t0, i8253_baseport[devnum], devnum, 0); 
     reg_dev(i8253t1, i8253_baseport[devnum] + 1, devnum, 0); 
     reg_dev(i8253t2, i8253_baseport[devnum] + 2, devnum, 0); 
     reg_dev(i8253c, i8253_baseport[devnum] + 3, devnum, 0);
+    uptr->u6 = i8253_num;
     i8253_num++;
+    sim_activate (uptr, uptr->wait);    /* start poll */
     return SCPE_OK;
 }
+
+// i8253 unconfiguration
 
 t_stat i8253_clr(void)
 {
@@ -189,11 +214,130 @@ t_stat i8253_show_param (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
     return SCPE_OK;
 }
 
-/* i8253_svc - actually gets char & places in buffer */
+/* i8253_svc - actually does timing */
 
 t_stat i8253_svc (UNIT *uptr)
 {
-    sim_activate (&i8253_unit[0], i8253_unit[0].wait); /* continue poll */
+    int devnum;
+    
+    if (uptr == NULL)
+        return SCPE_ARG;
+    devnum = uptr->u6;              //get devnum for unit
+    switch (i8253_T0_control_word[devnum]) {
+        case 0:                 //mode 0    
+            break;
+        case 1:                 //mode 1
+            break;
+        case 2:                 //mode 2 - rate generator
+            if (i8253_T0_gate[devnum]) {
+                i8253_T0_out[devnum] = 0;
+                if (i8253_T0_flag[devnum] == 0x10) {
+                    i8253_T0_count[devnum]--; //decrement counter
+                    if (i8253_T0_count[devnum] == 0) { //if 0, do something
+                        i8253_T0_out[devnum] = 1;
+                        i8253_T0_count[devnum] = i8253_T0_load[devnum];
+                    } else {
+                        i8253_T0_out[devnum] = 1;
+                    }
+                }
+            }
+            break;
+        case 3:                 //mode 3 - square wave rate generator
+            if (i8253_T0_gate[devnum]) {
+                i8253_T0_out[devnum] = 0;
+                if (i8253_T0_flag[devnum] == 0x10) {
+                    i8253_T0_count[devnum]--; //decrement counter
+                    if (i8253_T0_count[devnum] == 0) { //if 0, do something
+                        i8253_T0_out[devnum] = ~i8253_T0_out[devnum];
+                        i8253_T0_count[devnum] = i8253_T0_load[devnum];
+                    } else {
+                        i8253_T0_out[devnum] = 1;
+                    }
+                }
+            }
+            break;
+        case 4:                 //mode 4
+            break;
+        case 5:                 //mode 5              
+            break;
+    }
+    switch (i8253_T1_control_word[devnum]) {
+        case 0:                 //mode 0    
+            break;
+        case 1:                 //mode 1
+            break;
+        case 2:                 //mode 2 - rate generator
+            if (i8253_T1_gate[devnum]) {
+                i8253_T1_out[devnum] = 0;
+                if (i8253_T0_flag[devnum] == 0x20) {
+                    i8253_T1_count[devnum]--; //decrement counter
+                    if (i8253_T1_count[devnum] == 0) { //if 0, do something
+                        i8253_T1_out[devnum] = 1;
+                        i8253_T1_count[devnum] = i8253_T1_load[devnum];
+                    } else {
+                        i8253_T1_out[devnum] = 1;
+                    }
+                }
+            }
+            break;
+        case 3:                 //mode 3 - square wave rate generator
+            if (i8253_T1_gate[devnum]) {
+                i8253_T1_out[devnum] = 0;
+                if (i8253_T0_flag[devnum] == 0x20) {
+                    i8253_T1_count[devnum]--; //decrement counter
+                    if (i8253_T1_count[devnum] == 0) { //if 0, do something
+                        i8253_T1_out[devnum] = ~i8253_T1_out[devnum];
+                        i8253_T1_count[devnum] = i8253_T1_load[devnum];
+                    } else {
+                        i8253_T1_out[devnum] = 1;
+                    }
+                }
+            }
+            break;
+        case 4:                 //mode 4
+            break;
+        case 5:                 //mode 5              
+            break;
+    }
+    switch (i8253_T2_control_word[devnum]) {
+        case 0:                 //mode 0    
+            break;
+        case 1:                 //mode 1
+            break;
+        case 2:                 //mode 2 - rate generator
+            if (i8253_T2_gate[devnum]) {
+                i8253_T2_out[devnum] = 0;
+                if (i8253_T0_flag[devnum] == 0x40) {
+                    i8253_T2_count[devnum]--; //decrement counter
+                    if (i8253_T2_count[devnum] == 0) { //if 0, do something
+                        i8253_T2_out[devnum] = 1;
+                        i8253_T2_count[devnum] = i8253_T2_load[devnum];
+                    } else {
+                        i8253_T2_out[devnum] = 1;
+                    }
+                }
+            }
+            break;
+        case 3:                 //mode 3 - square wave rate generator
+            if (i8253_T2_gate[devnum]) {
+                i8253_T2_out[devnum] = 0;
+                if (i8253_T0_flag[devnum] == 0x40) {
+                    i8253_T2_count[devnum]--; //decrement counter
+                    if (i8253_T2_count[devnum] == 0) { //if 0, do something
+                        i8253_T2_out[devnum] = ~i8253_T2_out[devnum];
+                        i8253_T2_count[devnum] = i8253_T2_load[devnum];
+                    } else {
+                        i8253_T2_out[devnum] = 1;
+                    }
+                }
+            }
+            break;
+        case 4:                 //mode 4
+            break;
+        case 5:                 //mode 5              
+            break;
+    }
+    sim_activate (uptr, uptr->wait);    /* continue poll */
     return SCPE_OK;
 }
 
@@ -201,14 +345,15 @@ t_stat i8253_svc (UNIT *uptr)
 
 t_stat i8253_reset (DEVICE *dptr)
 {
-    uint8 devnum;
-    
-    for (devnum=0; devnum<i8253_num+1; devnum++) {
-        i8253_unit[devnum].u3 = 0;        /* status */
-        i8253_unit[devnum].u4 = 0;        /* mode instruction */
-        i8253_unit[devnum].u5 = 0;        /* command instruction */
-        i8253_unit[devnum].u6 = 0;
-    }
+    int i;
+
+    for (i = 0; i < 4; i++)
+        if (i < i8253_num)
+            i8253_unit[i].flags = 0;
+        else {
+            sim_cancel (&i8253_unit[i]);
+            i8253_unit[i].flags = UNIT_DIS;
+        }
     return SCPE_OK;
 }
 
@@ -218,48 +363,198 @@ t_stat i8253_reset (DEVICE *dptr)
 
 uint8 i8253t0(t_bool io, uint8 data, uint8 devnum)
 {
+    uint8 rl;
+
+    rl = (i8253_T1_control_word[devnum] >> 4) & 0x03;
     if (io == 0) {                  /* read data port */
-        return i8253_unit[devnum].u3;
+        switch (rl) {
+            case 0:                 //counter latching
+                i8253_T1_latch[devnum] = i8253_T1_count[devnum];
+                break;
+            case 1:                 //read/load msb
+                i8253_T1_latch[devnum] = i8253_T1_count[devnum];
+                return (i8253_T1_latch[devnum] >> 8);
+                break;
+            case 2:                 //read/load lsb
+                i8253_T1_latch[devnum] = i8253_T1_count[devnum];
+                return (i8253_T1_latch[devnum] & BYTEMASK);
+                break;
+            case 3:                 //read/load lsb then msb
+                i8253_T1_latch[devnum] = i8253_T1_count[devnum];
+                break;
+        }
+        if ((i8253_T1_flag[devnum] & 0x01) == 0) {
+            i8253_T1_flag[devnum] |= 0x01;
+            return (i8253_T1_latch[devnum] & BYTEMASK);
+        } else {
+            i8253_T1_flag[devnum] &= 0xfe;
+            return (i8253_T1_latch[devnum] >> 8);
+        }
     } else {                        /* write data port */
-        i8253_unit[devnum].u3 = data;
-        //sim_activate_after (&i8253_unit[devnum], );
-        return 0;
+        switch (rl) {
+            case 0:                 //counter latching
+                i8253_T1_latch[devnum] = i8253_T1_count[devnum];
+                break;
+            case 1:                 //read/load msb
+                i8253_T1_load[devnum] = (data << 8);
+                i8253_T1_flag[devnum] |= 0x10;
+                break;
+            case 2:                 //read/load lsb
+                i8253_T1_load[devnum] = data;
+                i8253_T1_flag[devnum] |= 0x10;
+                break;
+            case 3:                 //read/load lsb then msb
+                if ((i8253_T1_flag[devnum] & 0x01) == 0) {
+                    i8253_T1_load[devnum] = data;
+                    i8253_T1_flag[devnum] |= 0x01;
+                } else {
+                    i8253_T1_load[devnum] |= (data << 8);
+                    i8253_T1_flag[devnum] &= 0xfe;
+                    i8253_T1_flag[devnum] |= 0x10;
+                }
+                break;
+        }
     }
     return 0;
 }
 
-//read routine:
-//sim_activate_time(&i8253_unit[devnum])/sim_inst_per_second()
-
 uint8 i8253t1(t_bool io, uint8 data, uint8 devnum)
 {
+    uint8 rl;
+
+    rl = (i8253_T1_control_word[devnum] >> 4) & 0x03;
     if (io == 0) {                  /* read data port */
-        return i8253_unit[devnum].u4;
+        switch (rl) {
+            case 0:                 //counter latching
+                i8253_T1_latch[devnum] = i8253_T1_count[devnum];
+                break;
+            case 1:                 //read/load msb
+                i8253_T1_latch[devnum] = i8253_T1_count[devnum];
+                return (i8253_T1_latch[devnum] >> 8);
+                break;
+            case 2:                 //read/load lsb
+                i8253_T1_latch[devnum] = i8253_T1_count[devnum];
+                return (i8253_T1_latch[devnum] & BYTEMASK);
+                break;
+            case 3:                 //read/load lsb then msb
+                i8253_T1_latch[devnum] = i8253_T1_count[devnum];
+                break;
+        }
+        if ((i8253_T1_flag[devnum] & 0x02) == 0) {
+            i8253_T1_flag[devnum] |= 0x02;
+            return (i8253_T1_latch[devnum] & BYTEMASK);
+        } else {
+            i8253_T1_flag[devnum] &= 0xfd;
+            return (i8253_T1_latch[devnum] >> 8);
+        }
     } else {                        /* write data port */
-        i8253_unit[devnum].u4 = data;
-        return 0;
+        switch (rl) {
+            case 0:                 //counter latching
+                i8253_T1_latch[devnum] = i8253_T1_count[devnum];
+                break;
+            case 1:                 //read/load msb
+                i8253_T1_load[devnum] = (data << 8);
+                i8253_T1_flag[devnum] |= 0x20;
+                break;
+            case 2:                 //read/load lsb
+                i8253_T1_load[devnum] = data;
+                i8253_T1_flag[devnum] |= 0x20;
+                break;
+            case 3:                 //read/load lsb then msb
+                if ((i8253_T1_flag[devnum] & 0x02) == 0) {
+                    i8253_T1_load[devnum] = data;
+                    i8253_T1_flag[devnum] |= 0x02;
+                } else {
+                    i8253_T1_load[devnum] |= (data << 8);
+                    i8253_T1_flag[devnum] &= 0xfd;
+                    i8253_T1_flag[devnum] |= 0x20;
+                }
+                break;
+        }
     }
     return 0;
 }
 
 uint8 i8253t2(t_bool io, uint8 data, uint8 devnum)
 {
+    uint8 rl;
+
+    rl = (i8253_T2_control_word[devnum] >> 4) & 0x03;
     if (io == 0) {                  /* read data port */
-        return i8253_unit[devnum].u5;
+        switch (rl) {
+            case 0:                 //counter latching
+                i8253_T2_latch[devnum] = i8253_T2_count[devnum];
+                break;
+            case 1:                 //read/load msb
+                i8253_T2_latch[devnum] = i8253_T2_count[devnum];
+                return (i8253_T2_latch[devnum] >> 8);
+                break;
+            case 2:                 //read/load lsb
+                i8253_T2_latch[devnum] = i8253_T2_count[devnum];
+                return (i8253_T2_latch[devnum] & BYTEMASK);
+                break;
+            case 3:                 //read/load lsb then msb
+                i8253_T2_latch[devnum] = i8253_T2_count[devnum];
+                break;
+        }
+        if ((i8253_T2_flag[devnum] & 0x04) == 0) {
+            i8253_T2_flag[devnum] |= 0x04;
+            return (i8253_T2_latch[devnum] & BYTEMASK);
+        }
+        else {
+            i8253_T2_flag[devnum] &= 0xfb;
+            return (i8253_T2_latch[devnum] >> 8);
+        }
     } else {                        /* write data port */
-        i8253_unit[devnum].u5 = data;
-        return 0;
+        switch (rl) {
+            case 0:                 //counter latching
+                i8253_T2_latch[devnum] = i8253_T2_count[devnum];
+                break;
+            case 1:                 //read/load msb
+                i8253_T2_load[devnum] = (data << 8);
+                i8253_T2_flag[devnum] |= 0x40;
+                break;
+            case 2:                 //read/load lsb
+                i8253_T2_load[devnum] = data;
+                i8253_T2_flag[devnum] |= 0x40;
+                break;
+            case 3:                 //read/load lsb then msb
+                if ((i8253_T2_flag[devnum] & 0x04) == 0) {
+                    i8253_T2_load[devnum] = data;
+                    i8253_T2_flag[devnum] |= 0x04;
+                } else {
+                    i8253_T2_load[devnum] |= (data << 8);
+                    i8253_T2_flag[devnum] &= 0xfb;
+                    i8253_T2_flag[devnum] |= 0x40;
+                }
+                break;
+        }
     }
     return 0;
 }
 
 uint8 i8253c(t_bool io, uint8 data, uint8 devnum)
 {
+    uint8 sc;
+
     if (io == 0) {                  /* read status port */
-        return i8253_unit[devnum].u6;
+        return 0xff;
     } else {                        /* write data port */
-        i8253_unit[devnum].u6 = data;
-        return 0;
+        sc = (data >> 6) & 0x03;
+        switch (sc) {
+            case 0:
+                i8253_T0_control_word[devnum] = data;
+                i8253_T0_flag[devnum] = 0;
+                break;
+            case 1:
+                i8253_T1_control_word[devnum] = data;
+                i8253_T1_flag[devnum] = 0;
+                break;
+            case 2:
+                i8253_T2_control_word[devnum] = data;
+                i8253_T2_flag[devnum] = 0;
+                break;
+        }
     }
     return 0;
 }

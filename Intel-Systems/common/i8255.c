@@ -152,7 +152,7 @@ MTAB i8255_mod[] = {
 //    { MTAB_XTD | MTAB_VDV, 0, NULL, "INT", &isbc202_set_int,
 //        NULL, NULL, "Sets the interrupt number for i8255"},
     { MTAB_XTD | MTAB_VDV, 0, "PARAM", NULL, NULL, i8255_show_param, NULL, 
-        "show configured parametes for i8255" },
+        "show configured parameters for i8255" },
     { 0 }
 };
 
@@ -161,8 +161,7 @@ DEBTAB i8255_debug[] = {
     { "FLOW", DEBUG_flow },
     { "READ", DEBUG_read },
     { "WRITE", DEBUG_write },
-    { "LEV1", DEBUG_level1 },
-    { "LEV2", DEBUG_level2 },
+    { "XACK", DEBUG_xack },
     { NULL }
 };
 
@@ -204,7 +203,7 @@ t_stat i8255_cfg(uint16 base, uint16 devnum, uint8 dummy)
     DEVICE *dptr;
     
     dptr = find_dev (i8255_dev.name);
-    i8255_baseport[devnum] = base & 0xff;
+    i8255_baseport[devnum] = base & BYTEMASK;
     sim_printf("    i8255%d: installed at base port 0%02XH\n",
         devnum, i8255_baseport[devnum]);
     reg_dev(i8255a, i8255_baseport[devnum], devnum, 0); 
@@ -257,9 +256,7 @@ t_stat i8255_show_param (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 
 t_stat i8255_reset (DEVICE *dptr)
 {
-//    if ((dptr->flags & DEV_DIS) == 0) { // enabled
-        i8255_reset_dev();              //software reset
-//    }
+    i8255_reset_dev();              //software reset
     return SCPE_OK;
 }
 

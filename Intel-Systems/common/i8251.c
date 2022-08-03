@@ -149,7 +149,7 @@ t_stat i8251_svc (UNIT *uptr);
 t_stat i8251_reset (DEVICE *dptr);
 uint8 i8251s(t_bool io, uint8 data, uint8 devnum);
 uint8 i8251d(t_bool io, uint8 data, uint8 devnum);
-void i8251_reset_dev(uint8 devnum);
+void i8251_reset_dev(uint16 devnum);
 
 /* i8251 Standard I/O Data Structures */
 /* up to 4 i8251 devices */
@@ -187,8 +187,6 @@ DEBTAB i8251_debug[] = {
     { "READ", DEBUG_read },
     { "WRITE", DEBUG_write },
     { "XACK", DEBUG_xack },
-    { "LEV1", DEBUG_level1 },
-    { "LEV2", DEBUG_level2 },
     { NULL }
 };
 
@@ -196,7 +194,7 @@ MTAB i8251_mod[] = {
     { UNIT_ANSI, 0, "ANSI", "ANSI", NULL },
     { UNIT_ANSI, UNIT_ANSI, "TTY", "TTY", NULL },
     { MTAB_XTD | MTAB_VDV, 0, "PARAM", NULL, NULL, i8251_show_param, NULL, 
-        "show configured parametes for i8251" },
+        "show configured parameters for i8251" },
     { 0 }
 };
 
@@ -235,11 +233,14 @@ DEVICE i8251_dev = {
 
 t_stat i8251_cfg(uint16 base, uint16 devnum, uint8 dummy)
 {
-    i8251_baseport[devnum] = base & 0xff;
+    i8251_baseport[devnum] = base & BYTEMASK;
     sim_printf("    i8251%d: installed at base port 0%02XH\n",
         devnum, i8251_baseport[devnum]);
     reg_dev(i8251d, i8251_baseport[devnum], devnum, 0); 
     reg_dev(i8251s, i8251_baseport[devnum] + 1, devnum, 0); 
+    i8251_reset_dev(devnum);
+    if (devnum == 0)
+        sim_activate (&i8251_unit[devnum], i8251_unit[devnum].wait); /* activate unit 0 */
     i8251_num++;                    //next device
     return SCPE_OK;
 }
@@ -295,7 +296,7 @@ t_stat i8251_svc (UNIT *uptr)
     if (uptr->flags & UNIT_ANSI)
         uptr->buf = toupper(uptr->buf);
     uptr->u3 |= RXR;               /* Set status */
-    return SCPE_OK;
+      return SCPE_OK;
 }
 
 /* Reset routine */
@@ -304,15 +305,15 @@ t_stat i8251_reset (DEVICE *dptr)
 {
     uint8 devnum;
     
-    for (devnum=0; devnum<I8251_NUM; devnum++) {
+    for (devnum=0; devnum<i8251_num+1; devnum++) {
         i8251_reset_dev(devnum);
         if (devnum == 0)
-            sim_activate (&i8251_unit[devnum], i8251_unit[devnum].wait); /* activate unit */
+            sim_activate (&i8251_unit[devnum], i8251_unit[devnum].wait); /* activate unit 0 */
     }
     return SCPE_OK;
 }
 
-void i8251_reset_dev(uint8 devnum)
+void i8251_reset_dev(uint16 devnum)
 {
     i8251_unit[devnum].u3 = TXR + TXE;          /* status */
     i8251_unit[devnum].u4 = 0;                  /* mode instruction */
@@ -340,7 +341,7 @@ uint8 i8251s(t_bool io, uint8 data, uint8 devnum)
             i8251_unit[devnum].u6 = 1;  /* set cmd received */
         }
     }
-    return 0;
+     return 0;
 }
 
 uint8 i8251d(t_bool io, uint8 data, uint8 devnum)

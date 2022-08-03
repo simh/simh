@@ -78,8 +78,7 @@ DEBTAB irq_debug[] = {
     { "FLOW", DEBUG_flow },
     { "READ", DEBUG_read },
     { "WRITE", DEBUG_write },
-    { "LEV1", DEBUG_level1 },
-    { "LEV2", DEBUG_level2 },
+    { "XACK", DEBUG_xack },
     { NULL }
 };
 
@@ -119,7 +118,7 @@ DEVICE irq_dev = {
 t_stat irq_reset(DEVICE *dptr)
 {
 //    if (SBC_reset(NULL) == 0) { 
-        sim_printf("  Interrupt: Reset\n");
+//        sim_printf("  Interrupt: Reset\n");
         sim_activate (&irq_unit, irq_unit.wait); /* activate unit */
         return SCPE_OK;
 //    } else {

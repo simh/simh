@@ -70,14 +70,12 @@ DEBTAB ipc_cont_debug[] = {
     { "READ", DEBUG_read },
     { "WRITE", DEBUG_write },
     { "XACK", DEBUG_xack },
-    { "LEV1", DEBUG_level1 },
-    { "LEV2", DEBUG_level2 },
     { NULL }
 };
 
 MTAB ipc_cont_mod[] = {
     { MTAB_XTD | MTAB_VDV, 0, "PARAM", NULL, NULL, ipc_cont_show_param, NULL, 
-        "show configured parametes for ipc_cont" },
+        "show configured parameters for ipc_cont" },
     { 0 }
 };
 
@@ -112,9 +110,9 @@ DEVICE ipc_cont_dev = {
 
 t_stat ipc_cont_cfg(uint16 base, uint16 devnum, uint8 dummy)
 {
-    sim_printf("    ipc-cont: at port 0%02XH\n",
-        base & 0xFF);
-    ipc_cont_baseport = base & 0xff;
+    sim_printf("    ipc-cont: installed at base port 0%02XH\n",
+        base & BYTEMASK);
+    ipc_cont_baseport = base & BYTEMASK;
     reg_dev(ipc_cont, base, 0, 0); 
     return SCPE_OK;
 }

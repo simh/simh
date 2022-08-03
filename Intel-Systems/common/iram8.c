@@ -70,7 +70,7 @@ MTAB RAM_mod[] = {
     { MTAB_XTD | MTAB_VDV, 0, NULL, "SIZE", &RAM_set_size,
         NULL, NULL, "Sets the size for RAM"},
     { MTAB_XTD | MTAB_VDV, 0, "PARAM", NULL, NULL, RAM_show_param, NULL, 
-        "show configured parametes for RAM" },
+        "show configured parameters for RAM" },
     { 0 }
 };
 
@@ -80,8 +80,6 @@ DEBTAB RAM_debug[] = {
     { "READ", DEBUG_read },
     { "WRITE", DEBUG_write },
     { "XACK", DEBUG_xack },
-    { "LEV1", DEBUG_level1 },
-    { "LEV2", DEBUG_level2 },
     { NULL }
 };
 
@@ -212,14 +210,14 @@ uint8 RAM_get_mbyte(uint16 addr)
     uint8 val;
 
     val = *((uint8 *)RAM_unit.filebuf + (addr - RAM_unit.u3));
-    return (val & 0xFF);
+    return (val & BYTEMASK);
 }
 
 /*  put a byte into memory */
 
 void RAM_put_mbyte(uint16 addr, uint8 val)
 {
-    *((uint8 *)RAM_unit.filebuf + (addr - RAM_unit.u3)) = val & 0xFF;
+    *((uint8 *)RAM_unit.filebuf + (addr - RAM_unit.u3)) = val & BYTEMASK;
     return;
 }
 

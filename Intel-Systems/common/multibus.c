@@ -34,7 +34,6 @@
 
 #include "system_defs.h"
 
-#define BASE_ADDR       u3    
 #define multibus_NAME   "Intel Multibus Interface"
 
 /* function prototypes */
@@ -81,8 +80,7 @@ DEBTAB multibus_debug[] = {
     { "FLOW", DEBUG_flow },
     { "READ", DEBUG_read },
     { "WRITE", DEBUG_write },
-    { "LEV1", DEBUG_level1 },
-    { "LEV2", DEBUG_level2 },
+    { "XACK", DEBUG_xack },
     { NULL }
 };
 
@@ -122,7 +120,7 @@ DEVICE multibus_dev = {
 t_stat multibus_reset(DEVICE *dptr)
 {
 //    if (SBC_reset(NULL) == 0) { 
-        sim_printf("  Multibus: Reset\n");
+//        sim_printf("  Multibus: Reset\n");
         sim_activate (&multibus_unit, multibus_unit.wait); /* activate unit */
         return SCPE_OK;
 //    } else {
@@ -145,15 +143,15 @@ uint8 multibus_get_mbyte(uint16 addr)
 {
     SET_XACK(0);                        /* set no XACK */
     if ((isbc464_dev.flags & DEV_DIS) == 0) { //ROM is enabled
-        if (addr >= isbc464_dev.units->BASE_ADDR && 
-        addr < (isbc464_dev.units->BASE_ADDR + isbc464_dev.units->capac)) {
+        if (addr >= isbc464_dev.units->u3 && 
+        addr < (isbc464_dev.units->u3 + isbc464_dev.units->capac)) {
             SET_XACK(1);            //set xack
             return(isbc464_get_mbyte(addr));
         }
     }
     if ((isbc064_dev.flags & DEV_DIS) == 0) { //iSBC 064 is enabled
-        if (addr >= isbc064_dev.units->BASE_ADDR && 
-        addr < (isbc064_dev.units->BASE_ADDR + isbc064_dev.units->capac)) {
+        if (addr >= isbc064_dev.units->u3 && 
+        addr < (isbc064_dev.units->u3 + isbc064_dev.units->capac)) {
             SET_XACK(1);            //set xack
             return (isbc064_get_mbyte(addr));
         }
@@ -165,8 +163,8 @@ void multibus_put_mbyte(uint16 addr, uint8 val)
 {
     SET_XACK(0);                        /* set no XACK */
     if ((isbc064_dev.flags & DEV_DIS) == 0) { //device is enabled
-        if (addr >= isbc064_dev.units->BASE_ADDR && 
-        addr < (isbc064_dev.units->BASE_ADDR + isbc064_dev.units->capac)) {
+        if (addr >= isbc064_dev.units->u3 && 
+        addr < (isbc064_dev.units->u3 + isbc064_dev.units->capac)) {
             SET_XACK(1);            //set xack
             isbc064_put_mbyte(addr, val);
         }

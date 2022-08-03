@@ -471,6 +471,8 @@
  
 #define isbc208_NAME    "Intel iSBC 208 Floppy Disk Controller Board"
 
+#define SBC208_INT      INT_1
+
 /* internal function prototypes */
  
 t_stat isbc208_cfg(uint16 baseport, uint16 size, uint8 devnum);
@@ -647,9 +649,7 @@ DEBTAB isbc208_debug[] = {
     { "FLOW", DEBUG_flow },
     { "READ", DEBUG_read },
     { "WRITE", DEBUG_write },
-    { "LEV1", DEBUG_level1 },
-    { "LEV2", DEBUG_level2 },
-    { "REG", DEBUG_reg },
+    { "XACK", DEBUG_xack },
     { NULL }
 };
  
@@ -860,8 +860,8 @@ t_stat isbc208_svc (UNIT *uptr)
             ssize = 128 << secn;    // size of sector (bytes)
             bpt = ssize * spt;      // bytes/track
             bpc = bpt * 2;          // bytes/cylinder
-//            sim_printf("208 Read: FDD=%d h=%d s=%d t=%d n=%d secsiz=%d spt=%d PCX=%04X\n",
-//                drv, h, sec, cyl, secn, ssize, spt, PCX);
+            sim_printf("208 Read: FDD=%d h=%d s=%d t=%d n=%d secsiz=%d spt=%d PCX=%04X\n",
+                drv, h, sec, cyl, secn, ssize, spt, PCX);
             if ((fddst[uptr->u6] & RDY) == 0) { // drive not ready
                 i8272_r0 = IC_ABNORM | NR | hed | drv; /* command done - Not ready error*/
                 i8272_r3 = fddst[uptr->u6];
@@ -933,7 +933,7 @@ t_stat isbc208_svc (UNIT *uptr)
                 /*
                 fp = fopen(uptr->filename, "wb"); // write out modified image
                 for (i=0; i<uptr->capac; i++) {
-                    c = *(isbc208_buf[uptr->u6] + i) & 0xFF;
+                    c = *(isbc208_buf[uptr->u6] + i) & BYTEMASK;
                     fputc(c, fp);
                 }
                 fclose(fp);
@@ -1192,7 +1192,7 @@ uint8 isbc208_r0(t_bool io, uint8 data, uint8 devnum)
             return (i8237_r0 >> 8);
         } else {                        /* low byte */
             i8237_rD++;
-            return (i8237_r0 & 0xFF);
+            return (i8237_r0 & BYTEMASK);
         }
     } else {                            /* write baseport & current address CH 0 */
         if (i8237_rD) {                 /* high byte */
@@ -1200,7 +1200,7 @@ uint8 isbc208_r0(t_bool io, uint8 data, uint8 devnum)
             i8237_r0 |= (data << 8);
         } else {                        /* low byte */
             i8237_rD++;
-            i8237_r0 = data & 0xFF;
+            i8237_r0 = data & BYTEMASK;
         }
         return 0;
     }
@@ -1214,7 +1214,7 @@ uint8 isbc208_r1(t_bool io, uint8 data, uint8 devnum)
             return (i8237_r1 >> 8);
         } else {                        /* low byte */
             i8237_rD++;
-            return (i8237_r1 & 0xFF);
+            return (i8237_r1 & BYTEMASK);
         }
     } else {                            /* write baseport & current address CH 0 */
         if (i8237_rD) {                 /* high byte */
@@ -1222,7 +1222,7 @@ uint8 isbc208_r1(t_bool io, uint8 data, uint8 devnum)
             i8237_r1 |= (data << 8);
         } else {                        /* low byte */
             i8237_rD++;
-            i8237_r1 = data & 0xFF;
+            i8237_r1 = data & BYTEMASK;
         }
         return 0;
     }
@@ -1236,7 +1236,7 @@ uint8 isbc208_r2(t_bool io, uint8 data, uint8 devnum)
             return (i8237_r2 >> 8);
         } else {                        /* low byte */
             i8237_rD++;
-            return (i8237_r2 & 0xFF);
+            return (i8237_r2 & BYTEMASK);
         }
     } else {                            /* write baseport & current address CH 1 */
         if (i8237_rD) {                 /* high byte */
@@ -1244,7 +1244,7 @@ uint8 isbc208_r2(t_bool io, uint8 data, uint8 devnum)
             i8237_r2 |= (data << 8);
         } else {                        /* low byte */
             i8237_rD++;
-            i8237_r2 = data & 0xFF;
+            i8237_r2 = data & BYTEMASK;
         }
         return 0;
     }
@@ -1258,7 +1258,7 @@ uint8 isbc208_r3(t_bool io, uint8 data, uint8 devnum)
             return (i8237_r3 >> 8);
         } else {                        /* low byte */
             i8237_rD++;
-            return (i8237_r3 & 0xFF);
+            return (i8237_r3 & BYTEMASK);
         }
     } else {                            /* write baseport & current address CH 1 */
         if (i8237_rD) {                 /* high byte */
@@ -1266,7 +1266,7 @@ uint8 isbc208_r3(t_bool io, uint8 data, uint8 devnum)
             i8237_r3 |= (data << 8);
         } else {                        /* low byte */
             i8237_rD++;
-            i8237_r3 = data & 0xFF;
+            i8237_r3 = data & BYTEMASK;
         }
         return 0;
     }
@@ -1280,7 +1280,7 @@ uint8 isbc208_r4(t_bool io, uint8 data, uint8 devnum)
             return (i8237_r4 >> 8);
         } else {                        /* low byte */
             i8237_rD++;
-            return (i8237_r4 & 0xFF);
+            return (i8237_r4 & BYTEMASK);
         }
     } else {                            /* write baseport & current address CH 2 */
         if (i8237_rD) {                 /* high byte */
@@ -1288,7 +1288,7 @@ uint8 isbc208_r4(t_bool io, uint8 data, uint8 devnum)
             i8237_r4 |= (data << 8);
         } else {                        /* low byte */
             i8237_rD++;
-            i8237_r4 = data & 0xFF;
+            i8237_r4 = data & BYTEMASK;
         }
         return 0;
     }
@@ -1302,7 +1302,7 @@ uint8 isbc208_r5(t_bool io, uint8 data, uint8 devnum)
             return (i8237_r5 >> 8);
         } else {                        /* low byte */
             i8237_rD++;
-            return (i8237_r5 & 0xFF);
+            return (i8237_r5 & BYTEMASK);
         }
     } else {                            /* write baseport & current address CH 2 */
         if (i8237_rD) {                 /* high byte */
@@ -1310,7 +1310,7 @@ uint8 isbc208_r5(t_bool io, uint8 data, uint8 devnum)
             i8237_r5 |= (data << 8);
         } else {                        /* low byte */
             i8237_rD++;
-            i8237_r5 = data & 0xFF;
+            i8237_r5 = data & BYTEMASK;
         }
         return 0;
     }
@@ -1324,7 +1324,7 @@ uint8 isbc208_r6(t_bool io, uint8 data, uint8 devnum)
             return (i8237_r6 >> 8);
         } else {                        /* low byte */
             i8237_rD++;
-            return (i8237_r6 & 0xFF);
+            return (i8237_r6 & BYTEMASK);
         }
     } else {                            /* write baseport & current address CH 3 */
         if (i8237_rD) {                 /* high byte */
@@ -1332,7 +1332,7 @@ uint8 isbc208_r6(t_bool io, uint8 data, uint8 devnum)
             i8237_r6 |= (data << 8);
         } else {                        /* low byte */
             i8237_rD++;
-            i8237_r6 = data & 0xFF;
+            i8237_r6 = data & BYTEMASK;
         }
         return 0;
     }
@@ -1346,7 +1346,7 @@ uint8 isbc208_r7(t_bool io, uint8 data, uint8 devnum)
             return (i8237_r7 >> 8);
         } else {                        /* low byte */
             i8237_rD++;
-            return (i8237_r7 & 0xFF);
+            return (i8237_r7 & BYTEMASK);
         }
     } else {                            /* write baseport & current address CH 3 */
         if (i8237_rD) {                 /* high byte */
@@ -1354,7 +1354,7 @@ uint8 isbc208_r7(t_bool io, uint8 data, uint8 devnum)
             i8237_r7 |= (data << 8);
         } else {                        /* low byte */
             i8237_rD++;
-            i8237_r7 = data & 0xFF;
+            i8237_r7 = data & BYTEMASK;
         }
         return 0;
     }
@@ -1365,7 +1365,7 @@ uint8 isbc208_r8(t_bool io, uint8 data, uint8 devnum)
     if (io == 0) {                      /* read status register */
         return (i8237_r8);
     } else {                            /* write command register */
-        i8237_r9 = data & 0xFF;
+        i8237_r9 = data & BYTEMASK;
         return 0;
     }
 }
@@ -1375,7 +1375,7 @@ uint8 isbc208_r9(t_bool io, uint8 data, uint8 devnum)
     if (io == 0) {
         return 0;
     } else {                            /* write request register */
-        i8237_rC = data & 0xFF;
+        i8237_rC = data & BYTEMASK;
         return 0;
     }
 }
@@ -1420,7 +1420,7 @@ uint8 isbc208_rB(t_bool io, uint8 data, uint8 devnum)
     if (io == 0) {
         return 0;
     } else {                            /* write mode register */
-        i8237_rA = data & 0xFF;
+        i8237_rA = data & BYTEMASK;
         return 0;
     }
 }
@@ -1480,7 +1480,7 @@ uint8 isbc208_r12(t_bool io, uint8 data, uint8 devnum)
     if (io == 0) {                      /* read interrupt status */
         return (isbc208_i);
     } else {                            /* write controller auxillary port */ 
-        isbc208_a = data & 0xFF;
+        isbc208_a = data & BYTEMASK;
         return 0;
     }
 }
@@ -1500,7 +1500,7 @@ uint8 isbc208_r14(t_bool io, uint8 data, uint8 devnum)
     if (io == 0) {
         return 0;
     } else {                            /* Low-Byte Segment Address Register */ 
-        isbc208_sr = data & 0xFF;
+        isbc208_sr = data & BYTEMASK;
         return 0;
     }
 }
