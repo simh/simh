@@ -873,10 +873,12 @@ else
 
 t_stat clk_reset (DEVICE *dptr)
 {
-if (clk_unit.filebuf == NULL) {                         /* make sure the TODR is initialized */
-    clk_unit.filebuf = calloc(sizeof(TOY), 1);
+if ((clk_unit.filebuf == NULL) ||                       /* make sure the TODR is initialized */
+    (sim_switches & SWMASK ('P'))) {
+    clk_unit.filebuf = realloc(clk_unit.filebuf, sizeof(TOY));
     if (clk_unit.filebuf == NULL)
         return SCPE_MEM;
+    memset (clk_unit.filebuf, 0, sizeof(TOY));
     }
 todr_resync ();
 sim_activate_after (&clk_unit, 10000);
@@ -886,8 +888,8 @@ return SCPE_OK;
 
 t_stat clk_svc (UNIT *uptr)
 {
-sim_activate_after (uptr, 10000);
 tmr_poll = sim_rtcn_calb (100, TMR_CLK);
+sim_activate_after (uptr, 10000);
 tmxr_poll = tmr_poll * TMXR_MULT;                       /* set mux poll */
 return SCPE_OK;
 }

@@ -289,7 +289,7 @@ DEVICE va_dev = {
     3, DEV_RDX, 20, 1, DEV_RDX, 8,
     NULL, NULL, &va_reset,
     NULL, NULL, NULL,
-    &va_dib, DEV_DIS | DEV_QBUS | DEV_DEBUG, 0,
+    &va_dib, DEV_DIS | DEV_QBUS | DEV_DEBUG | DEV_DISPLAY, 0,
     va_debug, NULL, NULL, &va_help, NULL, NULL,
     &va_description
     };

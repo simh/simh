@@ -1,4 +1,4 @@
-/*  mds210_sys.c: multibus system interface
+/*  imds_sys.c: multibus system interface
 
     Copyright (c) 2017, William A. Beech
 

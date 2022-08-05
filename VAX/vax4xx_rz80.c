@@ -114,11 +114,6 @@
 
 #define UA_SELECT       0
 
-#define UNIT_V_DTYPE    (SCSI_V_UF + 0)                 /* drive type */
-#define UNIT_M_DTYPE    0x1F
-#define UNIT_DTYPE      (UNIT_M_DTYPE << UNIT_V_DTYPE)
-#define GET_DTYPE(x)    (((x) >> UNIT_V_DTYPE) & UNIT_M_DTYPE)
-
 typedef struct {
     uint32 cnum;                                        /* ctrl number */
     uint8 odata;                                        /* output data */
@@ -144,8 +139,6 @@ t_stat rz_isvc (UNIT *uptr);
 t_stat rz_reset (DEVICE *dptr);
 t_stat rz_attach (UNIT *uptr, CONST char *cptr);
 t_stat rz_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
-t_stat rz_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
-t_stat rz_show_type (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 void rz_update_status (CTLR *rz);
 void rz_setint (CTLR *rz, uint32 flags);
 void rz_clrint (CTLR *rz);
@@ -163,25 +156,7 @@ const char *rz_description (DEVICE *dptr);
 
 CTLR rz_ctx = { 0 };
 
-UNIT rz_unit[] = {
-    { UDATA (&rz_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
-            (RZ23_DTYPE << UNIT_V_DTYPE), RZ_SIZE (RZ23)) },
-    { UDATA (&rz_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
-            (RZ23_DTYPE << UNIT_V_DTYPE), RZ_SIZE (RZ23)) },
-    { UDATA (&rz_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
-            (RZ23_DTYPE << UNIT_V_DTYPE), RZ_SIZE (RZ23)) },
-    { UDATA (&rz_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
-            (RZ23_DTYPE << UNIT_V_DTYPE), RZ_SIZE (RZ23)) },
-    { UDATA (&rz_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
-            (RZ23_DTYPE << UNIT_V_DTYPE), RZ_SIZE (RZ23)) },
-    { UDATA (&rz_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
-            (RZ23_DTYPE << UNIT_V_DTYPE), RZ_SIZE (RZ23)) },
-    { UDATA (&rz_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
-            (RZ23_DTYPE << UNIT_V_DTYPE), RZ_SIZE (RZ23)) },
-    { UDATA (&rz_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
-            (RZ23_DTYPE << UNIT_V_DTYPE), RZ_SIZE (RZ23)) },
-    { UDATA (&rz_isvc, UNIT_DIS, 0) }
-    };
+UNIT rz_unit[RZ_NUMDR + 1] = {{0}};
 
 REG rz_reg[] = {
     { FLDATAD ( INT,    int_req[IPL_SCA], INT_V_SCA, "interrupt pending flag") },
@@ -205,70 +180,9 @@ MTAB rz_mod[] = {
         &scsi_set_wlk, &scsi_show_wlk,   NULL, "Write enable drive" },
     { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
         &scsi_set_wlk, NULL,   NULL, "Write lock drive" },
-    { MTAB_XTD|MTAB_VUN, RZ23_DTYPE, NULL, "RZ23",
-      &rz_set_type, NULL, NULL, "Set RZ23 Disk Type" },
-    { MTAB_XTD|MTAB_VUN, RZ23L_DTYPE, NULL, "RZ23L",
-      &rz_set_type, NULL, NULL, "Set RZ23L Disk Type" },
-    { MTAB_XTD|MTAB_VUN, RZ24_DTYPE, NULL, "RZ24",
-      &rz_set_type, NULL, NULL, "Set RZ24 Disk Type" },
-    { MTAB_XTD|MTAB_VUN, RZ24L_DTYPE, NULL, "RZ24L",
-      &rz_set_type, NULL, NULL, "Set RZ24L Disk Type" },
-    { MTAB_XTD|MTAB_VUN, RZ25_DTYPE, NULL, "RZ25",
-      &rz_set_type, NULL, NULL, "Set RZ25 Disk Type" },
-    { MTAB_XTD|MTAB_VUN, RZ25L_DTYPE, NULL, "RZ25L",
-      &rz_set_type, NULL, NULL, "Set RZ25L Disk Type" },
-    { MTAB_XTD|MTAB_VUN, RZ26_DTYPE, NULL, "RZ26",
-      &rz_set_type, NULL, NULL, "Set RZ26 Disk Type" },
-    { MTAB_XTD|MTAB_VUN, RZ26L_DTYPE, NULL, "RZ26L",
-      &rz_set_type, NULL, NULL, "Set RZ26L Disk Type" },
-    { MTAB_XTD|MTAB_VUN, RZ55_DTYPE, NULL, "RZ55",
-      &rz_set_type, NULL, NULL, "Set RZ55 Disk Type" },
-    { MTAB_XTD|MTAB_VUN, RRD40_DTYPE, NULL, "CDROM",
-      &rz_set_type, NULL, NULL, "Set RRD40 Disk Type" },
-    { MTAB_XTD|MTAB_VUN, RRD40_DTYPE, NULL, "RRD40",
-      &rz_set_type, NULL, NULL, "Set RRD40 Disk Type" },
-    { MTAB_XTD|MTAB_VUN, RRD42_DTYPE, NULL, "RRD42",
-      &rz_set_type, NULL, NULL, "Set RRD42 Disk Type" },
-    { MTAB_XTD|MTAB_VUN, RRW11_DTYPE, NULL, "RRW11",
-      &rz_set_type, NULL, NULL, "Set RRW11 Disk Type" },
-    { MTAB_XTD|MTAB_VUN, CDW900_DTYPE, NULL, "CDW900",
-      &rz_set_type, NULL, NULL, "Set SONY CDW-900E Disk Type" },
-    { MTAB_XTD|MTAB_VUN, XR1001_DTYPE, NULL, "XR1001",
-      &rz_set_type, NULL, NULL, "Set JVC XR-W1001 Disk Type" },
-    { MTAB_XTD|MTAB_VUN, TZK50_DTYPE, NULL, "TZK50",
-      &rz_set_type, NULL, NULL, "Set DEC TZK50 Tape Type" },
-    { MTAB_XTD|MTAB_VUN, TZ30_DTYPE, NULL, "TZ30",
-      &rz_set_type, NULL, NULL, "Set DEC TZ30 Tape Type" },
-    { MTAB_XTD|MTAB_VUN|MTAB_VALR, RZU_DTYPE, NULL, "RZUSER",
-      &rz_set_type, NULL, NULL, "Set RZUSER=size Disk Type" },
-    { MTAB_XTD|MTAB_VUN, 0, "TYPE", NULL,
-      NULL, &rz_show_type, NULL, "Display device type" },
-    { SCSI_NOAUTO, SCSI_NOAUTO, "noautosize", "NOAUTOSIZE", NULL, NULL, NULL, "Disables disk autosize on attach" },
-    { SCSI_NOAUTO,           0, "autosize",   "AUTOSIZE",   NULL, NULL, NULL, "Enables disk autosize on attach" },
     { MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
       &scsi_set_fmt, &scsi_show_fmt, NULL, "Set/Display unit format" },
     { 0 }
-    };
-
-static const char *drv_types[] = {
-    "RZ23",
-    "RZ23L",
-    "RZ24",
-    "RZ24L",
-    "RZ25",
-    "RZ25L",
-    "RZ26",
-    "RZ26L",
-    "RZ55",
-    "CDROM",
-    "RRD40",
-    "RRD42",
-    "RRW11",
-    "CDW900",
-    "XR1001",
-    "TZK50",
-    "TZ30",
-    "RZUSER"
     };
 
 DEVICE rz_dev = {
@@ -276,9 +190,9 @@ DEVICE rz_dev = {
     RZ_NUMDR + 1, DEV_RDX, 31, 1, DEV_RDX, 8,
     NULL, NULL, &rz_reset,
     NULL, &rz_attach, &scsi_detach,
-    NULL, DEV_DEBUG | DEV_DISK | DEV_SECTORS | RZ_FLAGS,
+    NULL, DEV_DEBUG | DEV_SCSI | DEV_SECTORS | RZ_FLAGS,
     0, rz_debug, NULL, NULL, &rz_help, NULL, NULL,
-    &rz_description
+    &rz_description, NULL, &drv_tab
     };
 
 /* RZB data structures
@@ -294,25 +208,7 @@ DIB rzb_dib = {
     RZ_ROM_INDEX, BOOT_CODE_ARRAY, BOOT_CODE_SIZE
     };
 
-UNIT rzb_unit[] = {
-    { UDATA (&rz_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
-            (RZ23_DTYPE << UNIT_V_DTYPE), RZ_SIZE (RZ23)) },
-    { UDATA (&rz_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
-            (RZ23_DTYPE << UNIT_V_DTYPE), RZ_SIZE (RZ23)) },
-    { UDATA (&rz_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
-            (RZ23_DTYPE << UNIT_V_DTYPE), RZ_SIZE (RZ23)) },
-    { UDATA (&rz_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
-            (RZ23_DTYPE << UNIT_V_DTYPE), RZ_SIZE (RZ23)) },
-    { UDATA (&rz_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
-            (RZ23_DTYPE << UNIT_V_DTYPE), RZ_SIZE (RZ23)) },
-    { UDATA (&rz_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
-            (RZ23_DTYPE << UNIT_V_DTYPE), RZ_SIZE (RZ23)) },
-    { UDATA (&rz_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
-            (RZ23_DTYPE << UNIT_V_DTYPE), RZ_SIZE (RZ23)) },
-    { UDATA (&rz_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
-            (RZ23_DTYPE << UNIT_V_DTYPE), RZ_SIZE (RZ23)) },
-    { UDATA (&rz_isvc, UNIT_DIS, 0) }
-    };
+UNIT rzb_unit[RZ_NUMDR + 1] = {{0}};
 
 REG rzb_reg[] = {
     { FLDATAD ( INT,    int_req[IPL_SCB], INT_V_SCB, "interrupt pending flag") },
@@ -324,9 +220,9 @@ DEVICE rzb_dev = {
     RZ_NUMDR + 1, DEV_RDX, 31, 1, DEV_RDX, 8,
     NULL, NULL, &rz_reset,
     NULL, &rz_attach, &scsi_detach,
-    &rzb_dib, DEV_DEBUG | DEV_DISK | DEV_SECTORS | RZB_FLAGS,
-    0, rz_debug, NULL, NULL,
-    &rz_help, NULL                                      /* help and attach_help routines */
+    &rzb_dib, DEV_DEBUG | DEV_SCSI | DEV_SECTORS | RZB_FLAGS,
+    0, rz_debug, NULL, NULL, &rz_help, NULL, NULL,
+    &rz_description, NULL, &drv_tab                                /* help and attach_help routines */
     };
 
 static DEVICE *rz_devmap[RZ_NUMCT] = {
@@ -788,11 +684,28 @@ scsi_reset (&rz->bus);
 
 t_stat rz_reset (DEVICE *dptr)
 {
-int32 ctlr, i;
-uint32 dtyp;
+int32 ctlr, i, j;
 CTLR *rz;
 UNIT *uptr;
 t_stat r;
+static t_bool inited = FALSE;
+
+if (!inited) {
+    inited = TRUE;
+    for (i = 0; i < RZ_NUMCT; i++) {
+        for (j = 0; j < RZ_NUMDR; j++) {
+            uptr = rz_devmap[i]->units + j;
+            uptr->action = &rz_svc;
+            uptr->flags = UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_ROABLE;
+            sim_disk_set_drive_type_by_name (uptr, "RZ23");
+            if (j == RZ_SCSI_ID)                        /* initiator ID? */
+                uptr->flags = UNIT_DIS;                 /* disable unit */
+            }
+        uptr = rz_devmap[i]->units + j;
+        uptr->action = &rz_isvc;
+        uptr->flags = UNIT_DIS;
+        }
+    }
 
 for (i = 0, ctlr = -1; i < RZ_NUMCT; i++) {             /* find ctrl num */
     if (rz_devmap[i] == dptr)
@@ -816,48 +729,10 @@ for (i = 0; i < (RZ_NUMDR + 1); i++) {                  /* init units */
         uptr->flags = UNIT_DIS;                         /* disable unit */
     if (i < RZ_NUMDR) {
         scsi_add_unit (&rz->bus, i, uptr);
-        dtyp = GET_DTYPE (uptr->flags);
-        scsi_set_unit (&rz->bus, uptr, &rzdev_tab[dtyp]);
         scsi_reset_unit (uptr);
         }
     }
 rz_sw_reset (rz);
-return SCPE_OK;
-}
-
-/* Set unit type (and capacity if user defined) */
-
-t_stat rz_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
-{
-CTLR *rz = rz_ctxmap[uptr->cnum];
-uint32 cap;
-uint32 max = sim_toffset_64? RZU_EMAXC: RZU_MAXC;
-t_stat r;
-
-if ((val < 0) || ((val != RZU_DTYPE) && cptr))
-    return SCPE_ARG;
-if (uptr->flags & UNIT_ATT)
-    return SCPE_ALATT;
-if (cptr) {
-    cap = (uint32) get_uint (cptr, 10, 0xFFFFFFFF, &r);
-    if ((sim_switches & SWMASK ('L')) == 0)
-        cap = cap * 1954;
-    if ((r != SCPE_OK) || (cap < RZU_MINC) || (cap > max))
-        return SCPE_ARG;
-    rzdev_tab[val].lbn = cap;
-    }
-uptr->flags = (uptr->flags & ~UNIT_DTYPE) | (val << UNIT_V_DTYPE);
-uptr->capac = (t_addr)rzdev_tab[val].lbn;
-scsi_set_unit (&rz->bus, uptr, &rzdev_tab[val]);
-scsi_reset_unit (uptr);
-return SCPE_OK;
-}
-
-/* Show unit type */
-
-t_stat rz_show_type (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
-{
-fprintf (st, "%s", rzdev_tab[GET_DTYPE (uptr->flags)].name);
 return SCPE_OK;
 }
 
@@ -883,7 +758,7 @@ return SCPE_OK;
 
 t_stat rz_attach (UNIT *uptr, CONST char *cptr)
 {
-return scsi_attach_ex (uptr, cptr, drv_types);
+return scsi_attach_ex (uptr, cptr, NULL);
 }
 
 const char *rz_description (DEVICE *dptr)

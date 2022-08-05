@@ -76,6 +76,10 @@
 #define SYS_80204   11
 #define SYS_8024    12
 #define SYS_8030    13
+#define SYS_8010_0  14
+#define SYS_8010_1  15
+#define SYS_8010_2  16
+#define SYS_8010_3  17
 
 #define sys_name    "Intel MDS Configuration Controller"
 
@@ -107,6 +111,9 @@ extern t_stat EPROM_cfg(uint16 base, uint16 size, uint8 devnum);
 extern t_stat RAM_cfg(uint16 base, uint16 size, uint8 dummy);
 extern t_stat isbc064_cfg(uint16 base, uint16 size, uint8 dummy);
 extern t_stat isbc464_cfg(uint16 base, uint16 size, uint8 dummy);
+extern t_stat isbc201_cfg(uint16 base, uint16 size, uint8 dummy);
+extern t_stat isbc202_cfg(uint16 base, uint16 size, uint8 dummy);
+extern t_stat isbc208_cfg(uint16 base, uint16 size, uint8 dummy);
 extern t_stat i3214_clr(void);
 extern t_stat i8251_clr(void);
 extern t_stat i8253_clr(void);
@@ -118,12 +125,15 @@ extern t_stat EPROM_clr(void);
 extern t_stat RAM_clr(void);
 extern t_stat isbc064_clr(void);
 extern t_stat isbc464_clr(void);
+extern t_stat isbc201_clr(void);
+extern t_stat isbc202_clr(void);
+extern t_stat isbc208_clr(void);
 extern void clr_dev(void);
 
 /* globals */
 
 int     model = -1;                     //force no model
-int     mem_map = 0;                       //memory model
+int     mem_map = 0;                    //memory model
 
 typedef struct device {
     int id;
@@ -142,122 +152,153 @@ typedef struct system_model {
     SYS_DEV devices[30];
     } SYS_MODEL;
 
-#define SYS_NUM 15
+#define SYS_NUM 18
 
 SYS_MODEL models[SYS_NUM+1] = {
     {MDS_210, "MDS-210       ", 9,
 //         id           name       num arg routine       routine1      val1    val2  val3
-        {{ i8251,       "I8251",    2,  1, i8251_cfg,    i8251_clr,    0xF4,   0xF6 },
-         { i8253,       "I8253",    1,  1, i8253_cfg,    i8253_clr,    0xF0 },
+        {{ IOC_CONT,    "IOC-CONT", 1,  1, ioc_cont_cfg, ioc_cont_clr, 0xC0 },
          { i8255,       "I8255",    2,  1, i8255_cfg,    i8255_clr,    0xE4,   0xE8 },
+         { i8253,       "I8253",    1,  1, i8253_cfg,    i8253_clr,    0xF0 },
+         { i8251,       "I8251",    2,  1, i8251_cfg,    i8251_clr,    0xF4,   0xF6 },
          { i8259,       "I8259",    2,  1, i8259_cfg,    i8259_clr,    0xFA,   0xFC },
-         { IOC_CONT,    "IOC-CONT", 1,  1, ioc_cont_cfg, ioc_cont_clr, 0xC0 },
          { IPC_CONT,    "IPC-CONT", 1,  1, ipc_cont_cfg, ipc_cont_clr, 0xFF },
          { EPROM,       "EPROM",    1,  2, EPROM_cfg,    EPROM_clr,    0x0000, 0x0FFF },
          { RAM,         "RAM",      1,  2, RAM_cfg,      RAM_clr,      0x0000, 0x7FFF },
          { SBC464,      "SBC464",   1,  2, isbc464_cfg,  isbc464_clr,  0xA800, 0x47FF }},
          },
     {MDS_220, "MDS-220       ", 8,
-        {{ i8251,       "I8251",    2,  1, i8251_cfg,    i8251_clr,    0xF4,   0xF6 },
-         { i8253,       "I8253",    1,  1, i8253_cfg,    i8253_clr,    0xF0 },
+        {{ IOC_CONT,    "IOC-CONT", 1,  1, ioc_cont_cfg, ioc_cont_clr, 0xC0 },
          { i8255,       "I8255",    2,  1, i8255_cfg,    i8255_clr,    0xE4,   0xE8 },
+         { i8253,       "I8253",    1,  1, i8253_cfg,    i8253_clr,    0xF0 },
+         { i8251,       "I8251",    2,  1, i8251_cfg,    i8251_clr,    0xF4,   0xF6 },
          { i8259,       "I8259",    2,  1, i8259_cfg,    i8259_clr,    0xFA,   0xFC },
-         { IOC_CONT,    "IOC-CONT", 1,  1, ioc_cont_cfg, ioc_cont_clr, 0xC0 },
          { IPC_CONT,    "IPC-CONT", 1,  1, ipc_cont_cfg, ipc_cont_clr, 0xFF },
          { EPROM,       "EPROM",    1,  2, EPROM_cfg,    EPROM_clr,    0x0000, 0x0FFF },
          { RAM,         "RAM",      1,  2, RAM_cfg,      RAM_clr,      0x0000, 0x7FFF }} 
          },
     {MDS_225, "MDS-225       ", 8,
-        {{ i8251,       "I8251",    2,  1, i8251_cfg,    i8251_clr,    0xF4,   0xF6 },
-         { i8253,       "I8253",    1,  1, i8253_cfg,    i8253_clr,    0xF0 },
+        {{ IOC_CONT,    "IOC-CONT", 1,  1, ioc_cont_cfg, ioc_cont_clr, 0xC0 },
          { i8255,       "I8255",    2,  1, i8255_cfg,    i8255_clr,    0xE4,   0xE8 },
+         { i8253,       "I8253",    1,  1, i8253_cfg,    i8253_clr,    0xF0 },
+         { i8251,       "I8251",    2,  1, i8251_cfg,    i8251_clr,    0xF4,   0xF6 },
          { i8259,       "I8259",    2,  1, i8259_cfg,    i8259_clr,    0xFA,   0xFC },
-         { IOC_CONT,    "IOC-CONT", 1,  1, ioc_cont_cfg, ioc_cont_clr, 0xC0 },
          { IPC_CONT,    "IPC-CONT", 1,  1, ipc_cont_cfg, ipc_cont_clr, 0xFF },
          { EPROM,       "EPROM",    1,  2, EPROM_cfg,    EPROM_clr,    0x0000, 0x0FFF },
          { RAM,         "RAM",      1,  2, RAM_cfg,      RAM_clr,      0x0000, 0xFFFF }},
          },
     {MDS_230, "MDS-230       ", 9,
-        {{ i8251,       "I8251",    2,  1, i8251_cfg,    i8251_clr,    0xF4,   0xF6 },
-         { i8253,       "I8253",    1,  1, i8253_cfg,    i8253_clr,    0xF0 },
+        {{ IOC_CONT,    "IOC-CONT", 1,  1, ioc_cont_cfg, ioc_cont_clr, 0xC0 },   
          { i8255,       "I8255",    2,  1, i8255_cfg,    i8255_clr,    0xE4,   0xE8 },
+         { i8253,       "I8253",    1,  1, i8253_cfg,    i8253_clr,    0xF0 },
+         { i8251,       "I8251",    2,  1, i8251_cfg,    i8251_clr,    0xF4,   0xF6 },
          { i8259,       "I8259",    2,  1, i8259_cfg,    i8259_clr,    0xFA,   0xFC },
-         { IOC_CONT,    "IOC-CONT", 1,  1, ioc_cont_cfg, ioc_cont_clr, 0xC0 },   
          { IPC_CONT,    "IPC-CONT", 1,  1, ipc_cont_cfg, ipc_cont_clr, 0xFF },
          { EPROM,       "EPROM",    1,  2, EPROM_cfg,    EPROM_clr,    0x0000, 0x0FFF },
          { RAM,         "RAM",      1,  2, RAM_cfg,      RAM_clr,      0x0000, 0x7FFF },
          { SBC064,      "SBC064",   1,  2, isbc064_cfg,  isbc064_clr,  0x8000, 0x7FFF }},
          },
     {MDS_800, "MDS-800       ", 5,
-        {{ i3214,       "I3214",    1,  1, i3214_cfg,    i3214_clr,    0xFC },
-         { i8251,       "I8251",    2,  1, i8251_cfg,    i8251_clr,    0xF4,   0xF6 },
+        {{ i8251,       "I8251",    2,  1, i8251_cfg,    i8251_clr,    0xF4,   0xF6 },
+         { i3214,       "I3214",    1,  1, i3214_cfg,    i3214_clr,    0xFC },
          { EPROM,       "EPROM",    1,  2, EPROM_cfg,    EPROM_clr,    0x0000, 0x00FF },
          { EPROM,       "EPROM",    1,  2, EPROM_cfg,    EPROM_clr,    0xF800, 0x07FF },
-         { SBC064,      "SBC064",   1,  2, isbc064_cfg,  isbc064_clr,  0x0000, 0x7FFF }},
+         { SBC064,      "SBC064",   1,  2, isbc064_cfg,  isbc064_clr,  0x0000, 0xFFFF }},
          },
     {MDS_810, "MDS-810       ", 6,
-        {{ i3214,       "I3214",    1,  1, i3214_cfg,    i3214_clr,    0xFC },
-         { i8251,       "I8251",    2,  1, i8251_cfg,    i8251_clr,    0xF4,   0xF6 },
+        {{ i8251,       "I8251",    2,  1, i8251_cfg,    i8251_clr,    0xF4,   0xF6 },
+         { i3214,       "I3214",    1,  1, i3214_cfg,    i3214_clr,    0xFC },
          { EPROM,       "EPROM",    1,  2, EPROM_cfg,    EPROM_clr,    0x0000, 0x00FF },
          { EPROM,       "EPROM2",   1,  2, EPROM_cfg,    EPROM_clr,    0xF800, 0x07FF },
          { SBC064,      "SBC064",   1,  2, isbc064_cfg,  isbc064_clr,  0x0000, 0x7FFF },
          { SBC464,      "SBC464",   1,  2, isbc464_cfg,  isbc464_clr,  0xA800, 0x47FF }},
          },
     {SDK_80, "SDK-80         ", 4,
-        {{ i8251,       "I8251",    1,  1, i8251_cfg,    i8251_clr,    0xFA },
-         { i8255,       "I8255",    2,  1, i8255_cfg,    i8255_clr,    0xF4,   0xEC },
+        {{ i8255,       "I8255",    2,  1, i8255_cfg,    i8255_clr,    0xEC,   0xF4 },
+         { i8251,       "I8251",    1,  1, i8251_cfg,    i8251_clr,    0xFA },       
          { EPROM,       "EPROM",    1,  2, EPROM_cfg,    EPROM_clr,    0x0000, 0x0FFF },
          { RAM,         "RAM",      1,  2, RAM_cfg,      RAM_clr,      0x1000, 0x03FF }},
          },
     {SYS_8010, "SYS-80/10    ", 4,
-        {{ i8251,       "I8251",    1,  1, i8251_cfg,    i8251_clr,    0xEC },
-         { i8255,       "I8255",    2,  1, i8255_cfg,    i8255_clr,    0xE4,   0xE8 },
+        {{ i8255,       "I8255",    2,  1, i8255_cfg,    i8255_clr,    0xE4,   0xE8 },
+         { i8251,       "I8251",    1,  1, i8251_cfg,    i8251_clr,    0xEC },
          { EPROM,       "EPROM",    1,  2, EPROM_cfg,    EPROM_clr,    0x0000, 0x0FFF },
          { RAM,         "RAM",      1,  2, RAM_cfg,      RAM_clr,      0x3c00, 0x03FF }},
          },
     {SYS_8010A, "SYS-80/10A  ", 4,
-        {{ i8251,       "I8251",    1,  1, i8251_cfg,    i8251_clr,    0xEC },
-         { i8255,       "I8255",    2,  1, i8255_cfg,    i8255_clr,    0xE4,   0xE8 },
+        {{ i8255,       "I8255",    2,  1, i8255_cfg,    i8255_clr,    0xE4,   0xE8 },
+         { i8251,       "I8251",    1,  1, i8251_cfg,    i8251_clr,    0xEC },
          { EPROM,       "EPROM",    1,  2, EPROM_cfg,    EPROM_clr,    0x0000, 0x1FFF },
          { RAM,         "RAM",      1,  2, RAM_cfg,      RAM_clr,      0x3c00, 0x03FF }},
          },
     {SYS_8010B, "SYS-80/10B  ", 4,
-        {{ i8251,       "I8251",    1,  1, i8251_cfg,    i8251_clr,    0xEC },
-         { i8255,       "I8255",    2,  1, i8255_cfg,    i8255_clr,    0xE4,   0xE8 },
-         { EPROM,       "EPROM",    1,  2, EPROM_cfg,    EPROM_clr,    0x0000, 0x3FFF },
+        {{ i8255,       "I8255",    2,  1, i8255_cfg,    i8255_clr,    0xE4,   0xE8 },
+         { i8251,       "I8251",    1,  1, i8251_cfg,    i8251_clr,    0xEC },
+         { EPROM,       "EPROM",    1,  2, EPROM_cfg,    EPROM_clr,    0x0000, 0x1FFF },
          { RAM,         "RAM",      1,  2, RAM_cfg,      RAM_clr,      0x3c00, 0x03FF }},
          },
     {SYS_8020, "SYS-80/20    ", 6,
-        {{ i8251,       "I8251",    1,  1, i8251_cfg,    i8251_clr,    0xEC },
+        {{ i8259,       "I8259",    1,  1, i8259_cfg,    i8259_clr,    0xDA },
          { i8253,       "I8253",    1,  1, i8253_cfg,    i8253_clr,    0xDC },
-         { i8255,       "I8255",    1,  1, i8255_cfg,    i8255_clr,    0xE8 },
-         { i8259,       "I8259",    1,  1, i8259_cfg,    i8259_clr,    0xDA },
+         { i8255,       "I8255",    2,  1, i8255_cfg,    i8255_clr,    0xE4,   0xE8 },
+         { i8251,       "I8251",    1,  1, i8251_cfg,    i8251_clr,    0xEC },
          { EPROM,       "EPROM",    1,  2, EPROM_cfg,    EPROM_clr,    0x0000, 0x1FFF },
          { RAM,         "RAM",      1,  2, RAM_cfg,      RAM_clr,      0x3800, 0x07FF }},
          },
-    {SYS_8020-4, "SYS-80/20-4", 6,
-        {{ i8251,       "I8251",    1,  1, i8251_cfg,    i8251_clr,    0xEC },
+    {SYS_80204, "SYS-80/20-4 ", 6,
+        {{ i8259,       "I8259",    1,  1, i8259_cfg,    i8259_clr,    0xDA },
          { i8253,       "I8253",    1,  1, i8253_cfg,    i8253_clr,    0xDC },
-         { i8255,       "I8255",    1,  1, i8255_cfg,    i8255_clr,    0xE8 },
-         { i8259,       "I8259",    1,  1, i8259_cfg,    i8259_clr,    0xDA },
+         { i8255,       "I8255",    2,  1, i8255_cfg,    i8255_clr,    0xE4,   0xE8 },
+         { i8251,       "I8251",    1,  1, i8251_cfg,    i8251_clr,    0xEC },
          { EPROM,       "EPROM",    1,  2, EPROM_cfg,    EPROM_clr,    0x0000, 0x1FFF },
          { RAM,         "RAM",      1,  2, RAM_cfg,      RAM_clr,      0x3000, 0x0FFF }},
          },
     {SYS_8024, "SYS-80/24    ", 6,
-        {{ i8251,       "I8251",    1,  1, i8251_cfg,    i8251_clr,    0xEC },
+        {{ i8259,       "I8259",    1,  1, i8259_cfg,    i8259_clr,    0xDA },
          { i8253,       "I8253",    1,  1, i8253_cfg,    i8253_clr,    0xDC },
-         { i8255,       "I8255",    1,  1, i8255_cfg,    i8255_clr,    0xE8 },
-         { i8259,       "I8259",    1,  1, i8259_cfg,    i8259_clr,    0xDA },
+         { i8255,       "I8255",    2,  1, i8255_cfg,    i8255_clr,    0xE8 },
+         { i8251,       "I8251",    1,  1, i8251_cfg,    i8251_clr,    0xEC },
          { EPROM,       "EPROM",    1,  2, EPROM_cfg,    EPROM_clr,    0x0000, 0x1FFF },
          { RAM,         "RAM",      1,  2, RAM_cfg,      RAM_clr,      0x3c00, 0x03FF }},
          },
     {SYS_8030, "SYS-80/30    ", 6,
-        {{ i8251,       "I8251",    1,  1, i8251_cfg,    i8251_clr,    0xEC },
+        {{ i8259,       "I8259",    1,  1, i8259_cfg,    i8259_clr,    0xDA },
          { i8253,       "I8253",    1,  1, i8253_cfg,    i8253_clr,    0xDC },
-         { i8255,       "I8255",    1,  1, i8255_cfg,    i8255_clr,    0xE8 },
-         { i8259,       "I8259",    1,  1, i8259_cfg,    i8259_clr,    0xDA },
+         { i8255,       "I8255",    2,  1, i8255_cfg,    i8255_clr,    0xE8 },
+         { i8251,       "I8251",    1,  1, i8251_cfg,    i8251_clr,    0xEC },
          { EPROM,       "EPROM",    1,  2, EPROM_cfg,    EPROM_clr,    0x0000, 0x1FFF },
          { RAM,         "RAM",      1,  2, RAM_cfg,      RAM_clr,      0x2000, 0x3FFF }},
+         },
+    {SYS_8010_0, "SYS-80/10-0", 5,
+        {{ i8255,       "I8255",    2,  1, i8255_cfg,    i8255_clr,    0xE4,   0xE8 },
+         { i8251,       "I8251",    1,  1, i8251_cfg,    i8251_clr,    0xEC },
+         { EPROM,       "EPROM",    1,  2, EPROM_cfg,    EPROM_clr,    0x0000, 0x0FFF },
+         { RAM,         "RAM",      1,  2, RAM_cfg,      RAM_clr,      0x3c00, 0x03FF },
+         { SBC064,      "SBC064",   1,  2, isbc064_cfg,  isbc064_clr,  0x0000, 0xFFFF }},
+         },
+    {SYS_8010_1, "SYS-80/10-1", 6,
+        {{ i8255,       "I8255",    2,  1, i8255_cfg,    i8255_clr,    0xE4,   0xE8 },
+         { i8251,       "I8251",    1,  1, i8251_cfg,    i8251_clr,    0xEC },
+         { EPROM,       "EPROM",    1,  2, EPROM_cfg,    EPROM_clr,    0x0000, 0x0FFF },
+         { RAM,         "RAM",      1,  2, RAM_cfg,      RAM_clr,      0x3c00, 0x03FF },
+         { SBC064,      "SBC064",   1,  2, isbc064_cfg,  isbc064_clr,  0x0000, 0xFFFF },
+         { SBC201,      "SBC201",   1,  1, isbc201_cfg,  isbc201_clr,  0x78 }},
+         },
+    {SYS_8010_2, "SYS-80/10-2", 6,
+        {{ i8255,       "I8255",    2,  1, i8255_cfg,    i8255_clr,    0xE4,   0xE8 },
+         { i8251,       "I8251",    1,  1, i8251_cfg,    i8251_clr,    0xEC },
+         { EPROM,       "EPROM",    1,  2, EPROM_cfg,    EPROM_clr,    0x0000, 0x0FFF },
+         { RAM,         "RAM",      1,  2, RAM_cfg,      RAM_clr,      0x3c00, 0x03FF },
+         { SBC064,      "SBC064",   1,  2, isbc064_cfg,  isbc064_clr,  0x0000, 0xFFFF },
+         { SBC202,      "SBC202",   1,  1, isbc202_cfg,  isbc202_clr,  0x78 }},
+         },
+    {SYS_8010_3, "SYS-80/10-3 ", 6,
+        {{ i8255,       "I8255",    2,  1, i8255_cfg,    i8255_clr,    0xE4,   0xE8 },
+         { i8251,       "I8251",    1,  1, i8251_cfg,    i8251_clr,    0xEC },
+         { EPROM,       "EPROM",    1,  2, EPROM_cfg,    EPROM_clr,    0x0000, 0x0FFF },
+         { RAM,         "RAM",      1,  2, RAM_cfg,      RAM_clr,      0x3c00, 0x03FF },
+         { SBC064,      "SBC064",   1,  2, isbc064_cfg,  isbc064_clr,  0x0000, 0xFFFF },
+         { SBC208,      "SBC208",   1,  1, isbc208_cfg,  isbc208_clr,  0x40 }},
          },
     {0}
     };
@@ -282,8 +323,6 @@ DEBTAB sys_debug[] = {
     { "READ", DEBUG_read },
     { "WRITE", DEBUG_write },
     { "XACK", DEBUG_xack },
-    { "LEV1", DEBUG_level1 },
-    { "LEV2", DEBUG_level2 },
     { NULL }
 };
 
@@ -328,7 +367,7 @@ t_stat sys_cfg(uint16 base, uint16 devnum, uint8 dummy)
     DEVICE *dptr;
     
     if (model == (-1)) return SCPE_ARG; //no valid config
-    sim_printf("sys_cfg: Configure %s:\n", models[model].name);
+    sim_printf("sys_cfg: Configuring an %s:\n", models[model].name);
     switch (model) {                    //set memory map type
         case 0:                         //mds-210
             mem_map = 0;                //ipb
@@ -372,6 +411,18 @@ t_stat sys_cfg(uint16 base, uint16 devnum, uint8 dummy)
         case 13:                        //sys-8030
             mem_map = 4;                //sys-8030
             break;
+        case 14:                        //sys-8010-0
+            mem_map = 4;                //sys-8010-0
+            break;
+        case 15:                        //sys-8010-1
+            mem_map = 4;                //sys-8010-1
+            break;
+        case 16:                        //sys-8010-2
+            mem_map = 4;                //sys-8010-2
+            break;
+        case 17:                        //sys-8010-3
+            mem_map = 4;                //sys-8010-3
+            break;
         default:
             return SCPE_ARG;
     }
@@ -391,13 +442,14 @@ t_stat sys_cfg(uint16 base, uint16 devnum, uint8 dummy)
                     break;
                 case 3:                 //three arguments
                     models[model].devices[i].cfg_routine (models[model].devices[i].val[j], 
-                        models[model].devices[i].val[j+1], models[model].devices[i].val[j+1] & 0xff);
+                        models[model].devices[i].val[j+1], models[model].devices[i].val[j+1] & BYTEMASK);
                     break;
                 default:
                     return SCPE_ARG;
             }
         }
     }
+    //reset_all (0);
     return SCPE_OK;
 }
 
@@ -428,7 +480,7 @@ t_stat sys_reset(DEVICE *dptr)
 {
     if (dptr == NULL)
         return SCPE_ARG;
-    sim_printf("SYS Reset\n");
+//    sim_printf("SYS Reset\n");
     sys_cfg(0, 0, 0);
     return SCPE_OK;
 }
@@ -447,7 +499,7 @@ t_stat sys_set_model (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
         if (!strncmp(cptr, models[i].name, strlen(cptr))) { //find the system
             model = models[i].id;
             strncpy(sim_name, models[i].name, 11);
-            printf("sys_set_model: Configuring %s\n", sim_name);
+            printf("sys_set_model: Configuring an %s\n", sim_name);
             switch (model) {            //set memory map type
                 case 0:                 //mds-210
                     mem_map = 0;        //ipb
@@ -491,6 +543,18 @@ t_stat sys_set_model (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
                 case 13:                //sys-8030
                     mem_map = 4;        //sys-8030
                     break;
+                case 14:                //sys-8010-0
+                    mem_map = 4;        //sys-8010-0
+                    break;
+                case 15:                //sys-8010-1
+                    mem_map = 4;        //sys-8010-1
+                    break;
+                case 16:                //sys-8010-2
+                    mem_map = 4;        //sys-8010-2
+                    break;
+                case 17:                //sys-8010-3
+                    mem_map = 4;        //sys-8010-3
+                    break;
                 default:
                     return SCPE_ARG;
             }
@@ -510,13 +574,14 @@ t_stat sys_set_model (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
                             break;
                         case 3:         //three arguments
                             models[model].devices[i].cfg_routine (models[model].devices[i].val[j], 
-                                models[model].devices[i].val[j+1], models[model].devices[i].val[j+1] & 0xff);
+                                models[model].devices[i].val[j+1], models[model].devices[i].val[j+1] & BYTEMASK);
                             break;
                         default:
                             return SCPE_ARG;
                     }
                 }
             }
+            reset_all (0);
             return SCPE_OK;
         }
     }
@@ -530,12 +595,11 @@ t_stat sys_show_model (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
     
     if (uptr == NULL)
         return SCPE_ARG;
-    return SCPE_OK;
-    fprintf(st, "%s:  %d\n", models[model].name, models[model].num);
+    fprintf(st, "%s:%d devices\n", models[model].name, models[model].num);
     for (i=0; i<models[model].num; i++) {
         fprintf(st, "  %s:", models[model].devices[i].name);
-        fprintf(st, " %d", models[model].devices[i].num);
-        fprintf(st, " %d", models[model].devices[i].args);
+        fprintf(st, " %d devices", models[model].devices[i].num);
+        fprintf(st, " %d args", models[model].devices[i].args);
         for (j=0; j<models[model].devices[i].num; j++) {
             if (models[model].devices[i].args == 2)
                 fprintf(st, " 0%04XH 0%04XH", models[model].devices[i].val[j], 

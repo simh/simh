@@ -39,9 +39,9 @@
 */
 
 #include "system_defs.h"
-#define IPC     0
-
-#define i3214_NAME    "Intel i3214 Perpherial Interrupt Contrlooer Chip"
+#define UNIT_V_BOOT     (UNIT_V_UF+1)   /* BOOT/RUN switch */
+#define UNIT_BOOT       (1 << UNIT_V_BOOT)
+#define i3214_NAME      "Intel i3214 Perpherial Interrupt Controller Chip"
 
 /* external globals */
 
@@ -62,8 +62,8 @@ static const char* i3214_desc(DEVICE *dptr) {
     return i3214_NAME;
 }
 int   i3214_baseport = -1;              //base port
-uint8   i3214_intnum = 0;               //interrupt number
-uint8   i3214_verb = 0;                 //verbose flag
+uint8 i3214_intnum = 0;                 //interrupt number
+uint8 i3214_verb = 0;                   //verbose flag
 
 /* function prototypes */
 
@@ -98,14 +98,14 @@ DEBTAB i3214_debug[] = {
     { "READ", DEBUG_read },
     { "WRITE", DEBUG_write },
     { "XACK", DEBUG_xack },
-    { "LEV1", DEBUG_level1 },
-    { "LEV2", DEBUG_level2 },
     { NULL }
 };
 
 MTAB i3214_mod[] = {
+    { UNIT_BOOT, 0, "BOOT", "BOOT", NULL },
+    { UNIT_BOOT, UNIT_BOOT, "RUN", "RUN", NULL },
     { MTAB_XTD | MTAB_VDV, 0, "PARAM", NULL, NULL, i3214_show_param, NULL, 
-        "show configured parametes for i3214" },
+        "show configured parameters for i3214" },
     { 0 }
 };
 
@@ -144,7 +144,7 @@ DEVICE i3214_dev = {
 
 t_stat i3214_cfg(uint16 base, uint16 devnum, uint8 dummy)
 {
-    i3214_baseport = base & 0xff;
+    i3214_baseport = base & BYTEMASK;
     sim_printf("    i3214: at base port 0%02XH\n",
         i3214_baseport);
     reg_dev(i3214_do_mask, i3214_baseport, 0, 0);
@@ -213,18 +213,18 @@ t_stat i3214_reset_dev (uint8 devnum)
 
 uint8 i3214_do_mask(t_bool io, uint8 data, uint8 devnum)
 {
-    if (io == 0)                        /* read status port */
+    if (io == 0)                        //read port
         return i3214_mask;
-    else
+    else                                //write port
         i3214_mask = data;
     return 0;
 }
 
 uint8 i3214_do_status(t_bool io, uint8 data, uint8 devnum)
 {
-    if (io == 0)
+    if (io == 0)                        //read port
         return 0;
-    else {
+    else {                              //write port
         i3214_cnt--;
     }
     return 0;
@@ -232,18 +232,31 @@ uint8 i3214_do_status(t_bool io, uint8 data, uint8 devnum)
 
 uint8 i3214_cpu_bus_override(t_bool io, uint8 data, uint8 devnum)
 {
-    if (io == 0)                        /* read status port */
+    if (io == 0)                        //read port
         return 0;
-    else
+    else                                //write port
         BUS_OVERRIDE = data & 0x01;
     return 0;
 }
 
 uint8 i3214_monitor_do_boot(t_bool io, uint8 data, uint8 devnum)
 {
-    if (io == 0)                        /* read status port */
-        return monitor_boot;
-    else
+    UNIT *uptr;
+    static uint8 onetime = 1;
+
+    uptr = i3214_unit;
+    if (io == 0)                        //read port
+        if (uptr->flags & UNIT_BOOT) {  //toggle response
+            monitor_boot = 0;
+            printf("    Boot Switch set to BOOT\n");
+        } else {                           
+            monitor_boot = 0x02;
+            if (onetime) {
+                printf("    Boot Switch set to RUN\n");
+                onetime = 0;
+            }
+        }
+    else                                //write port
         monitor_boot = data;
     return 0;
 }

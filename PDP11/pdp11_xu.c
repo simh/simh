@@ -154,19 +154,10 @@ struct xu_device    xua = {
   };
 
 MTAB xu_mod[] = {
-#if defined (VM_PDP11)
   { MTAB_XTD|MTAB_VDV|MTAB_VALR, 010, "ADDRESS", "ADDRESS",
-    &set_addr, &show_addr, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, NULL, "AUTOCONFIGURE",
-    &set_addr_flt, NULL, NULL },
+    &set_addr, &show_addr, NULL, "Unibus address" },
   { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", "VECTOR",
-    &set_vec, &show_vec, NULL },
-#else
-  { MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
-    NULL, &show_addr, NULL, "Unibus address" },
-  { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
-    NULL, &show_vec, NULL, "Interrupt vector" },
-#endif
+    &set_vec, &show_vec, NULL, "Interrupt vector" },
   { MTAB_XTD|MTAB_VDV|MTAB_VALR|MTAB_NC, 0, "MAC", "MAC=xx:xx:xx:xx:xx:xx",
     &xu_setmac, &xu_showmac, NULL, "MAC address" },
   { MTAB_XTD |MTAB_VDV|MTAB_NMO, 0, "ETH", NULL,
@@ -593,7 +584,7 @@ t_stat xu_process_loopback(CTLR* xu, ETH_PACK* pack)
   ++xu->var->stats.loopf;
 
   if (DBG_PCK & xu->dev->dctrl)
-      eth_packet_trace_ex(xu->var->etherface, response.msg, response.len, ((function == 1) ? "xu-loopbackreply" : "xu-loopbackforward"), DBG_DAT & xu->dev->dctrl, DBG_PCK);
+      eth_packet_trace_ex(xu->var->etherface, response.msg, response.len, "xu-loopbackforward", DBG_DAT & xu->dev->dctrl, DBG_PCK);
 
   return status;
 }

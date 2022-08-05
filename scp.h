@@ -163,6 +163,7 @@ t_stat show_writelock (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 const char *sim_dname (DEVICE *dptr);
 const char *sim_uname (UNIT *dptr);
 const char *sim_set_uname (UNIT *uptr, const char *uname);
+const char *sim_attach_name (UNIT *dptr);
 t_stat get_yn (const char *ques, t_stat deflt);
 void sim_srand (unsigned int seed);
 int sim_rand (void);
@@ -203,6 +204,7 @@ const char *sim_fmt_numeric (double number);
 const char *sprint_capac (DEVICE *dptr, UNIT *uptr);
 char *read_line (char *cptr, int32 size, FILE *stream);
 char *read_line_p (const char *prompt, char *ptr, int32 size, FILE *stream);
+void fprint_brk_help (FILE *st, DEVICE *dptr);
 void fprint_reg_help (FILE *st, DEVICE *dptr);
 void fprint_set_help (FILE *st, DEVICE *dptr);
 void fprint_show_help (FILE *st, DEVICE *dptr);
@@ -273,6 +275,10 @@ void _sim_debug_device (uint32 dbits, DEVICE* dptr, const char* fmt, ...) GCC_FM
 #define sim_debug_unit(dbits, uptr, ...) do { if ((sim_deb != NULL) && ((uptr) != NULL) && (uptr->dptr != NULL) && (((uptr)->dctrl | (uptr)->dptr->dctrl) & (dbits))) _sim_debug_unit (dbits, uptr, __VA_ARGS__);} while (0)
 #endif
 void sim_flush_buffered_files (void);
+
+/* Only for use in SCP code and libraries - NOT in simulator code */
+#define SIM_SCP_ABORT(msg) _sim_scp_abort (msg, __FILE__, __LINE__)
+void _sim_scp_abort (const char *msg, const char *filename, int filelinenum);
 
 void fprint_stopped_gen (FILE *st, t_stat v, REG *pc, DEVICE *dptr);
 #define SCP_HELP_FLAT   (1u << 31)       /* Force flat help when prompting is not possible */
@@ -378,7 +384,7 @@ extern t_value (*sim_vm_pc_value) (void);
 extern t_bool (*sim_vm_is_subroutine_call) (t_addr **ret_addrs);
 extern void (*sim_vm_reg_update) (REG *rptr, uint32 idx, t_value prev_val, t_value new_val);
 extern const char **sim_clock_precalibrate_commands;
-extern int32 sim_vm_initial_ips;                        /* base estimate of simulated instructions per second */
+extern uint32 sim_vm_initial_ips;                       /* base estimate of simulated instructions per second */
 extern const char *sim_vm_interval_units;               /* Simulator can change this - default "instructions" */
 extern const char *sim_vm_step_unit;                    /* Simulator can change this - default "instruction" */
 

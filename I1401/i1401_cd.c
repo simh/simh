@@ -1,6 +1,6 @@
 /* i1401_cd.c: IBM 1402 card reader/punch
 
-   Copyright (c) 1993-2017, Robert M. Supnik
+   Copyright (c) 1993-2021, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -35,6 +35,7 @@
    Cards are represented as ASCII text streams terminated by newlines.
    This allows cards to be created and edited as normal files.
 
+   09-Jun-21    RMS     Removed use of ftell on output for pipe compatibility
    09-Mar-17    RMS     Protect character conversions from gargage files (COVERITY)
    05-May-16    RMS     Fixed calling sequence inconsistency (Mark Pizzolato)
    28-Feb-15    RMS     Added read from console
@@ -295,13 +296,13 @@ else uptr = &stack_unit[0];                             /* then default */
 if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
     return SCPE_OK;
 fputs (cdr_buf, uptr->fileref);                         /* write card */
-uptr->pos = ftell (uptr->fileref);                      /* update position */
 if (ferror (uptr->fileref)) {                           /* error? */
     sim_perror ("Card stacker I/O error");
     clearerr (uptr->fileref);
     if (iochk)
         return SCPE_IOERR;
     }
+uptr->pos = uptr->pos + strlen (cdr_buf);               /* update position */
 return SCPE_OK;
 }
 
@@ -375,7 +376,6 @@ if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
     return SCPE_UNATT;
 fputs (cdp_buf, uptr->fileref);                         /* output card */
 fputc ('\n', uptr->fileref);                            /* plus new line */
-uptr->pos = ftell (uptr->fileref);                      /* update position */
 if (ferror (uptr->fileref)) {                           /* error? */
     sim_perror ("Card punch I/O error");
     clearerr (uptr->fileref);
@@ -383,6 +383,7 @@ if (ferror (uptr->fileref)) {                           /* error? */
         return SCPE_IOERR;
     ind[IN_PNCH] = 1;
     }
+uptr->pos = uptr->pos + strlen (cdp_buf) + 1;           /* update position */
 return SCPE_OK;
 }
 
@@ -423,9 +424,9 @@ if (ferror (cdr_unit.fileref)) {                        /* error? */
     }
 cdr_unit.pos = ftell (cdr_unit.fileref);                /* update position */
 if (ssa) {                                              /* if last cd on */
-    getc (cdr_unit.fileref);                            /* see if more */
-    if (feof (cdr_unit.fileref))                        /* eof? set flag */
-        ind[IN_LST] = 1;
+    if (getc (cdr_unit.fileref) == EOF)                 /* eof? */
+        ind[IN_LST] = 1;                                /* set flag */
+    clearerr (cdr_unit.fileref);
     fseek (cdr_unit.fileref, cdr_unit.pos, SEEK_SET);
     }
 return SCPE_OK;

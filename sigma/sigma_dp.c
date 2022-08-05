@@ -1,6 +1,6 @@
 /* sigma_dp.c: moving head disk pack controller
 
-   Copyright (c) 2008-2017, Robert M Supnik
+   Copyright (c) 2008-2022, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,12 @@
 
    dp           moving head disk pack controller
 
+   23-Jul-22    RMS     SEEK(I), RECAL(I) should be fast operations (Ken Rector)
+   02-Jul-22    RMS     Fixed bugs in multi-unit operation
+   28-Jun-22    RMS     Fixed off-by-1 error in DP_SEEK definition (Ken Rector)
+   07-Jun-22    RMS     Removed unused variables (V4)
+   06-Jun-22    RMS     Fixed incorrect return in TIO status (Ken Rector)
+   06-Jun-22    RMS     Fixed missing loop increment in TDV (Ken Rector)
    13-Mar-17    RMS     Fixed bug in selecting 3281 unit F (COVERITY)
 
    Transfers are always done a sector at a time.
@@ -72,7 +78,7 @@
 #define DP_WDSC         256                             /* words/sector */
 #define DP_BYHD         8                               /* byte/header */
 #define DP_NUMDR        ((uint32) ((DP_Q10B (ctx->dp_ctype))? DP_NUMDR_10B: DP_NUMDR_16B))
-#define DP_SEEK         (DP_CONT)                       /* offset to seek units */
+#define DP_SEEK         (DP_CONT + 1)                   /* offset to seek units */
 
 /* Address bytes */
 
@@ -332,13 +338,13 @@ static DP_SNSTAB dp_sense_16B[] = {
 #define C_C             (1u << (DP_CTYPE + 1))          /* ctrl cmd */
 
 static uint16 dp_cmd[256] = {
-   0, C_A, C_A, C_A, C_A|C_F, C_A, 0, C_16B|C_F,
+   0, C_A, C_A, C_A|C_F, C_A|C_F, C_A, 0, C_16B|C_F,
    0, C_A, C_A, 0, 0, 0, 0, C_16B|C_F|C_C,
    0, 0, C_A, C_A|C_F, 0, 0, 0, C_16B|C_F,
    0, 0, 0, 0, 0, 0, 0, C_16B|C_F|C_C,
    0, 0, 0, C_10B|C_F, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
-   0, 0, 0, C_A, 0, 0, 0, 0,
+   0, 0, 0, C_A|C_F, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
@@ -348,13 +354,13 @@ static uint16 dp_cmd[256] = {
    0, 0, 0, 0, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
-   0, 0, 0, C_A, 0, 0, 0, 0,
+   0, 0, 0, C_A|C_F, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
-   0, 0, 0, C_16B, 0, 0, 0, 0,
+   0, 0, 0, C_16B|C_F, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
@@ -544,7 +550,11 @@ DEVICE dp_dev[] = {
     }
     };
 
-/* DP: IO dispatch routine */
+/* DP: IO dispatch routine
+
+   For all calls except AIO, dva is the full channel/device/unit address
+   For AIO, the handler must return the unit number
+*/
 
 uint32 dpa_disp (uint32 op, uint32 dva, uint32 *dvst)
 {
@@ -608,7 +618,7 @@ switch (op) {                                           /* case on op */
             for (i = 0; i < DP_NUMDR; i++) {            /* do every unit */
                 if (sim_is_active (&dp_unit[i])) {      /* chan active? */
                     sim_cancel (&dp_unit[i]);           /* cancel */
-                    chan_uen (dva);                     /* uend */
+                    chan_uen ((dva & ~DVA_M_UNIT) | i); /* uend */
                     }
                 dp_clr_ski (cidx, i);                   /* clear seek int */
                 sim_cancel (&dp_unit[i + DP_SEEK]);     /* cancel seek compl */
@@ -631,16 +641,16 @@ switch (op) {                                           /* case on op */
 return 0;
 }
 
-/* Unit service */
+/* Unit service - reconstruct full device address on entry */
 
 t_stat dp_svc (UNIT *uptr)
 {
 uint32 i, da, wd, wd1, c[DPS_NBY_16B];
 uint32 cidx = uptr->UCTX;
-uint32 dva = dp_dib[cidx].dva;
-uint32 dtype = GET_DTYPE (uptr->flags);
 UNIT *dp_unit = dp_dev[cidx].units;
 uint32 un = uptr - dp_unit;
+uint32 dva = dp_dib[cidx].dva | un;
+uint32 dtype = GET_DTYPE (uptr->flags);
 DP_CTX *ctx = &dp_ctx[cidx];
 int32 t, dc;
 uint32 st, cmd, sc;
@@ -928,7 +938,8 @@ return SCPE_OK;
 t_bool dp_end_sec (UNIT *uptr, uint32 lnt, uint32 exp, uint32 st)
 {
 uint32 cidx = uptr->UCTX;
-uint32 dva = dp_dib[cidx].dva;
+uint32 un = uptr - dp_dev[cidx].units;
+uint32 dva = dp_dib[cidx].dva | un;
 DP_CTX *ctx = &dp_ctx[cidx];
 
 if (st != CHS_ZBC) {                                    /* end record? */
@@ -963,14 +974,14 @@ uint32 stat = DVS_AUTO;
 
 for (i = 0; i < DP_NUMDR; i++) {
     if (sim_is_active (&dp_unit[i])) {
-        stat |= (DVS_CBUSY|(CC2 << DVT_V_CC));
+        stat |= (DVS_CBUSY | (CC2 << DVT_V_CC));
         break;
         }
     }
 if (sim_is_active (&dp_unit[un]) ||
     sim_is_active (&dp_unit[un + DP_SEEK]))
-    stat |= (DVS_DBUSY|(CC2 << DVT_V_CC));
-return DVS_AUTO;
+    stat |= (DVS_DBUSY | (CC2 << DVT_V_CC));
+return stat;
 }
 
 uint32 dp_tdv_status (uint32 cidx, uint32 un)
@@ -1028,6 +1039,7 @@ while (tptr->byte != 0) {
         data = (uint8) ((ctx->dp_flags & tptr->mask) >> tptr->fpos);
         c[tptr->byte] |= (data << tptr->tpos);
         }
+    tptr++;
     }
 return;
 }
@@ -1107,7 +1119,8 @@ return SCPE_OK;
 t_stat dp_ioerr (UNIT *uptr)
 {
 uint32 cidx = uptr->UCTX;
-uint32 dva = dp_dib[cidx].dva;
+uint32 un = uptr - dp_dev[cidx].units;
+uint32 dva = dp_dib[cidx].dva | un;
 
 perror ("DP I/O error");
 clearerr (uptr->fileref);
@@ -1192,7 +1205,16 @@ else if (chan_chk_chi (dp_dib[cidx].dva) < 0)           /* any int? */
 return;
 }
 
-/* Reset routine */
+/* Reset routines */
+
+void dp_reset_unit (UNIT *uptr, uint32 cidx)
+{
+sim_cancel (uptr);                                      /* stop dev thread */
+uptr->UDA = 0;
+uptr->UCMD = 0;
+uptr->UCTX = cidx;
+return;
+}
 
 t_stat dp_reset (DEVICE *dptr)
 {
@@ -1205,12 +1227,10 @@ if (cidx >= DP_NUMCTL)
     return SCPE_IERR;
 dp_unit = dptr->units;
 ctx = &dp_ctx[cidx];
-for (i = 0; i < DP_NUMDR_16B; i++) {
-    sim_cancel (&dp_unit[i]);                           /* stop dev thread */
-    sim_cancel (&dp_unit[i + DP_SEEK]);                 /* stop seek thread */
-    dp_unit[i].UDA = 0;
-    dp_unit[i].UCMD = 0;
-    dp_unit[i].UCTX = cidx;
+dp_reset_unit (&dp_unit[DP_CONT], cidx);                /* reset controller */
+for (i = 0; i < DP_NUMDR_16B; i++) {                    /* reset drives */
+    dp_reset_unit (&dp_unit[i], cidx);
+    dp_reset_unit (&dp_unit[i + DP_SEEK], cidx);        /* reset seek thread */
     }
 ctx->dp_flags = 0;
 ctx->dp_ski = 0;

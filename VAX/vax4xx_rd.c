@@ -37,9 +37,8 @@
 #endif
 
 #define RD_NUMDR        3
-#define RD_RMV(u)       ((drv_tab[GET_DTYPE (u->flags)].flgs & RDDF_RMV)? \
-                          UF_RMV: 0)
-#define RDDF_RMV        01                              /* removable */
+#define RD_RMV(u)       ((u->drvtyp->flags & RDDF_RMV)? UF_RMV : 0)
+#define RDDF_RMV        DRVFL_RMV                       /* removable */
 #define RD_NUMBY        512                             /* bytes/sector */
 
 #define RD_MAXFR        (1 << 14)                       /* max transfer */
@@ -108,8 +107,6 @@
 #define TRM_ERR_VER     2                               /* Error in VERIFY sequence */
 #define TRM_ERR_TRAN    3                               /* Error in DATA TRANSFER sequence */
 
-#define GET_DTYPE(x)    (((x) >> UNIT_V_DTYPE) & UNIT_M_DTYPE)
-
 #define DBG_REG         0x0001                          /* registers */
 #define DBG_CMD         0x0002                          /* commands */
 #define DBG_RD          0x0004                          /* disk reads */
@@ -125,8 +122,8 @@
 
 #define CUR_DRV         (rd_cstat & CST_SDRV)           /* currently selected drive */
 
-#define GET_SPT(u)      (drv_tab[GET_DTYPE (u->flags)].sect)
-#define GET_SURF(u)     (drv_tab[GET_DTYPE (u->flags)].surf)
+#define GET_SPT(u)      (u->drvtyp->sect)
+#define GET_SURF(u)     (u->drvtyp->surf)
 #define GET_DA(u,c,h,s) ((c * (GET_SPT(u) * GET_SURF(u))) \
                          + (h * GET_SPT(u)) + s)
 
@@ -141,7 +138,6 @@
    RD54 17      15      1225    15      1       7*8     311256
 */
 
-#define RX33_DTYPE      0
 #define RX33_SECT       15
 #define RX33_SURF       2
 #define RX33_CYL        80
@@ -156,9 +152,8 @@
 #define RX33_CYLR       0
 #define RX33_CCS        0
 #define RX33_MED        0x25658021
-#define RX33_FLGS       RDDF_RMV
+#define RX33_FLGS       RDDF_RMV | DRVFL_NOCHNG
 
-#define RD31_DTYPE      1
 #define RD31_SECT       17
 #define RD31_SURF       4
 #define RD31_CYL        616                             /* last unused */
@@ -173,9 +168,8 @@
 #define RD31_CYLR       615
 #define RD31_CCS        9
 #define RD31_MED        0x2564401F
-#define RD31_FLGS       0
+#define RD31_FLGS       DRVFL_NORMV
 
-#define RD32_DTYPE      2
 #define RD32_SECT       17
 #define RD32_SURF       6
 #define RD32_CYL        821                             /* last unused */
@@ -190,9 +184,8 @@
 #define RD32_CYLR       821
 #define RD32_CCS        14
 #define RD32_MED        0x25644020
-#define RD32_FLGS       0
+#define RD32_FLGS       DRVFL_NORMV
 
-#define RD53_DTYPE      3
 #define RD53_SECT       17
 #define RD53_SURF       8
 #define RD53_CYL        1024                            /* last unused */
@@ -207,9 +200,8 @@
 #define RD53_CYLR       1024
 #define RD53_CCS        13
 #define RD53_MED        0x25644035
-#define RD53_FLGS       0
+#define RD53_FLGS       DRVFL_NORMV
 
-#define RD54_DTYPE      4
 #define RD54_SECT       17
 #define RD54_SURF       15
 #define RD54_CYL        1225                            /* last unused */
@@ -224,13 +216,7 @@
 #define RD54_CYLR       1225
 #define RD54_CCS        14
 #define RD54_MED        0x25644036
-#define RD54_FLGS       0
-
-#define UNIT_V_DTYPE    (DKUF_V_UF + 0)                 /* drive type */
-#define UNIT_W_DTYPE    3                               /* 3b drive type encode */
-#define UNIT_M_DTYPE    ((1u << UNIT_W_DTYPE) - 1)
-#define UNIT_DTYPE      (UNIT_M_DTYPE << UNIT_V_DTYPE)
-#define UNIT_NOAUTO     DKUF_NOAUTOSIZE
+#define RD54_FLGS       DRVFL_NORMV
 
 struct drvtyp {
     int32       sect;                                   /* sectors */
@@ -252,16 +238,19 @@ struct drvtyp {
     };
 
 #define RD_DRV(d) \
-    d##_SECT, d##_SURF, d##_CYL,  d##_TPG, \
-    d##_XBN,  d##_DBN,  d##_LBN,  d##_RCTS, \
-    d##_RCTC, d##_RBN,  d##_CYLP, d##_CYLR, \
-    d##_CCS,  d##_MED,  d##_FLGS
-#define RD_SIZE(d)      (d##_LBN * RD_NUMBY)
+    { d##_SECT, d##_SURF, d##_CYL, d##_LBN,         \
+      #d,       RD_NUMBY, DRVFL_TYPE_MFM | d##_FLGS,\
+      "DU",     d##_MED,  0,       NULL,   NULL,    \
+      d##_TPG,  0, d##_XBN,  d##_DBN,  d##_RCTS,    \
+      d##_RCTC, d##_RBN,  d##_CYLP, d##_CYLR,       \
+      d##_CCS }
 
-static struct drvtyp drv_tab[] = {
-    { RD_DRV (RX33), "RX33" },{ RD_DRV (RD31), "RD31" },
-    { RD_DRV (RD32), "RD32" },{ RD_DRV (RD53), "RD53" },
-    { RD_DRV (RD54), "RD54" },
+static DRVTYP drv_tab[] = {
+    RD_DRV (RX33),
+    RD_DRV (RD31),
+    RD_DRV (RD32),
+    RD_DRV (RD53),
+    RD_DRV (RD54),
     { 0 }
     };
 
@@ -290,8 +279,6 @@ void rd_set_dstat (UNIT *uptr);
 void rd_done (int32 term_code, t_bool setint);
 void rd_cmd (int32 data);
 int32 rd_decode_cmd (int32 data);
-t_stat rd_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
-t_stat rd_show_type (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat rd_attach (UNIT *uptr, CONST char *cptr);
 t_stat rd_detach (UNIT *uptr);
 t_stat rd_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
@@ -309,14 +296,7 @@ DIB rd_dib = {
     RD_ROM_INDEX, BOOT_CODE_ARRAY, BOOT_CODE_SIZE
     };
 
-UNIT rd_unit[] = {
-    { UDATA (&rd_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
-            (RD54_DTYPE << UNIT_V_DTYPE), RD_SIZE (RD54)) },
-    { UDATA (&rd_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
-            (RD54_DTYPE << UNIT_V_DTYPE), RD_SIZE (RD54)) },
-    { UDATA (&rd_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
-            (RX33_DTYPE << UNIT_V_DTYPE), RD_SIZE (RX33)) }
-    };
+UNIT rd_unit[RD_NUMDR] = {{0}};
 
 REG rd_reg[] = {
     { DRDATA  (RPTR,  rd_rg_p,   4), REG_HRO },
@@ -336,7 +316,6 @@ REG rd_reg[] = {
     { HRDATAD (TCON,  rd_term,   8, "Termination Conditions") },
     { DRDATAD (CWAIT, rd_cwait, 24, "Command wait time"), PV_LEFT + REG_NZ },
     { DRDATAD (DWAIT, rd_dwait, 24, "Data wait time"), PV_LEFT + REG_NZ },
-    { URDATA  (CAPAC, rd_unit[0].capac, 10, T_ADDR_W, 0, RD_NUMDR, REG_HRO | PV_LEFT) },
     { FLDATAD (INT,   int_req[IPL_SCA], INT_V_SCA, "Interrupt pending flag") },
     { NULL }
     };
@@ -357,20 +336,6 @@ MTAB rd_mod[] = {
         &set_writelock, &show_writelock,   NULL, "Write enable drive" },
     { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
         &set_writelock, NULL,   NULL, "Write lock drive" },
-    { MTAB_XTD|MTAB_VUN, RX33_DTYPE, NULL, "RX33",
-      &rd_set_type, NULL, NULL, "Set RX33 Disk Type" },
-    { MTAB_XTD|MTAB_VUN, RD31_DTYPE, NULL, "RD31",
-      &rd_set_type, NULL, NULL, "Set RD31 Disk Type" },
-    { MTAB_XTD|MTAB_VUN, RD32_DTYPE, NULL, "RD32",
-      &rd_set_type, NULL, NULL, "Set RD32 Disk Type" },
-    { MTAB_XTD|MTAB_VUN, RD53_DTYPE, NULL, "RD53",
-      &rd_set_type, NULL, NULL, "Set RD53 Disk Type" },
-    { MTAB_XTD|MTAB_VUN, RD54_DTYPE, NULL, "RD54",
-      &rd_set_type, NULL, NULL, "Set RD54 Disk Type" },
-    { MTAB_XTD|MTAB_VUN, 0, "TYPE", NULL,
-      NULL, &rd_show_type, NULL, "Display device type" },
-    { UNIT_NOAUTO, UNIT_NOAUTO, "noautosize", "NOAUTOSIZE", NULL, NULL, NULL, "Disable disk autosize on attach" },
-    { UNIT_NOAUTO,           0, "autosize",   "AUTOSIZE",   NULL, NULL, NULL, "Enable disk autosize on attach" },
     { MTAB_XTD|MTAB_VUN | MTAB_VALR, 0, "FORMAT", "FORMAT={SIMH|VHD|RAW}",
       &sim_disk_set_fmt, &sim_disk_show_fmt, NULL, "Display disk format" },
     { 0 }
@@ -381,9 +346,9 @@ DEVICE rd_dev = {
     RD_NUMDR, DEV_RDX, 20, 1, DEV_RDX, 8,
     NULL, NULL, &rd_reset,
     NULL, &rd_attach, &rd_detach,
-    &rd_dib, DEV_DEBUG | RD_FLAGS, 0,
+    &rd_dib, DEV_DEBUG | DEV_SECTORS | DEV_DISK | RD_FLAGS, 0,
     rd_debug, NULL, NULL, &rd_help, NULL, NULL,
-    &rd_description
+    &rd_description, NULL, drv_tab
     };
 
 /* RD read
@@ -597,7 +562,7 @@ switch (uptr->CMD) {
         else
             uptr->CYL++;                                /* out */
 
-        max_cyl = drv_tab[GET_DTYPE (uptr->flags)].cyl;
+        max_cyl = uptr->drvtyp->cyl;
         if (uptr->CYL == max_cyl)                       /* check for wrap */
             uptr->CYL = 0;
         if (uptr->CYL == -1)
@@ -638,7 +603,7 @@ return CMD_UNKNOWN;
 
 /* read cylinder 0 - simulate special formatting */
 
-t_stat rd_rdcyl0 (int32 hd, int32 dtype)
+t_stat rd_rdcyl0 (int32 hd, UNIT *uptr)
 {
 uint32 i;
 uint16 c;
@@ -647,28 +612,28 @@ if (hd <= 2) {
     memset (rd_xb, 0, sizeof(*rd_xb) * 256);            /* fill sector buffer with 0's */
     /* rd_xb[0]-rd_xb[3] */                             /* 8 bytes of zero */
     rd_xb[4] = 0x3600;
-    rd_xb[5] = drv_tab[dtype].xbn & WMASK;              /* number of XBNs */
-    rd_xb[6] = (drv_tab[dtype].xbn >> 16) & WMASK;
-    rd_xb[7] = drv_tab[dtype].dbn & WMASK;              /* number of DBNs */
-    rd_xb[8] = (drv_tab[dtype].dbn >> 16) & WMASK;
-    rd_xb[9] = drv_tab[dtype].lbn & WMASK;              /* number of LBNs (Logical-Block-Numbers) */
-    rd_xb[10] = (drv_tab[dtype].lbn >> 16) & WMASK;
-    rd_xb[11] = drv_tab[dtype].rbn & WMASK;             /* number of RBNs (Replacement-Block-Numbers) */
-    rd_xb[12] = (drv_tab[dtype].rbn >> 16) & WMASK;
-    rd_xb[13] = drv_tab[dtype].sect;                    /* number of sectors per track */
-    rd_xb[14] = drv_tab[dtype].tpg;                     /* number of tracks */
-    rd_xb[15] = drv_tab[dtype].cyl;                     /* number of cylinders */
-    rd_xb[16] = drv_tab[dtype].cylp;                    /* first cylinder for write precompensation */
-    rd_xb[17] = drv_tab[dtype].cylr;                    /* first cylinder for reduced write current */
+    rd_xb[5] = uptr->drvtyp->xbn & WMASK;               /* number of XBNs */
+    rd_xb[6] = (uptr->drvtyp->xbn >> 16) & WMASK;
+    rd_xb[7] = uptr->drvtyp->dbn & WMASK;               /* number of DBNs */
+    rd_xb[8] = (uptr->drvtyp->dbn >> 16) & WMASK;
+    rd_xb[9] = uptr->drvtyp->size & WMASK;              /* number of LBNs (Logical-Block-Numbers) */
+    rd_xb[10] = (uptr->drvtyp->size >> 16) & WMASK;
+    rd_xb[11] = uptr->drvtyp->rbn & WMASK;              /* number of RBNs (Replacement-Block-Numbers) */
+    rd_xb[12] = (uptr->drvtyp->rbn >> 16) & WMASK;
+    rd_xb[13] = uptr->drvtyp->sect;                     /* number of sectors per track */
+    rd_xb[14] = uptr->drvtyp->tpg;                      /* number of tracks */
+    rd_xb[15] = uptr->drvtyp->cyl;                      /* number of cylinders */
+    rd_xb[16] = uptr->drvtyp->cylp;                     /* first cylinder for write precompensation */
+    rd_xb[17] = uptr->drvtyp->cylr;                     /* first cylinder for reduced write current */
     rd_xb[18] = 0;                                      /* seek rate or zero for buffered seeks */
     rd_xb[19] = 1;                                      /* 0 if CRC, 1 if ECC is being used */
-    rd_xb[20] = drv_tab[dtype].rcts;                    /* "replacement control table" (RCT) */
-    rd_xb[21] = drv_tab[dtype].rctc;                    /* number of copies of the RCT */
-    rd_xb[22] = drv_tab[dtype].med & WMASK;             /* media identifier */
-    rd_xb[23] = (drv_tab[dtype].med >> 16) & WMASK;
+    rd_xb[20] = uptr->drvtyp->rcts;                     /* "replacement control table" (RCT) */
+    rd_xb[21] = uptr->drvtyp->rctc;                     /* number of copies of the RCT */
+    rd_xb[22] = uptr->drvtyp->MediaId & WMASK;          /* media identifier */
+    rd_xb[23] = (uptr->drvtyp->MediaId >> 16) & WMASK;
     rd_xb[24] = 1;                                      /* sector-to-sector interleave */
     rd_xb[25] = 7;                                      /* head-to-head skew */
-    rd_xb[26] = drv_tab[dtype].ccs;                     /* cylinder-to-cylinder skew */
+    rd_xb[26] = uptr->drvtyp->ccs;                      /* cylinder-to-cylinder skew */
     rd_xb[27] = 16;                                     /* size of GAP 0 in the MFM format */
     rd_xb[28] = 16;                                     /* size of GAP 1 in the MFM format */
     rd_xb[29] = 5;                                      /* size of GAP 2 in the MFM format */
@@ -709,18 +674,17 @@ return sim_disk_wrsect (uptr, lba, (uint8 *)rd_xb, &sectswritten, sects);
 t_stat rd_svc (UNIT *uptr)
 {
 t_lba lba;
-int32 dtype = GET_DTYPE (uptr->flags);
 
 switch (uptr->CMD) {
     case CMD_RDPHY:
     case CMD_RDLOG:
         uptr->CYL = rd_dcyl;
         uptr->HEAD = rd_dhead;
-        if (dtype >= RD31_DTYPE) {
+        if (strcasecmp (uptr->drvtyp->name, "RX33") != 0) {
             if (rd_dcyl == 0) {
                 lba = 0;
                 sim_debug (DBG_RD, &rd_dev, "cyl=%04d, hd=%d, sect=%02d, lba=%08X\n", rd_dcyl, rd_dhead, rd_dsect, lba);
-                rd_rdcyl0 (rd_dhead, dtype);
+                rd_rdcyl0 (rd_dhead, uptr);
                 }
             else {
                 lba = GET_DA (uptr, (rd_dcyl - 1), rd_dhead, rd_dsect);
@@ -752,7 +716,7 @@ switch (uptr->CMD) {
         uptr->HEAD = rd_dhead;
         ddb_ReadW (rd_dma, (rd_scnt * RD_NUMBY), rd_xb);
         rd_dma = (rd_dma + (rd_scnt * RD_NUMBY)) & 0xFFFFFF;
-        if (dtype >= RD31_DTYPE) {
+        if (strcasecmp (uptr->drvtyp->name, "RX33") != 0) {
             if (rd_dcyl == 0) {
                 lba = 0;
                 sim_debug (DBG_WR, &rd_dev, "cyl=%04d, hd=%d, sect=%02d, lba=%08X (ignored)\n", rd_dcyl, rd_dhead, rd_dsect, lba);
@@ -850,6 +814,22 @@ if ((rd_term & 0x20) && setint) {
 
 t_stat rd_reset (DEVICE *dptr)
 {
+static t_bool inited = FALSE;
+
+if (!inited) {
+    int32 i;
+
+    inited = TRUE;
+    for (i = 0; i < RD_NUMDR; i++) {
+        UNIT *uptr = rd_unit + i;
+
+        uptr->action = &rd_svc;
+        uptr->flags = UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_ROABLE;
+        }
+    sim_disk_set_drive_type_by_name (&rd_unit[0], "RD54");
+    sim_disk_set_drive_type_by_name (&rd_unit[1], "RD54");
+    sim_disk_set_drive_type_by_name (&rd_unit[2], "RX33");
+    }
 rd_rg_p = 0;
 CLR_INT (SCA);                                          /* clear int req */
 rd_done (TRM_OK, FALSE);
@@ -867,12 +847,9 @@ return SCPE_OK;
 
 t_stat rd_attach (UNIT *uptr, CONST char *cptr)
 {
-const char *drives[] = {"RX33", "RD31", "RD32", "RD53", "RD54", };
-
 return sim_disk_attach_ex (uptr, cptr, RD_NUMBY,
                            sizeof (uint8), TRUE, DBG_DSK,
-                           drv_tab[GET_DTYPE (uptr->flags)].name, 0, 0,
-                           (uptr->flags & UNIT_NOAUTO) ? NULL: drives);
+                           uptr->drvtyp->name, 0, 0, NULL);
 }
 
 /* Detach routine */
@@ -881,36 +858,6 @@ t_stat rd_detach (UNIT *uptr)
 {
 sim_cancel (uptr);
 return sim_disk_detach (uptr);
-}
-
-/* Set unit type */
-
-t_stat rd_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
-{
-if (uptr->flags & UNIT_ATT)
-    return SCPE_ALATT;
-
-if ((uptr == &rd_unit[0]) || (uptr == &rd_unit[1])) {   /* hard disk only */
-    if (val < RD31_DTYPE)
-        return SCPE_ARG;
-    uptr->flags = (uptr->flags & ~UNIT_DTYPE) | (val << UNIT_V_DTYPE);
-    }
-if (uptr == &rd_unit[2]) {                              /* floppy disk only */
-    if (val > RX33_DTYPE)
-        return SCPE_ARG;
-    uptr->flags = (uptr->flags & ~UNIT_DTYPE) | (val << UNIT_V_DTYPE);
-    }
-uptr->capac = ((t_addr) drv_tab[val].lbn) * RD_NUMBY;
-
-return SCPE_OK;
-}
-
-/* Show unit type */
-
-t_stat rd_show_type (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
-{
-fprintf (st, "%s", drv_tab[GET_DTYPE (uptr->flags)].name);
-return SCPE_OK;
 }
 
 t_stat rd_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)

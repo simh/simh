@@ -73,7 +73,7 @@ MTAB EPROM_mod[] = {
 //    { MTAB_XTD | MTAB_VDV, 0, NULL, "BASE", &isbc464_set_base,
 //        NULL, NULL, "Sets the ROM base for EPROM"               },
     { MTAB_XTD|MTAB_VDV, 0, "PARAM", NULL, NULL, &EPROM_show_param, NULL, 
-        "Parameters" },
+        "show configured parameters for iEPROM" },
     { 0 }
 };
 
@@ -83,8 +83,6 @@ DEBTAB EPROM_debug[] = {
     { "READ", DEBUG_read },
     { "WRITE", DEBUG_write },
     { "XACK", DEBUG_xack },
-    { "LEV1", DEBUG_level1 },
-    { "LEV2", DEBUG_level2 },
     { NULL }
 };
 
@@ -153,6 +151,7 @@ t_stat EPROM_clr(void)
 
 t_stat EPROM_reset (DEVICE *dptr)
 {
+    EPROM_clr();
     return SCPE_OK;
 }
 

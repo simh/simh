@@ -1,6 +1,6 @@
 /* i1620_cd.c: IBM 1622 card reader/punch
 
-   Copyright (c) 2002-2017, Robert M. Supnik
+   Copyright (c) 2002-2021, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    cdr          1622 card reader
    cdp          1622 card punch
 
+   09-Jun-21    RMS     Removed use of ftell on output for pipe compatibility
    23-Jun-17    RMS     Unattached error does not set RDCHK/WRCHK
    09-Mar-17    RMS     Guardbanded translation table lookups (COVERITY)
    31-Jan-15    TFM     Changes to translation tables (Tom McBride)
@@ -371,9 +372,9 @@ if ((i = strlen (cdr_buf)) > 0) {                       /* anything at all? */
         }
     }
 cdr_unit.pos = ftell (cdr_unit.fileref);                /* update position */
-getc (cdr_unit.fileref);                                /* see if more */
-if (feof (cdr_unit.fileref))                            /* eof? set last */
-    ind[IN_LAST] = 1;
+if (getc (cdr_unit.fileref) == EOF)                     /* eof? */
+    ind[IN_LAST] = 1;                                   /* set flag */
+clearerr (cdr_unit.fileref);
 fseek (cdr_unit.fileref, cdr_unit.pos, SEEK_SET);       /* "backspace" */
 return SCPE_OK;
 }
@@ -528,13 +529,13 @@ cdp_buf[len] = '\n';                                    /* newline, null */
 cdp_buf[len + 1] = 0;
 
 fputs (cdp_buf, cdp_unit.fileref);                      /* write card */
-cdp_unit.pos = ftell (cdp_unit.fileref);                /* count char */
 if (ferror (cdp_unit.fileref)) {                        /* error? */
     ind[IN_WRCHK] = 1;
     sim_perror ("CDP I/O error");
     clearerr (cdp_unit.fileref);
     return SCPE_IOERR;
     }
+cdp_unit.pos = cdp_unit.pos + strlen (cdp_buf);         /* update position */
 return SCPE_OK;
 }
 

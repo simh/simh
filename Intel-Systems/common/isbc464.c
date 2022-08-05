@@ -76,7 +76,7 @@ MTAB isbc464_mod[] = {
    { MTAB_XTD | MTAB_VDV, 0, NULL, "BASE", &isbc464_set_base,
         NULL, NULL, "Sets the ROM base for iSBC464"               },
     { MTAB_XTD|MTAB_VDV, 0, "PARAM", NULL, NULL, &isbc464_show_param, NULL, 
-        "Parameter" },
+        "show configured parameters for SBC 464" },
     { 0 }
 };
 
@@ -86,8 +86,6 @@ DEBTAB isbc464_debug[] = {
     { "READ", DEBUG_read },
     { "WRITE", DEBUG_write },
     { "XACK", DEBUG_xack },
-    { "LEV1", DEBUG_level1 },
-    { "LEV2", DEBUG_level2 },
     { NULL }
 };
 
@@ -231,8 +229,8 @@ t_stat isbc464_reset (DEVICE *dptr)
     if (dptr == NULL)
         return SCPE_ARG;
     if (isbc464_onetime) {
-        isbc464_dev.units->capac = SBC464_SIZE; //set default size
-        isbc464_dev.units->BASE_ADDR = SBC464_BASE; //set default base
+//        isbc464_dev.units->capac = SBC464_SIZE; //set default size
+//        isbc464_dev.units->BASE_ADDR = SBC464_BASE; //set default base
         isbc464_onetime = 0;
     }
     if ((dptr->flags & DEV_DIS) == 0) { //already enabled
@@ -246,7 +244,7 @@ t_stat isbc464_reset (DEVICE *dptr)
     } else { //disabled
         if (isbc464_dev.units->filebuf)
             free(isbc464_dev.units->filebuf);   //return allocated memory
-        sim_printf("    sbc464: Disabled\n");
+//        sim_printf("    sbc464: Disabled\n");
     }
     return SCPE_OK;
 }
@@ -272,7 +270,7 @@ uint8 isbc464_get_mbyte(uint16 addr)
     uint8 val;
 
     val = *((uint8 *)isbc464_unit.filebuf + (addr - isbc464_unit.BASE_ADDR));
-    return (val & 0xFF);
+    return (val & BYTEMASK);
 }
 
 /* end of isbc464.c */

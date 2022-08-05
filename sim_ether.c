@@ -407,7 +407,7 @@ t_stat eth_mac_scan_ex (ETH_MAC* mac, const char* strmac, UNIT *uptr)
   ETH_MAC newmac;
   struct {
       uint32 bits;
-      char system_id[37];
+      char system_id[64];
       char cwd[PATH_MAX];
       char file[PATH_MAX];
       ETH_MAC base_mac;
@@ -2704,7 +2704,7 @@ if (!version[0]) {
     while (*c && !isdigit (*c))
       ++c;
     get_glyph (c, maj_min, ',');
-    if (strcmp ("0.9990", maj_min) < 0)
+    if (strcmp ("0.9990", maj_min) > 0)
       snprintf(version, sizeof(version), "Unsupported - %s", pcap_lib_version());
     }
   }
@@ -3115,6 +3115,9 @@ int write_queue_size = 1;
 
 /* make sure device exists */
 if ((!dev) || (dev->eth_api == ETH_API_NONE)) return SCPE_UNATT;
+
+if (packet->len > sizeof (packet->msg)) /* packet ovesized? */
+    return SCPE_IERR;                   /* that's no good! */
 
 /* Get a buffer */
 pthread_mutex_lock (&dev->writer_lock);
@@ -3718,7 +3721,7 @@ switch (dev->eth_api) {
     break;
   default:
     bpf_used = to_me = 0;                           /* Should NEVER happen */
-    abort();
+    SIM_SCP_ABORT ("_eth_callback()");
     break;
   }
 

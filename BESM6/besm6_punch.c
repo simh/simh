@@ -155,7 +155,7 @@ void fs_control (int num, uint32 cmd)
         besm6_debug("<<< ФС1500-%d команда %o", num, cmd);
     if (! IS_RDY(FS1_READY >> num)) {
         if (fs_dev.dctrl)
-            besm6_debug("<<< ФС1500-%d не готово", num, cmd);
+            besm6_debug("<<< ФС1500-%d не готово", num);
         return;
     }
     switch (cmd) {

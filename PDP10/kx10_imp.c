@@ -28,8 +28,9 @@
 #include "sim_ether.h"
 
 #if NUM_DEVS_IMP > 0
-#define IMP_DEVNUM  0460
-#define WA_IMP_DEVNUM  0400
+#define IMP_DEVNUM      0460
+#define BBN_IMP_DEVNUM  0550
+#define WA_IMP_DEVNUM   0400
 
 #define DEVNUM imp_dib.dev_num
 
@@ -900,7 +901,6 @@ t_stat imp_devio(uint32 dev, uint64 *data)
              check_interrupts(uptr);
              break;
         case TYPE_BBN:
-             break;
         case TYPE_WAITS:
              if (*data & IMP_ODPIEN) {
                  imp_data.pia &= ~07;
@@ -952,7 +952,6 @@ t_stat imp_devio(uint32 dev, uint64 *data)
              *data = (uint64)(uptr->STATUS | (imp_data.pia & 07));
              break;
         case TYPE_BBN:
-             break;
         case TYPE_WAITS:
              *data = (uint64)(imp_data.pia & 0777);
              if (uptr->STATUS & IMPOD)
@@ -1508,6 +1507,8 @@ imp_packet_in(struct imp_device *imp)
                         int     i;
                         char    port_buffer[100];
                         struct udp_hdr     udp_hdr;
+                       if (l > 1500)
+                           l = 1500;
                        /* Count out 4 commas */
                        for (i = nlen = 0; i < l && nlen < 4; i++) {
                           if (tcp_payload[i] == ',')
@@ -2098,6 +2099,8 @@ void imp_packet_debug(struct imp_device *imp, const char *action, ETH_PACK *pack
 
             }
             len = ntohs(ip->ip_len) - ((ip->ip_v_hl & 0xf) * 4 + (ntohs(tcp->flags) >> 12) * 4);
+            if (len > 1500)
+                len = 1500;
             sim_debug(DEBUG_TCP, &imp_dev, "%s %s%s %d byte packet from %s:%s to %s:%s\n", action,
                         flags, *flags ? ":" : "", (int)len, src_ip, src_port, dst_ip, dst_port);
             if (len && (imp_dev.dctrl & DEBUG_TCP))
@@ -3128,8 +3131,10 @@ t_stat imp_attach(UNIT* uptr, CONST char* cptr)
     /* Set to correct device number */
     switch(GET_DTYPE(imp_unit[0].flags)) {
     case TYPE_MIT:
-    case TYPE_BBN:
                    imp_dib.dev_num = IMP_DEVNUM;
+                   break;
+    case TYPE_BBN:
+                   imp_dib.dev_num = BBN_IMP_DEVNUM;
                    break;
     case TYPE_WAITS:
                    imp_dib.dev_num = WA_IMP_DEVNUM;

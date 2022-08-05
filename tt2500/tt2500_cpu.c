@@ -388,7 +388,7 @@ static void cpu_bus (uint16 insn)
 
   if (bb) {
     switch (a) {
-    case 2: PC = RES;
+    case 2: PC = RES; return;
     case 4: dpy_magic (RES, &R[2], &R[3], R[4], R[5]); return;
     case 5: dpy_chartv (R[b]); return;
     case 6: cpu_popj (); return;

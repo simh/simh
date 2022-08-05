@@ -1,4 +1,4 @@
-/*  mp-a_sys.c: SWTP 6800 system interface
+/*  mp-a2_sys.c: SWTP 6800 CPU Board Type 2
 
     Copyright (c) 2005-2012, William Beech
 
@@ -43,6 +43,9 @@ extern DEVICE ptr_dev;
 extern DEVICE ptp_dev;
 extern DEVICE mp_8m_dev;
 extern DEVICE dsk_dev;
+extern DEVICE fd400_dsk_dev;
+
+extern int32 saved_PC;                     /* Program counter */
 
 /* SCP data structures
 
@@ -61,8 +64,8 @@ REG *sim_PC = &m6800_reg[0];
 int32 sim_emax = 4;
 
 DEVICE *sim_devices[] = {
-    &CPU_BD_dev,
     &m6800_dev,
+    &CPU_BD_dev,
     &BOOTROM_dev,
     &m6810_dev,
     &i2716_dev,
@@ -72,6 +75,7 @@ DEVICE *sim_devices[] = {
     &ptp_dev,
     &mp_8m_dev,
     &dsk_dev,
+    &fd400_dsk_dev,
     NULL
 };
 
@@ -84,4 +88,4 @@ const char *sim_stop_messages[SCPE_BASE] = {
     "Invalid Memory" 
 };
 
-/* end of mp-a_sys.c */
+/* end of mp-a2_sys.c */

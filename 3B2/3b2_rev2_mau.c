@@ -1389,7 +1389,11 @@ static void normalize_xfp_subnormal(t_uint64 in_frac, int32 *out_exp, t_uint64 *
     int8 shift_count;
 
     shift_count = leading_zeros_64(in_frac);
-    *out_frac = in_frac << shift_count;
+    if (shift_count < 64) {
+        *out_frac = in_frac << shift_count;
+    } else {
+        *out_frac = 0;
+    }
     *out_exp = 1 - shift_count;
 }
 
@@ -1721,6 +1725,7 @@ void mau_int_to_xfp(int32 val, XFP *result)
 
     result->sign_exp = sign_exp;
     result->frac = frac;
+    result->s = 0;
 
     if (sign_exp & 0x8000) {
         mau_state.asr |= MAU_ASR_N;
@@ -1776,7 +1781,12 @@ void mau_int64_to_xfp(t_uint64 val, XFP *result)
     sign = (val & 0x8000000000000000ull) != 0ull;
     abs = val & 0x7fffffffffffffffull;
     shift_count = leading_zeros_64(abs);
-    PACK_XFP(sign, 0x403e - shift_count, abs << shift_count, result);
+    if (shift_count < 64) {
+        abs = abs << shift_count;
+    } else {
+        abs = 0;
+    }
+    PACK_XFP(sign, 0x403e - shift_count, abs, result);
 }
 
 /*
@@ -3355,6 +3365,7 @@ static void mau_neg()
     result.sign_exp = a.sign_exp;
     result.frac = a.frac;
     result.sign_exp ^= 0x8000;
+    result.s = a.s;
     store_op3(&result);
 }
 
@@ -3366,6 +3377,7 @@ static void mau_abs()
     result.sign_exp = a.sign_exp;
     result.frac = a.frac;
     result.sign_exp &= 0x7fff;
+    result.s = a.s;
     store_op3(&result);
 }
 

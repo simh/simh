@@ -144,9 +144,9 @@ MTAB tti_mod[] = {
     { MTAB_XTD|MTAB_VDV, TT_PAR_ODD,    NULL, "ODD",   &tty_set_parity, NULL, NULL, "Odd Parity" },
     { MTAB_XTD|MTAB_VDV, 0, "MODE", NULL, NULL, &sim_tt_show_modepar, NULL, "Mode and Parity" },
     { MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
-      NULL, &show_addr, NULL },
+      NULL, &show_addr, NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
-      NULL, &show_vec, NULL },
+      NULL, &show_vec, NULL, "Interrupt vector" },
     { 0 }
     };
 
@@ -210,9 +210,9 @@ MTAB tto_mod[] = {
     { MTAB_XTD|MTAB_VDV, TT_PAR_ODD,    NULL, "ODD",   &tty_set_parity, NULL, NULL, "Odd Parity" },
     { MTAB_XTD|MTAB_VDV, 0, "MODE", NULL, NULL, &sim_tt_show_modepar, NULL, "Mode and Parity" },
     { MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
-      NULL, &show_addr, NULL },
+      NULL, &show_addr, NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
-      NULL, &show_vec, NULL },
+      NULL, &show_vec, NULL, "Interrupt vector" },
     { 0 }
     };
 
@@ -262,15 +262,15 @@ REG clk_reg[] = {
 
 MTAB clk_mod[] = {
     { MTAB_XTD|MTAB_VDV, 50, NULL, "50HZ",
-      &clk_set_freq, NULL, NULL },
+      &clk_set_freq, NULL, NULL, "60 ticks per second" },
     { MTAB_XTD|MTAB_VDV, 60, NULL, "60HZ",
-      &clk_set_freq, NULL, NULL },
+      &clk_set_freq, NULL, NULL, "60 ticks per second" },
     { MTAB_XTD|MTAB_VDV, 0, "FREQUENCY", NULL,
-      NULL, &clk_show_freq, NULL },
+      NULL, &clk_show_freq, NULL, "Clock tick frequency" },
     { MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
-      NULL, &show_addr, NULL },
+      NULL, &show_addr, NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
-      NULL, &show_vec, NULL },
+      NULL, &show_vec, NULL, "Interrupt vector" },
     { 0 }
     };
 

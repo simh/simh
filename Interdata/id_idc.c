@@ -252,10 +252,10 @@ UNIT idc_unit[] = {
 
 REG idc_reg[] = {
     { HRDATA (STA, idc_sta, 8) },
-    { HRDATA (BUF, idc_db, 8) },
+    { HRDATA (BUFC, idc_db, 8) },
     { HRDATA (SEC, idc_sec, 8) },
     { HRDATA (HCYL, idc_hcyl, 16) },
-    { HRDATA (BUF, idd_db, 8) },
+    { HRDATA (BUFD, idd_db, 8) },
     { HRDATA (SVUN, idc_svun, 2), REG_HIDDEN },
     { BRDATA (DBUF, idcxb, 16, 8, IDC_NUMBY * 3) },
     { HRDATA (DBPTR, idc_bptr, 10), REG_RO },

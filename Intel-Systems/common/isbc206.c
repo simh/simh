@@ -262,7 +262,7 @@ MTAB isbc206_mod[] = {
     { MTAB_XTD | MTAB_VDV, 0, NULL, "INT", &isbc206_set_int,
         NULL, NULL, "Sets the interrupt number for iSBC206"},
     { MTAB_XTD | MTAB_VDV, 0, "PARAM", NULL, NULL, &isbc206_show_param, NULL, 
-        "show configured parametes for iSBC206" },
+        "show configured parameters for iSBC206" },
     { 0 }
 };
 
@@ -272,8 +272,6 @@ DEBTAB isbc206_debug[] = {
     { "READ", DEBUG_read },
     { "WRITE", DEBUG_write },
     { "XACK", DEBUG_xack },
-    { "LEV1", DEBUG_level1 },
-    { "LEV2", DEBUG_level2 },
     { NULL }
 };
 
@@ -320,7 +318,7 @@ t_stat isbc206_cfg(uint16 baseport, uint16 devnum, uint8 intnum)
         uptr = isbc206_dev.units + i;
         uptr->u6 = i;               //fdd unit number
     }
-    hdc206.baseport = baseport & 0xff;  //set port
+    hdc206.baseport = baseport & BYTEMASK;  //set port
     hdc206.intnum = intnum;             //set interrupt
     hdc206.verb = 0;                    //clear verb
     reg_dev(isbc206r0, hdc206.baseport, 0, 0); //read status
@@ -381,8 +379,13 @@ t_stat isbc206_set_port(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
         return SCPE_ARG;
     result = sscanf(cptr, "%02x", &size);
     hdc206.baseport = size;
-    if (hdc206.verb)
+//    if (hdc206.verb)
         sim_printf("SBC206: Base port=%04X\n", hdc206.baseport);
+    reg_dev(isbc206r0, hdc206.baseport, 0, 0); //read status
+    reg_dev(isbc206r1, hdc206.baseport + 1, 0, 0); //read rslt type/write IOPB addr-l
+    reg_dev(isbc206r2, hdc206.baseport + 2, 0, 0); //write IOPB addr-h and start 
+    reg_dev(isbc206r3, hdc206.baseport + 3, 0, 0); //read rstl byte 
+    reg_dev(isbc206r7, hdc206.baseport + 7, 0, 0); //write reset fdc202
     return SCPE_OK;
 }
 
@@ -396,7 +399,7 @@ t_stat isbc206_set_int(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
         return SCPE_ARG;
     result = sscanf(cptr, "%02x", &size);
     hdc206.intnum = size;
-    if (hdc206.verb)
+//    if (hdc206.verb)
         sim_printf("SBC206: Interrupt number=%04X\n", hdc206.intnum);
     return SCPE_OK;
 }

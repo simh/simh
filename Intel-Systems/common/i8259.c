@@ -92,18 +92,9 @@ UNIT i8259_unit[] = {
 };
 
 REG i8259_reg[] = {
-    { HRDATA (IRR0, i8259_unit[0].u3, 8) }, /* i8259 0 */
-    { HRDATA (ISR0, i8259_unit[0].u4, 8) },
-    { HRDATA (IMR0, i8259_unit[0].u5, 8) },
-    { HRDATA (IRR1, i8259_unit[1].u3, 8) }, /* i8259 1 */
-    { HRDATA (ISR1, i8259_unit[1].u4, 8) },
-    { HRDATA (IMR1, i8259_unit[1].u5, 8) },
-    { HRDATA (IRR1, i8259_unit[2].u3, 8) }, /* i8259 2 */
-    { HRDATA (ISR1, i8259_unit[2].u4, 8) },
-    { HRDATA (IMR1, i8259_unit[2].u5, 8) },
-    { HRDATA (IRR1, i8259_unit[3].u3, 8) }, /* i8259 3 */
-    { HRDATA (ISR1, i8259_unit[3].u4, 8) },
-    { HRDATA (IMR1, i8259_unit[3].u5, 8) },
+    { URDATAD(IRR0,i8259_unit[0].u3,16,8,0,4,0,"IRR0") },
+    { URDATAD(ISR0,i8259_unit[0].u4,16,8,0,4,0,"ISR0") },
+    { URDATAD(IMR0,i8259_unit[0].u5,16,8,0,4,0,"IMR0") },
     { NULL }
 };
 
@@ -112,14 +103,13 @@ DEBTAB i8259_debug[] = {
     { "FLOW", DEBUG_flow },
     { "READ", DEBUG_read },
     { "WRITE", DEBUG_write },
-    { "LEV1", DEBUG_level1 },
-    { "LEV2", DEBUG_level2 },
+    { "XACK", DEBUG_xack },
     { NULL }
 };
 
 MTAB i8259_mod[] = {
     { MTAB_XTD | MTAB_VDV, 0, "PARAM", NULL, NULL, i8259_show_param, NULL, 
-        "show configured parametes for i8259" },
+        "show configured parameters for i8259" },
     { 0 }
 };
 
@@ -130,7 +120,7 @@ DEVICE i8259_dev = {
     i8259_unit,         //units
     i8259_reg,          //registers
     i8259_mod,          //modifiers
-    I8259_NUM,          //numunits
+    4,                  //numunits
     16,                 //aradix
     16,                 //awidth
     1,                  //aincr
@@ -162,7 +152,7 @@ DEVICE i8259_dev = {
 
 t_stat i8259_cfg(uint16 base, uint16 devnum, uint8 dummy)
 {
-    i8259_baseport[devnum] = base & 0xff;
+    i8259_baseport[devnum] = base & BYTEMASK;
     sim_printf("    i8259%d: installed at base port 0%02XH\n",
         devnum, i8259_baseport[devnum]);
     reg_dev(i8259a, i8259_baseport[devnum], devnum, 0); 
@@ -213,10 +203,16 @@ t_stat i8259_reset (DEVICE *dptr)
 {
     uint8 devnum;
     
-    for (devnum=0; devnum<i8259_num+1; devnum++) {
-        i8259_unit[devnum].u3 = 0x00; /* IRR */
-        i8259_unit[devnum].u4 = 0x00; /* ISR */
-        i8259_unit[devnum].u5 = 0x00; /* IMR */
+    for (devnum=0; devnum < 4; devnum++) {
+        if (devnum < i8259_num) {
+            i8259_unit[devnum].flags = 0;
+            i8259_unit[devnum].u3 = 0x00; /* IRR */
+            i8259_unit[devnum].u4 = 0x00; /* ISR */
+            i8259_unit[devnum].u5 = 0x00; /* IMR */
+        } else {
+            sim_cancel (&i8259_unit[devnum]);
+            i8259_unit[devnum].flags = UNIT_DIS;
+        }
     }
     return SCPE_OK;
 }

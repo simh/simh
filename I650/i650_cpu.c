@@ -1575,10 +1575,12 @@ t_stat ExecOpcode(int opcode, int DA,
             if (neg > 2) {
                sim_debug(DEBUG_EXP, &cpu_dev, "Arm out of range (should be 0..2)\n");
                reason = STOP_IO; // selected arm or unit out of range
+               break; 
             }
             if (i > 3) {
                sim_debug(DEBUG_EXP, &cpu_dev, "Unit out of range (should be 0..3)\n");
                reason = STOP_IO; // selected arm or unit out of range
+               break; 
             }
             if (cpu_unit.flags & OPTION_1DSKARM) {
                 // if 1 arm per disk enabled, alisase all disck comands to be executed on arm 0

@@ -25,23 +25,25 @@
 
 
 /* Set an IRQ for a DF10 device */
-void df10_setirq(struct df10 *df) {
+void
+df10_setirq(struct df10 *df) {
       df->status |= PI_ENABLE;
       set_interrupt(df->devnum, df->status);
 }
 
 /* Generate the DF10 complete word */
-void df10_writecw(struct df10 *df) {
+void
+df10_writecw(struct df10 *df) {
       uint64  wrd;
-      df->status |= 1 << df->ccw_comp;
       if (df->wcr != 0)
           df->cda++;
-      wrd = ((uint64)(df->ccw & WMASK) << CSHIFT) | ((uint64)(df->cda) & AMASK);
+      wrd = ((uint64)(df->ccw & df->wmask) << df->cshift) | ((uint64)(df->cda) & df->amask);
       (void)Mem_write_word(df->cia|1, &wrd, 0);
 }
 
 /* Finish off a DF10 transfer */
-void df10_finish_op(struct df10 *df, int flags) {
+void
+df10_finish_op(struct df10 *df, int flags) {
       df->status &= ~BUSY;
       df->status |= flags;
       df10_writecw(df);
@@ -49,27 +51,28 @@ void df10_finish_op(struct df10 *df, int flags) {
 }
 
 /* Setup for a DF10 transfer */
-void df10_setup(struct df10 *df, uint32 addr) {
+void
+df10_setup(struct df10 *df, uint32 addr) {
       df->cia = addr & ICWA;
       df->ccw = df->cia;
       df->wcr = 0;
       df->status |= BUSY;
-      df->status &= ~(1 << df->ccw_comp);
 }
 
 /* Fetch the next IO control word */
-int df10_fetch(struct df10 *df) {
+int
+df10_fetch(struct df10 *df) {
       uint64 data;
       if (Mem_read_word(df->ccw, &data, 0)) {
            df10_finish_op(df, df->nxmerr);
            return 0;
       }
-      while((data & (WMASK << CSHIFT)) == 0) {
-          if ((data & AMASK) == 0 || (uint32)(data & AMASK) == df->ccw) {
+      while((data & (df->wmask << df->cshift)) == 0) {
+          if ((data & df->amask) == 0 || (uint32)(data & df->amask) == df->ccw) {
                 df10_finish_op(df,0);
                 return 0;
           }
-          df->ccw = (uint32)(data & AMASK);
+          df->ccw = (uint32)(data & df->amask);
           if (Mem_read_word(df->ccw, &data, 0)) {
                 df10_finish_op(df, 1<<df->nxmerr);
                 return 0;
@@ -77,27 +80,28 @@ int df10_fetch(struct df10 *df) {
       }
 #if KA & ITS
       if (cpu_unit[0].flags & UNIT_ITSPAGE) {
-          df->wcr = (uint32)((data >> CSHIFT) & 0077777) | 0700000;
+          df->wcr = (uint32)((data >> df->cshift) & 0077777) | 0700000;
           df->cda = (uint32)(data & RMASK);
           df->cda |= (uint32)((data >> 15) & 00000007000000LL) ^ 07000000;
-          df->ccw = (uint32)((df->ccw + 1) & AMASK);
+          df->ccw = (uint32)((df->ccw + 1) & df->amask);
           return 1;
       }
 #endif
-      df->wcr = (uint32)((data >> CSHIFT) & WMASK);
-      df->cda = (uint32)(data & AMASK);
-      df->ccw = (uint32)((df->ccw + 1) & AMASK);
+      df->wcr = (uint32)((data >> df->cshift) & df->wmask);
+      df->cda = (uint32)(data & df->amask);
+      df->ccw = (uint32)((df->ccw + 1) & df->amask);
       return 1;
 }
 
 /* Read next word */
-int df10_read(struct df10 *df) {
+int
+df10_read(struct df10 *df) {
      uint64 data;
      if (df->wcr == 0) {
          if (!df10_fetch(df))
              return 0;
      }
-     df->wcr = (uint32)((df->wcr + 1) & WMASK);
+     df->wcr = (uint32)((df->wcr + 1) & df->wmask);
      if (df->cda != 0) {
         if (df->cda > MEMSIZE) {
             df10_finish_op(df, 1<<df->nxmerr);
@@ -108,7 +112,7 @@ int df10_read(struct df10 *df) {
             df->cda = (uint32)((df->cda + 1) & RMASK) | (df->cda & 07000000);
         else
 #endif
-        df->cda = (uint32)((df->cda + 1) & AMASK);
+        df->cda = (uint32)((df->cda + 1) & df->amask);
         if (Mem_read_word(df->cda, &data, 0)) {
             df10_finish_op(df, 1<<df->nxmerr);
             return 0;
@@ -124,12 +128,13 @@ int df10_read(struct df10 *df) {
 }
 
 /* Write next word */
-int df10_write(struct df10 *df) {
+int
+df10_write(struct df10 *df) {
      if (df->wcr == 0) {
          if (!df10_fetch(df))
              return 0;
      }
-     df->wcr = (uint32)((df->wcr + 1) & WMASK);
+     df->wcr = (uint32)((df->wcr + 1) & df->wmask);
      if (df->cda != 0) {
         if (df->cda > MEMSIZE) {
            df10_finish_op(df, 1<<df->nxmerr);
@@ -140,7 +145,7 @@ int df10_write(struct df10 *df) {
             df->cda = (uint32)((df->cda + 1) & RMASK) | (df->cda & 07000000);
         else
 #endif
-        df->cda = (uint32)((df->cda + 1) & AMASK);
+        df->cda = (uint32)((df->cda + 1) & df->amask);
         if (Mem_write_word(df->cda, &df->buf, 0)) {
            df10_finish_op(df, 1<<df->nxmerr);
            return 0;
@@ -151,3 +156,29 @@ int df10_write(struct df10 *df) {
      }
      return 1;
 }
+
+/* Initialize a DF10 to default values */
+void
+df10_init(struct df10 *df, uint32 dev_num, uint8 nxmerr)
+{
+    df->status = 0;
+    df->devnum = dev_num;    /* Set device number link */
+    df->nxmerr = nxmerr;     /* Set bit in status for NXM */
+#if KI_22BIT
+    if (cpu_unit[0].flags & UNIT_DF10C) {
+        df->amask = 00000017777777LL;
+        df->wmask = 0037777LL;
+        df->cshift = 22;
+    } else {
+        df->amask = RMASK;
+        df->wmask = RMASK;
+        df->cshift = 18;
+    }
+#else
+    df->amask = RMASK;
+    df->wmask = RMASK;
+    df->cshift = 18;
+#endif
+}
+
+

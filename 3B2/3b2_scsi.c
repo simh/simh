@@ -65,25 +65,14 @@ uint8    ha_subdev_cnt;
 uint32   ha_crc = 0;
 uint32   cq_offset = 0;
 
-static struct scsi_dev_t ha_tab[] = {
+static DRVTYP ha_tab[] = {
     HA_DISK(SD327),
     HA_TAPE(ST120)
 };
 
-#define SCSI_U_FLAGS  (UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+ \
-                       UNIT_ROABLE+(SD327_DTYPE << UNIT_V_DTYPE))
+#define SCSI_U_FLAGS  (UNIT_FIX|UNIT_ATTABLE|UNIT_DISABLE|UNIT_ROABLE)
 
-UNIT ha_unit[] = {
-    { UDATA (&ha_svc, SCSI_U_FLAGS, HA_SIZE(SD327)) },  /* SCSI ID 0 */
-    { UDATA (&ha_svc, SCSI_U_FLAGS, HA_SIZE(SD327)) },  /* SCSI ID 1 */
-    { UDATA (&ha_svc, SCSI_U_FLAGS, HA_SIZE(SD327)) },  /* SCSI ID 2 */
-    { UDATA (&ha_svc, SCSI_U_FLAGS, HA_SIZE(SD327)) },  /* SCSI ID 3 */
-    { UDATA (&ha_svc, SCSI_U_FLAGS, HA_SIZE(SD327)) },  /* SCSI ID 4 */
-    { UDATA (&ha_svc, SCSI_U_FLAGS, HA_SIZE(SD327)) },  /* SCSI ID 5 */
-    { UDATA (&ha_svc, SCSI_U_FLAGS, HA_SIZE(SD327)) },  /* SCSI ID 6 */
-    { UDATA (&ha_svc, SCSI_U_FLAGS, HA_SIZE(SD327)) },  /* SCSI ID 7 */
-    { UDATA (&ha_svc, UNIT_DIS, 0) },                   /* CIO unit  */
-};
+UNIT ha_unit[9] = {0};  /* SCSI ID 0-7 + CIO Unit */
 
 static UNIT *cio_unit  = &ha_unit[8];
 
@@ -94,12 +83,6 @@ MTAB ha_mod[] = {
       &scsi_set_wlk, NULL, NULL, "Write lock disk drive" },
     { MTAB_XTD|MTAB_VUN, 0, "WRITE", NULL,
       NULL, &scsi_show_wlk, NULL, "Display drive writelock status" },
-    { MTAB_XTD|MTAB_VUN, SD327_DTYPE, NULL, "SD327",
-      &ha_set_type, NULL, NULL, "Set CDC 327MB Disk Type" },
-    { MTAB_XTD|MTAB_VUN, ST120_DTYPE, NULL, "ST120",
-      &ha_set_type, NULL, NULL, "Set Wangtek 120MB Tape Type" },
-    { MTAB_XTD|MTAB_VUN, 0, "TYPE", NULL,
-      NULL, &ha_show_type, NULL, "Display device type" },
     { MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
       &scsi_set_fmt, &scsi_show_fmt, NULL, "Set/Display unit format" },
     { 0 }
@@ -143,6 +126,8 @@ DEVICE ha_dev = {
     NULL,
     NULL,
     NULL,
+    NULL,
+    &ha_tab
 };
 
 void ha_cio_reset(uint8 cid)
@@ -157,13 +142,27 @@ void ha_cio_reset(uint8 cid)
 t_stat ha_reset(DEVICE *dptr)
 {
     uint8 cid;
-    uint32 t, dtyp;
+    uint32 t;
     UNIT *uptr;
     t_stat r;
+    static t_bool inited = FALSE;
 
     sim_debug(HA_TRACE, &ha_dev,
               "[%08x] [ha_reset] Resetting SCSI device\n",
               R[NUM_PC]);
+
+    if (!inited) {
+        inited = TRUE;
+        for (t = 0; t < dptr->numunits - 1; t++) {
+            uptr = dptr->units + t;
+            uptr->action = &ha_svc;
+            uptr->flags = SCSI_U_FLAGS;
+            sim_disk_set_drive_type_by_name (uptr, "SD327");
+            }
+        uptr = dptr->units + t;
+        uptr->action = &ha_svc;
+        uptr->flags = UNIT_DIS;
+        }
 
     ha_state.pump_state = PUMP_NONE;
 
@@ -187,8 +186,6 @@ t_stat ha_reset(DEVICE *dptr)
             uptr->flags = UNIT_DIS;
         }
         scsi_add_unit(&ha_bus, t, uptr);
-        dtyp = GET_DTYPE(uptr->flags);
-        scsi_set_unit(&ha_bus, uptr, &ha_tab[dtyp]);
         scsi_reset_unit(uptr);
     }
 
@@ -253,7 +250,6 @@ static void ha_calc_subdevs()
 {
     uint32 target;
     UNIT *uptr;
-    SCSI_DEV *dev;
 
     ha_subdev_cnt = 0;
 
@@ -262,7 +258,6 @@ static void ha_calc_subdevs()
     for (target = 0; target < 8; target++) {
         uptr = &ha_unit[target];
         if (uptr->flags & UNIT_ATT) {
-            dev = (SCSI_DEV *)uptr->up7;
             ha_subdev_tab[ha_subdev_cnt++] = target;
         }
     }
@@ -790,8 +785,7 @@ static void ha_cmd(uint8 op, uint8 subdev, uint32 addr, int32 len, t_bool expres
 {
     int32 i, block;
     UNIT *uptr;
-    SCSI_DEV *dev;
-    uint8 target;
+    int8 target;
 
     /* Immediately cancel any pending IRQs */
     sim_cancel(cio_unit);
@@ -844,6 +838,7 @@ static void ha_cmd(uint8 op, uint8 subdev, uint32 addr, int32 len, t_bool expres
         cio[ha_state.cid].sysgen_s = 0;
         ha_state.reply.status = CIO_SUCCESS;
         sim_activate_abs(cio_unit, 1200);
+        break;
     case CIO_DSD:
         sim_debug(HA_TRACE, &ha_dev,
                   "[ha_cmd] SCSI DSD - %d CONFIGURED DEVICES (writing to addr %08x).\n",
@@ -863,13 +858,11 @@ static void ha_cmd(uint8 op, uint8 subdev, uint32 addr, int32 len, t_bool expres
 
             uptr = &ha_unit[target];
 
-            dev = (SCSI_DEV *)uptr->up7;
-
             sim_debug(HA_TRACE, &ha_dev,
                       "[ha_cmd] [DSD] Probing subdev %d, target %d, devtype %d\n",
-                      i, target, dev->devtype);
+                      i, target, uptr->drvtyp->devtype);
 
-            switch(dev->devtype) {
+            switch(uptr->drvtyp->devtype) {
             case SCSI_DISK:
                 sim_debug(HA_TRACE, &ha_dev,
                           "[ha_cmd] [DSD] Subdev %d is DISK (writing to addr %08x)\n",
@@ -920,9 +913,7 @@ static void ha_cmd(uint8 op, uint8 subdev, uint32 addr, int32 len, t_bool expres
             return;
         }
 
-        dev = (SCSI_DEV *)uptr->up7;
-
-        switch(dev->devtype) {
+        switch(uptr->drvtyp->devtype) {
         case SCSI_DISK:
             ha_boot_disk(uptr, target);
             break;
@@ -980,11 +971,10 @@ static void ha_cmd(uint8 op, uint8 subdev, uint32 addr, int32 len, t_bool expres
             return;
         }
 
-        dev = (SCSI_DEV *)uptr->up7;
         block = pread_w(addr);     /* Logical block we've been asked to read */
         addr = pread_w(addr + 4);  /* Dereference the pointer to the destination */
 
-        switch(dev->devtype) {
+        switch(uptr->drvtyp->devtype) {
         case SCSI_TAPE:
             ha_read_block_tape(uptr, addr);
             break;
@@ -1340,30 +1330,6 @@ void ha_fcm_express()
     }
 }
 
-t_stat ha_set_type(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
-{
-    if (val < 0 || cptr || val > HA_MAX_DTYPE) {
-        return SCPE_ARG;
-    }
-
-    if (uptr->flags & UNIT_ATT) {
-        return SCPE_ALATT;
-    }
-
-    uptr->flags = (uptr->flags & ~UNIT_DTYPE) | (val << UNIT_V_DTYPE);
-    uptr->capac = (t_addr) ha_tab[val].lbn;
-    scsi_set_unit(&ha_bus, uptr, &ha_tab[val]);
-    scsi_reset_unit(uptr);
-    return SCPE_OK;
-}
-
-t_stat ha_show_type(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
-{
-    fprintf(st, "%s", ha_tab[GET_DTYPE(uptr->flags)].name);
-
-    return SCPE_OK;
-}
-
 /* Used for debugging only */
 /* TODO: Remove after testing */
 static void dump_edt()
@@ -1372,7 +1338,7 @@ static void dump_edt()
 
     uint32 offset;
 
-    char name[10];
+    char name[11];
 
     sim_debug(HA_TRACE, &ha_dev,
               "[EDT]  Sanity: %08x\n",

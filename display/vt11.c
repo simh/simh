@@ -3223,7 +3223,7 @@ vt11_cycle(int us, int slowdown)
             DEBUGF("Load Status C");
             if (TESTBIT(inst,9)) {
                 char_rotate = TESTBIT(inst,8);
-                DEBUGF(" char_rotate=d", (int)char_rotate);
+                DEBUGF(" char_rotate=%d", (int)char_rotate);
             }
             if (TESTBIT(inst,7)) {
                 cs_index = GETFIELD(inst,6,5);  /*  0, 1, 2, 3 */

@@ -1,6 +1,6 @@
 /* pdp11_tq.c: TMSCP tape controller simulator
 
-   Copyright (c) 2002-2013, Robert M Supnik
+   Copyright (c) 2002-2022, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tq           TQK50 tape controller
 
+   26-Mar-22    RMS     Added extra case points for new MTSE definitions
    23-Oct-13    RMS     Revised for new boot setup routine
    23-Jan-12    MP      Added missing support for Logical EOT detection while
                         positioning.
@@ -509,8 +510,6 @@ MTAB tq_mod[] = {
 #if defined (VM_PDP11)
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 004,     "ADDRESS", "ADDRESS",
         &set_addr, &show_addr, NULL, "Bus address" },
-    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, NULL, "AUTOCONFIGURE",
-        &set_addr_flt, NULL, NULL, "Enable autoconfiguration of address & vector" },
 #else
     { MTAB_XTD|MTAB_VDV, 004,               "ADDRESS", NULL,
         NULL, &show_addr, NULL, "Bus address" },
@@ -1582,6 +1581,10 @@ switch (st) {
     case MTSE_WRP:
         uptr->flags = uptr->flags | UNIT_SXC;
         return ST_WPR;
+
+    default:
+        uptr->flags = uptr->flags | UNIT_SXC;
+        return SCPE_IERR;
 
     case MTSE_LEOT:
         return ST_LED;

@@ -80,7 +80,7 @@ DEVICE dk_dev = {
     NUM_DEVS_DK, 0, 0, 0, 0, 0,
     NULL, NULL, NULL,
     NULL, NULL, NULL,
-    &dk_dib, DEV_DISABLE | DEV_DEBUG, 0, dev_debug,
+    &dk_dib, DEV_DISABLE | DEV_DEBUG | DEV_DIS, 0, dev_debug,
     NULL, NULL, NULL, NULL, NULL, &dk_description
     };
 
@@ -190,15 +190,29 @@ set_clock:
 /* Bump counter by 1 */
 void dk_test (UNIT *uptr)
 {
-    int   dev;
+    int         dev;
+    double      us;
+    int32       t;
+
     if (uptr->CLK_REG & (~RMASK))
        uptr->STAT_REG |= CLK_OVF;
     uptr->CLK_REG &= RMASK;
-    if (uptr->INT_REG == uptr->CLK_REG)
+    if (uptr->INT_REG == uptr->CLK_REG) {
        uptr->STAT_REG |= CLK_FLG;
+       uptr->CLK_REG = 0;
+    }
     if (uptr->STAT_REG & (CLK_FLG|CLK_OVF)) {
        dev = ((uptr - dk_unit) << 2) + DK_DEVNUM;
        set_interrupt(dev, uptr->STAT_REG);
+    }
+    if (uptr->STAT_REG & CLK_EN) {
+       if (uptr->INT_REG < uptr->CLK_REG)  /* Count until overflow */
+           uptr->CLK_TIM = 01000000;
+       else
+           uptr->CLK_TIM = uptr->INT_REG;
+       t = uptr->CLK_TIM - uptr->CLK_REG;
+       us = (double)(t) * 10.0;
+       sim_activate_after_d(uptr, us);
     }
 }
 

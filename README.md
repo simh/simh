@@ -5,6 +5,7 @@
 [![AppVeyor](https://ci.appveyor.com/api/projects/status/github/simh/simh)](https://ci.appveyor.com/project/simh/simh/history)
 
 ## Table of Contents:
+[WHAT'S NEW since the Open SIMH fork](#whats-new-since-the-open-simh-fork)  
 [WHAT'S NEW since simh v3.9](#whats-new-since-simh-v39)  
 . . [New Simulators](#new-simulators)  
 . . [Simulator Front Panel API](#simulator-front-panel-api)  
@@ -44,6 +45,50 @@
 . . . . . . . . [MinGW32](#mingw32)  
 . . . . . . [VMS](#vms)  
 . . [Problem Reports](#problem-reports)  
+
+## WHAT'S NEW since the Open SIMH fork
+
+All Simulator updates on Open SIMH will be present in this repository, and any changes to the master branch code in this repository authored by anyone except Mark Pizzolato will be posted as pull requestss on the Open simh repo.
+
+### Mark Pizzolato's changes not present in the Open SIMH repo:
+
+#### Changes to SCP (the simulator framework or command execution environment)
+
+- Add descriptive messages for cases when NOPARAM status is returned.
+- Avoid excessive DO command context lines when commands produce multiple lines of output.
+- Support has been added to allow for optional per device unit tests to exist and to invoke them at simulator startup.
+- Add support for generic bit field packing and unpacking during buffer copying.
+- Display count of units when all units are disabled.
+- Support to display all SCP visible filenames via relative paths and use those in SAVEd state.
+- ZAP command can be aborted by a Control-C.
+- Display current NOAUTOSIZE status in SHOW VERSION output.
+- Extend logical name support to include optional unique names for units as well as devices.
+- Add extended register sanity checks including duplicate name detection.  Fixed simulator devices with duplicate register names.
+- Simulators with video devices that may be enabled, no longer disable the screen saver until the video display is presented.  Optionally enabling or disabling the OS screen saver by an environment variable.
+- More readable output of SHOW <dev>|<unit> with variable sized DEVICE and UNIT names.
+
+#### Changes to the PDP-11 and VAX simulators
+
+- All VAXen: Correct HELP CPU to properly describe model specific LOAD options for ROM and NVRAM.
+- Add 2.11 BSD and NetBSD file system recognizers.
+- Add memory details and behavior description to the MicroVAX 3900 HELP CPU output.
+- Unibus and Qbus autoconfiguration disabling has been relaxed somewhat.  Previously, any "SET <device> ADDRESS= (or VECTOR=)" command would automatically disable autoconfigure for the rest of the simulator session.  This behavior has been relaxed so that autoconfigure will only be disabled if the specified ADDRESS or VECTOR value is different from the value previously set by the initial autoconfigure.
+- Aggressive validation of Unibus and Qbus ADDRESS and VECTOR values prior to execution starting due to a BOOT command.
+- Fixed bug in devices that use sim_disk which deallocated a file transfer buffer on detach.
+- Metadata is implemented on all VAX and PDP11 disk devices when NOAUTOSIZE is not specified.
+- Full support for using disk containers with metadata between different system and device types where it makes sense.
+- VHD disk formats are available on all disk types (including floppy or DECtape devices).
+- Properly size RY drives which also don't have DEC144
+- Properly name RQ extended units beyond the initial default units.
+- HELP CPU shows supported breakpoint types.
+- Add device support for DL11-C/DL11-D/DL11-E/DLV11-J in addition to the original KL11/DL11-A/DL11-B/DL11-E/DL11-F support.  These new devices have different bus address ranges and can coexist with the original DL devices.  The new devices are DLCJI and DLCJO and are managed identically to the original DLI and DLO devices.
+
+### Updates to the Unibus DUP & Qbus DPV device by Trevor Warwick
+
+Support for Phase V DECnet connections on VAX Unibus and Qbus systems and the addition of support for the DPV11 for Qbus VAX systems.
+
+### Bill Beech has made significant enhancements and bug fixes to the SWTP simulators along with a new disk controller from Roberto Sancho Villa
+
 
 ## WHAT'S NEW since simh v3.9
 
@@ -238,7 +283,7 @@ Host platforms which have libSDL2 available can leverage this functionality.
     RAW Disk Access (including CDROM)
     Virtual Disk Container files, including differencing disks
     File System type detection to accurately autosize disks.
-    Recognized file systems are: DEC ODS1, DEC ODS2, DEC RT11, DEC RSTS, DEC RSX11, Ultrix Partitions
+    Recognized file systems are: DEC ODS1, DEC ODS2, DEC RT11, DEC RSTS, DEC RSX11, Ultrix Partitions, ISO 9660, BSD 2.11 partitions and NetBSD partitions
 
 #### Tape Extensions
     AWS format tape support
@@ -536,17 +581,13 @@ functionality.
 
 The MacPorts package manager is available to provide these external packages.  Once MacPorts is installed, these commands will install the required dependent packages:
 
-    # port install vde2
-    # port install libsdl2
-    # port install libsdl2_ttf
+    # port install vde2 libsdl2 libsdl2_ttf libpng zlib pcre
 
 OR
 
 The HomeBrew package manager can be used to provide these packages:
 
-    $ brew install vde
-    $ brew install sdl2
-    $ brew install sdl2_ttf
+    $ brew install vde sdl2 sdl2_ttf libpng zlib pcre
 
 ###### Linux - Dependencies
 
@@ -554,11 +595,7 @@ Different Linux distributions have different package management systems:
 
 Ubuntu:
 
-    # apt-get install libpcap-dev
-    # apt-get install libpcre3-dev
-    # apt-get install vde2
-    # apt-get install libsdl2-dev
-    # apt-get install libsdl2_ttf-dev
+    # apt-get install libpcap-dev libpcre3-dev vde2 libsdl2-dev libsdl2_ttf-dev
 
 #### Windows
 

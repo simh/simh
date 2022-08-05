@@ -799,19 +799,18 @@ for (i = 0; i < cnt; i++) {                             /* print 'n' newlines; e
     fputc ('\n', lp20_unit->fileref);
     if (dvuadv) {                                       /* update DAVFU ptr */
         dvptr = (dvptr + cnt) % dvlnt;
-        if (davfu[dvptr] & (1 << DV_TOF)) {              /* at top of form? */
-            lppagc = (lppagc - 1) & PAGC_MASK;           /* decr page cntr */
+        if (davfu[dvptr] & (1 << DV_TOF)) {             /* at top of form? */
+            lppagc = (lppagc - 1) & PAGC_MASK;          /* decr page cntr */
             if (lppagc == 0) {
-                lpcsa = lpcsa | CSA_PZRO;                /* stop if zero */
+                lpcsa = lpcsa | CSA_PZRO;               /* stop if zero */
                 stoppc = TRUE;
                 }
             } /* At TOF */
         } /* update pointer */
     }
 lp20_unit->pos = (t_addr)sim_ftell (lp20_unit->fileref);
-if (stoppc)                                            /* Crossed one or more TOFs? */
+if (stoppc)                                            /* crossed one or more TOFs? */
     return FALSE;
-
 return TRUE;
 }
 
@@ -952,10 +951,6 @@ t_stat reason;
 
 sim_switches |= SWMASK ('A');                           /* position to EOF */
 reason = attach_unit (uptr, cptr);                      /* attach file */
-if (reason == SCPE_OK) {
-    sim_fseek (uptr->fileref, 0, SEEK_END);
-    uptr->pos = (t_addr)sim_ftell (uptr->fileref);
-    }
 if (lpcsa & CSA_DVON) {
     int i;
     for (i = 0; i < dvlnt; i++) {                       /* Align VFU with new file */

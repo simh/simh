@@ -25,8 +25,6 @@
 
     MODIFICATIONS:
 
-        24 Apr 15 -- Modified to use simh_debug
-
     NOTES:
 
         These functions support a simulated m6810 RAM device on a CPU board.  The
@@ -46,20 +44,19 @@ void m6810_put_mbyte(int32 offset, int32 val);
 
 /* SIMH RAM Standard I/O Data Structures */
 
-UNIT m6810_unit = { UDATA (NULL, UNIT_BINK, 128),
-                    0 };
+UNIT m6810_unit = { 
+    UDATA (NULL, UNIT_BINK, 128),
+    0 };
 
 MTAB m6810_mod[] = {
     { 0 }
 };
 
 DEBTAB m6810_debug[] = {
-    { "ALL", DEBUG_all },
-    { "FLOW", DEBUG_flow },
-    { "READ", DEBUG_read },
-    { "WRITE", DEBUG_write },
-    { "LEV1", DEBUG_level1 },
-    { "LEV2", DEBUG_level2 },
+    { "ALL", DEBUG_all, "All debug bits" },
+    { "FLOW", DEBUG_flow, "Flow control" },
+    { "READ", DEBUG_read, "Read Command" },
+    { "WRITE", DEBUG_write, "Write Command"},
     { NULL }
 };
 
@@ -94,16 +91,14 @@ DEVICE m6810_dev = {
 
 t_stat m6810_reset (DEVICE *dptr)
 {
-    sim_debug (DEBUG_flow, &m6810_dev, "m6810_reset: \n");
     if (m6810_unit.filebuf == NULL) {
-        m6810_unit.filebuf = malloc(128);
+        m6810_unit.filebuf = calloc(128, sizeof(uint8));
         if (m6810_unit.filebuf == NULL) {
-            printf("m6810_reset: Malloc error\n");
+            printf("m6810_reset: Calloc error\n");
             return SCPE_MEM;
         }
         m6810_unit.capac = 128;
     }
-    sim_debug (DEBUG_flow, &m6810_dev, "m6810_reset: Done\n");
     return SCPE_OK;
 }
 
@@ -117,13 +112,10 @@ int32 m6810_get_mbyte(int32 offset)
 {
     int32 val;
 
-    sim_debug (DEBUG_read, &m6810_dev, "m6810_get_mbyte: offset=%04X\n", offset);
     if (((t_addr)offset) < m6810_unit.capac) {
         val = *((uint8 *)(m6810_unit.filebuf) + offset) & 0xFF;
-        sim_debug (DEBUG_read, &m6810_dev, "val=%04X\n", val);
         return val;
     } else {
-        sim_debug (DEBUG_read, &m6810_dev, "m6810_get_mbyte: out of range\n");
         return 0xFF;
     }
 }
@@ -132,15 +124,12 @@ int32 m6810_get_mbyte(int32 offset)
 
 void m6810_put_mbyte(int32 offset, int32 val)
 {
-    sim_debug (DEBUG_write, &m6810_dev, "m6810_put_mbyte: offset=%04X, val=%02X\n",
-        offset, val);
     if ((t_addr)offset < m6810_unit.capac) {
         *((uint8 *)(m6810_unit.filebuf) + offset) = val & 0xFF;
         return;
-    } else {
-        sim_debug (DEBUG_write, &m6810_dev, "m6810_put_mbyte: out of range\n");
-        return;
     }
+    return;
 }
 
 /* end of m6810.c */
+

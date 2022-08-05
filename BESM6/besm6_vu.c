@@ -258,7 +258,7 @@ void vu_control (int num, uint32 cmd)
         besm6_debug("<<< VU-%d cmd %o", num, cmd);
     if (ISSET_RDY2(VU1_NOTREADY >> (num*4))) {
         if (vu_dev.dctrl)
-            besm6_debug("<<< VU-%d not ready", num, cmd);
+            besm6_debug("<<< VU-%d not ready", num);
         return;
     }
     if (cmd & 010) {
@@ -510,7 +510,7 @@ t_stat vu_event (UNIT *u)
                 while (ch == '\n' || ch == EOF);
                 
             }
-            if (0 == strncmp(vu_gost[num], DISP_END, 7)) {
+            if (0 == strncmp((char *)vu_gost[num], DISP_END, 7)) {
                 // The "dispatcher's end" card, end of card image mode.
                 memset(vu_image[num], 0, 160);
                 vu_image[num][0] = vu_image[num][40] = 0xFFF;

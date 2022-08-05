@@ -31,11 +31,14 @@ Copyright (c) 2005-2012, William Beech
 
 #define PC PC_Global
 
+//#define DONT_USE_INTERNAL_ROM 1
+
 /* Memory */
 
 #define MAXMEMSIZE      65536               // max memory size
 #define MEMSIZE         (m6800_unit.capac)  // actual memory size
 #define ADDRMASK        (MAXMEMSIZE - 1)    // address mask
+#define BYTEMASK        0xff
 #define MEM_ADDR_OK(x)  (((uint32) (x)) < MEMSIZE)
 
 /* debug definitions */
@@ -43,10 +46,8 @@ Copyright (c) 2005-2012, William Beech
 #define DEBUG_flow      0x0001
 #define DEBUG_read      0x0002
 #define DEBUG_write     0x0004
-#define DEBUG_level1    0x0008
-#define DEBUG_level2    0x0010
-#define DEBUG_reg       0x0020
-#define DEBUG_asm       0x0040
+#define DEBUG_reg       0x0008
+#define DEBUG_asm       0x0010
 #define DEBUG_all       0xFFFF
 
 /* Simulator stop codes */

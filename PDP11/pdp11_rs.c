@@ -261,7 +261,7 @@ DEVICE rs_dev = {
     RS_NUMDR, DEV_RADIX, 19, 1, DEV_RADIX, 16,
     NULL, NULL, &rs_reset,
     &rs_boot, &rs_attach, &rs_detach,
-    &rs_dib, DEV_DISABLE|DEV_DIS|DEV_UBUS|DEV_QBUS|DEV_MBUS|DEV_DEBUG, 0,
+    &rs_dib, DEV_DISABLE|DEV_DIS|DEV_MBUS|DEV_DEBUG, 0,
     NULL, NULL, NULL, &rs_help, NULL, NULL,
     &rs_description
     };

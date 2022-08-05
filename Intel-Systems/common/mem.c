@@ -56,7 +56,8 @@ extern uint8 xack;                      /* XACK signal */
 extern UNIT i8255_unit;                 //for isbc memory control
 extern UNIT ipc_cont_unit;
 extern UNIT ioc_cont_unit;
-extern uint8 i8255_C[4];                    //port C byte I/O
+extern uint8 i8255_C[4];                //port C byte I/O
+
 
 /*  get a byte from memory - handle MODEL, RAM, ROM and Multibus memory */
 
@@ -65,7 +66,7 @@ uint8 get_mbyte(uint16 addr)
     uint8 val;
     
     SET_XACK(0);                        /* clear xack */
-    if ((mem_map <= 1) && (addr >= 0xF800)) { //monitor ROM - always there IPB/IPC
+    if ((mem_map <= 1) && (addr >= 0xF800)) { //monitor ROM - always there IPB/IPC/800
         SET_XACK(1);                    //set xack
         return EPROM_get_mbyte(addr - 0xF000, 0); //top half of EPROM
     }
@@ -86,10 +87,16 @@ uint8 get_mbyte(uint16 addr)
         return RAM_get_mbyte(addr);
     }
     if (mem_map == 2) {                 //800
-        if (((monitor_boot & 0x04) == 0) && (addr >= EPROM_unit[0].u3) && (addr <= (EPROM_unit[0].u3 + EPROM_unit[0].capac)))
-            return EPROM_get_mbyte(addr, 0); 
-        else if ((addr >= EPROM_unit[1].u3) && (addr <= (EPROM_unit[1].u3 + EPROM_unit[1].capac)))
+        SET_XACK(1);                    //set xack
+        if ((addr >= EPROM_unit[0].u3) && (addr <= (EPROM_unit[0].u3 + EPROM_unit[0].capac))) {
+            if ((monitor_boot & 0x02) == 0)
+                return EPROM_get_mbyte(addr, 0);
+            else
+                return multibus_get_mbyte(addr); 
+        }
+        if ((addr >= EPROM_unit[1].u3) && (addr <= (EPROM_unit[1].u3 + EPROM_unit[1].capac))) {
             return EPROM_get_mbyte(addr, 1);
+        }
     } 
     if (mem_map == 3) {                 //isdk80
         if ((addr >= EPROM_unit->u3) && ((uint16)addr <= (EPROM_unit->u3 + EPROM_unit->capac))) {
@@ -133,14 +140,18 @@ uint16 get_mword(uint16 addr)
 
 void put_mbyte(uint16 addr, uint8 val)
 {
-    SET_XACK(0);                        /* set no XACK */
-    if (addr >= 0xF800) {               //monitor ROM - always there IPB/IPC/800
+/*  put a byte to memory - handle RAM, ROM, I/O, and pcbus memory */
+    SET_XACK(0);                        /* clear xack */
+    if ((mem_map <= 1) && (addr >= 0xF800)) { //monitor ROM - always there IPB/IPC/800
+        SET_XACK(1);                    //set xack
         return;                         //do nothing
     } 
     if ((mem_map <= 1) && (addr < 0x1000) && ((ipc_cont_unit.u3 & 0x04) == 0)) { //startup IPB/IPC
+        SET_XACK(1);                    //set xack
         return;                         //do nothing
     }
     if ((mem_map <= 1) && (addr >= 0xE800) && (addr < 0xF000) && ((ipc_cont_unit.u3 & 0x10) == 0)) { //diagnostic ROM IPB/IPC
+        SET_XACK(1);                    //set xack
         return;                         //do nothing
     }
     if (mem_map == 1) {                 //IPC RAM
@@ -186,7 +197,7 @@ void put_mbyte(uint16 addr, uint8 val)
 
 void put_mword(uint16 addr, uint16 val)
 {
-    put_mbyte(addr, val & 0xff);
+    put_mbyte(addr, val & BYTEMASK);
     put_mbyte(addr+1, val >> 8);
 }
 

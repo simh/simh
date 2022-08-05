@@ -25,7 +25,7 @@
 
     MODIFICATIONS:
 
-        24 Apr 15 -- Modified to use simh_debug
+        28 May 22 -- Roberto Sancho Villa (RSV) fixes for DEL and BS
 
     NOTES:
 
@@ -64,6 +64,11 @@
 #define UNIT_V_TTY  (UNIT_V_UF)         // TTY or ANSI mode
 #define UNIT_TTY   (1 << UNIT_V_TTY)
 
+#define RXF     0x01
+#define TXE     0x02
+#define DCD     0x04
+#define CTS     0x08
+
 /* local global variables */
 
 int32 ptr_stopioe = 0;                  // stop on error
@@ -94,7 +99,8 @@ int32 sio1d(int32 io, int32 data);
    sio_reg        SIO register list
    sio_mod        SIO modifiers list */
 
-UNIT sio_unit = { UDATA (&sio_svc, 0, 0), KBD_POLL_WAIT
+UNIT sio_unit = { 
+    UDATA (&sio_svc, 0, 0), KBD_POLL_WAIT
 };
 
 REG sio_reg[] = {
@@ -110,10 +116,22 @@ MTAB sio_mod[] = {
 };
 
 DEVICE sio_dev = {
-    "MP-S", &sio_unit, sio_reg, sio_mod,
-    1, 10, 31, 1, 8, 8,
-    NULL, NULL, &sio_reset,
-    NULL, NULL, NULL
+    "MP-S",                             //name 
+    &sio_unit,                          //units 
+    sio_reg,                            //registers 
+    sio_mod,                            //modifiers
+    1,                                  //numunits 
+    10,                                 //aradix 
+    31,                                 //awidth 
+    1,                                  //aincr 
+    8,                                  //dradix 
+    8,                                  //dwidth
+    NULL,                               //examine 
+    NULL,                               //deposit 
+    &sio_reset,                         //reset
+    NULL,                               //boot
+    NULL,                               //attach
+    NULL                                //detach
 };
 
 /* paper tape reader data structures
@@ -127,10 +145,22 @@ UNIT ptr_unit = { UDATA (&ptr_svc, UNIT_SEQ + UNIT_ATTABLE, 0), KBD_POLL_WAIT
 };
 
 DEVICE ptr_dev = {
-    "PTR", &ptr_unit, NULL, NULL,
-    1, 10, 31, 1, 8, 8,
-    NULL, NULL, &ptr_reset,
-    NULL, NULL, NULL
+    "PTR",                              //name
+    &ptr_unit,                          //units
+    NULL,                               //registers 
+    NULL,                               //modifiers
+    1,                                  //numunits 
+    10,                                 //aradix 
+    31,                                 //awidth 
+    1,                                  //aincr 
+    8,                                  //dradix 
+    8,                                  //dwidth
+    NULL,                               //examine 
+    NULL,                               //deposit 
+    &ptr_reset,                         //reset
+    NULL,                               //boot
+    NULL,                               //attach
+    NULL                                //detach
 };
 
 /* paper tape punch data structures
@@ -143,10 +173,22 @@ DEVICE ptr_dev = {
 UNIT ptp_unit = { UDATA (&ptp_svc, UNIT_SEQ + UNIT_ATTABLE, 0), KBD_POLL_WAIT
 };
 DEVICE ptp_dev = {
-    "PTP", &ptp_unit, NULL, NULL,
-    1, 10, 31, 1, 8, 8,
-    NULL, NULL, &ptp_reset,
-    NULL, NULL, NULL
+    "PTP",                              //name
+    &ptp_unit,                          //units 
+    NULL,                               //registers 
+    NULL,                               //modifiers
+    1,                                  //numunits 
+    10,                                 //aradix 
+    31,                                 //awidth 
+    1,                                  //aincr 
+    8,                                  //dradix 
+    8,                                  //dwidth
+    NULL,                               //examine 
+    NULL,                               //deposit 
+    &ptp_reset,                         //reset
+    NULL,                               //boot
+    NULL,                               //attach
+    NULL                                //detach
 };
 
 /* console input service routine */
@@ -158,8 +200,12 @@ t_stat sio_svc (UNIT *uptr)
     sim_activate (&sio_unit, sio_unit.wait); // continue poll
     if ((temp = sim_poll_kbd ()) < SCPE_KFLAG)
         return temp;                    // no char or error?
-    sio_unit.buf = temp & 0xFF;         // Save char
-    sio_unit.u3 |= 0x01;                // Set RXF flag
+    sio_unit.buf = temp & BYTEMASK;     // Save char
+    if (sio_unit.buf==127) {
+        // convert BackSpace (ascii 127) so del char (ascii 8) for swtbug
+        sio_unit.buf=8; 
+    }
+    sio_unit.u3 |= RXF;                 // Set RXF flag
     /* Do any special character handling here */
     sio_unit.pos++;                     // step character count
     return SCPE_OK;
@@ -174,8 +220,8 @@ t_stat ptr_svc (UNIT *uptr)
     sim_activate (&ptr_unit, ptr_unit.wait); // continue poll
     if ((temp = sim_poll_kbd ()) < SCPE_KFLAG)
         return temp;                    // no char or error?
-    ptr_unit.buf = temp & 0xFF;         // Save char
-    ptr_unit.u3 |= 0x01;                // Set RXF flag
+    ptr_unit.buf = temp & BYTEMASK;     // Save char
+    ptr_unit.u3 |= RXF;                 // Set RXF flag
     /* Do any special character handling here */
     ptr_unit.pos++;                     // step character count
     return SCPE_OK;
@@ -192,8 +238,8 @@ t_stat ptp_svc (UNIT *uptr)
 
 t_stat sio_reset (DEVICE *dptr)
 {
-    sio_unit.buf = 0;                   // Data buffer
-    sio_unit.u3 = 0x02;                 // Status buffer
+    sio_unit.buf = 0;                   //clear data buffer
+    sio_unit.u3 = TXE;                  //set TXE flag
     sio_unit.wait = 10000;
     sim_activate (&sio_unit, sio_unit.wait); // activate unit
     return SCPE_OK;
@@ -203,9 +249,8 @@ t_stat sio_reset (DEVICE *dptr)
 
 t_stat ptr_reset (DEVICE *dptr)
 {
-    ptr_unit.buf = 0;
-    ptr_unit.u3 = 0x02;
-//    sim_activate (&ptr_unit, ptr_unit.wait); // activate unit
+    ptr_unit.buf = 0;                   //clear data buffer
+    ptr_unit.u3 = TXE;                  //set TXE flag
     sim_cancel (&ptr_unit);             // deactivate unit
     return SCPE_OK;
 }
@@ -214,9 +259,8 @@ t_stat ptr_reset (DEVICE *dptr)
 
 t_stat ptp_reset (DEVICE *dptr)
 {
-    ptp_unit.buf = 0;
-    ptp_unit.u3 = 0x02;
-//    sim_activate (&ptp_unit, ptp_unit.wait); // activate unit
+    ptp_unit.buf = 0;                   //clear data buffer
+    ptp_unit.u3 = TXE;                  //set TXE flag
     sim_cancel (&ptp_unit);             // deactivate unit
     return SCPE_OK;
 }
@@ -229,15 +273,15 @@ int32 sio0s(int32 io, int32 data)
     if (io == 0) {                      // control register read
         if (ptr_flag) {                 // reader enabled?
             if ((ptr_unit.flags & UNIT_ATT) == 0) { // attached?
-                ptr_unit.u3 &= 0xFE;    // no, clear RXF flag 
+                ptr_unit.u3 &= ~RXF;    // no, clear RXF flag 
                 ptr_flag = 0;           // clear reader flag
                 printf("Reader not attached to file\n");
             } else {                    // attached
                 if (feof(ptr_unit.fileref)) { // EOF
-                    ptr_unit.u3 &= 0xFE; // clear RXF flag
+                    ptr_unit.u3 &= ~RXF; // clear RXF flag
                     ptr_flag = 0;       // clear reader flag
                 } else                  // not EOF
-                    ptr_unit.u3 |= 0x01; // set ready
+                    ptr_unit.u3 |= RXF; // set ready
             }
             return (status = ptr_unit.u3); // return ptr status
         } else {
@@ -245,13 +289,13 @@ int32 sio0s(int32 io, int32 data)
         }
     } else {                            // control register write
         if (data == 0x03) {             // reset port!
-            sio_unit.u3 = 0x02;         // reset console
+            sio_unit.u3 = TXE;          // reset console
             sio_unit.buf = 0;
             sio_unit.pos = 0;
-            ptr_unit.u3 = 0x02;         // reset reader
+            ptr_unit.u3 = TXE;          // reset reader
             ptr_unit.buf = 0;
             ptr_unit.pos = 0;
-            ptp_unit.u3 = 0x02;         // reset punch
+            ptp_unit.u3 = TXE;          // reset punch
             ptp_unit.buf = 0;
             ptp_unit.pos = 0;
         }
@@ -265,22 +309,18 @@ int32 sio0d(int32 io, int32 data)
         if (ptr_flag) {                 // RDR enabled?
             if ((ptr_unit.flags & UNIT_ATT) == 0) // attached?
                 return 0;               // no, done
-//          printf("ptr_unit.u3=%02X\n", ptr_unit.u3);
-            if ((ptr_unit.u3 & 0x01) == 0) { // yes, more data?
-//              printf("Returning old %02X\n", odata); // no, return previous byte
-                return (odata & 0xFF);
-            }
+            if ((ptr_unit.u3 & RXF) == 0) // yes, more data?
+                return (odata & BYTEMASK);
             if ((odata = getc(ptr_unit.fileref)) == EOF) { // end of file?
-//              printf("Got EOF\n");
+                printf("Got EOF\n");
                 ptr_unit.u3 &= 0xFE;    // clear RXF flag
                 return (odata = 0);     // no data
             }
-//          printf("Returning new %02X\n", odata);
             ptr_unit.pos++;             // step character count
-            ptr_unit.u3 &= 0xFE;        // clear RXF flag
-            return (odata & 0xFF);      // return character
+            ptr_unit.u3 &= ~RXF;        // clear RXF flag
+            return (odata & BYTEMASK); // return character
         } else {
-            sio_unit.u3 &= 0xFE;        // clear RXF flag
+            sio_unit.u3 &= ~RXF;        // clear RXF flag
             return (odata = sio_unit.buf); // return next char
         }
     } else {                            // data register write
@@ -294,21 +334,25 @@ int32 sio0d(int32 io, int32 data)
             switch (data) {
                 case 0x11:              // PTR on
                     ptr_flag = 1;
-                    ptr_unit.u3 |= 0x01;
-//                    printf("Reader on\n");
+                    ptr_unit.u3 |= RXF;
+		    printf("Reader on\n");
                     break;
                 case 0x12:              // PTP on
                     ptp_flag = 1;
-                    ptp_unit.u3 |= 0x02;
-//                    printf("Punch on\n");
+                    ptp_unit.u3 |= TXE;
+		    printf("Punch on\n");
                     break;
                 case 0x13:              // PTR off
                     ptr_flag = 0;
-//                    printf("Reader off-%d bytes read\n", ptr_unit.pos);
+                    if (ptr_unit.pos)
+		        printf("Reader off-%d bytes read\n", ptr_unit.pos);
+                    ptr_unit.pos = 0;
                     break;
                 case 0x14:              // PTP off
                     ptp_flag = 0;
-//                    printf("Punch off-%d bytes written\n", ptp_unit.pos);
+                    if (ptp_unit.pos)
+		        printf("Punch off-%d bytes written\n", ptp_unit.pos);
+                    ptp_unit.pos = 0;
                     break;
                 default:                // ignore all other characters
                     break;

@@ -74,23 +74,34 @@
 #error "RC11 is not supported!"
 #endif
 #include "pdp11_defs.h"
-#include <math.h>
 #include "sim_disk.h"
+#include <math.h>
 
-#define UNIT_V_PLAT     (DKUF_V_UF + 0)                 /* #platters - 1 */
-#define UNIT_M_PLAT     03
-#define UNIT_GETP(x)    ((((x) >> UNIT_V_PLAT) & UNIT_M_PLAT) + 1)
-#define UNIT_NOAUTO     DKUF_NOAUTOSIZE
+#define UNIT_GETP(u)    ((u)->capac / (RC_NUMWD * RC_NUMSC * RC_NUMCY))
 #define UNIT_PLAT       (UNIT_M_PLAT << UNIT_V_PLAT)
 
 /* Constants */
 
 #define RC_NUMWD        32                              /* words/sector */
 #define RC_NUMSC        64                              /* sectors/track */
-#define RC_NUMTR        32                              /* tracks/disk */
-#define RC_DKSIZE       (RC_NUMTR * RC_NUMWD * RC_NUMSC)/* words/disk */
+#define RC_NUMCY        32                              /* tracks/disk */
+#define RC_DKSIZE       (RC_NUMCY * RC_NUMSC)           /* sectors/disk */
 #define RC_NUMDK        4                               /* disks/controller */
 #define RC_WMASK        (RC_NUMWD * RC_NUMSC - 1)       /* word mask */
+
+#define RC_DRV(d)                                   \
+  { RC_NUMSC, d, RC_NUMCY, RC_NUMCY * RC_NUMSC * d, \
+     #d "P",  RC_NUMWD * 2, 0, NULL, 0, 0, NULL, \
+     "Set to " #d " platter device" }
+
+static DRVTYP drv_tab[] = {
+    RC_DRV(1),
+    RC_DRV(2),
+    RC_DRV(3),
+    RC_DRV(4),
+    { 0 }
+    };
+
 
 /* Parameters in the unit descriptor */
 
@@ -146,7 +157,7 @@
 /* extract memory extension address (bits 17,18) */
 #define GET_MEX(x)      (((x) & RCCS_MEX) << (16 - RCCS_V_MEX))
 #define GET_POS(x)      ((int) fmod (sim_gtime() / ((double) (x)), \
-                        ((double) (RC_NUMWD * RC_NUMSC))))
+                        ((double) RC_NUMSC)))
 
 extern int32 R[];
 
@@ -169,8 +180,6 @@ static t_stat rc_wr (int32, int32, int32);
 static t_stat rc_svc (UNIT *);
 static t_stat rc_reset (DEVICE *);
 static t_stat rc_attach (UNIT *, CONST char *);
-static t_stat rc_set_size (UNIT *, int32, CONST char *, void *);
-static t_stat rc_show_size (FILE *, UNIT *, int32, CONST void *);
 static uint32 update_rccs (uint32, uint32);
 static const char *rc_description (DEVICE *dptr);
 
@@ -191,10 +200,7 @@ static DIB rc_dib = {
     1, IVCL (RC), VEC_AUTO, { NULL }, IOLN_RC,
 };
 
-static UNIT rc_unit = {
-    UDATA (&rc_svc, UNIT_FIX + UNIT_ATTABLE + UNIT_BUFABLE +
-            UNIT_MUSTBUF + UNIT_ROABLE + UNIT_BINK, RC_DKSIZE)
-};
+static UNIT rc_unit = {0};
 
 static const REG rc_reg[] = {
     { ORDATA (RCLA, rc_la, 16) },
@@ -218,20 +224,14 @@ static const REG rc_reg[] = {
 };
 
 static const MTAB rc_mod[] = {
-    { UNIT_PLAT, (0 << UNIT_V_PLAT), NULL, "1P", 
-        &rc_set_size, NULL, NULL, "Set to 1 platter device" },
-    { UNIT_PLAT, (1 << UNIT_V_PLAT), NULL, "2P",
-        &rc_set_size, NULL, NULL, "Set to 2 platter device" },
-    { UNIT_PLAT, (2 << UNIT_V_PLAT), NULL, "3P",
-        &rc_set_size, NULL, NULL, "Set to 3 platter device" },
-    { UNIT_PLAT, (3 << UNIT_V_PLAT), NULL, "4P",
-        &rc_set_size, NULL, NULL, "Set to 4 platter device" },
     { MTAB_XTD|MTAB_VUN, 0, "PLATTERS", NULL,
-        NULL, &rc_show_size, NULL, "Display Platters" },
-    { UNIT_NOAUTO, 0, "autosize", "AUTOSIZE", 
-        NULL, NULL, NULL, "set platters based on file size at ATTACH" },
-    { UNIT_NOAUTO, UNIT_NOAUTO, "noautosize", "NOAUTOSIZE", 
-        NULL, NULL, NULL, "set platters based explicit platter setting" },
+        NULL, &sim_disk_show_drive_type, NULL, "Display Platters" },
+    { MTAB_XTD|MTAB_VUN,        1,  NULL, "AUTOSIZE", 
+        &sim_disk_set_autosize,  NULL, NULL, "set platters based on file size at attach" },
+    { MTAB_XTD|MTAB_VUN,        0,  NULL, "NOAUTOSIZE", 
+        &sim_disk_set_autosize,  NULL, NULL, "set platters based explicit platter setting"  },
+    { MTAB_XTD|MTAB_VUN,        0,  "AUTOSIZE", NULL, 
+        NULL, &sim_disk_show_autosize, NULL, "Display disk autosize on attach setting" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0020, "ADDRESS", "ADDRESS",
       &set_addr, &show_addr, NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR,    0, "VECTOR", "VECTOR",
@@ -251,7 +251,7 @@ DEVICE rc_dev = {
     &rc_dib,
     DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG | DEV_DISK, 0,
     NULL, NULL, NULL, NULL, NULL, NULL, 
-    &rc_description
+    &rc_description, NULL, &drv_tab
 };
 
 /* I/O dispatch routine, I/O addresses 17777440 - 17777456 */
@@ -342,7 +342,7 @@ static t_stat rc_wr (int32 data, int32 PA, int32 access)
             rc_cs &= ~RCCS_NED;
             update_rccs (0, 0);
             /* perform unit select */
-            if (((rc_da >> 11) & 03) >= UNIT_GETP(rc_unit.flags))
+            if (((rc_da >> 11) & 03) >= UNIT_GETP(&rc_unit))
                 update_rccs (RCCS_NED, 0);
             else
                 rc_la = rc_da;
@@ -461,7 +461,7 @@ static t_stat rc_svc (UNIT *uptr)
     }
 
     ma = GET_MEX (rc_cs) | rc_ca;                       /* 18b mem addr */
-    da = rc_da * RC_NUMTR;                              /* sector->word offset */
+    da = rc_da * RC_NUMCY;                              /* sector->word offset */
     u_old = (da >> 16) & 03;                            /* save starting unit# */
     do {
         u_new = (da >> 16) & 03;
@@ -469,7 +469,7 @@ static t_stat rc_svc (UNIT *uptr)
             update_rccs (RCCS_NED, RCER_OVFL);
             break;
         }
-        if (u_new >= UNIT_GETP(uptr->flags)) {          /* disk overflow? */
+        if (u_new >= UNIT_GETP(uptr)) {                 /* disk overflow? */
             update_rccs (RCCS_NED, 0);
             break;
         }
@@ -554,6 +554,14 @@ static uint32 update_rccs (uint32 newcs, uint32 newer)
 
 static t_stat rc_reset (DEVICE *dptr)
 {
+    static t_bool inited = FALSE;
+
+    if (!inited) {
+        inited = TRUE;
+        rc_unit.action = &rc_svc;
+        rc_unit.flags = UNIT_FIX | UNIT_ATTABLE | UNIT_BUFABLE | UNIT_MUSTBUF | UNIT_ROABLE | UNIT_BINK;
+        sim_disk_set_drive_type_by_name (&rc_unit, "1P");
+        }
     rc_cs = RCCS_DONE;
     rc_la = rc_da = 0;
     rc_er = 0;
@@ -570,32 +578,8 @@ static t_stat rc_reset (DEVICE *dptr)
 
 static t_stat rc_attach (UNIT *uptr, CONST char *cptr)
 {
-    static const char *platters[] = {"1P", "2P", "3P", "4P", NULL};
-    char plat[32];
-
-    sprintf (plat, "%dP", UNIT_GETP (uptr->flags));
-
     return sim_disk_attach_ex (uptr, cptr, RC_NUMWD * sizeof (uint16), sizeof (uint16), 
-                                    TRUE, 0, plat, FALSE, 0, (uptr->flags & UNIT_NOAUTO) ? NULL : platters);
-}
-
-/* Change disk size */
-
-static t_stat rc_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
-{
-    if (val < 0)
-        return (SCPE_IERR);
-    if (uptr->flags & UNIT_ATT)
-        return (SCPE_ALATT);
-    uptr->capac = UNIT_GETP (val) * RC_DKSIZE;
-    uptr->flags = uptr->flags | UNIT_NOAUTO;
-    return (SCPE_OK);
-}
-
-static t_stat rc_show_size (FILE *st, UNIT *uptr, int32 flag, CONST void *desc)
-{
-fprintf (st, "%dP", UNIT_GETP (uptr->flags));
-return SCPE_OK;
+                                    TRUE, 0, uptr->drvtyp->name, FALSE, 0, NULL);
 }
 
 static const char *rc_description (DEVICE *dptr)

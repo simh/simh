@@ -52,6 +52,7 @@
    sim_buf_copy_swapped -    copy data swapping elements along the way
    sim_buf_swap_data -       swap data elements inplace in buffer if needed
    sim_byte_swap_data -      swap data elements inplace in buffer
+   sim_buf_pack_unpack -     pack or unpack data between buffers
    sim_shmem_open            create or attach to a shared memory region
    sim_shmem_close           close a shared memory region
    sim_chdir                 change working directory
@@ -90,6 +91,28 @@ t_bool sim_toffset_64;              /* Large File (>2GB) file I/O Support availa
 #ifndef MIN
 #define MIN(a,b)  (((a) <= (b)) ? (a) : (b))
 #endif
+
+#define FIO_DBG_PACK    1       /* Pack/Unpack Test Detail */
+
+static DEBTAB fio_debug[] = {
+  {"PACK",     FIO_DBG_PACK,      "Pack/Unpack Test Detail"},
+  {0}
+};
+
+static const char *sim_fio_test_description (DEVICE *dptr)
+{
+return "SCP FIO Testing";
+}
+
+static UNIT sim_fio_unit = { 0 };
+
+static DEVICE sim_fio_test_dev = {
+    "SCP-FIO", &sim_fio_unit, NULL, NULL, 
+    1, 0, 0, 0, 0, 0, 
+    NULL, NULL, NULL, NULL, NULL, NULL, 
+    NULL, DEV_NOSAVE|DEV_DEBUG, 0, 
+    fio_debug, NULL, NULL, NULL, NULL, NULL,
+    sim_fio_test_description};
 
 /* OS-independent, endian independent binary I/O package
 
@@ -155,7 +178,7 @@ if ((size == 0) || (count == 0))                        /* check arguments */
 c = fread (bptr, size, count, fptr);                    /* read buffer */
 if (sim_end || (size == sizeof (char)) || (c == 0))     /* le, byte, or err? */
     return c;                                           /* done */
-sim_buf_swap_data (bptr, size, count);
+sim_buf_swap_data (bptr, size, c);
 return c;
 }
 
@@ -175,6 +198,60 @@ for (j = 0; j < count; j++) {                           /* loop on items */
         *(dptr + k) = *sptr++;
     dptr = dptr + size;
     }
+}
+
+static uint32 _bit_index (uint32 bit, uint32 bits, t_bool LSB)
+{
+uint32 base, offset;
+
+if (LSB)
+    return bit;
+//return (bits * (bit / bits)) + bits - ((bit % bits) + 1); /* Reverse bit ordering - likely not useful */
+base = (bits * (bit / bits)) - (((bits % 8) == 0) ? 8 : 0);
+offset = ((base / bits) * (bits % 8));
+bit = (bit % bits) + offset;
+return base + (bits - (((bit + (bits % 8)) / 8) * 8) - (bits % 8)) + offset + ((bit + (bits % 8)) % 8);
+}
+
+t_bool sim_buf_pack_unpack (const void *sptr,          /* source buffer pointer */
+                            void *dptr,                /* destination buffer pointer */
+                            uint32 sbits,              /* source buffer element size in bits */
+                            t_bool sLSB_o_numbering,   /* source numbered using LSB ordering */
+                            uint32 scount,             /* count of source elements */
+                            uint32 dbits,              /* interesting bits of each destination element */
+                            t_bool dLSB_o_numbering)   /* destination numbered using LSB ordering */
+{
+const uint8 *s = (const uint8 *)sptr;
+uint8 *d = (uint8 *)dptr;
+uint32 bits_to_process;         /* bits in current source element remaining to be processed */
+uint32 sbit_offset, dbit_offset;/* source and destination bit offsets */
+uint32 sx;                      /* source byte index */
+uint32 dx;                      /* destination byte index */
+uint32 bit;                     /* Current Bit number */
+uint32 element;                 /* Current element number */
+
+sim_debug (FIO_DBG_PACK, &sim_fio_test_dev, "sim_buf_pack_unpack(sbits=%d, dLSB_o=%s, scount=%d, dbits=%d, dLSB_o=%s)\n", sbits, sLSB_o_numbering ? "True" : "False", scount, dbits, dLSB_o_numbering ? "True" : "False");
+if (((dbits * scount) & 7) != 0)
+    return TRUE;                    /* Error - Can't process all source elements */
+memset (d, 0, (dbits * scount) >> 3);
+
+if (((sbits % 8) == 0)                  &&
+    (sbits == dbits)                    &&
+    (sLSB_o_numbering == dLSB_o_numbering)) {
+    sim_buf_copy_swapped (dptr, sptr, sbits >> 3, scount);
+    return FALSE;
+    }
+bits_to_process = MIN (sbits, dbits);
+for (element = 0; element < scount; element++) {
+    sbit_offset = element * sbits;
+    dbit_offset = element * dbits;
+    for (bit = 0; bit < bits_to_process; bit++, sbit_offset++, dbit_offset++) {
+        sx = _bit_index (sbit_offset, sbits, sLSB_o_numbering);
+        dx = _bit_index (dbit_offset, dbits, dLSB_o_numbering);
+        d[dx >> 3] |= (((s[sx >> 3] >> (sx & 7)) & 1) << (dx & 7));
+        }
+    }
+return FALSE;
 }
 
 size_t sim_fwrite (const void *bptr, size_t size, size_t count, FILE *fptr)
@@ -307,6 +384,261 @@ else {
 free (without_quotes);
 return dest;
 }
+
+/*
+ *  DBD9 packing/encoding is:
+ *          9 character per pair of 36 bit words.
+ *
+ *    36b   Bit numbers using              bit
+ *   word   standard bit numbering   byte  offset
+ *      0 - 35 34 33 32 31 30 29 28     0     0
+ *      0 - 27 26 25 24 23 22 21 20     1     8
+ *      0 - 19 18 17 16 15 14 13 12     2    16
+ *      0 - 11 10  9  8  7  6  5  4     3    24
+ *      0 -  3  2  1  0 35 34 33 32     4    32
+ *      1 - 31 30 29 28 27 26 25 24     5    40
+ *      1 - 23 22 21 20 19 18 17 16     6    48
+ *      1 - 15 14 13 12 11 10  9  8     7    56
+ *      1 -  7  6  5  4  3  2  1  0     8    64
+ *
+ *   word   Bit numbers using PDP10 bit numbering
+ *      0 - B0  1  2  3  4  5  6  7
+ *      0 -  8  9 10 11 12 13 14 15
+ *      0 - 16 17 18 19 20 21 22 23
+ *      0 - 24 25 26 27 28 29 30 31
+ *      0 - 32 33 34 35 B0  1  2  3
+ *      1 -  4  5  6  7  8  9 10 11
+ *      1 - 12 13 14 15 16 17 18 19
+ *      1 - 20 21 22 23 24 25 26 27
+ *      1 - 28 29 30 31 32 33 34 35
+ *
+ *  DLD9 packing/encoding is:   
+ *          9 character per pair of 36 bit words.
+ *
+ *    36b   Bit numbers using              bit
+ *   word   standard bit numbering   byte  offset
+ *      0 -  7  6  5  4  3  2  1  0     0     0
+ *      0 - 15 14 13 12 11 10  9  8     1     8
+ *      0 - 23 22 21 20 19 18 17 16     2    16
+ *      0 - 31 30 29 28 27 26 25 24     3    24
+ *      0 -  3  2  1  0 35 34 33 32     4    32
+ *      1 - 11 10  9  8  7  6  5  4     5    40
+ *      1 - 19 18 17 16 15 14 13 12     6    48
+ *      1 - 27 26 25 24 23 22 21 20     7    56
+ *      1 - 35 34 33 32 31 30 29 28     8    64
+ *
+ *   word   Bit numbers using PDP10 bit numbering
+ *      0 - 28 29 30 31 32 33 34 35
+ *      0 - 20 21 22 23 24 25 26 27
+ *      0 - 12 13 14 15 16 17 18 19
+ *      0 -  4  5  6  7  8  9 10 11
+ *      0 - 32 33 34 35 B0  1  2  3
+ *      1 - 24 25 26 27 28 29 30 31
+ *      1 - 16 17 18 19 20 21 22 23
+ *      1 -  8  9 10 11 12 13 14 15
+ *      1 - B0  1  2  3  4  5  6  7
+ */
+
+uint32 int32_data[] = {  0x00000000,  0x00000001,  0x00000002,  0x00000003, 
+                         0x00000004,  0x00000005,  0x00000006,  0x00000007, 
+                         0x00000008,  0x00000009,  0x0000000A,  0x0000000B,
+                         0x0000000C,  0x0000000D,  0x0000000E,  0x0000000F};
+uint32 res_32bitM[] = {  0x00000000,  0x01000000,  0x02000000,  0x03000000, 
+                         0x04000000,  0x05000000,  0x06000000,  0x07000000, 
+                         0x08000000,  0x09000000,  0x0A000000,  0x0B000000,
+                         0x0C000000,  0x0D000000,  0x0E000000,  0x0F000000};
+uint32 res_32_1[] =   {  0,  1,  0,  1, 
+                         0,  1,  0,  1, 
+                         0,  1,  0,  1,
+                         0,  1,  0,  1};
+uint16 int16_data[] = { 0x1234, 0x5678,
+                        0x9ABC, 0xDEF0};
+uint16 res_16bit[] =  { 0x3412, 0x7856,
+                        0xBC9A, 0xF0DE};
+uint8 res_8bit[] = {  0,  1,  2,  3, 
+                      4,  5,  6,  7, 
+                      8,  9, 10, 11,
+                     12, 13, 14, 15};
+uint8 res_4bit[] = {  0x10,  0x32, 0x54, 0x76, 
+                      0x98,  0xba, 0xdc, 0xfe};
+uint8 res_2bit[] = {  0xE4,  0xE4, 0xE4, 0xE4};
+uint8 res_1bit[] = {  0xAA,  0xAA};
+#if defined (USE_INT64)
+t_uint64 int64_data[] = { 0x876543210, 0x012345678, 0x987654321, 0x123456789};
+uint8 res_36bit[] = {0x10, 0x32, 0x54, 0x76, 0x88, 0x67, 0x45, 0x23, 0x01,
+                     0x21, 0x43, 0x65, 0x87, 0x99, 0x78, 0x56, 0x34, 0x12};
+uint8 res_36bitM[]= {0x87, 0x65, 0x43, 0x21, 0x00, 0x12, 0x34, 0x56, 0x78,
+                     0x98, 0x76, 0x54, 0x32, 0x11, 0x23, 0x45, 0x67, 0x89};
+uint8 int64_data_dbd9[18];
+uint8 int64_data_dld9[18];
+#endif
+
+static struct pack_test {
+    const void *src;
+    const void *exp_dst;
+    uint32      sbits;
+    t_bool      slsb;
+    uint32      dbits;
+    t_bool      dlsb;
+    uint32      scount;
+    t_bool      exp_stat;
+    } p_test[] = {
+#if defined (USE_INT64)
+        {&int64_data, &res_36bitM, 64, TRUE,  36, FALSE, 4,  FALSE},
+        {&res_36bitM, &int64_data, 36, FALSE, 64, TRUE,  4,  FALSE},
+        {&int64_data, &res_36bit,  64, TRUE,  36, TRUE,  4,  FALSE},
+        {&res_36bit,  &int64_data, 36, TRUE,  64, TRUE,  4,  FALSE},
+#endif
+        {&int16_data, &res_16bit,  16, TRUE,  16, FALSE, 4,  FALSE},
+        {&int16_data, &res_16bit,  16, FALSE, 16, TRUE,  4,  FALSE},
+        {&int16_data, &int16_data, 16, TRUE,  16, TRUE,  4,  FALSE},
+        {&int16_data, &int16_data, 16, FALSE, 16, FALSE, 4,  FALSE},
+        {&int32_data, &int32_data, 32, FALSE, 32, FALSE,16,  FALSE},
+        {&int32_data, &int32_data, 32, TRUE,  32, TRUE, 16,  FALSE},
+        {&int32_data, &res_32bitM, 32, TRUE,  32, FALSE,16,  FALSE},
+        {&res_32bitM, &int32_data, 32, FALSE, 32, TRUE, 16,  FALSE},
+        {&res_8bit,   &res_8bit,    8, TRUE,   8, FALSE,16,  FALSE},
+        {&res_8bit,   &res_8bit,    8, FALSE,  8, TRUE, 16,  FALSE},
+        {&res_8bit,   &res_8bit,    8, FALSE,  8, FALSE,16,  FALSE},
+        {&res_8bit,   &res_8bit,    8, TRUE,   8, TRUE, 16,  FALSE},
+        {&res_8bit,   &res_8bit,   16, TRUE,  16, TRUE,  8,  FALSE},
+        {&res_8bit,   &res_8bit,   16, FALSE, 16, FALSE, 8,  FALSE},
+        {&res_1bit,   &res_32_1,    1, TRUE,  32, TRUE, 16,  FALSE},
+        {&res_8bit,   &int32_data,  8, TRUE,  32, TRUE,  2,  FALSE},
+        {&res_4bit,   &int32_data,  4, TRUE,  32, TRUE, 16,  FALSE},
+        {&int32_data, &res_8bit,   32, TRUE,   8, TRUE, 16,  FALSE},
+        {&int32_data, &int32_data, 32, TRUE,  32, TRUE, 16,  FALSE},
+        {&int32_data, &int32_data, 16, TRUE,  16, TRUE, 32,  FALSE},
+        {&int32_data, &int32_data,  8, TRUE,   8, TRUE, 64,  FALSE},
+        {&int32_data, &res_8bit,   32, TRUE,   8, TRUE, 16,  FALSE},
+        {&int32_data, &res_4bit,   32, TRUE,   4, TRUE, 16,  FALSE},
+        {&int32_data, &res_2bit,   32, TRUE,   2, TRUE, 16,  FALSE},
+        {&int32_data, &res_1bit,   32, TRUE,   1, TRUE, 16,  FALSE},
+        {NULL},
+        };
+
+
+
+static struct relative_path_test {
+    const char  *input;
+    t_bool      prepend_cwd;
+    const char  *working_dir;
+    const char  *result;
+    } r_test[] = {
+        {"/xx.dat",                 TRUE,  "xx",     "../xx.dat"},
+        {"/file.dat",               TRUE,  "xx/t",   "../../file.dat"},
+        {"/../../xxx/file.dat",     TRUE,  NULL,     "../../xxx/file.dat"},
+        {"\\..\\..\\xxx\\file.dat", TRUE,  NULL,     "../../xxx/file.dat"},
+        {"file.dat",                FALSE, NULL,     "./file.dat"},
+        {"\\file.dat",              TRUE,  NULL,     "./file.dat"},
+        {"C:/XXX/yyy/file.dat",     FALSE, NULL,     "C:/XXX/yyy/file.dat"},
+        {"C:/Users/yyy/file.dat",   FALSE, NULL,     "C:/Users/yyy/file.dat"},
+        {"W:/XXX/yyy/file.dat",     FALSE, NULL,     "W:/XXX/yyy/file.dat"},
+        {"/file.dat",               TRUE,  NULL,     "./file.dat"},
+        {"/x/filepath/file.dat",    FALSE, NULL,     "/x/filepath/file.dat"},
+        {NULL},
+        };
+
+t_stat sim_fio_test (const char *cptr)
+{
+struct pack_test *pt;
+struct relative_path_test *rt;
+t_stat r = SCPE_OK;
+char test_desc[512];
+uint8 result[512];
+
+sim_register_internal_device (&sim_fio_test_dev);
+sim_fio_test_dev.dctrl = (sim_switches & SWMASK ('D')) ? FIO_DBG_PACK : 0;
+sim_set_deb_switches (SWMASK ('F'));
+sim_messagef (SCPE_OK, "sim_buf_pack_unpack - tests\n");
+for (pt = p_test; pt->src; ++pt) {
+    t_bool res;
+
+    snprintf (test_desc, sizeof (test_desc), "%dbit%s->%dbit%s %d words", pt->sbits, pt->slsb ? "LSB" : "MSB", pt->dbits, pt->dlsb ? "LSB" : "MSB", pt->scount);
+    memset (result, 0x80, sizeof (result));
+    res = sim_buf_pack_unpack (pt->src, result, pt->sbits, pt->slsb, pt->scount, pt->dbits, pt->dlsb);
+    if (res == pt->exp_stat) {
+        if (!res) {
+            if (0 == memcmp (pt->exp_dst, result, (pt->scount * pt->dbits) / 8))
+                sim_messagef (SCPE_OK, "%s - GOOD\n", test_desc);
+            else {
+                uint32 i;
+
+                r = sim_messagef (SCPE_IERR, "%s - BAD Data:\n", test_desc);
+                sim_messagef (SCPE_IERR, "Off: Exp:    Got:\n");
+                for (i = 0; i < ((pt->scount * pt->dbits) / 8); i++)
+                    sim_messagef (SCPE_IERR, "%3d  0x%02X%s0x%02X\n", i, ((uint8 *)pt->exp_dst)[i], (((uint8 *)pt->exp_dst)[i] == result[i]) ? "    " : " != ", result[i]);
+                }
+            }
+        }
+    else
+        r = sim_messagef (SCPE_IERR, "%s - BAD Status - Expected: %s got %s\n", test_desc, pt->exp_stat ? "True" : "False", res ? "True" : "False");
+    }
+sim_messagef (SCPE_OK, "Testing relative path logic:\n");
+for (rt = r_test; rt->input; ++rt) {
+    char input[PATH_MAX + 1];
+    char cmpbuf[PATH_MAX + 1];
+    char cwd[PATH_MAX + 1];
+    char origcwd[PATH_MAX + 1];
+    char *wd = sim_getcwd(cwd, sizeof (cwd));
+    char *cp;
+    const char *result;
+    static const char seperators[] = "/\\";
+    const char *sep;
+    t_stat mkdir_stat = SCPE_OK;
+
+    strlcpy (origcwd, cwd, sizeof (origcwd));
+    if (rt->prepend_cwd) {
+        strlcpy (input, cwd, sizeof (input));
+        strlcat (input, rt->input, sizeof (input));
+        }
+    else
+        strlcpy (input, rt->input, sizeof (input));
+    if (rt->working_dir != NULL) {
+        mkdir_stat = mkdir_cmd (0, rt->working_dir);
+        sim_chdir (rt->working_dir);
+        wd = sim_getcwd(cwd, sizeof (cwd));
+        }
+    for (sep = seperators; *sep != '\0'; ++sep) {
+        while ((cp = strchr (input, *sep)))
+            *cp = (*sep == '/') ? '\\' : '/';
+        while ((cp = strchr (cwd, *sep)))
+            *cp = (*sep == '/') ? '\\' : '/';
+        result = sim_relative_path (input);
+        strlcpy (cmpbuf, rt->result, sizeof (cmpbuf));
+        if (strchr (input, *sep) != NULL) {         /* Input has separators? */
+            while ((cp = strchr (cmpbuf, *sep)))
+                *cp = (*sep == '/') ? '\\' : '/';   /* Change the expected result to match */
+            }
+        if (strcmp (result, cmpbuf) != 0) {
+            r = sim_messagef (SCPE_IERR, "Relative Path Unexpected Result:\n");
+            sim_messagef (SCPE_IERR, "    input: %s\n", input);
+            sim_messagef (SCPE_IERR, "   result: %s\n", result);
+            sim_messagef (SCPE_IERR, " expected: %s\n", cmpbuf);
+            sim_messagef (SCPE_IERR, "      cwd: %s\n", cwd);
+            }
+        else {
+            sim_messagef (SCPE_OK, "Relative Path Good Result:\n");
+            sim_messagef (SCPE_OK, "    input: %s\n", input);
+            sim_messagef (SCPE_OK, "   result: %s\n", result);
+            }
+        }
+    sim_chdir (origcwd);
+    if ((rt->working_dir != NULL) && (mkdir_stat == SCPE_OK)) {
+        char *xdir = strdup (rt->working_dir);
+        
+        sim_rmdir (rt->working_dir);
+        while ((cp = strrchr (xdir, '/')) != NULL) {
+            *cp = '\0';
+            sim_rmdir (xdir);
+            }
+        free (xdir);
+        }
+    }
+return r;
+}
+
+
 
 #if defined(_WIN32)
 #include <direct.h>
@@ -1123,6 +1455,105 @@ for (p = parts; *p; p++) {
     }
 free (fullpath);
 return result;
+}
+
+/*
+ * relative file path processing
+ *
+ *    Input is a filepath which may contain either / or \ directory 
+ *    separators (or both) and always returns a relative or complete path
+ *    with / directory separators.
+ */
+
+const char *sim_relative_path (const char *filenamepath)
+{
+char dir[PATH_MAX+1] = "";
+char *wd = sim_getcwd(dir, sizeof (dir));
+char dsep = (strchr (dir, '/') != NULL) ? '/' : '\\';
+char *cp;
+static char buf[CBUFSIZE*4];
+char *filepath = NULL;
+char fsep = (strchr (filenamepath, '\\') != NULL) ? '\\' : '/';
+char updir[4] = {'.', '.', fsep};
+size_t offset = 0, lastdir = 0, updirs = 0, up, cwd_dirs;
+
+filepath = sim_filepath_parts (filenamepath, "f");
+if (strchr (filepath, fsep) == NULL) {  /* file directory path separators changed? */
+    char csep = (fsep == '/') ? '\\' : '/';
+
+    while ((cp = strchr (filepath, csep)))
+        *cp = fsep;                     /* restore original file path separator */
+    }
+if (dsep != fsep) {                     /* if directory path separators aren't the same */
+    while ((cp = strchr (dir, dsep)) != NULL)
+        *cp = fsep;                     /* change to the file path separator */
+    dsep = fsep;
+    }
+cp = dir - 1;
+cwd_dirs = (isalpha(dir[0]) && (dir[1] == ':')) ? 1 : 0;
+while ((cp = strchr (cp + 1, fsep)) != NULL)
+    cwd_dirs++;
+if (dir[strlen (dir) - 1] != fsep)
+    cwd_dirs++;
+buf[0] = '\0';
+while ((dir[offset] != '\0') && (filepath[offset] != '\0')) {
+    if (dir[offset] == dsep) {
+        if (filepath[offset] == fsep) {
+            lastdir = offset;
+            ++offset;
+            continue;
+            }
+        }
+
+#if defined(_WIN32)                     /* Windows has case independent file names */
+#define _CMP(x) toupper (x)
+#else
+#define _CMP(x) (x)
+#endif
+    if (_CMP(dir[offset]) != _CMP(filepath[offset]))
+        break;
+    ++offset;
+    }
+if (dir[offset] == '\0') {
+    if (filepath[offset] == fsep) {
+        lastdir = offset;
+        ++offset;
+        updirs = 0;
+        }
+    else {
+        offset = lastdir + 1;
+        updirs = 1;
+        }
+    }
+else {
+    updirs = 1;
+    while (dir[++lastdir] != '\0') {
+        if (dir[lastdir] == fsep)
+            ++updirs;
+        }
+    }
+if (updirs > 0) {
+    if ((offset == 3) &&                /* if only match windows drive letter? */
+        (dir[1] == ':') && 
+        (dir[2] == dsep))
+        offset = 0;                     /* */
+    if ((offset > 0) && (updirs != cwd_dirs)) {
+        for (up = 0; up < updirs; up++)
+            strlcat (buf, updir, sizeof (buf));
+        if (strlen (buf) > offset) {    /* if relative path prefix is longer than input path? */
+            offset = 0;                 /* revert to original path */
+            buf[0] = '\0';
+            }
+        }
+    }
+else
+    strlcpy (buf, "./", sizeof (buf));
+strlcat (buf, &filepath[offset], sizeof (buf));
+if (dsep != '/')
+    while ((cp = strchr (buf, dsep)) != NULL)
+        *cp = '/';                      /* Always return with / as the directory separator */
+free (filepath);
+return buf;
 }
 
 #if defined (_WIN32)

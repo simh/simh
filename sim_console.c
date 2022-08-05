@@ -417,7 +417,8 @@ while (*cptr != 0) {                                    /* do all mods */
         if (r != SCPE_OK)
             return r;
         }
-    else return SCPE_NOPARAM;
+    else
+        return sim_messagef (SCPE_NOPARAM, "Invalid console parameter: %s\n", gbuf);
     }
 return SCPE_OK;
 }
@@ -440,7 +441,8 @@ while (*cptr != 0) {
     cptr = get_glyph (cptr, gbuf, ',');                 /* get modifier */
     if ((shptr = find_shtab (show_con_tab, gbuf)))
         shptr->action (st, dptr, uptr, shptr->arg, NULL);
-    else return SCPE_NOPARAM;
+    else
+        return sim_messagef (SCPE_NOPARAM, "Invalid console parameter: %s\n", gbuf);
     }
 return SCPE_OK;
 }
@@ -588,7 +590,8 @@ while (*cptr != 0) {                                    /* do all mods */
         if (r != SCPE_OK)
             return r;
         }
-    else return SCPE_NOPARAM;
+    else 
+        return sim_messagef (SCPE_NOPARAM, "Invalid remote console parameter: %s\n", gbuf);
     }
 return SCPE_OK;
 }
@@ -1919,7 +1922,7 @@ if (flag) {
             sim_activate_after(rem_con_poll_unit, 1000000);/* check for connection in 1 second */
         return r;
         }
-    return SCPE_NOPARAM;
+    return sim_messagef (SCPE_NOPARAM, "Invalid remote telnet specification: %s\n", gbuf);
     }
 else {
     if (sim_rem_con_tmxr.master) {
@@ -2206,7 +2209,11 @@ return SCPE_OK;
 
 t_stat sim_set_cons_speed (int32 flag, CONST char *cptr)
 {
-return tmxr_set_line_speed (&sim_con_ldsc, cptr);
+t_stat r = tmxr_set_line_speed (&sim_con_ldsc, cptr);
+
+if ((r == SCPE_OK) && (sim_con_ldsc.uptr != NULL))
+    sim_con_ldsc.uptr->wait = sim_con_ldsc.rxdeltausecs;
+return r;
 }
 
 t_stat sim_show_cons_speed (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr)
@@ -2273,7 +2280,7 @@ if (cptr && (*cptr != 0))
     return SCPE_2MARG;
 if (sim_log)
     fprintf (st, "Logging enabled to \"%s\"\n", 
-                 sim_logfile_name (sim_log, sim_log_ref));
+                 sim_relative_path (sim_logfile_name (sim_log, sim_log_ref)));
 else
     fprintf (st, "Logging disabled\n");
 return SCPE_OK;
@@ -2382,10 +2389,11 @@ if (sim_deb_switches & SWMASK ('B')) {
 
     while (sim_debug_buffer_inuse > 0) {
         size_t write_size = MIN (sim_deb_buffer_size - offset, sim_debug_buffer_inuse);
+        size_t written;
 
-        fwrite (sim_deb_buffer + offset, 1, write_size, sim_deb);
-        sim_debug_buffer_inuse -= write_size;
-        offset += write_size;
+        written = fwrite (sim_deb_buffer + offset, 1, write_size, sim_deb);
+        sim_debug_buffer_inuse -= written;
+        offset += written;
         if (offset == sim_deb_buffer_size)
             offset = 0;
         }
@@ -2396,6 +2404,7 @@ if (sim_deb_switches & SWMASK ('B')) {
 sim_close_logfile (&sim_deb_ref);
 sim_deb = NULL;
 sim_deb_switches = 0;
+errno = 0;
 return sim_messagef (SCPE_OK, "Debug output disabled\n");
 }
 
@@ -2409,7 +2418,7 @@ if (cptr && (*cptr != 0))
     return SCPE_2MARG;
 if (sim_deb) {
     fprintf (st, "Debug output enabled to \"%s\"\n", 
-                 sim_logfile_name (sim_deb, sim_deb_ref));
+                 sim_relative_path (sim_logfile_name (sim_deb, sim_deb_ref)));
     if (sim_deb_switches & SWMASK ('P'))
         fprintf (st, "   Debug messages contain current PC value\n");
     if (sim_deb_switches & SWMASK ('T'))
@@ -2713,15 +2722,18 @@ else if (strcmp (gbuf, "STDERR") == 0) {                /* output to stderr? */
     *pref = NULL;
     }
 else {
+    char *fullpath = NULL;
+
     *pref = (FILEREF *)calloc (1, sizeof(**pref));
     if (!*pref)
         return SCPE_MEM;
-    get_glyph_nc (filename, gbuf, 0);                   /* reparse */
-    strlcpy ((*pref)->name, gbuf, sizeof((*pref)->name));
+    fullpath = sim_filepath_parts (filename, "f");      /* reparse */
+    strlcpy ((*pref)->name, fullpath, sizeof((*pref)->name));
     if (sim_switches & SWMASK ('N'))                    /* if a new log file is requested */
-        *pf = sim_fopen (gbuf, (binary ? "w+b" : "w+"));/*   then open an empty file */
+        *pf = sim_fopen (fullpath, (binary ? "w+b" : "w+"));/*   then open an empty file */
     else                                                /* otherwise */
-        *pf = sim_fopen (gbuf, (binary ? "a+b" : "a+"));/*   append to an existing file */
+        *pf = sim_fopen (fullpath, (binary ? "a+b" : "a+"));/*   append to an existing file */
+    free (fullpath);
     if (*pf == NULL) {                                  /* error? */
         free (*pref);
         *pref = NULL;

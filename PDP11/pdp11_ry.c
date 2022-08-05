@@ -56,20 +56,30 @@
 #define DEV_DISI        DEV_DIS
 #endif
 
+#include "sim_disk.h"
+
 #define RX_NUMTR        77                              /* tracks/disk */
 #define RX_M_TRACK      0377
+#define RX_NUMSF        1                               /* surfaces (heads) */
 #define RX_NUMSC        26                              /* sectors/track */
 #define RX_M_SECTOR     0177
-#define RX_NUMBY        128
-#define RX_SIZE         (RX_NUMTR * RX_NUMSC * RX_NUMBY)
-#define RY_NUMBY        256                             /* bytes/sector */
-#define RY_SIZE         (RX_NUMTR * RX_NUMSC * RY_NUMBY)
+#define RX01_NUMBY      128
+#define RX02_NUMBY      256                             /* bytes/sector */
 #define RX_NUMDR        2                               /* drives/controller */
 #define RX_M_NUMDR      01
-#define UNIT_V_DEN      (UNIT_V_UF + 0)                 /* double density */
-#define UNIT_V_AUTO     (UNIT_V_UF + 1)                 /* autosize */
-#define UNIT_DEN        (1u << UNIT_V_DEN)
+#define UNIT_V_AUTO     (UNIT_V_UF + 0)                 /* autosize */
 #define UNIT_AUTO       (1u << UNIT_V_AUTO)
+
+#define RY_DRV(d,a)                                     \
+  { RX_NUMSC, RX_NUMSF, RX_NUMTR, (RX_NUMSC * RX_NUMTR),\
+    #d,       d##_NUMBY, DRVFL_RMV,                   \
+    "DY",     0,        0,        #a }
+
+static DRVTYP drv_tab[] = {
+    RY_DRV(RX01,SINGLE),
+    RY_DRV(RX02,DOUBLE),
+    { 0 }
+    };
 
 #define IDLE            0                               /* idle state */
 #define RWDS            1                               /* rw, sect next */
@@ -134,7 +144,7 @@
 #define RYES_ERR        (RYES_NXM|RYES_WCO|RYES_DERR|RYES_ACLO|RYES_CRC)
 
 #define TRACK u3                                        /* current track */
-#define CALC_DA(t,s,b)  (((t) * RX_NUMSC) + ((s) - 1)) * b
+#define CALC_DA(t,s)    (((t) * RX_NUMSC) + ((s) - 1))
 
 int32 ry_csr = 0;                                       /* control/status */
 int32 ry_dbr = 0;                                       /* data buffer */
@@ -149,7 +159,7 @@ int32 ry_stopioe = 1;                                   /* stop on error */
 int32 ry_cwait = 100;                                   /* command time */
 int32 ry_swait = 10;                                    /* seek, per track */
 int32 ry_xwait = 1;                                     /* tr set time */
-uint8 rx2xb[RY_NUMBY] = { 0 };                          /* sector buffer */
+uint8 rx2xb[RX02_NUMBY] = { 0 };                          /* sector buffer */
 
 t_stat ry_rd (int32 *data, int32 PA, int32 access);
 t_stat ry_wr (int32 data, int32 PA, int32 access);
@@ -157,8 +167,9 @@ t_stat ry_svc (UNIT *uptr);
 t_stat ry_reset (DEVICE *dptr);
 t_stat ry_boot (int32 unitno, DEVICE *dptr);
 void ry_done (int32 esr_flags, uint8 new_ecode);
-t_stat ry_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat ry_show_density (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat ry_attach (UNIT *uptr, CONST char *cptr);
+t_stat ry_detach (UNIT *uptr);
 t_stat ry_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 const char *ry_description (DEVICE *dptr);
 
@@ -178,12 +189,7 @@ DIB ry_dib = {
     1, IVCL (RY), VEC_AUTO, { NULL }, IOLN_RY,
     };
 
-UNIT ry_unit[] = {
-    { UDATA (&ry_svc, UNIT_DEN+UNIT_FIX+UNIT_ATTABLE+UNIT_BUFABLE+UNIT_MUSTBUF,
-             RY_SIZE) },
-    { UDATA (&ry_svc, UNIT_DEN+UNIT_FIX+UNIT_ATTABLE+UNIT_BUFABLE+UNIT_MUSTBUF,
-             RY_SIZE) }
-    };
+UNIT ry_unit[RX_NUMDR] = {{0}};
 
 REG ry_reg[] = {
     { GRDATAD (RYCS,            ry_csr, DEV_RDX, 16, 0, "status") },
@@ -203,7 +209,7 @@ REG ry_reg[] = {
     { DRDATAD (CTIME,         ry_cwait, 24,             "command completion time"), PV_LEFT },
     { DRDATAD (STIME,         ry_swait, 24,             "seek time, per track"), PV_LEFT },
     { DRDATAD (XTIME,         ry_xwait, 24,             "transfer ready delay"), PV_LEFT },
-    { BRDATAD (SBUF,             rx2xb, 8, 8, RY_NUMBY, "sector buffer array") },
+    { BRDATAD (SBUF,             rx2xb, 8, 8, sizeof (rx2xb), "sector buffer array") },
     { FLDATAD (STOP_IOE,    ry_stopioe, 0,              "stop on I/O error") },
     { URDATA  (CAPAC, ry_unit[0].capac, 10, T_ADDR_W, 0,
               RX_NUMDR, REG_HRO | PV_LEFT) },
@@ -213,26 +219,18 @@ REG ry_reg[] = {
     };
 
 MTAB ry_mod[] = {
-    { MTAB_XTD|MTAB_VUN,                    0, "write enabled", "WRITEENABLED", 
-        &set_writelock, &show_writelock,   NULL, "Write enable floppy drive" },
-    { MTAB_XTD|MTAB_VUN,                    1, NULL, "LOCKED", 
-        &set_writelock, NULL,   NULL, "Write lock floppy drive" },
-    { (UNIT_DEN+UNIT_ATT),           UNIT_ATT, "single density",    NULL, NULL },
-    { (UNIT_DEN+UNIT_ATT), (UNIT_DEN+UNIT_ATT), "double density",   NULL, NULL },
-    { (UNIT_AUTO+UNIT_DEN+UNIT_ATT),         0, "single density",   NULL, NULL },
-    { (UNIT_AUTO+UNIT_DEN+UNIT_ATT),  UNIT_DEN, "double density",   NULL, NULL },
+    { UNIT_WLK,                             0, "write enabled",     "WRITEENABLED", 
+        NULL, NULL, NULL, "Write enable disk drive" },
+    { UNIT_WLK,                      UNIT_WLK, "write locked",      "LOCKED", 
+        NULL, NULL, NULL, "Write lock disk drive" },
     { (UNIT_AUTO+UNIT_ATT),          UNIT_AUTO, "autosize",         NULL, NULL },
     { UNIT_AUTO,                     UNIT_AUTO, NULL,               "AUTOSIZE", 
         NULL, NULL, NULL, "set density based on file size at ATTACH" },
-    { (UNIT_AUTO+UNIT_DEN),                  0, NULL,               "SINGLE", 
-        &ry_set_size, NULL, NULL, "Set to Single density (256Kb)" },
-    { (UNIT_AUTO+UNIT_DEN),           UNIT_DEN, NULL,               "DOUBLE", 
-        &ry_set_size, NULL, NULL, "Set to Double density (512Kb)" },
+    { MTAB_XTD|MTAB_VUN, 0, "DENSITY", NULL,
+      NULL, &ry_show_density, NULL, "Display disk density" },
 #if defined (VM_PDP11)
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 004, "ADDRESS", "ADDRESS",
       &set_addr, &show_addr, NULL, "Bus Address" },
-    { MTAB_XTD | MTAB_VDV, 0, NULL, "AUTOCONFIGURE",
-      &set_addr_flt, NULL, NULL, "Enable autoconfiguration of address & vector" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", "VECTOR",
       &set_vec, &show_vec, NULL, "Interrupt vector" },
 #else
@@ -248,10 +246,10 @@ DEVICE ry_dev = {
     "RY", ry_unit, ry_reg, ry_mod,
     RX_NUMDR, DEV_RDX, 20, 1, DEV_RDX, 8,
     NULL, NULL, &ry_reset,
-    &ry_boot, &ry_attach, NULL,
-    &ry_dib, DEV_DISABLE | DEV_DISI | DEV_UBUS | DEV_Q18, 0,
+    &ry_boot, &ry_attach, &ry_detach,
+    &ry_dib, DEV_DISABLE | DEV_DISI | DEV_UBUS | DEV_Q18 | DEV_DISK, 0,
     NULL, NULL, NULL, &ry_help, NULL, NULL,
-    &ry_description
+    &ry_description, NULL, &drv_tab
     };
 
 /* I/O dispatch routine, I/O addresses 17777170 - 17777172
@@ -378,13 +376,12 @@ return SCPE_OK;
 
 t_stat ry_svc (UNIT *uptr)
 {
-int32 i, t, func, bps;
+int32 t, func, bps;
 static uint8 estat[8];
 uint32 ba, da;
-int8 *fbuf = (int8 *) uptr->filebuf;
 
 func = RYCS_GETFNC (ry_csr);                            /* get function */
-bps = (ry_csr & RYCS_DEN)? RY_NUMBY: RX_NUMBY;          /* get sector size */
+bps = (ry_csr & RYCS_DEN)? RX02_NUMBY: RX01_NUMBY;      /* get sector size */
 ba = (RYCS_GETUAE (ry_csr) << 16) | ry_ba;              /* get mem addr */
 switch (ry_state) {                                     /* case on state */
 
@@ -409,8 +406,7 @@ switch (ry_state) {                                     /* case on state */
             break;
             }
         if (func == RYCS_FILL) {                        /* fill? read */
-            for (i = 0; i < RY_NUMBY; i++)
-                rx2xb[i] = 0;
+            memset (rx2xb, 0, sizeof (rx2xb));
             t = Map_ReadB (ba, ry_wc << 1, rx2xb);
             }
         else t = Map_WriteB (ba, ry_wc << 1, rx2xb);
@@ -432,7 +428,7 @@ switch (ry_state) {                                     /* case on state */
         return SCPE_OK;
 
     case RWXFR:                                         /* read/write */
-        if ((uptr->flags & UNIT_BUF) == 0) {            /* not buffered? */
+        if ((uptr->flags & UNIT_ATT) == 0) {            /* not attached? */
             ry_done (0, 0110);                          /* done, error */
             return IORETURN (ry_stopioe, SCPE_UNATT);
             }
@@ -445,28 +441,24 @@ switch (ry_state) {                                     /* case on state */
             ry_done (0, 0070);                          /* done, error */
             break;
             }
-        if (((uptr->flags & UNIT_DEN) != 0) ^
+        if ((0 == strcmp (uptr->drvtyp->name, "RX02")) ^
             ((ry_csr & RYCS_DEN) != 0)) {               /* densities agree? */
             ry_done (RYES_DERR, 0240);                  /* no, error */
             break;
             }
-        da = CALC_DA (ry_track, ry_sector, bps);        /* get disk address */
+        da = CALC_DA (ry_track, ry_sector);             /* get disk address */
         if (func == RYCS_WRDEL)                         /* del data? */
             ry_esr = ry_esr | RYES_DD;
-        if (func == RYCS_READ) {                        /* read? */
-            for (i = 0; i < bps; i++)
-                rx2xb[i] = fbuf[da + i];
-             }
+        if (func == RYCS_READ)                          /* read? */
+            sim_disk_rdsect (uptr, da, rx2xb, NULL, 1); /* read sector */
         else {
             if (uptr->flags & UNIT_WPRT) {              /* write and locked? */
                 ry_done (0, 0100);                      /* done, error */
                 break;
                 }
-            for (i = 0; i < bps; i++)                   /* write */
-                fbuf[da + i] = rx2xb[i];
-            da = da + bps;
-            if (da > uptr->hwmark)
-                uptr->hwmark = da;
+            sim_disk_wrsect (uptr, da, rx2xb, NULL, 1); /* write */
+            if ((da * bps) > uptr->hwmark)
+                uptr->hwmark = (da * bps);
             }
         ry_done (0, 0);                                 /* done */
         break;
@@ -481,12 +473,12 @@ switch (ry_state) {                                     /* case on state */
         break;
 
     case SDXFR:                                         /* erase disk */
-        for (i = 0; i < (int32) uptr->capac; i++)
-            fbuf[i] = 0;
+        sim_disk_erase (uptr);
         uptr->hwmark = (uint32) uptr->capac;
         if (ry_csr & RYCS_DEN)
-            uptr->flags = uptr->flags | UNIT_DEN;
-        else uptr->flags = uptr->flags & ~UNIT_DEN;
+            sim_disk_set_drive_type_by_name (uptr, "RX02");
+        else 
+            sim_disk_set_drive_type_by_name (uptr, "RX01");
         ry_done (0, 0);
         break;
 
@@ -505,9 +497,9 @@ switch (ry_state) {                                     /* case on state */
         estat[4] = ry_track;
         estat[5] = ry_sector;
         estat[6] = ((ry_csr & RYCS_DRV)? 0200: 0) |
-                   ((ry_unit[1].flags & UNIT_DEN)? 0100: 0) |
+                   ((0 == strcasecmp (ry_unit[1].drvtyp->name, "RX02"))? 0100: 0) |
                    ((uptr->flags & UNIT_ATT)? 0040: 0) |
-                   ((ry_unit[0].flags & UNIT_DEN)? 0020: 0) |
+                   ((0 == strcasecmp (ry_unit[0].drvtyp->name, "RX02"))? 0020: 0) |
                    ((ry_csr & RYCS_DEN)? 0001: 0);
         estat[7] = (uint8)uptr->TRACK;
         t = Map_WriteB (ba, 8, estat);                  /* DMA to memory */
@@ -521,13 +513,12 @@ switch (ry_state) {                                     /* case on state */
     case INIT_COMPLETE:                                 /* init complete */
         ry_unit[0].TRACK = 1;                           /* drive 0 to trk 1 */
         ry_unit[1].TRACK = 0;                           /* drive 1 to trk 0 */
-        if ((uptr->flags & UNIT_BUF) == 0) {            /* not buffered? */
+        if ((uptr->flags & UNIT_ATT) == 0) {            /* not attached? */
             ry_done (RYES_ID, 0010);                    /* init done, error */
             break;
             }
-        da = CALC_DA (1, 1, bps);                       /* track 1, sector 1 */
-        for (i = 0; i < bps; i++)                       /* read sector */
-            rx2xb[i] = fbuf[da + i];
+        da = CALC_DA (1, 1);                            /* track 1, sector 1 */
+        sim_disk_rdsect (uptr, da, rx2xb, NULL, 1);     /* read sector */
         ry_done (RYES_ID, 0);                           /* set done */
         if ((ry_unit[1].flags & UNIT_ATT) == 0)
             ry_ecode = 0020;
@@ -554,7 +545,7 @@ if (drv)                                                /* updates RYES */
     ry_esr = ry_esr | RYES_USEL;
 if (ry_unit[drv].flags & UNIT_ATT) {
     ry_esr = ry_esr | RYES_DRDY;
-    if (ry_unit[drv].flags & UNIT_DEN)
+    if (0 == strcmp (ry_unit[drv].drvtyp->name, "RX02"))
         ry_esr = ry_esr | RYES_DDEN;
     }
 if ((new_ecode > 0) || (ry_esr & RYES_ERR))             /* test for error */
@@ -570,6 +561,20 @@ return;
 
 t_stat ry_reset (DEVICE *dptr)
 {
+int32 i;
+static t_bool inited = FALSE;
+
+if (!inited) {
+    inited = TRUE;
+    for (i = 0; i < RX_NUMDR; i++) {
+        UNIT *uptr;
+        uptr = dptr->units + i;
+        uptr->action = &ry_svc;
+        uptr->flags = UNIT_FIX|UNIT_ATTABLE|UNIT_BUFABLE|UNIT_MUSTBUF;
+        sim_disk_set_drive_type_by_name (uptr, "RX02");
+        }
+    }
+
 ry_csr = ry_dbr = 0;                                    /* clear registers */
 ry_esr = ry_ecode = 0;                                  /* clear error */
 ry_ba = ry_wc = 0;                                      /* clear wc, ba */
@@ -579,7 +584,7 @@ CLR_INT (RY);                                           /* clear int req */
 sim_cancel (&ry_unit[1]);                               /* cancel drive 1 */
 if (dptr->flags & UNIT_DIS)                             /* disabled? */
     sim_cancel (&ry_unit[0]);
-else if (ry_unit[0].flags & UNIT_BUF)  {                /* attached? */
+else if (ry_unit[0].flags & UNIT_ATT)  {                /* attached? */
     ry_state = INIT_COMPLETE;                           /* yes, sched init */
     sim_activate (&ry_unit[0], ry_swait * abs (1 - ry_unit[0].TRACK));
     }
@@ -591,24 +596,23 @@ return auto_config (dptr->name, 1);                     /* run autoconfig */
 
 t_stat ry_attach (UNIT *uptr, CONST char *cptr)
 {
-uint32 sz;
-
-if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize_name (cptr))) {
-    if (sz > RX_SIZE)
-        uptr->flags = uptr->flags | UNIT_DEN;
-    else uptr->flags = uptr->flags & ~UNIT_DEN;
-    }
-uptr->capac = (uptr->flags & UNIT_DEN)? RY_SIZE: RX_SIZE;
-return attach_unit (uptr, cptr);
+return sim_disk_attach_ex (uptr, cptr, uptr->drvtyp->sectsize, 
+                           sizeof (uint8), TRUE, 0, 
+                           uptr->drvtyp->name, 0, 0,
+                           NULL);
 }
 
-/* Set size routine */
-
-t_stat ry_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+t_stat ry_detach (UNIT *uptr)
 {
-if (uptr->flags & UNIT_ATT)
-    return SCPE_ALATT;
-uptr->capac = val? RY_SIZE: RX_SIZE;
+sim_cancel (uptr);
+return sim_disk_detach (uptr);
+}
+
+/* Show density */
+
+t_stat ry_show_density (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+fprintf (st, "%s density", (strcasecmp (uptr->drvtyp->name, "RX01") == 0) ? "single" : "double");
 return SCPE_OK;
 }
 
@@ -687,7 +691,7 @@ t_stat ry_boot (int32 unitno, DEVICE *dptr)
 {
 size_t i;
 
-if ((ry_unit[unitno & RX_M_NUMDR].flags & UNIT_DEN) == 0)
+if (0 != strcasecmp (ry_unit[unitno & RX_M_NUMDR].drvtyp->name, "RX02"))
     return SCPE_NOFNC;
 for (i = 0; i < BOOT_LEN; i++)
     WrMemW (BOOT_START + (2 * i), boot_rom[i]);

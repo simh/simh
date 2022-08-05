@@ -110,7 +110,7 @@ uint32          CC;                         /* Condition codes, bits 1-4 of PSD1
 uint32          CPUSTATUS;                  /* cpu status word */
 uint32          TRAPSTATUS;                 /* trap status word */
 uint32          SPAD[256];                  /* Scratch pad memory */
-uint32          INTS[112];                  /* Interrupt status flags */
+uint32          INTS[128];                  /* Interrupt status flags */
 uint32          pad[16];                    /* In case of wrong access */
 uint32          CMCR;                       /* Cache Memory Control Register */
 uint32          SMCR;                       /* Shared Memory Control Register */
@@ -277,7 +277,7 @@ REG cpu_reg[] = {
     {HRDATAD(TRAPSTATUS, TRAPSTATUS, 32, "TRAP Status Word"), REG_FIT},
     {HRDATAD(CC, CC, 32, "Condition Codes"), REG_FIT},
     {HRDATAD(MODES, MODES, 32, "Mode bits"), REG_FIT},
-    {BRDATAD(INTS, INTS, 16, 32, 112, "Interrupt Status"), REG_FIT},
+    {BRDATAD(INTS, INTS, 16, 32, 128, "Interrupt Status"), REG_FIT},
     {HRDATAD(CMCR, CMCR, 32, "Cache Memory Control Register"), REG_FIT},
     {HRDATAD(SMCR, SMCR, 32, "Shared Memory Control Register"), REG_FIT},
     {HRDATAD(CMSMC, CMSMC, 32, "V9 Cache/Shadow Memory Configuration Word"), REG_FIT},

@@ -86,6 +86,7 @@
    sim_tape_show_capac  show tape capacity
    sim_tape_set_dens    set tape density
    sim_tape_show_dens   show tape density
+   sim_tape_error_text  the textual description of a tape status
    sim_tape_set_async   enable asynchronous operation
    sim_tape_clr_async   disable asynchronous operation
    aim_tape_test        unit test routine
@@ -185,8 +186,8 @@ if ((callback == NULL) || !(ctx->asynch_io))
         sim_debug_unit (ctx->dbit, uptr,                                \
       "sim_tape AIO_CALL(op=%d, unit=%d)\n", op, (int)(uptr-ctx->dptr->units));\
                                                                         \
-        if (ctx->callback)                                              \
-            abort(); /* horrible mistake, stop */                       \
+        if (ctx->callback)      /* horrible mistake, stop */            \
+            SIM_SCP_ABORT ("AIO_CALL error");                           \
         ctx->io_top = op;                                               \
         ctx->buf = _buf;                                                \
         ctx->bc = _bc;                                                  \
@@ -324,7 +325,7 @@ TAPE_PCALLBACK callback = ctx->callback;
 sim_debug_unit (ctx->dbit, uptr, "_tape_completion_dispatch(unit=%d, top=%d, callback=%p)\n", (int)(uptr-ctx->dptr->units), ctx->io_top, ctx->callback);
 
 if (ctx->io_top != TOP_DONE)
-    abort();                                            /* horribly wrong, stop */
+    SIM_SCP_ABORT ("_tape_completion_dispatch()"); /* horribly wrong, stop */
 
 if (ctx->asynch_io)
     pthread_mutex_lock (&ctx->io_lock);
@@ -3442,7 +3443,6 @@ free (recbuf);
 return objc;
 }
 
-static 
 const char *sim_tape_error_text (t_stat stat)
 {
 const char *mtse_errors[] = {

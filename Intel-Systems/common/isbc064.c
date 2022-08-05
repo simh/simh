@@ -37,8 +37,6 @@
 
 #include "system_defs.h"
 
-#define BASE_ADDR       u3    
-
 #define isbc064_NAME    "Intel iSBC 064 RAM Board"
 
 /* prototypes */
@@ -107,8 +105,6 @@ DEBTAB isbc064_debug[] = {
     { "READ", DEBUG_read },
     { "WRITE", DEBUG_write },
     { "XACK", DEBUG_xack },
-    { "LEV1", DEBUG_level1 },
-    { "LEV2", DEBUG_level2 },
     { NULL }
 };
 
@@ -155,7 +151,7 @@ t_stat isbc064_cfg(uint16 base, uint16 size, uint8 dummy)
         return SCPE_MEM;
     }
     sim_printf("    SBC064: Enabled 0%04XH bytes at base 0%04XH\n",
-        isbc064_dev.units->capac, isbc064_dev.units->BASE_ADDR);
+        isbc064_dev.units->capac, isbc064_dev.units->u3);
     return SCPE_OK;
 }
 
@@ -205,8 +201,8 @@ t_stat isbc064_set_base(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
             sim_printf("SBC064: Base error\n");
             return SCPE_ARG;     
         } else {
-            isbc064_unit.BASE_ADDR = size * 1024;
-            sim_printf("SBC064: Base=%04XH\n", isbc064_unit.BASE_ADDR);
+            isbc064_unit.u3 = size * 1024;
+            sim_printf("SBC064: Base=%04XH\n", isbc064_unit.u3);
             return SCPE_OK;
         }
     }   
@@ -219,7 +215,7 @@ t_stat isbc064_show_param (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
     fprintf(st, "Device %s, Base address=0%04XH, Size=0%04XH  ", 
         ((isbc064_dev.flags & DEV_DIS) == 0) ? "Enabled" : "Disabled", 
-        isbc064_unit.BASE_ADDR, isbc064_unit.capac);
+        isbc064_unit.u3, isbc064_unit.capac);
     return SCPE_OK;
 }
 
@@ -229,6 +225,7 @@ t_stat isbc064_reset (DEVICE *dptr)
 {
     if (dptr == NULL)
         return SCPE_ARG;
+    isbc064_unit.u3 = 0;                //BASE=0
     return SCPE_OK;
 }
 
@@ -238,15 +235,15 @@ uint8 isbc064_get_mbyte(uint16 addr)
 {
     uint8 val;
 
-    val = *((uint8 *)isbc064_unit.filebuf + (addr - isbc064_unit.BASE_ADDR));
-    return (val & 0xFF);
+    val = *((uint8 *)isbc064_unit.filebuf + (addr - isbc064_unit.u3));
+    return (val & BYTEMASK);
 }
 
 /*  put a byte into memory */
 
 void isbc064_put_mbyte(uint16 addr, uint8 val)
 {
-    *((uint8 *)isbc064_unit.filebuf + (addr - isbc064_unit.BASE_ADDR)) = val & 0xFF;
+    *((uint8 *)isbc064_unit.filebuf + (addr - isbc064_unit.u3)) = val & BYTEMASK;
     return;
 }
 

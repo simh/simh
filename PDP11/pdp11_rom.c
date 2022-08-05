@@ -62,7 +62,7 @@ DEVICE rom_dev = {
     ROM_UNITS, 8, 9, 2, 8, 16,
     rom_ex, rom_dep, rom_reset,
     &rom_boot, &rom_attach, &rom_detach,
-    &rom_dib[0], DEV_DISABLE | DEV_UBUS | DEV_QBUS,
+    &rom_dib[0], DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_NOAUTOCON,
     0, NULL, NULL, NULL,
     &rom_help, &rom_help_attach,          /* help and attach_help routines */
     NULL, &rom_description                     /* description routine */

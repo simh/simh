@@ -685,7 +685,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
         ifeq (/opt/local/bin/port,$(shell which port))
           $(info *** Info *** Install the MacPorts libSDL2 package to provide this)
           $(info *** Info *** functionality for your OS X system:)
-          $(info *** Info ***       # port install libsdl2 libpng zlib)
+          $(info *** Info ***       # port install libsdl2 libpng zlib pcre)
         endif
         ifeq (/usr/local/bin/brew,$(shell which brew))
           ifeq (/opt/local/bin/port,$(shell which port))
@@ -695,7 +695,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
           endif
           $(info *** Info *** Install the HomeBrew libSDL2 package to provide this)
           $(info *** Info *** functionality for your OS X system:)
-          $(info *** Info ***       $$ brew install sdl2 libpng zlib)
+          $(info *** Info ***       $$ brew install sdl2 libpng zlib pcre)
         else
           ifeq (,$(shell which port))
             $(info *** Info *** Install MacPorts or HomeBrew and rerun this make for)
@@ -1399,7 +1399,7 @@ VAX = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c ${VAXD}/vax_io.c \
 	${PDP11D}/pdp11_rl.c ${PDP11D}/pdp11_rq.c ${PDP11D}/pdp11_ts.c \
 	${PDP11D}/pdp11_dz.c ${PDP11D}/pdp11_lp.c ${PDP11D}/pdp11_tq.c \
 	${PDP11D}/pdp11_xq.c ${PDP11D}/pdp11_vh.c ${PDP11D}/pdp11_cr.c \
-	${PDP11D}/pdp11_td.c ${PDP11D}/pdp11_io_lib.c
+	${PDP11D}/pdp11_td.c ${PDP11D}/pdp11_io_lib.c ${PDP11D}/pdp11_dup.c
 VAX_OPT = -DVM_VAX -DUSE_INT64 -DUSE_ADDR64 -DUSE_SIM_VIDEO -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT} ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS}
 
 
@@ -1485,7 +1485,7 @@ VAX630 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
 	${PDP11D}/pdp11_rl.c ${PDP11D}/pdp11_rq.c ${PDP11D}/pdp11_ts.c \
 	${PDP11D}/pdp11_dz.c ${PDP11D}/pdp11_lp.c ${PDP11D}/pdp11_tq.c \
 	${PDP11D}/pdp11_xq.c ${PDP11D}/pdp11_vh.c ${PDP11D}/pdp11_cr.c \
-	${PDP11D}/pdp11_td.c ${PDP11D}/pdp11_io_lib.c
+	${PDP11D}/pdp11_td.c ${PDP11D}/pdp11_io_lib.c ${PDP11D}/pdp11_dup.c
 VAX620_OPT = -DVM_VAX -DVAX_620 -DUSE_INT64 -DUSE_ADDR64 -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
 VAX630_OPT = -DVM_VAX -DVAX_630 -DUSE_INT64 -DUSE_ADDR64 -DUSE_SIM_VIDEO -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT} ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS}
 
@@ -1501,7 +1501,7 @@ VAX730 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
 	${PDP11D}/pdp11_xu.c ${PDP11D}/pdp11_ry.c ${PDP11D}/pdp11_cr.c \
 	${PDP11D}/pdp11_hk.c ${PDP11D}/pdp11_vh.c ${PDP11D}/pdp11_dmc.c \
 	${PDP11D}/pdp11_td.c ${PDP11D}/pdp11_tc.c ${PDP11D}/pdp11_rk.c \
-	${PDP11D}/pdp11_io_lib.c ${PDP11D}/pdp11_ch.c
+	${PDP11D}/pdp11_io_lib.c ${PDP11D}/pdp11_ch.c ${PDP11D}/pdp11_dup.c
 VAX730_OPT = -DVM_VAX -DVAX_730 -DUSE_INT64 -DUSE_ADDR64 -I VAX -I ${PDP11D} ${NETWORK_OPT}
 
 
@@ -1548,7 +1548,7 @@ VAX8200 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
 	${PDP11D}/pdp11_xu.c ${PDP11D}/pdp11_ry.c ${PDP11D}/pdp11_cr.c \
 	${PDP11D}/pdp11_hk.c ${PDP11D}/pdp11_vh.c ${PDP11D}/pdp11_dmc.c \
 	${PDP11D}/pdp11_td.c ${PDP11D}/pdp11_tc.c ${PDP11D}/pdp11_rk.c \
-	${PDP11D}/pdp11_io_lib.c ${PDP11D}/pdp11_ch.c
+	${PDP11D}/pdp11_io_lib.c ${PDP11D}/pdp11_ch.c ${PDP11D}/pdp11_dup.c
 VAX8200_OPT = -DVM_VAX -DVAX_820 -DUSE_INT64 -DUSE_ADDR64 -I VAX -I ${PDP11D} ${NETWORK_OPT}
 
 
@@ -1806,11 +1806,13 @@ SDS_OPT = -I ${SDSD} -DUSE_SIM_CARD
 SWTP6800D = ${SIMHD}/swtp6800/swtp6800
 SWTP6800C = ${SIMHD}/swtp6800/common
 SWTP6800MP-A = ${SWTP6800C}/mp-a.c ${SWTP6800C}/m6800.c ${SWTP6800C}/m6810.c \
-	${SWTP6800C}/bootrom.c ${SWTP6800C}/dc-4.c ${SWTP6800C}/mp-s.c ${SWTP6800D}/mp-a_sys.c \
-	${SWTP6800C}/mp-b2.c ${SWTP6800C}/mp-8m.c
+	${SWTP6800C}/bootrom.c ${SWTP6800C}/dc-4.c ${SWTP6800D}/mp-a_sys.c \
+	${SWTP6800C}/mp-8m.c ${SWTP6800C}/fd400.c ${SWTP6800C}/mp-b2.c \
+	${SWTP6800C}/mp-s.c
 SWTP6800MP-A2 = ${SWTP6800C}/mp-a2.c ${SWTP6800C}/m6800.c ${SWTP6800C}/m6810.c \
-	${SWTP6800C}/bootrom.c ${SWTP6800C}/dc-4.c ${SWTP6800C}/mp-s.c ${SWTP6800D}/mp-a2_sys.c \
-	${SWTP6800C}/mp-b2.c ${SWTP6800C}/mp-8m.c ${SWTP6800C}/i2716.c
+	${SWTP6800C}/bootrom.c ${SWTP6800C}/dc-4.c ${SWTP6800D}/mp-a2_sys.c \
+	${SWTP6800C}/mp-8m.c ${SWTP6800C}/i2716.c ${SWTP6800C}/fd400.c \
+	${SWTP6800C}/mp-s.c ${SWTP6800C}/mp-b2.c
 SWTP6800_OPT = -I ${SWTP6800D}
 
 INTELSYSD = ${SIMHD}/Intel-Systems
@@ -2040,12 +2042,13 @@ KI10_LDFLAGS = -lusb-1.0
 endif
 
 KL10D = ${SIMHD}/PDP10
-KL10 = ${KL10D}/kx10_cpu.c ${KL10D}/kx10_sys.c ${KL10D}/kx10_df.c \
-	${KL10D}/kx10_mt.c ${KL10D}/kx10_dc.c ${KL10D}/kx10_rh.c \
-	${KL10D}/kx10_rp.c ${KL10D}/kx10_tu.c ${KL10D}/kx10_rs.c \
-	${KL10D}/kx10_imp.c ${KL10D}/kl10_fe.c ${KL10D}/ka10_pd.c \
-	${KL10D}/ka10_ch10.c ${KL10D}/kx10_lp.c ${KL10D}/kl10_nia.c \
-	${KL10D}/kx10_disk.c
+KL10 =  ${KL10D}/kx10_cpu.c ${KL10D}/kx10_sys.c ${KL10D}/kx10_df.c \
+    ${KA10D}/kx10_dp.c ${KA10D}/kx10_mt.c ${KA10D}/kx10_lp.c \
+    ${KA10D}/kx10_pt.c ${KA10D}/kx10_dc.c ${KL10D}/kx10_rh.c \
+    ${KA10D}/kx10_dt.c ${KA10D}/kx10_cr.c ${KA10D}/kx10_cp.c \
+    ${KL10D}/kx10_rp.c ${KL10D}/kx10_tu.c ${KL10D}/kx10_rs.c \
+    ${KL10D}/kx10_imp.c ${KL10D}/kl10_fe.c ${KL10D}/ka10_pd.c \
+    ${KL10D}/ka10_ch10.c ${KL10D}/kl10_nia.c ${KL10D}/kx10_disk.c
 KL10_OPT = -DKL=1 -DUSE_INT64 -I $(KL10D) -DUSE_SIM_CARD ${NETWORK_OPT} 
 
 KS10D = ${SIMHD}/PDP10

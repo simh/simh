@@ -68,6 +68,7 @@ extern DEVICE va_dev;
 extern DEVICE vc_dev;
 extern DEVICE lk_dev;
 extern DEVICE vs_dev;
+extern DEVICE dpv_dev;
 
 DEVICE *sim_devices[] = { 
     &cpu_dev,
@@ -100,6 +101,9 @@ DEVICE *sim_devices[] = {
     &tq_dev,
     &xq_dev,
     &xqb_dev,
+#if !defined(VAX_620)
+    &dpv_dev,
+#endif
     NULL
     };
 

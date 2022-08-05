@@ -284,7 +284,7 @@ MTAB isbc202_mod[] = {
     { MTAB_XTD | MTAB_VDV, 0, NULL, "INT", &isbc202_set_int,
         NULL, NULL, "Sets the interrupt number for iSBC202"},
     { MTAB_XTD | MTAB_VDV, 0, "PARAM", NULL, NULL, &isbc202_show_param, NULL, 
-        "show configured parametes for iSBC202" },
+        "show configured parameters for iSBC202" },
     { 0 }
 };
 
@@ -294,8 +294,6 @@ DEBTAB isbc202_debug[] = {
     { "READ", DEBUG_read },
     { "WRITE", DEBUG_write },
     { "XACK", DEBUG_xack },
-    { "LEV1", DEBUG_level1 },
-    { "LEV2", DEBUG_level2 },
     { NULL }
 };
 
@@ -343,14 +341,14 @@ t_stat isbc202_cfg(uint16 baseport, uint16 devnum, uint8 intnum)
         uptr->u6 = i;                   //fdd unit number
         uptr->flags &= ~UNIT_ATT;
     }
-    fdc202.baseport = baseport & 0xff;  //set port
+    fdc202.baseport = baseport & BYTEMASK;  //set port
     fdc202.intnum = intnum;             //set interrupt
     fdc202.verb = 0;                    //clear verb
     reg_dev(isbc202r0, fdc202.baseport, 0, 0); //read status
     reg_dev(isbc202r1, fdc202.baseport + 1, 0, 0); //read rslt type/write IOPB addr-l
     reg_dev(isbc202r2, fdc202.baseport + 2, 0, 0); //write IOPB addr-h and start 
     reg_dev(isbc202r3, fdc202.baseport + 3, 0, 0); //read rstl byte 
-    reg_dev(isbc202r7, fdc202.baseport + 7, 0, 0); //write reset fdc201
+    reg_dev(isbc202r7, fdc202.baseport + 7, 0, 0); //write reset fdc202
     isbc202_reset_dev();                //software reset
 //    if (fdc202.verb)
         sim_printf("    sbc202: Enabled base port at 0%02XH, Interrupt #=%02X, %s\n",
@@ -366,7 +364,7 @@ t_stat isbc202_clr(void)
     unreg_dev(fdc202.baseport + 1);     //read rslt type/write IOPB addr-l
     unreg_dev(fdc202.baseport + 2);     //write IOPB addr-h and start 
     unreg_dev(fdc202.baseport + 3);     //read rstl byte 
-    unreg_dev(fdc202.baseport + 7);     //write reset fdc201
+    unreg_dev(fdc202.baseport + 7);     //write reset fdc202
 //    if (fdc202.verb)
         sim_printf("    sbc202: Disabled\n");
     return SCPE_OK;
@@ -374,7 +372,7 @@ t_stat isbc202_clr(void)
 
 /* isbc202 set mode = Write protect */
 
-t_stat isbc202_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+t_stat isbc202_set_mode(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
     if (uptr == NULL)
         return SCPE_ARG;
@@ -384,11 +382,11 @@ t_stat isbc202_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
     if (val & UNIT_WPMODE) {            /* write protect */
         uptr->flags |= val;
 //        if (fdc202.verb)
-            sim_printf("    SBC202: WP\n");
+            sim_printf("    SBC202%d: WP\n", uptr->u6);
     } else {                            /* read write */
         uptr->flags &= ~val;
 //        if (fdc202.verb)
-            sim_printf("    SBC202: RW\n");
+            sim_printf("    SBC202%d: RW\n", uptr->u6);
     }
     return SCPE_OK;
 }
@@ -409,7 +407,7 @@ t_stat isbc202_set_port(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
     reg_dev(isbc202r1, fdc202.baseport + 1, 0, 0); //read rslt type/write IOPB addr-l
     reg_dev(isbc202r2, fdc202.baseport + 2, 0, 0); //write IOPB addr-h and start 
     reg_dev(isbc202r3, fdc202.baseport + 3, 0, 0); //read rstl byte 
-    reg_dev(isbc202r7, fdc202.baseport + 7, 0, 0); //write reset fdc201
+    reg_dev(isbc202r7, fdc202.baseport + 7, 0, 0); //write reset fdc202
     return SCPE_OK;
 }
 
@@ -549,7 +547,7 @@ t_stat isbc202_attach (UNIT *uptr, CONST char *cptr)
 uint8 isbc202r0(t_bool io, uint8 data, uint8 devnum)
 {
     if (io == 0) {                      /* read ststus*/
-        return fdc202.stat;
+         return fdc202.stat;
     }
     return 0;
 }
@@ -631,14 +629,17 @@ void isbc202_diskio(void)
     fddnum = (di & 0x30) >> 4;
     uptr = isbc202_dev.units + fddnum;
     fbuf = (uint8 *) uptr->filebuf;
-    //check for not ready
-    switch(fddnum) {
+    if (fdc202.verb)
+        sim_printf("\n   SBC202: FDD %d - nr=%02XH ta=%02XH sa=%02XH IOPB=%04XH PCX=%04XH",
+            fddnum, nr, ta, sa, fdc202.iopb, PCX);
+    switch(fddnum) {                    //check ready status
         case 0:
             if ((fdc202.stat & RDY0) == 0) {
                 fdc202.rtype = ROK;
                 fdc202.rbyte0 = RB0NR;
                 fdc202.intff = 1;       //set interrupt FF
                 sim_printf("\n   SBC202: FDD %d - Ready error", fddnum);
+                return;
             }
             break;
         case 1:

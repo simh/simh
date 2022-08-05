@@ -67,6 +67,14 @@ the RTC in real, wall clock, time, and the delay you see here is comparable to
 the delay you'd see on real IMP hardware.  IT HAS NOTHING TO DO WITH THE SPEED
 OF THE PC RUNNING THE SIMULATION!
 
+  You may also see the message
+
+    	   HI1 - UNRECOVERABLE I/O ERROR!
+
+on any or all of the IMPs.  This occurs because no host mainframe is connected
+to the IMP.  This is harmless, at least for the purposes of this demonstration,
+and may be ignored.
+
 
 NOW WHAT ?
 ----------
@@ -125,5 +133,5 @@ There is an entire section devoted to ARPAnet and IMP related content.
 
 Bob Armstrong
 bob@jfcl.com
-30-Nov-2013
+30-Nov-2013 / updated 20-Mar-2022
 

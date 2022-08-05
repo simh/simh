@@ -587,7 +587,7 @@ REG cpu_reg[] = {
 
 MTAB cpu_mod[] = {
     { MTAB_XTD|MTAB_VDV, 0, "TYPE", NULL,
-      NULL, &cpu_show_model },
+      NULL, &cpu_show_model, NULL, "Display current model features" },
 #if !defined (UC15)
     { MTAB_XTD|MTAB_VDV, MOD_1103, NULL, "11/03", &cpu_set_model, NULL, NULL, "Set CPU type to 11/03" },
     { MTAB_XTD|MTAB_VDV, MOD_1104, NULL, "11/04", &cpu_set_model, NULL, NULL, "Set CPU type to 11/04" },
@@ -3675,7 +3675,7 @@ for (i = 0; i < MOD_MAX; i++) {
 
     fprintf (st, "    %-6s  %s   %-7s %-3s   %-3s    %-3s   %-3s   %-3s   %-3s   %-3s\n", 
                      cpu->name, 
-                     (cpu->std & BUS_Q) ? "Q" : "U",
+                     (cpu->std & BUS_U) ? "U" : "Q",
                      (cpu->maxm == MEMSIZE64K) ? "64K" : ((cpu->maxm == MAXMEMSIZE) ? "4M" : ((cpu->maxm == UNIMEMSIZE) ? "256K" : "UNK")),
                      _OPT(OPT_MMU), _OPT(OPT_UBM), _OPT(OPT_EIS), _OPT(OPT_FIS),
                      _OPT(OPT_FPP), _OPT(OPT_CIS), _OPT(OPT_BVT));
@@ -3754,7 +3754,7 @@ fprintf (st, "theoretically possible devices to be configured simultaneously at\
 fprintf (st, "fixed addresses.  Instead, many devices have floating addresses and\n");
 fprintf (st, "vectors; that is, the assigned device address and vector depend on the\n");
 fprintf (st, "presence of other devices in the configuration:\n\n");
-fprintf (st, "       DZ11           all instances have floating addresses\n");
+fprintf (st, "       DZ11/DZV11     all instances have floating addresses\n");
 fprintf (st, "       DHU11/DHQ11    all instances have floating addresses\n");
 fprintf (st, "       RL11           first instance has fixed address, rest floating\n");
 fprintf (st, "       RX11/RX211     first instance has fixed address, rest floating\n");
@@ -3777,17 +3777,16 @@ fprintf (st, "use the same I/O addresses.\n\n");
 fprintf (st, "In addition to autoconfiguration, most devices support the SET <device>\n");
 fprintf (st, "ADDRESS command, which allows the I/O page address of the device to be\n");
 fprintf (st, "changed, and the SET <device> VECTOR command, which allows the vector of\n");
-fprintf (st, "the device to be changed.  Explicitly setting the I/O address of any device\n");
-fprintf (st, "DISABLES autoconfiguration for that device and for the entire system.  As\n");
-fprintf (st, "a consequence, the user may have to manually configure all other\n");
-fprintf (st, "autoconfigured devices, because the autoconfiguration algorithm no longer\n");
-fprintf (st, "recognizes the explicitly configured device.  A device can be reset to\n");
-fprintf (st, "autoconfigure with the SET <device> AUTOCONFIGURE command.\n");
-fprintf (st, "autoconfiguration can be restored for the entire system with the SET\n");
-fprintf (st, "CPU AUTOCONFIGURE command.\n\n");
+fprintf (st, "the device to be changed.  Explicitly setting the I/O address or vector of\n");
+fprintf (st, "any device DISABLES autoconfiguration for the entire system.  As\n");
+fprintf (st, "a consequence, when autoconfiguration is disabled, the user may have to\n");
+fprintf (st, "manually configure all remaining devices in the system that are explicitly\n");
+fprintf (st, "enabled after autoconfiguration has been disabled.  Autoconfiguration can\n");
+fprintf (st, "be restored for the entire system with the SET CPU AUTOCONFIGURE command.\n\n");
 fprintf (st, "The current I/O map can be displayed with the SHOW CPU IOSPACE command.\n");
 fprintf (st, "Addresses that have set by autoconfiguration are marked with an asterisk (*).\n");
 fprintf (st, "All devices support the SHOW <device> ADDRESS and SHOW <device> VECTOR\n");
-fprintf (st, "commands, which display the device address and vector, respectively.\n\n");
+fprintf (st, "commands, which display the device address and vector, respectively.\n");
+fprint_brk_help (st, dptr);
 return SCPE_OK;
 }

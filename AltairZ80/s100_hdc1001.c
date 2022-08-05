@@ -428,7 +428,12 @@ static uint8 HDC1001_Write(const uint32 Addr, uint8 cData)
         sim_debug(VERBOSE_MSG, &hdc1001_dev,DEV_NAME ": " ADDRESS_FORMAT
             " WR TF[DATA 0x%03x]=0x%02x\n", PCX, hdc1001_info->secbuf_index, cData);
         hdc1001_info->secbuf_index++;
-        if (hdc1001_info->secbuf_index == (pDrive->xfr_nsects * pDrive->sectsize)) HDC1001_doCommand();
+        if (hdc1001_info->secbuf_index == (pDrive->xfr_nsects * pDrive->sectsize)) {
+            if (SCPE_OK != HDC1001_doCommand()) {
+                sim_debug(ERROR_MSG, &hdc1001_dev,DEV_NAME ": " ADDRESS_FORMAT
+                    " HDC1001_doCommand() failed.\n", PCX);
+            }
+        }
         break;
         case TF_SDH:
             hdc1001_info->sel_drive = (cData >> 3) & 0x03;
@@ -489,7 +494,10 @@ static uint8 HDC1001_Write(const uint32 Addr, uint8 cData)
 
             /* Everything except Write commands are executed immediately. */
             if (cmd != HDC1001_CMD_WRITE_SECT) {
-                HDC1001_doCommand();
+                if (SCPE_OK != HDC1001_doCommand()) {
+                    sim_debug(ERROR_MSG, &hdc1001_dev,DEV_NAME ": " ADDRESS_FORMAT
+                        " HDC1001_doCommand() failed.\n", PCX);
+                }
             }
             else {
                 /* Writes will be executed once the proper number of bytes
@@ -584,6 +592,7 @@ static t_stat HDC1001_doCommand(void)
 {
     HDC1001_DRIVE_INFO* pDrive;
     uint8 cmd;
+    t_stat r = SCPE_OK;
 
     cmd = hdc1001_info->taskfile[TF_CMD] & 0x70;
 
@@ -648,7 +657,8 @@ static t_stat HDC1001_doCommand(void)
 
                 xfr_len = pDrive->xfr_nsects * pDrive->sectsize;
 
-                sim_fseek((pDrive->uptr)->fileref, file_offset, SEEK_SET);
+                if(0 != (r = sim_fseek((pDrive->uptr)->fileref, file_offset, SEEK_SET)))
+                    break;
 
                 if(cmd == HDC1001_CMD_READ_SECT) { /* Read */
                     if (rwopts & HDC1001_RWOPT_DMA) {
@@ -661,7 +671,9 @@ static t_stat HDC1001_doCommand(void)
                         (cmd == HDC1001_CMD_READ_SECT) ? "READ" : "WRITE",
                         pDrive->cur_cyl, pDrive->cur_head,
                         pDrive->cur_sect, pDrive->xfr_nsects, file_offset, xfr_len);
-                    sim_fread(hdc1001_info->sectbuf, 1, xfr_len, (pDrive->uptr)->fileref);
+                    if (sim_fread(hdc1001_info->sectbuf, 1, xfr_len, (pDrive->uptr)->fileref) != xfr_len) {
+                        r = SCPE_IOERR;
+                    }
                 } else { /* Write */
                     sim_debug(WR_DATA_MSG, &hdc1001_dev, DEV_NAME "%d: " ADDRESS_FORMAT
                         " %s SECTOR  C:%04d/H:%d/S:%04d/#:%d, offset=%5x, len=%d\n",
@@ -669,7 +681,9 @@ static t_stat HDC1001_doCommand(void)
                         (cmd == HDC1001_CMD_READ_SECT) ? "READ" : "WRITE",
                         pDrive->cur_cyl, pDrive->cur_head,
                         pDrive->cur_sect, pDrive->xfr_nsects, file_offset, xfr_len);
-                    sim_fwrite(hdc1001_info->sectbuf, 1, xfr_len, (pDrive->uptr)->fileref);
+                    if (sim_fwrite(hdc1001_info->sectbuf, 1, xfr_len, (pDrive->uptr)->fileref) != xfr_len) {
+                        r = SCPE_IOERR;
+                    }
                 }
                 hdc1001_info->status_reg |= HDC1001_STATUS_DRQ;
                 break;
@@ -711,9 +725,11 @@ static t_stat HDC1001_doCommand(void)
                     memset(fmtBuffer, HDC1001_FORMAT_FILL_BYTE, data_len);
                 }
 
-                sim_fseek((pDrive->uptr)->fileref, file_offset, SEEK_SET);
-                sim_fwrite(fmtBuffer, 1, data_len, (pDrive->uptr)->fileref);
-
+                if (0 != (r = sim_fseek((pDrive->uptr)->fileref, file_offset, SEEK_SET))) {
+                    if (sim_fwrite(fmtBuffer, 1, data_len, (pDrive->uptr)->fileref) != data_len) {
+                        r = SCPE_IOERR;
+                    }
+                }
                 free(fmtBuffer);
                 hdc1001_info->status_reg |= HDC1001_STATUS_DRQ;
 
@@ -727,5 +743,5 @@ static t_stat HDC1001_doCommand(void)
         }
     }
 
-    return SCPE_OK;
+    return r;
 }

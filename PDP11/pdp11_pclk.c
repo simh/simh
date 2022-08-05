@@ -218,13 +218,13 @@ REG pclk_reg[] = {
     };
 
 MTAB pclk_mod[] = {
-    { UNIT_LINE50HZ, UNIT_LINE50HZ, "50 Hz Line Frequency", "50HZ", &pclk_set_line },
-    { UNIT_LINE50HZ,             0, "60 Hz Line Frequency", "60HZ", &pclk_set_line },
-    { MTAB_XTD|MTAB_VDV,         0, "FREQUENCY",            NULL,   NULL, &pclk_show_freq, NULL },
+    { UNIT_LINE50HZ, UNIT_LINE50HZ, "50 Hz Line Frequency", "50HZ", &pclk_set_line, NULL, NULL, "50 ticks per second" },
+    { UNIT_LINE50HZ,             0, "60 Hz Line Frequency", "60HZ", &pclk_set_line, NULL, NULL, "60 ticks per second" },
+    { MTAB_XTD|MTAB_VDV,         0, "FREQUENCY",            NULL,   NULL, &pclk_show_freq, NULL, "Clock tick frequency" },
     { MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
-      NULL, &show_addr, NULL },
+      NULL, &show_addr, NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", "VECTOR",
-      &set_vec, &show_vec, NULL },
+      &set_vec, &show_vec, NULL, "Interrupt vector" },
     { 0 }
     };
 

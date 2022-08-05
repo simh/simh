@@ -25,8 +25,6 @@
 
     MODIFICATIONS:
 
-        24 Apr 15 -- Modified to use simh_debug
-
     NOTES:
 
         These functions support 6 simulated MP-8M memory cards on an SS-50 system.
@@ -40,7 +38,7 @@
 #include <stdio.h>
 #include "swtp_defs.h"
 
-#define MP_8M_NUM       6               /* number of MP-*m boards */
+#define MP_8M_NUM 6                     /* number of MP-8M boards */
 
 /* prototypes */
 
@@ -66,12 +64,10 @@ MTAB mp_8m_mod[] = {
 };
 
 DEBTAB mp_8m_debug[] = {
-    { "ALL", DEBUG_all },
-    { "FLOW", DEBUG_flow },
-    { "READ", DEBUG_read },
-    { "WRITE", DEBUG_write },
-    { "LEV1", DEBUG_level1 },
-    { "LEV2", DEBUG_level2 },
+    { "ALL", DEBUG_all, "All debug bits" },
+    { "FLOW", DEBUG_flow, "Flow control" },
+    { "READ", DEBUG_read, "Read Command" },
+    { "WRITE", DEBUG_write, "Write Command"},
     { NULL }
 };
 
@@ -104,34 +100,24 @@ DEVICE mp_8m_dev = {
 
 t_stat mp_8m_reset (DEVICE *dptr)
 {
-    int32 i, j, val;
+    int32 i;
     UNIT *uptr;
 
-    sim_debug (DEBUG_flow, &mp_8m_dev, "mp_8m_reset: \n");
     for (i = 0; i < MP_8M_NUM; i++) {   /* init all units */
         uptr = mp_8m_dev.units + i;
-        sim_debug (DEBUG_flow, &mp_8m_dev, "MP-8M %d unit.flags=%08X\n",
-            i, uptr->flags);
         uptr->capac = 0x2000;
         if (i < 4)
             uptr->u3 = 0x2000 * i;
         else
             uptr->u3 = 0x2000 * (i + 1);
         if (uptr->filebuf == NULL) {
-            uptr->filebuf = malloc(0x2000);
+            uptr->filebuf = calloc(0x2000, sizeof(uint8));
             if (uptr->filebuf == NULL) {
-                printf("mp_8m_reset: Malloc error\n");
+                printf("mp_8m_reset: Calloc error\n");
                 return SCPE_MEM;
             }
-            for (j=0; j<8192; j++) {    /* fill pattern for testing */
-                val = (0xA0 |  i);
-                *((uint8 *)(uptr->filebuf) + j) = val & 0xFF;
-            }
         }
-        sim_debug (DEBUG_flow, &mp_8m_dev, "MP-8M %d initialized at [%04X-%04XH]\n",
-            i, uptr->u3, uptr->u3 + uptr->capac - 1);
     }
-    sim_debug (DEBUG_flow, &mp_8m_dev, "mp_8m_reset: Done\n");
     return SCPE_OK;
 }
 
@@ -147,19 +133,16 @@ int32 mp_8m_get_mbyte(int32 addr)
     int32 i;
     UNIT *uptr;
 
-    sim_debug (DEBUG_read, &mp_8m_dev, "mp_8m_get_mbyte: addr=%04X", addr);
     for (i = 0; i < MP_8M_NUM; i++) { /* find addressed unit */
         uptr = mp_8m_dev.units + i;
         org = uptr->u3;
         len = uptr->capac - 1;
         if ((addr >= org) && (addr <= org + len)) {
             val = *((uint8 *)(uptr->filebuf) + (addr - org));
-            sim_debug (DEBUG_read, &mp_8m_dev, " val=%04X\n", val);
-            return (val & 0xFF);
+            return (val & BYTEMASK);
         }
     }
-    sim_debug (DEBUG_read, &mp_8m_dev, "mp_8m_get_mbyte: Out of range\n");
-    return 0xFF;        /* multibus has active high pullups */
+    return 0xFF;
 }
 
 /*  get a word from memory */
@@ -181,19 +164,15 @@ void mp_8m_put_mbyte(int32 addr, int32 val)
     int32 i;
     UNIT *uptr;
 
-    sim_debug (DEBUG_write, &mp_8m_dev, "mp_8m_put_mbyte: addr=%04X, val=%02X",
-        addr, val);
     for (i = 0; i < MP_8M_NUM; i++) { /* find addressed unit */
         uptr = mp_8m_dev.units + i;
         org = uptr->u3;
         len = uptr->capac - 1;
         if ((addr >= org) && (addr <= org + len)) {
-            *((uint8 *)(uptr->filebuf) + (addr - org)) = val & 0xFF;
-            sim_debug (DEBUG_write, &mp_8m_dev, "\n");
+            *((uint8 *)(uptr->filebuf) + (addr - org)) = val & BYTEMASK;
             return;
         }
     }
-    sim_debug (DEBUG_write, &mp_8m_dev, "mp_8m_put_mbyte: Out of range\n");
 }
 
 /*  put a word into memory */

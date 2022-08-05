@@ -81,7 +81,7 @@ REG sio_reg[] = {
     { HRDATA(IBUF, u58.ibuf, 8) },
     { HRDATA(OBUF, u58.obuf, 8) },
     { HRDATA(STATUS, u58.status, 8) },
-    { HRDATA(STATUS, u58.bitmask, 8), REG_HRO },
+    { HRDATA(BITMASK, u58.bitmask, 8), REG_HRO },
     { 0 }
 };
 

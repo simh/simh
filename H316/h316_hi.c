@@ -243,7 +243,8 @@ void hi_get_dmc (uint16 dmc, uint16 *pnext, uint16 *plast, uint16 *pcount)
 {
   uint16 dmcad;
   if ((dmc<DMC1) || (dmc>(DMC1+DMC_MAX-1))) {
-    *pnext = *plast = *pcount = 0;  return;
+    *pnext = *plast = *pcount = 0;
+    return;
   }
   dmcad = DMC_BASE + (dmc-DMC1)*2;
   *pnext = M[dmcad] & X_AMASK;  *plast = M[dmcad+1] & X_AMASK;
@@ -395,7 +396,7 @@ void hi_poll_rx (uint16 line)
   // a packet is waiting AND a receive is pending then we'll store it and finish
   // the receive operation.  If a packet is waiting but no receive is pending
   // then the packet is discarded...
-  uint16 next, last, maxbuf;  uint16 *pdata;  int16 count;
+  uint16 next, last, maxbuf;  uint16 *pdata;  int16 count=0;
   uint16 i;
 
   // If the modem isn't attached, then the read never completes!
@@ -514,16 +515,17 @@ int32 hi_io (uint16 host, int32 inst, int32 fnc, int32 dat, int32 dev)
       case 000:
         // HnROUT - start regular host output ...
         hi_debug_hio(host, PDIB(host)->txdmc, "output");
-        hi_start_tx(host, 0);  return dat;
+        hi_start_tx(host, 0);
+        return dat;
       case 001:
         // HnIN - start host input ...
         hi_debug_hio(host, PDIB(host)->rxdmc, "input");
-        hi_start_rx(host);  return dat;
+        hi_start_rx(host);
         return dat;
       case 002:
         // HnFOUT - start final host output ...
         sim_debug(IMP_DBG_IOT, PDEVICE(host), "start final output (PC=%06o)\n", PC-1);
-        hi_start_tx(host, PFLG_FINAL);  return dat;
+        hi_start_tx(host, PFLG_FINAL);
         return dat;
       case 003:
         // HnXP - cross patch ...
@@ -566,7 +568,6 @@ int32 hi_io (uint16 host, int32 inst, int32 fnc, int32 dat, int32 dev)
         // HnEOM - skip on end of message ...
         sim_debug(IMP_DBG_IOT, PDEVICE(host), "skip on end of message (PC=%06o %s)\n", PC-1, PHIDB(host)->eom ? "SKIP" : "NOSKIP");
         return  PHIDB(host)->eom ? IOSKIP(dat) : dat;
-        return dat;
       case 005:
         // HnFULL - skip on host buffer full ...
         sim_printf("HnFULL unimp.\n");

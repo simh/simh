@@ -74,8 +74,7 @@ DEBTAB port_debug[] = {
     { "FLOW", DEBUG_flow },
     { "READ", DEBUG_read },
     { "WRITE", DEBUG_write },
-    { "LEV1", DEBUG_level1 },
-    { "LEV2", DEBUG_level2 },
+    { "XACK", DEBUG_xack },
     { NULL }
 };
 
@@ -115,7 +114,7 @@ DEVICE port_dev = {
 t_stat port_reset(DEVICE *dptr)
 {
 //    if (SBC_reset(NULL) == 0) { 
-        sim_printf("  Port: Reset\n");
+//        sim_printf("  Port: Reset\n");
         sim_activate (&port_unit, port_unit.wait); /* activate unit */
         return SCPE_OK;
 //    } else {

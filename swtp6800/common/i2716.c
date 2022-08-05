@@ -25,8 +25,6 @@
 
     MODIFICATIONS:
 
-        24 Apr 15 -- Modified to use simh_debug
-
     NOTES:
 
         These functions support a simulated 2704 to 2764 EPROMs device on an 8-bit 
@@ -71,12 +69,10 @@ MTAB i2716_mod[] = {
 };
 
 DEBTAB i2716_debug[] = {
-    { "ALL", DEBUG_all },
-    { "FLOW", DEBUG_flow },
-    { "READ", DEBUG_read },
-    { "WRITE", DEBUG_write },
-    { "LEV1", DEBUG_level1 },
-    { "LEV2", DEBUG_level2 },
+    { "ALL", DEBUG_all, "All debug bits" },
+    { "FLOW", DEBUG_flow, "Flow control" },
+    { "READ", DEBUG_read, "Read Command" },
+    { "WRITE", DEBUG_write, "Write Command"},
     { NULL }
 };
 
@@ -116,19 +112,15 @@ t_stat i2716_attach (UNIT *uptr, CONST char *cptr)
     t_stat r;
     FILE *fp;
 
-    sim_debug (DEBUG_flow, &i2716_dev, "i2716_attach: cptr=%s\n", cptr);
     if ((r = attach_unit (uptr, cptr)) != SCPE_OK) {
-        sim_debug (DEBUG_flow, &i2716_dev, "i2716_attach: Error\n");
         return r;
     }
-    sim_debug (DEBUG_read, &i2716_dev, "\tOpen file\n");
     fp = fopen(uptr->filename, "rb");   /* open EPROM file */
     if (fp == NULL) {
         printf("i2716%d: Unable to open ROM file %s\n", (int)(uptr - i2716_dev.units), uptr->filename);
         printf("\tNo ROM image loaded!!!\n");
         return SCPE_OK;
     }
-    sim_debug (DEBUG_read, &i2716_dev, "\tRead file\n");
     j = 0;                              /* load EPROM file */
     c = fgetc(fp);
     while (c != EOF) {
@@ -139,10 +131,7 @@ t_stat i2716_attach (UNIT *uptr, CONST char *cptr)
             break;
         }
     }
-    sim_debug (DEBUG_read, &i2716_dev, "\tClose file\n");
     fclose(fp);
-//    printf("i2716%d: %d bytes of ROM image %s loaded\n",uptr - i2716_dev.units, j, uptr->filename);
-    sim_debug (DEBUG_flow, &i2716_dev, "i2716_attach: Done\n");
     return SCPE_OK;
 }
 
@@ -153,32 +142,21 @@ t_stat i2716_reset (DEVICE *dptr)
     int32 i, base;
     UNIT *uptr;
 
-    sim_debug (DEBUG_flow, &i2716_dev, "i2716_reset: \n");
     for (i = 0; i < I2716_NUM; i++) {   /* init all units */
         uptr = i2716_dev.units + i;
-        sim_debug (DEBUG_flow, &i2716_dev, "i2716 %d unit.flags=%08X\n",
-            i, uptr->flags);
         uptr->capac = 2048;
         uptr->u3 = 2048 * i;
         base = get_base();
         if (uptr->filebuf == NULL) {    /* no buffer allocated */
-            uptr->filebuf = malloc(2048); /* allocate EPROM buffer */
+            uptr->filebuf = calloc(2048, sizeof(uint8)); /* allocate EPROM buffer */
             if (uptr->filebuf == NULL) {
-                sim_debug (DEBUG_flow, &i2716_dev, "i2716_reset: Malloc error\n");
                 return SCPE_MEM;
             }
         }
         if (base == 0) {
-//            printf("i2716%d: Not enabled on MP-A2\n", i);
             continue;
         }
-//        printf("i2716%d: Initializing [%04X-%04XH]\n", 
-//            i, base+uptr->u3, base+uptr->u3 + uptr->capac);
-//        if ((uptr->flags & UNIT_ATT) == 0) {
-//            printf("i2716%d: No file attached\n", i);
-//        }
     }
-    sim_debug (DEBUG_flow, &i2716_dev, "i2716_reset: Done\n");
     return SCPE_OK;
 }
 
@@ -199,16 +177,13 @@ int32 i2716_get_mbyte(int32 offset)
         len = uptr->capac - 1;
         if ((offset >= org) && (offset < (org + len))) {
             if (uptr->filebuf == NULL) {
-                sim_debug (DEBUG_read, &i2716_dev, "i2716_get_mbyte: EPROM not configured\n");
                 return 0xFF;
             } else {
                 val = *((uint8 *)(uptr->filebuf) + (offset - org));
-                sim_debug (DEBUG_read, &i2716_dev, " val=%04X\n", val);
                 return (val & 0xFF);
             }
         }
     }
-    sim_debug (DEBUG_read, &i2716_dev, "i2716_get_mbyte: Out of range\n");
     return 0xFF;
 }
 

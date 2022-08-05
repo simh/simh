@@ -111,6 +111,19 @@
 105. RAD: write check was reading words off disk instead of bytes.
 106. RAD: end of transfer routine checking for address error incorrectly.
 107. DK: end of transfer routine checking for address error incorrectly.
+108. DP: TIO status routine always returns DVS_AUTO instead of proper status.
+109. DP: DP_SEEK definition is off by 1.
+110. DP: reset does not properly initialize controller, seek threads.
+111. DP: device address must include unit identifier everywhere, for interrupt generation.
+112. DK: device address must include unit identifier everywhere, for interrupt generation.
+113. MT: device address must include unit identifier everywhere, for interrupt generation.
+114: RAD: device address must include unit identifier everywhere, for interrupt generation.
+115. MT: error handling not consistent.
+116: IO: dangling else in write direct mode 1 code causes incorrect behavior.
+117: CPU: sim_interval is decremented before breakpoint test, which is incorrect.
+118. MT: revised error handling failed to set tape mark status on space file forward/reverse.
+119. IO: UEND flag in the wrong bit position in status word.
+120. DP: SEEK(I), RECAL(I) must be coded as fast operations.
 
 
 Diagnostic Notes

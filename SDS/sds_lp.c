@@ -1,6 +1,6 @@
 /* sds_lp.c: SDS 940 line printer simulator
 
-   Copyright (c) 2001-2008, Robert M. Supnik
+   Copyright (c) 2001-2021, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt          line printer
 
+   10-Jun-21    RMS     Removed use of ftell for pipe compatibility
    24-Nov-08    RMS     Fixed loss of carriage control position on space op
    19-Jan-07    RMS     Added UNIT_TEXT flag
    25-Apr-03    RMS     Revised for extended file support
@@ -61,13 +62,13 @@ DSPT lpt_tplt[] = {                                     /* template */
 t_stat lpt_svc (UNIT *uptr);
 t_stat lpt_reset (DEVICE *dptr);
 t_stat lpt_attach (UNIT *uptr, CONST char *cptr);
-t_stat lpt_crctl (UNIT *uptr, int32 ch);
-t_stat lpt_space (UNIT *uptr, int32 cnt);
-t_stat lpt_status (UNIT *uptr);
+int32 lpt_crctl (UNIT *uptr, int32 ch);
+int32 lpt_space (UNIT *uptr, int32 cnt);
+t_stat lpt_status (UNIT *uptr, int32 cnt);
 t_stat lpt_bufout (UNIT *uptr);
 void lpt_end_op (int32 fl);
 t_stat lpt (uint32 fnc, uint32 inst, uint32 *dat);
-int8 sds_to_ascii(int8 c);
+int8 sds_to_ascii (int8 c);
 
 /* LPT data structures
 
@@ -181,7 +182,7 @@ switch (fnc) {                                          /* case function */
         break;
 
     case IO_WRITE:                                      /* write */
-        asc = sds_to_ascii(*dat);                       /* convert data */
+        asc = sds_to_ascii (*dat);                      /* convert data */
         xfr_req = xfr_req & ~XFR_LPT;                   /* clr xfr flag */
         if (lpt_bptr < LPT_WIDTH)                       /* store data */
             lpt_buf[lpt_bptr++] = asc;
@@ -201,6 +202,7 @@ return SCPE_OK;
 t_stat lpt_svc (UNIT *uptr)
 {
 t_stat r = SCPE_OK;
+int32 cc = 0;
 
 if (lpt_sta & SET_XFR)                                  /* need lpt xfr? */
     chan_set_ordy (lpt_dib.chan);
@@ -212,10 +214,14 @@ if (lpt_sta & SET_SPC) {                                /* spacing? */
     if (uptr->flags & UNIT_ATT) {                       /* attached? */
         int32 ln = LPT_GETLN (lpt_spc);                 /* get lines, ch */
         if (lpt_spc & 0200)                             /* n lines? */
-            lpt_space (uptr, ln);                       /* upspace */
-        else lpt_crctl (uptr, ln);                      /* carriage ctl */
+            cc = lpt_space (uptr, ln);                  /* upspace */
+        else {
+            cc = lpt_crctl (uptr, ln);                  /* carriage ctl */
+            if (cc < 0)                                 /* tape error? */
+                return STOP_CCT;
+            }
         }
-    r = lpt_status (uptr);                              /* update status */
+    r = lpt_status (uptr, cc);                          /* update status */
     }
 lpt_sta = 0;                                            /* clear state */
 return r;
@@ -226,28 +232,30 @@ return r;
 t_stat lpt_bufout (UNIT *uptr)
 {
 int32 i;
+int32 cc = 0;
 
 if ((uptr->flags & UNIT_ATT) && lpt_bptr) {             /* attached? */
     for (i = LPT_WIDTH - 1; (i >= 0) && (lpt_buf[i] == ' '); i--)
         lpt_buf[i] = 0;                                 /* trim line */
     fputs (lpt_buf, uptr->fileref);                     /* write line */
+    cc = strlen (lpt_buf);
     lpt_bptr = 0;
     }
-return lpt_status (uptr);                               /* return status */
+return lpt_status (uptr, cc);                           /* return status */
 }
 
 /* Status update after I/O */
 
-t_stat lpt_status (UNIT *uptr)
+t_stat lpt_status (UNIT *uptr, int32 cnt)
 {
 if (uptr->flags & UNIT_ATT) {                           /* attached? */
-    uptr->pos = ftell (uptr->fileref);                  /* update position */
     if (ferror (uptr->fileref)) {                       /* I/O error? */
         lpt_end_op (CHF_EOR | CHF_ERR);                 /* set err, disc */
         sim_perror ("LPT I/O error");                       /* print msg */
         clearerr (uptr->fileref);
         return SCPE_IOERR;                              /* ret error */
         }
+    uptr->pos = uptr->pos + (t_addr)cnt;                /* udpate position */
     }
 else {
     lpt_end_op (CHF_EOR | CHF_ERR);                     /* set err, disc */
@@ -273,40 +281,40 @@ return;
 
 /* Carriage control */
 
-t_stat lpt_crctl (UNIT *uptr, int32 ch)
+int32 lpt_crctl (UNIT *uptr, int32 ch)
 {
 int32 i, j;
 
 if ((ch == 1) && CHP (ch, lpt_cct[0])) {                /* top of form? */
     fputs ("\f\n", uptr->fileref);                      /* ff + nl */
     lpt_ccp = 0;                                        /* top of page */
-    return SCPE_OK;
+    return 2;
     }
 for (i = 1; i < lpt_ccl + 1; i++) {                     /* sweep thru cct */
     lpt_ccp = (lpt_ccp + 1) % lpt_ccl;                  /* adv pointer */
     if (CHP (ch, lpt_cct[lpt_ccp])) {                   /* chan punched? */
         for (j = 0; j < i; j++)
             fputc ('\n', uptr->fileref);
-        return SCPE_OK;
+        return i;
         }
     }
-return STOP_CCT;                                        /* runaway channel */
+return -1;                                              /* runaway channel */
 }
 
 /* Spacing */
 
-t_stat lpt_space (UNIT *uptr, int32 cnt)
+int32 lpt_space (UNIT *uptr, int32 cnt)
 {
 int32 i;
 
-if (cnt == 0)
+if (cnt == 0) {                                         /* overprint */
      fputc ('\r', uptr->fileref);
-else {
-    for (i = 0; i < cnt; i++)
-        fputc ('\n', uptr->fileref);
-    lpt_ccp = (lpt_ccp + cnt) % lpt_ccl;
-    }
-return SCPE_OK;
+     return 1;
+    } 
+for (i = 0; i < cnt; i++)                               /* 'cnt' newlines */
+    fputc ('\n', uptr->fileref);
+lpt_ccp = (lpt_ccp + cnt) % lpt_ccl;                    /* advance CCT */
+return cnt;
 }
 
 /* Reset routine */

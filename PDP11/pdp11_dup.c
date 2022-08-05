@@ -36,6 +36,7 @@
    characters both initially and between DDCMP packets.
 
    15-May-13    MP      Initial implementation
+
 */
 
 #if defined (VM_PDP10)                                  /* PDP10 version */
@@ -73,6 +74,7 @@ static uint16 dup_txdbuf[DUP_LINES];
 static t_bool dup_W3[DUP_LINES];
 static t_bool dup_W5[DUP_LINES];
 static t_bool dup_W6[DUP_LINES];
+static t_bool dup_kmc[DUP_LINES];                       /* being used by a kmc or other internal simulator device */
 static uint32 dup_rxi = 0;                                     /* rcv interrupts */
 static uint32 dup_txi = 0;                                     /* xmt interrupts */
 static uint32 dup_wait[DUP_LINES];                             /* rcv/xmt byte delay */
@@ -317,6 +319,198 @@ static BITFIELD dup_txdbuf_bits[] = {
 #define TXDBUF_WRITEABLE (TXDBUF_M_TABRT|TXDBUF_M_TEOM|TXDBUF_M_TSOM|TXDBUF_M_TXDBUF)
 
 
+/* Equivalent register definitions for DPV11. Some bits are common; some are nearly common
+   but with slightly different semantics; some are different altogether */
+
+/* DPV RXCSR - 16XXX0 - receiver control/status register */
+
+static BITFIELD dpv_rxcsr_bits[] = {
+    BIT(DPV_SFRL),                           /* Set Freq / Remote Loop */
+#define RXCSR_V_DPV_SFRL     0
+#define RXCSR_M_DPV_SFRL     (1<<RXCSR_V_DPV_SFRL)
+    BIT(DPV_DTR),                               /* Data Terminal Ready */
+#define RXCSR_V_DPV_DTR      1
+#define RXCSR_M_DPV_DTR      (1<<RXCSR_V_DPV_DTR)
+    BIT(DPV_RTS),                               /* Request To Send */
+#define RXCSR_V_DPV_RTS      2
+#define RXCSR_M_DPV_RTS      (1<<RXCSR_V_DPV_RTS)
+    BIT(DPV_DPV_LL),                            /* Local Loop */
+#define RXCSR_V_DPV_LL       3
+#define RXCSR_M_DPV_LL       (1<<RXCSR_V_DPV_LL)
+    BIT(DPV_RCVEN),                             /* Receiver Enable */
+#define RXCSR_V_DPV_RCVEN    4
+#define RXCSR_M_DPV_RCVEN    (1<<RXCSR_V_DPV_RCVEN)
+    BIT(DPV_DSCIE),                             /* Data Set Change Interrupt Enable */
+#define RXCSR_V_DPV_DSCIE    5
+#define RXCSR_M_DPV_DSCIE    (1<<RXCSR_V_DPV_DSCIE)
+    BIT(DPV_RXIE),                              /* Receive Interrupt Enable */
+#define RXCSR_V_DPV_RXIE     6
+#define RXCSR_M_DPV_RXIE     (1<<RXCSR_V_DPV_RXIE)
+    BIT(DPV_RXDONE),                            /* Receive Done */
+#define RXCSR_V_DPV_RXDONE   7
+#define RXCSR_M_DPV_RXDONE   (1<<RXCSR_V_DPV_RXDONE)
+    BIT(DPV_DETSYN),                            /* Sync Detected */
+#define RXCSR_V_DPV_DETSYN   8
+#define RXCSR_M_DPV_DETSYN   (1<<RXCSR_V_DPV_DETSYN)
+    BIT(DPV_DSR),                               /* Data Set Ready */
+#define RXCSR_V_DPV_DSR      9
+#define RXCSR_M_DPV_DSR      (1<<RXCSR_V_DPV_DSR)
+    BIT(DPV_RSTARY),                            /* Receiver Status Ready */
+#define RXCSR_V_DPV_RSTARY   10
+#define RXCSR_M_DPV_RSTARY   (1<<RXCSR_V_DPV_RSTARY)
+    BIT(DPV_RXACT),                             /* Receive Active */
+#define RXCSR_V_DPV_RXACT    11
+#define RXCSR_M_DPV_RXACT    (1<<RXCSR_V_DPV_RXACT)
+    BIT(DPV_DCD),                               /* Carrier */
+#define RXCSR_V_DPV_DCD      12
+#define RXCSR_M_DPV_DCD      (1<<RXCSR_V_DPV_DCD)
+    BIT(DPV_CTS),                               /* Clear to Send */
+#define RXCSR_V_DPV_CTS      13
+#define RXCSR_M_DPV_CTS      (1<<RXCSR_V_DPV_CTS)
+    BIT(DPV_RING),                              /* Ring */
+#define RXCSR_V_DPV_RING     14
+#define RXCSR_M_DPV_RING     (1<<RXCSR_V_DPV_RING)
+    BIT(DPV_DSCHNG),                            /* Data Set Change */
+#define RXCSR_V_DPV_DSCHNG   15
+#define RXCSR_M_DPV_DSCHNG   (1<<RXCSR_V_DPV_DSCHNG)
+    ENDBITS
+};
+#define RXCSR_DPV_MODEM_BITS (RXCSR_M_DPV_RING|RXCSR_M_DPV_CTS|RXCSR_M_DPV_DSR|RXCSR_M_DPV_DCD)
+#define RXCSR_DPV_WRITEABLE (RXCSR_M_DPV_SFRL|RXCSR_M_DPV_DTR|RXCSR_M_DPV_RTS|RXCSR_M_DPV_LL|RXCSR_M_DPV_RCVEN|RXCSR_M_DPV_DSCIE|RXCSR_M_DPV_RXIE)
+
+/* DPV RXDBUF - 16XXX2 - receiver Data Buffer register */
+
+static BITFIELD dpv_rxdbuf_bits[] = {
+    BITF(DPV_RXDBUF,8),                         /* Receive Data Buffer */
+#define RXDBUF_V_DPV_RXDBUF  0
+#define RXDBUF_S_DPV_RXDBUF  8
+#define RXDBUF_M_DPV_RXDBUF  (((1<<RXDBUF_S_DPV_RXDBUF)-1)<<RXDBUF_V_DPV_RXDBUF)
+    BIT(DPV_RSTRMSG),                           /* Receiver Start of Message */
+#define RXDBUF_V_DPV_RSTRMSG 8
+#define RXDBUF_M_DPV_RSTRMSG (1<<RXDBUF_V_DPV_RSTRMSG)
+    BIT(DPV_RENDMSG),                           /* Receiver End Of Message */
+#define RXDBUF_V_DPV_RENDMSG 9
+#define RXDBUF_M_DPV_RENDMSG (1<<RXDBUF_V_DPV_RENDMSG)
+    BIT(DPV_RABRT),                             /* Receiver Abort */
+#define RXDBUF_V_DPV_RABRT   10
+#define RXDBUF_M_DPV_RABRT   (1<<RXDBUF_V_DPV_RABRT)
+    BIT(DPV_RXOVR),                             /* Receiver Overrun */
+#define RXDBUF_V_DPV_RXOVR   11
+#define RXDBUF_M_DPV_RXOVR   (1<<RXDBUF_V_DPV_RXOVR)
+    BITF(DPV_ABC,3),                           /* Assembled Bit Count */
+#define RXDBUF_V_DPV_ABC     12
+#define RXDBUF_S_DPV_ABC     3
+#define RXDBUF_M_DPV_ABC     (((1<<RXDBUF_S_DPV_ABC)-1)<<RXDBUF_V_DPV_ABC)
+    BIT(DPV_RCRCER),                            /* Receiver CRC Error */
+#define RXDBUF_V_DPV_RCRCER  15
+#define RXDBUF_M_DPV_RCRCER  (1<<RXDBUF_V_DPV_RCRCER)
+    ENDBITS
+};
+
+/* DPV PCSAR - 16XXX2 - Parameter Control/Status register */
+
+static BITFIELD dpv_parcsr_bits[] = {
+    BITF(DPV_ADSYNC,8),                         /* Secondary Station Address/Receiver Sync Char */
+#define PARCSR_V_DPV_ADSYNC   0
+#define PARCSR_S_DPV_ADSYNC   8
+#define PARCSR_M_DPV_ADSYNC   (((1<<PARCSR_S_DPV_ADSYNC)-1)<<PARCSR_V_DPV_ADSYNC)
+    BITF(DPV_ERRDET,8),                         /* CRC Type */
+#define PARCSR_V_DPV_ERRDET   8
+#define PARCSR_S_DPV_ERRDET   3
+#define PARCSR_M_DPV_ERRDET   (((1<<PARCSR_S_DPV_ERRDET)-1)<<PARCSR_V_DPV_ERRDET)
+    BIT(DPV_IDLEMODE),                          /* Idle Mode Select */
+#define PARCSR_V_DPV_IDLEMODE 11
+#define PARCSR_M_DPV_IDLEMODE (1<<PARCSR_V_DPV_IDLEMODE)
+    BIT(DPV_SECMODE),                           /* Secondary Mode Select */
+#define PARCSR_V_DPV_SECMODE  12
+#define PARCSR_M_DPV_SECMODE  (1<<PARCSR_V_DPV_SECMODE)
+    BIT(DPV_STRSYN),                            /* Strip Sync */
+#define PARCSR_V_DPV_STRSYN   13
+#define PARCSR_M_DPV_STRSYN   (1<<PARCSR_V_DPV_STRSYN)
+    BIT(DPV_PROTSEL),                           /* Protocol Select */
+#define PARCSR_V_DPV_PROTSEL  14
+#define PARCSR_M_DPV_PROTSEL  (1<<PARCSR_V_DPV_PROTSEL)
+    BIT(DPV_APA),                               /* All Parties Address Mode */
+#define PARCSR_V_DPV_APA      15
+#define PARCSR_M_DPV_APA      (1<<PARCSR_V_DPV_APA)
+    ENDBITS
+};
+
+/* DPV PCSCR - 16XXX4 - Parameter Control / Character Length register */
+
+static BITFIELD dpv_txcsr_bits[] = {
+    BIT(DPV_RESET),                           /* Device Reset */
+#define TXCSR_V_DPV_RESET        0
+#define TXCSR_M_DPV_RESET        (1<<TXCSR_V_DPV_RESET)
+    BIT(DPV_TXACT),                           /* Transmitter Active */
+#define TXCSR_V_DPV_TXACT        1
+#define TXCSR_M_DPV_TXACT        (1<<TXCSR_V_DPV_TXACT)
+    BIT(DPV_TBEMPTY),                         /* Transmit Buffer Empty (DONE) */
+#define TXCSR_V_DPV_TBEMPTY      2
+#define TXCSR_M_DPV_TBEMPTY      (1<<TXCSR_V_DPV_TBEMPTY)
+    BIT(DPV_MAINT),                           /* Maintenance Mode Select */
+#define TXCSR_V_DPV_MAINT        3
+#define TXCSR_M_DPV_MAINT        (1<<TXCSR_V_DPV_MAINT)
+    BIT(DPV_SEND),                            /* Enable Transmit */
+#define TXCSR_V_DPV_SEND         4
+#define TXCSR_M_DPV_SEND         (1<<TXCSR_V_DPV_SEND)
+    BIT(DPV_SQTM),                            /* SQ/TM */
+#define TXCSR_V_DPV_SQTM         5
+#define TXCSR_M_DPV_SQTM         (1<<TXCSR_V_DPV_SQTM)
+    BIT(DPV_TXIE),                            /* Transmit Interrupt Enable */
+#define TXCSR_V_DPV_TXIE         6
+#define TXCSR_M_DPV_TXIE         (1<<TXCSR_V_DPV_TXIE)
+    BITNCF(1),                               /* reserved */
+    BITF(DPV_RXCHARSIZE,3),                  /* Receive Character Size*/
+#define TXCSR_V_DPV_RXCHARSIZE    8
+#define TXCSR_S_DPV_RXCHARSIZE    3
+#define TXCSR_M_DPV_RXCHARSIZE    (((1<<TXCSR_S_DPV_RXCHARSIZE)-1)<<TXCSR_V_DPV_RXCHARSIZE)
+    BIT(DPV_EXTCONT),                        /* Extended Control Field */
+#define TXCSR_V_DPV_EXTCONT       11
+#define TXCSR_M_DPV_EXTCONT       (1<<TXCSR_V_DPV_EXTCONT)
+    BIT(DPV_EXTADDR),                        /* Extended Control Field */
+#define TXCSR_V_DPV_EXTADDR       12
+#define TXCSR_M_DPV_EXTADDR       (1<<TXCSR_V_DPV_EXTADDR)
+    BITF(DPV_TXCHARSIZE,3),                  /* Transmit Character Size*/
+#define TXCSR_V_DPV_TXCHARSIZE    13
+#define TXCSR_S_DPV_TXCHARSIZE    3
+#define TXCSR_M_DPV_TXCHARSIZE    (((1<<TXCSR_S_DPV_TXCHARSIZE)-1)<<TXCSR_V_DPV_TXCHARSIZE)
+    ENDBITS
+};
+#define TXCSR_DPV_MBZ ((1<<7))
+#define TXCSR_DPV_WRITEABLE (TXCSR_M_DPV_RESET|TXCSR_M_DPV_MAINT|TXCSR_M_DPV_SEND|TXCSR_M_DPV_SQTM|TXCSR_M_DPV_TXIE|TXCSR_M_DPV_RXCHARSIZE|TXCSR_M_DPV_EXTCONT|TXCSR_M_DPV_EXTADDR|TXCSR_M_DPV_TXCHARSIZE)
+
+/* DPV TDSR - 16XXX6 - Transmitter Data and Status  register */
+
+static BITFIELD dpv_txdbuf_bits[] = {
+    BITF(DPV_TXDBUF,8),                         /* Transmit Data Buffer */
+#define TXDBUF_V_DPV_TXDBUF  0
+#define TXDBUF_S_DPV_TXDBUF  8
+#define TXDBUF_M_DPV_TXDBUF  (((1<<TXDBUF_S_DPV_TXDBUF)-1)<<TXDBUF_V_DPV_TXDBUF)
+    BIT(DPV_TSOM),                              /* Transmit Start of Message */
+#define TXDBUF_V_DPV_TSOM    8
+#define TXDBUF_M_DPV_TSOM    (1<<TXDBUF_V_DPV_TSOM)
+    BIT(DPV_TEOM),                              /* End of Transmitted Message */
+#define TXDBUF_V_DPV_TEOM    9
+#define TXDBUF_M_DPV_TEOM    (1<<TXDBUF_V_DPV_TEOM)
+    BIT(DPV_TABRT),                             /* Transmit Abort */
+#define TXDBUF_V_DPV_TABRT   10
+#define TXDBUF_M_DPV_TABRT   (1<<TXDBUF_V_DPV_TABRT)
+    BIT(DPV_GOAHEAD),                           /* Use Go Ahead */
+#define TXDBUF_V_DPV_GOAHEAD 11
+#define TXDBUF_M_DPV_GOAHEAD (1<<TXDBUF_V_DPV_GOAHEAD)
+    BITNCF(3),                                  /* reserved */
+    BIT(DPV_TERR),                              /* Transmit Error */
+#define TXDBUF_V_DPV_TERR    15
+#define TXDBUF_M_DPV_TERR    (1<<TXDBUF_V_DPV_TERR)
+    ENDBITS
+};
+#define TXDBUF_DPV_MBZ ((7<<12))
+#define TXDBUF_DPV_WRITEABLE (TXDBUF_M_DPV_GOAHEAD|TXDBUF_M_DPV_TABRT|TXDBUF_M_DPV_TEOM|TXDBUF_M_DPV_TSOM|TXDBUF_M_DPV_TXDBUF)
+
+
+#define TRAILING_SYNS 8
+const uint8 tsyns[TRAILING_SYNS] = {0x96,0x96,0x96,0x96,0x96,0x96,0x96,0x96}; 
 
 /* DUP data structures
 
@@ -371,6 +565,27 @@ static REG dup_reg[] = {
     { NULL }
     };
 
+/* We need a DPV version of the REG structure because the CSR definitions and settable jumpers are different */
+
+static REG dpv_reg[] = {
+    { BRDATADF (RXCSR,          dup_rxcsr,  DEV_RDX, 16, DUP_LINES, "receive control/status register",  dpv_rxcsr_bits) },
+    { BRDATADF (RXDBUF,        dup_rxdbuf,  DEV_RDX, 16, DUP_LINES, "receive data buffer",              dpv_rxdbuf_bits) },
+    { BRDATADF (PARCSR,        dup_parcsr,  DEV_RDX, 16, DUP_LINES, "receive control/status register",  dpv_parcsr_bits) },
+    { BRDATADF (TXCSR,          dup_txcsr,  DEV_RDX, 16, DUP_LINES, "transmit control/status register", dpv_txcsr_bits) },
+    { BRDATADF (TXDBUF,        dup_txdbuf,  DEV_RDX, 16, DUP_LINES, "transmit data buffer",             dpv_txdbuf_bits) },
+    { GRDATAD  (RXINT,            dup_rxi,  DEV_RDX, DUP_LINES,  0, "receive interrupts") },
+    { GRDATAD  (TXINT,            dup_txi,  DEV_RDX, DUP_LINES,  0, "transmit interrupts") },
+    { BRDATAD  (WAIT,            dup_wait,       10, 32, DUP_LINES, "delay time for transmit/receive bytes"), PV_RSPC },
+    { BRDATAD  (SPEED,          dup_speed,       10, 32, DUP_LINES, "line bit rate"), PV_RCOMMA },
+    { BRDATAD  (TPOFFSET, dup_xmtpkoffset,  DEV_RDX, 16, DUP_LINES, "transmit assembly packet offset") },
+    { BRDATAD  (TPSIZE,    dup_xmtpkbytes,  DEV_RDX, 16, DUP_LINES, "transmit digest packet size") },
+    { BRDATAD  (TPDELAY,dup_xmtpkdelaying,  DEV_RDX, 16, DUP_LINES, "transmit packet completion delay") },
+    { BRDATAD  (TPSTART,   dup_xmtpkstart,  DEV_RDX, 32, DUP_LINES, "transmit digest packet start time") },
+    { BRDATAD  (RPINOFF,   dup_rcvpkinoff,  DEV_RDX, 16, DUP_LINES, "receive digest packet offset") },
+    { BRDATAD  (CORRUPT,   dup_corruption,  DEV_RDX, 32, DUP_LINES, "data corruption factor (0.1%)") },
+    { NULL }
+    };
+
 static TMLN *dup_ldsc = NULL;                                  /* line descriptors */
 static TMXR dup_desc = { INITIAL_DUP_LINES, 0, 0, NULL };      /* mux descriptor */
 
@@ -397,6 +612,24 @@ static MTAB dup_mod[] = {
         &dup_set_W6, NULL,         NULL, "Enable A & B Dataset Control Option" },
     { MTAB_XTD|MTAB_VUN,          0, NULL, "NOW6" ,
         &dup_set_W6, NULL,         NULL, "Disable A & B Dataset Control  Option" },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 020, "ADDRESS", "ADDRESS",
+        &set_addr, &show_addr, NULL, "Bus address" },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 1, "VECTOR", "VECTOR",
+        &set_vec, &show_vec_mux, (void *) &dup_desc, "Interrupt vector" },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO, 1, "CONNECTIONS", NULL,
+        NULL, &tmxr_show_cstat, (void *) &dup_desc, "Display current connections" },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "LINES", "LINES=n",
+        &dup_setnl, &tmxr_show_lines, (void *) &dup_desc, "Display number of lines" },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "SYNC", NULL,
+      NULL, &tmxr_show_sync, NULL, "Display attachable DDCMP synchronous links" },
+    { 0 }
+    };
+
+static MTAB dpv_mod[] = {
+    { MTAB_XTD|MTAB_VUN,          0, "SPEED", "SPEED=bits/sec (0=unrestricted)" ,
+        &dup_setspeed, &dup_showspeed, NULL, "Display rate limit" },
+    { MTAB_XTD|MTAB_VUN,          0, "CORRUPTION", "CORRUPTION=factor (0=uncorrupted)" ,
+        &dup_setcorrupt, &dup_showcorrupt, NULL, "Display corruption factor (0.1% of packets)" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 020, "ADDRESS", "ADDRESS",
         &set_addr, &show_addr, NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 1, "VECTOR", "VECTOR",
@@ -450,6 +683,12 @@ static DEBTAB dup_debug[] = {
    find_dev_from_unit api to uniquely determine the device structure.  
    We define the DUPDPTR macro to return the active device pointer when 
    necessary.
+
+   The general approach for supporting the two device types is to re-use as much
+   code as possible for the DUP when acting as a DPV, including using the "wrong"
+   names for CSR bits if the bits are equivalent. So the device definitions below are
+   only different where actually required. As with the DUP, currently only DDCMP
+   is supported, and some register bits that are for BOP only are not implemented.
  */
 DEVICE dup_dev = {
     "DUP", dup_units, dup_reg, dup_mod,
@@ -462,7 +701,7 @@ DEVICE dup_dev = {
     };
 
 DEVICE dpv_dev = {
-    "DPV", dup_units, dup_reg, dup_mod,
+    "DPV", dup_units, dpv_reg, dpv_mod,
     2, 10, 31, 1, DEV_RDX, 8,
     NULL, NULL, &dup_reset,
     NULL, &dup_attach, &dup_detach,
@@ -495,6 +734,7 @@ static const char *dup_wr_regs[] =
 static t_stat dup_rd (int32 *data, int32 PA, int32 access)
 {
 static BITFIELD* bitdefs[] = {dup_rxcsr_bits, dup_rxdbuf_bits, dup_txcsr_bits, dup_txdbuf_bits};
+static BITFIELD* dpv_bitdefs[] = {dpv_rxcsr_bits, dpv_rxdbuf_bits, dpv_txcsr_bits, dpv_txdbuf_bits};
 static uint16 *regs[] = {dup_rxcsr, dup_rxdbuf, dup_txcsr, dup_txdbuf};
 int32 dup = ((PA - dup_dib.ba) >> 3);                   /* get line num */
 int32 orig_val;
@@ -508,12 +748,17 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
     case 00:                                            /* RXCSR */
         dup_get_modem (dup);
         *data = dup_rxcsr[dup];
-        dup_rxcsr[dup] &= ~(RXCSR_M_DSCHNG|RXCSR_M_BDATSET);
+        if (UNIBUS)
+            dup_rxcsr[dup] &= ~(RXCSR_M_DSCHNG|RXCSR_M_BDATSET);
+        else
+            dup_rxcsr[dup] &= ~(RXCSR_M_DPV_DSCHNG);
         break;
 
     case 01:                                            /* RXDBUF */
         *data = dup_rxdbuf[dup];
         dup_rxcsr[dup] &= ~RXCSR_M_RXDONE;
+        if (!UNIBUS)
+            dup_rxcsr[dup] &= ~RXCSR_M_DPV_RSTARY;
         if (dup_rxcsr[dup] & RXCSR_M_RXACT)
             sim_activate (dup_units+dup, dup_wait[dup]);
         break;
@@ -528,14 +773,15 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
     }
 
 sim_debug(DBG_REG, DUPDPTR, "dup_rd(PA=0x%08X [%s], data=0x%X) ", PA, dup_rd_regs[(PA >> 1) & 03], *data);
-sim_debug_bits(DBG_REG, DUPDPTR, bitdefs[(PA >> 1) & 03], (uint32)(orig_val), (uint32)(regs[(PA >> 1) & 03][dup]), TRUE);
+sim_debug_bits(DBG_REG, DUPDPTR, ((UNIBUS) ? bitdefs[(PA >> 1) & 03] : dpv_bitdefs[(PA >> 1) & 03]),
+               (uint32)(orig_val), (uint32)(regs[(PA >> 1) & 03][dup]), TRUE);
 
 return SCPE_OK;
 }
-
 static t_stat dup_wr (int32 data, int32 PA, int32 access)
 {
 static BITFIELD* bitdefs[] = {dup_rxcsr_bits, dup_parcsr_bits, dup_txcsr_bits, dup_txdbuf_bits};
+static BITFIELD* dpv_bitdefs[] = {dpv_rxcsr_bits, dpv_parcsr_bits, dpv_txcsr_bits, dpv_txdbuf_bits};
 static uint16 *regs[] = {dup_rxcsr, dup_parcsr, dup_txcsr, dup_txdbuf};
 int32 dup = ((PA - dup_dib.ba) >> 3);                   /* get line num */
 int32 orig_val;
@@ -544,7 +790,8 @@ if (dup >= dup_desc.lines)                              /* validate line number 
     return SCPE_IERR;
 
 orig_val = regs[(PA >> 1) & 03][dup];
-if (PA & 1)                                             /* unaligned byte access? */
+
+if (PA & 1)
     data = ((data << 8) | (orig_val & 0xFF)) & 0xFFFF;  /* Merge with original word */
 else
     if (access == WRITEB)                               /* byte access? */
@@ -554,21 +801,30 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
 
     case 00:                                            /* RXCSR */
         dup_set_modem (dup, data);
-        dup_rxcsr[dup] &= ~RXCSR_WRITEABLE;
-        dup_rxcsr[dup] |= (data & RXCSR_WRITEABLE);
-        if ((dup_rxcsr[dup] & RXCSR_M_DTR) &&           /* Upward transition of DTR */
-            (!(orig_val & RXCSR_M_DTR)))                /* Enables Receive on the line */
-            dup_desc.ldsc[dup].rcve = TRUE;
-        if ((dup_rxcsr[dup] & RXCSR_M_RTS) &&           /* Upward transition of RTS */
-            (!(orig_val & RXCSR_M_RTS)) &&              /* while receiver is enabled and */
-            (dup_rxcsr[dup] & RXCSR_M_RCVEN) &&         /* not stripping sync characters */
-            (!(dup_rxcsr[dup] & RXCSR_M_STRSYN)) ) {    /* Receive a SYNC character */
-            dup_rxcsr[dup] |= RXCSR_M_RXDONE;
-            dup_rxdbuf[dup] &= ~RXDBUF_M_RXDBUF;
-            dup_rxdbuf[dup] |= (dup_parcsr[dup] & PARCSR_M_ADSYNC);
-            if (dup_rxcsr[dup] & RXCSR_M_RXIE)
-                dup_set_rxint (dup);
+        if (UNIBUS) {
+            dup_rxcsr[dup] &= ~RXCSR_WRITEABLE;
+            dup_rxcsr[dup] |= (data & RXCSR_WRITEABLE);
+            if ((dup_rxcsr[dup] & RXCSR_M_DTR) &&           /* Upward transition of DTR */
+                (!(orig_val & RXCSR_M_DTR)))                /* Enables Receive on the line */
+                dup_desc.ldsc[dup].rcve = TRUE;
+            if ((dup_rxcsr[dup] & RXCSR_M_RTS) &&           /* Upward transition of RTS */
+                (!(orig_val & RXCSR_M_RTS)) &&              /* while receiver is enabled and */
+                (dup_rxcsr[dup] & RXCSR_M_RCVEN) &&         /* not stripping sync characters */
+                (!(dup_rxcsr[dup] & RXCSR_M_STRSYN)) ) {    /* Receive a SYNC character */
+                dup_rxcsr[dup] |= RXCSR_M_RXDONE;
+                dup_rxdbuf[dup] &= ~RXDBUF_M_RXDBUF;
+                dup_rxdbuf[dup] |= (dup_parcsr[dup] & PARCSR_M_ADSYNC);
+                if (dup_rxcsr[dup] & RXCSR_M_RXIE)
+                    dup_set_rxint (dup);
             }
+        }
+        else {
+            dup_rxcsr[dup] &= ~RXCSR_DPV_WRITEABLE;
+            dup_rxcsr[dup] |= (data & RXCSR_DPV_WRITEABLE);
+            if ((dup_rxcsr[dup] & RXCSR_M_DTR) &&           /* Upward transition of DTR */
+                (!(orig_val & RXCSR_M_DTR)))                /* Enables Receive on the line */
+                dup_desc.ldsc[dup].rcve = TRUE;
+        }
         if ((dup_rxcsr[dup] & RXCSR_M_RCVEN) && 
             (!(orig_val & RXCSR_M_RCVEN))) {            /* Upward transition of receiver enable */
             dup_rcv_byte (dup);                         /* start any pending receive */
@@ -576,7 +832,7 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
         if ((!(dup_rxcsr[dup] & RXCSR_M_RCVEN)) && 
             (orig_val & RXCSR_M_RCVEN)) {               /* Downward transition of receiver enable */
             dup_rxdbuf[dup] &= ~RXDBUF_M_RXDBUF;
-            dup_rxcsr[dup] &= ~RXCSR_M_RXACT;
+            dup_rxcsr[dup] &= ~(RXCSR_M_RXACT|RXCSR_M_RXDONE);    /* also clear RXDONE per DUP11 spec. */
             if ((dup_rcvpkinoff[dup] != 0) || 
                 (dup_rcvpkbytes[dup] != 0))
                 dup_rcvpkinoff[dup] = dup_rcvpkbytes[dup] = 0;
@@ -589,19 +845,25 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
         break;
 
     case 01:                                            /* PARCSR */
-        dup_parcsr[dup] &= ~PARCSR_WRITEABLE;
-        dup_parcsr[dup] |= (data & PARCSR_WRITEABLE);
+        if (UNIBUS) {
+            dup_parcsr[dup] &= ~PARCSR_WRITEABLE;
+            dup_parcsr[dup] |= (data & PARCSR_WRITEABLE);
+        } else 
+            dup_parcsr[dup] = data ;
         break;
 
     case 02:                                            /* TXCSR */
-        dup_txcsr[dup] &= ~TXCSR_WRITEABLE;
-        dup_txcsr[dup] |= (data & TXCSR_WRITEABLE);
-        if (dup_txcsr[dup] & TXCSR_M_DRESET) {
-            dup_clear(dup, dup_W3[dup]);
-            break;
+        if (UNIBUS) {
+            dup_txcsr[dup] &= ~TXCSR_WRITEABLE;
+            dup_txcsr[dup] |= (data & TXCSR_WRITEABLE);
+            if (dup_txcsr[dup] & TXCSR_M_DRESET) {
+                dup_clear(dup, dup_W3[dup]);
+                /* must also clear loopback if it was set */
+                tmxr_set_line_loopback (&dup_desc.ldsc[dup], FALSE);
+                break;
             }
-        if (TXCSR_GETMAISEL(dup_txcsr[dup]) != TXCSR_GETMAISEL(orig_val)) { /* Maint Select Changed */
-            switch (TXCSR_GETMAISEL(dup_txcsr[dup])) {
+            if (TXCSR_GETMAISEL(dup_txcsr[dup]) != TXCSR_GETMAISEL(orig_val)) { /* Maint Select Changed */
+                switch (TXCSR_GETMAISEL(dup_txcsr[dup])) {
                 case 0:  /* User/Normal Mode */
                     tmxr_set_line_loopback (&dup_desc.ldsc[dup], FALSE);
                     break;
@@ -613,38 +875,75 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
                     break;
                 }
             }
-        if ((dup_txcsr[dup] & TXCSR_M_TXACT) && 
-            (!(orig_val & TXCSR_M_TXACT))    && 
-            (orig_val & TXCSR_M_TXDONE)) {
-            dup_txcsr[dup] &= ~TXCSR_M_TXDONE;
+            if ((dup_txcsr[dup] & TXCSR_M_TXACT) &&  
+                (!(orig_val & TXCSR_M_TXACT))    && 
+                (orig_val & TXCSR_M_TXDONE)) {
+                dup_txcsr[dup] &= ~TXCSR_M_TXDONE;
             }
-        if ((!(dup_txcsr[dup] & TXCSR_M_SEND)) && 
-            (orig_val & TXCSR_M_SEND)) {
-            dup_txcsr[dup] &= ~TXCSR_M_TXACT;
-            dup_put_msg_bytes (dup, NULL, 0, FALSE, TRUE);
+            if ((!(dup_txcsr[dup] & TXCSR_M_SEND)) && 
+                (orig_val & TXCSR_M_SEND)) {
+                dup_txcsr[dup] &= ~TXCSR_M_TXACT;
+                dup_put_msg_bytes (dup, NULL, 0, FALSE, TRUE);
             }
-        if ((dup_txcsr[dup] & TXCSR_M_HALFDUP) ^ (orig_val & TXCSR_M_HALFDUP))
-            tmxr_set_line_halfduplex (dup_desc.ldsc+dup, dup_txcsr[dup] & TXCSR_M_HALFDUP);
-        if ((dup_txcsr[dup] & TXCSR_M_TXIE) && 
-            (!(orig_val & TXCSR_M_TXIE))    && 
-            (dup_txcsr[dup] & TXCSR_M_TXDONE)) {
-            dup_set_txint (dup);
+            if ((dup_txcsr[dup] & TXCSR_M_HALFDUP) ^ (orig_val & TXCSR_M_HALFDUP))
+                tmxr_set_line_halfduplex (dup_desc.ldsc+dup, dup_txcsr[dup] & TXCSR_M_HALFDUP);
+            if ((dup_txcsr[dup] & TXCSR_M_TXIE) && 
+                (!(orig_val & TXCSR_M_TXIE))    && 
+                (dup_txcsr[dup] & TXCSR_M_TXDONE)) {
+                dup_set_txint (dup);
             }
+        } else {
+            dup_txcsr[dup] &= ~TXCSR_DPV_WRITEABLE;
+            dup_txcsr[dup] |= (data & TXCSR_DPV_WRITEABLE);
+            if (dup_txcsr[dup] & TXCSR_M_DPV_RESET) {
+                dup_clear(dup, TRUE); 
+                /* must also clear loopback if it was set */
+                tmxr_set_line_loopback (&dup_desc.ldsc[dup], FALSE);
+                break;
+            }
+            if ((dup_txcsr[dup] & TXCSR_M_DPV_MAINT) ^ (orig_val & TXCSR_M_DPV_MAINT))   /* maint mode change */
+                tmxr_set_line_loopback (&dup_desc.ldsc[dup], dup_txcsr[dup] & TXCSR_M_DPV_MAINT );
+            if ((!(dup_txcsr[dup] & TXCSR_M_DPV_SEND)) && 
+                (orig_val & TXCSR_M_DPV_SEND)) {
+                dup_txcsr[dup] &= ~TXCSR_M_DPV_TXACT;
+                dup_put_msg_bytes (dup, NULL, 0, FALSE, TRUE);
+            }
+            if ((dup_txcsr[dup] & TXCSR_M_DPV_TXIE) && 
+                (!(orig_val & TXCSR_M_DPV_TXIE))    && 
+                (dup_txcsr[dup] & TXCSR_M_DPV_TBEMPTY)) {
+                dup_set_txint (dup);
+            }
+            /* Receive character length, transmit character length, extended HDLC fields, SQ/TM  not supported */
+        }
         break;
 
     case 03:                                            /* TXDBUF */
-        dup_txdbuf[dup] &= ~TXDBUF_WRITEABLE;
-        dup_txdbuf[dup] |= (data & TXDBUF_WRITEABLE);
-        dup_txcsr[dup] &= ~TXCSR_M_TXDONE;
-        if (dup_txcsr[dup] & TXCSR_M_SEND) {
-            dup_txcsr[dup] |= TXCSR_M_TXACT;
-            sim_activate (dup_units+dup, dup_wait[dup]);
+        if (UNIBUS) {
+            dup_txdbuf[dup] &= ~TXDBUF_WRITEABLE;
+            dup_txdbuf[dup] |= (data & TXDBUF_WRITEABLE);
+            dup_txcsr[dup] &= ~TXCSR_M_TXDONE;
+            dup_clr_txint (dup);  /* clear any pending interrupts */
+            if (dup_txcsr[dup] & TXCSR_M_SEND) {
+                dup_txcsr[dup] |= TXCSR_M_TXACT;
+                sim_activate (dup_units+dup, dup_wait[dup]);
             }
+        } else {
+            dup_txdbuf[dup] &= ~TXDBUF_DPV_WRITEABLE;
+            dup_txdbuf[dup] |= (data & TXDBUF_DPV_WRITEABLE);
+            dup_txcsr[dup] &= ~TXCSR_M_DPV_TBEMPTY;
+            dup_clr_txint (dup);  /* clear any pending interrupts */
+            if (dup_txcsr[dup] & TXCSR_M_DPV_SEND) {
+                dup_txcsr[dup] |= TXCSR_M_DPV_TXACT;
+                sim_activate (dup_units+dup, dup_wait[dup]);
+                /* Go ahead, Abort not supported */
+            }
+        }
         break;
     }
 
 sim_debug(DBG_REG, DUPDPTR, "dup_wr(PA=0x%08X [%s], data=0x%X) ", PA, dup_wr_regs[(PA >> 1) & 03], data);
-sim_debug_bits(DBG_REG, DUPDPTR, bitdefs[(PA >> 1) & 03], (uint32)orig_val, (uint32)regs[(PA >> 1) & 03][dup], TRUE);
+sim_debug_bits(DBG_REG, DUPDPTR, ((UNIBUS) ? bitdefs[(PA >> 1) & 03] : dpv_bitdefs[(PA >> 1) & 03]),
+               (uint32)orig_val, (uint32)regs[(PA >> 1) & 03][dup], TRUE);
 dup_get_modem (dup);
 return SCPE_OK;
 }
@@ -669,48 +968,73 @@ int32 old_rxcsr_a_modem_bits, new_rxcsr_a_modem_bits, old_rxcsr_b_modem_bits, ne
 TMLN *lp = &dup_desc.ldsc[dup];
 t_bool new_modem_change = FALSE;
 
-if (dup_W5[dup])
-    old_rxcsr_a_modem_bits = dup_rxcsr[dup] & (RXCSR_M_RING | RXCSR_M_CTS | RXCSR_M_DSR | RXCSR_M_DCD);
-else
-    old_rxcsr_a_modem_bits = dup_rxcsr[dup] & (RXCSR_M_RING | RXCSR_M_CTS);
-if (dup_W6[dup])
-    old_rxcsr_b_modem_bits = dup_rxcsr[dup] & RXCSR_B_MODEM_BITS;
-else
-    old_rxcsr_b_modem_bits = 0;
-tmxr_set_get_modem_bits (lp, 0, 0, &modem_bits);
-if (dup_W5[dup])
-    new_rxcsr_a_modem_bits = (((modem_bits & TMXR_MDM_RNG) ? RXCSR_M_RING : 0) |
-                              ((modem_bits & TMXR_MDM_CTS) ? RXCSR_M_CTS : 0) |
-                              ((modem_bits & TMXR_MDM_DSR) ? RXCSR_M_DSR : 0) |
+if (UNIBUS) {
+    if (dup_W5[dup])
+        old_rxcsr_a_modem_bits = dup_rxcsr[dup] & (RXCSR_M_RING | RXCSR_M_CTS | RXCSR_M_DSR | RXCSR_M_DCD);
+    else
+        old_rxcsr_a_modem_bits = dup_rxcsr[dup] & (RXCSR_M_RING | RXCSR_M_CTS);
+    if (dup_W6[dup])
+        old_rxcsr_b_modem_bits = dup_rxcsr[dup] & RXCSR_B_MODEM_BITS;
+    else
+        old_rxcsr_b_modem_bits = 0;
+    tmxr_set_get_modem_bits (lp, 0, 0, &modem_bits);
+    if (dup_W5[dup])
+        new_rxcsr_a_modem_bits = (((modem_bits & TMXR_MDM_RNG) ? RXCSR_M_RING : 0) |
+                                  ((modem_bits & TMXR_MDM_CTS) ? RXCSR_M_CTS : 0) |
+                                  ((modem_bits & TMXR_MDM_DSR) ? RXCSR_M_DSR : 0) |
+                                  ((modem_bits & TMXR_MDM_DCD) ? RXCSR_M_DCD : 0));
+    else
+        new_rxcsr_a_modem_bits = (((modem_bits & TMXR_MDM_RNG) ? RXCSR_M_RING : 0) |
+                                  ((modem_bits & TMXR_MDM_CTS) ? RXCSR_M_CTS : 0));
+    if (dup_W6[dup])
+        new_rxcsr_b_modem_bits = (((modem_bits & TMXR_MDM_DSR) ? RXCSR_M_DSR : 0) |
+                                  ((modem_bits & TMXR_MDM_DCD) ? RXCSR_M_DCD : 0));
+    else
+        new_rxcsr_b_modem_bits = 0;
+    dup_rxcsr[dup] &= ~(RXCSR_A_MODEM_BITS | RXCSR_B_MODEM_BITS);
+    dup_rxcsr[dup] |= new_rxcsr_a_modem_bits | new_rxcsr_b_modem_bits;
+    if (old_rxcsr_a_modem_bits != new_rxcsr_a_modem_bits) {
+        dup_rxcsr[dup] |= RXCSR_M_DSCHNG;
+        new_modem_change = TRUE;
+    }
+    if (old_rxcsr_b_modem_bits != new_rxcsr_b_modem_bits) {
+        dup_rxcsr[dup] |= RXCSR_M_BDATSET;
+        new_modem_change = TRUE;
+    }
+    if (new_modem_change) {
+        sim_debug(DBG_MDM, DUPDPTR, "dup_get_modem() - Modem Signal Change ");
+        sim_debug_bits(DBG_MDM, DUPDPTR, dup_rxcsr_bits, (uint32)old_rxcsr, (uint32)dup_rxcsr[dup], TRUE);
+    }
+    if (dup_modem_change_callback[dup] && new_modem_change)
+        dup_modem_change_callback[dup](dup);
+    if ((dup_rxcsr[dup] & RXCSR_M_DSCHNG) &&
+        ((dup_rxcsr[dup] & RXCSR_M_DSCHNG) != (old_rxcsr & RXCSR_M_DSCHNG)) &&
+        (dup_rxcsr[dup] & RXCSR_M_DSCIE))
+        dup_set_rxint (dup);
+} else {
+    old_rxcsr_a_modem_bits = dup_rxcsr[dup] & (RXCSR_M_DPV_RING | RXCSR_M_DPV_CTS | RXCSR_M_DPV_DSR | RXCSR_M_DPV_DCD);
+    tmxr_set_get_modem_bits (lp, 0, 0, &modem_bits);
+    new_rxcsr_a_modem_bits = (((modem_bits & TMXR_MDM_RNG) ? RXCSR_M_DPV_RING : 0) |
+                              ((modem_bits & TMXR_MDM_CTS) ? RXCSR_M_DPV_CTS : 0) |
+                              ((modem_bits & TMXR_MDM_DSR) ? RXCSR_M_DPV_DSR : 0) |
                               ((modem_bits & TMXR_MDM_DCD) ? RXCSR_M_DCD : 0));
-else
-    new_rxcsr_a_modem_bits = (((modem_bits & TMXR_MDM_RNG) ? RXCSR_M_RING : 0) |
-                              ((modem_bits & TMXR_MDM_CTS) ? RXCSR_M_CTS : 0));
-if (dup_W6[dup])
-    new_rxcsr_b_modem_bits = (((modem_bits & TMXR_MDM_DSR) ? RXCSR_M_DSR : 0) |
-                              ((modem_bits & TMXR_MDM_DCD) ? RXCSR_M_DCD : 0));
-else
-    new_rxcsr_b_modem_bits = 0;
-dup_rxcsr[dup] &= ~(RXCSR_A_MODEM_BITS | RXCSR_B_MODEM_BITS);
-dup_rxcsr[dup] |= new_rxcsr_a_modem_bits | new_rxcsr_b_modem_bits;
-if (old_rxcsr_a_modem_bits != new_rxcsr_a_modem_bits) {
-    dup_rxcsr[dup] |= RXCSR_M_DSCHNG;
-    new_modem_change = TRUE;
+    dup_rxcsr[dup] &= ~(RXCSR_DPV_MODEM_BITS);
+    dup_rxcsr[dup] |= new_rxcsr_a_modem_bits;
+    if (old_rxcsr_a_modem_bits != new_rxcsr_a_modem_bits) {
+        dup_rxcsr[dup] |= RXCSR_M_DPV_DSCHNG;
+        new_modem_change = TRUE;
     }
-if (old_rxcsr_b_modem_bits != new_rxcsr_b_modem_bits) {
-    dup_rxcsr[dup] |= RXCSR_M_BDATSET;
-    new_modem_change = TRUE;
+    if (new_modem_change) {
+        sim_debug(DBG_MDM, DUPDPTR, "dup_get_modem() - Modem Signal Change ");
+        sim_debug_bits(DBG_MDM, DUPDPTR, dpv_rxcsr_bits, (uint32)old_rxcsr, (uint32)dup_rxcsr[dup], TRUE);
     }
-if (new_modem_change) {
-    sim_debug(DBG_MDM, DUPDPTR, "dup_get_modem() - Modem Signal Change ");
-    sim_debug_bits(DBG_MDM, DUPDPTR, dup_rxcsr_bits, (uint32)old_rxcsr, (uint32)dup_rxcsr[dup], TRUE);
-    }
-if (dup_modem_change_callback[dup] && new_modem_change)
-     dup_modem_change_callback[dup](dup);
-if ((dup_rxcsr[dup] & RXCSR_M_DSCHNG) &&
-    ((dup_rxcsr[dup] & RXCSR_M_DSCHNG) != (old_rxcsr & RXCSR_M_DSCHNG)) &&
-    (dup_rxcsr[dup] & RXCSR_M_DSCIE))
-    dup_set_rxint (dup);
+    if (dup_modem_change_callback[dup] && new_modem_change)
+        dup_modem_change_callback[dup](dup);
+    if ((dup_rxcsr[dup] & RXCSR_M_DPV_DSCHNG) &&
+        ((dup_rxcsr[dup] & RXCSR_M_DPV_DSCHNG) != (old_rxcsr & RXCSR_M_DPV_DSCHNG)) &&
+        (dup_rxcsr[dup] & RXCSR_M_DPV_DSCIE))
+        dup_set_rxint (dup);
+}
 return SCPE_OK;
 }
 
@@ -833,6 +1157,7 @@ if (!protocol_DDCMP) {
 if (crc_inhibit) {
     return SCPE_ARG;                /* Must enable CRC for DDCMP */
     }
+dup_kmc[dup] = TRUE;     /* remember we are being used by an internal simulator device */
 /* These settings reflect how RSX operates a bare DUP when used for 
    DECnet communications */
 dup_clear(dup, FALSE);
@@ -904,7 +1229,10 @@ if (!tmxr_tpbusyln(&dup_ldsc[dup])) {  /* Not Busy sending? */
         memcpy (&dup_xmtpacket[dup][dup_xmtpkoffset[dup]], bytes, len);
         dup_xmtpkoffset[dup] += (uint16)len;
         }
-    dup_txcsr[dup] |= TXCSR_M_TXDONE;
+    if (UNIBUS)
+        dup_txcsr[dup] |= TXCSR_M_TXDONE;
+    else
+        dup_txcsr[dup] |= TXCSR_M_DPV_TBEMPTY;
     if (dup_txcsr[dup] & TXCSR_M_TXIE)
         dup_set_txint (dup);
     /* On End of Message, insert CRC and flag delivery start */
@@ -920,8 +1248,8 @@ if (!tmxr_tpbusyln(&dup_ldsc[dup])) {  /* Not Busy sending? */
         }
     breturn = TRUE;
     }
-sim_debug (DBG_TRC, DUPDPTR, "dup_put_msg_bytes(dup=%d, len=%d, start=%s, end=%s) %s\n", 
-           dup, (int)len, start ? "TRUE" : "FALSE", end ? "TRUE" : "FALSE", breturn ? "Good" : "Busy");
+sim_debug (DBG_TRC, DUPDPTR, "dup_put_msg_bytes(dup=%d, len=%d, start=%s, end=%s, byte=0x%02hhx) %s\n", 
+           dup, (int)len, start ? "TRUE" : "FALSE", end ? "TRUE" : "FALSE", *bytes, breturn ? "Good" : "Busy");
 if (breturn && (tmxr_tpbusyln (&dup_ldsc[dup]) || dup_xmtpkbytes[dup])) {
     if (dup_xmt_complete_callback[dup])
         dup_svc(dup_units+dup);
@@ -951,6 +1279,8 @@ return SCPE_OK;
 
 static t_stat dup_rcv_byte (int32 dup)
 {
+int32 crcoffset;
+
 sim_debug (DBG_TRC, DUPDPTR, "dup_rcv_byte(dup=%d) - %s, byte %d of %d\n", dup, 
            (dup_rxcsr[dup] & RXCSR_M_RCVEN) ? "enabled" : "disabled",
            dup_rcvpkinoff[dup], dup_rcvpkbytes[dup]);
@@ -962,17 +1292,31 @@ if (dup_rcv_packet_data_callback[dup]) {
     dup_rcv_packet_data_callback[dup](dup, dup_rcvpkbytes[dup]);
     return SCPE_OK;
     }
+/* if we added trailing SYNs, don't include them in the CRC calc */
+crcoffset = (dup_kmc[dup] ? 0 : TRAILING_SYNS);
 dup_rxcsr[dup] |= RXCSR_M_RXACT;
-dup_rxdbuf[dup] &= ~RXDBUF_M_RCRCER;
+if (UNIBUS)
+    dup_rxdbuf[dup] &= ~RXDBUF_M_RCRCER;
+else
+    dup_rxdbuf[dup] &= ~RXDBUF_M_DPV_RCRCER;
 dup_rxdbuf[dup] &= ~RXDBUF_M_RXDBUF;
 dup_rxdbuf[dup] |= dup_rcvpacket[dup][dup_rcvpkinoff[dup]++];
 dup_rxcsr[dup] |= RXCSR_M_RXDONE;
-if (((dup_rcvpkinoff[dup] == 8) || 
-     (dup_rcvpkinoff[dup] >= dup_rcvpkbytes[dup])) &&
-    (0 == ddcmp_crc16 (0, dup_rcvpacket[dup], dup_rcvpkinoff[dup])))
-    dup_rxdbuf[dup] |= RXDBUF_M_RCRCER;
-else
-    dup_rxdbuf[dup] &= ~RXDBUF_M_RCRCER;
+if (UNIBUS) {
+    if ( ((dup_rcvpkinoff[dup] == 8) || 
+          (dup_rcvpkinoff[dup] >= dup_rcvpkbytes[dup]-crcoffset)) &&
+         (0 == ddcmp_crc16 (0, dup_rcvpacket[dup], dup_rcvpkinoff[dup])))
+        dup_rxdbuf[dup] |= RXDBUF_M_RCRCER;
+    else
+        dup_rxdbuf[dup] &= ~RXDBUF_M_RCRCER;
+} else {
+    if ( ((dup_rcvpkinoff[dup] == 6) || 
+          (dup_rcvpkinoff[dup] >= dup_rcvpkbytes[dup]-crcoffset-2)) &&
+         (0 == ddcmp_crc16 (0, dup_rcvpacket[dup], dup_rcvpkinoff[dup]+2)))
+        dup_rxdbuf[dup] |= RXDBUF_M_DPV_RCRCER;
+    else
+        dup_rxdbuf[dup] &= ~RXDBUF_M_DPV_RCRCER;
+}
 if (dup_rcvpkinoff[dup] >= dup_rcvpkbytes[dup]) {
     dup_rcvpkinoff[dup] = dup_rcvpkbytes[dup] = 0;
     dup_rxcsr[dup] &= ~RXCSR_M_RXACT;
@@ -984,14 +1328,20 @@ return SCPE_OK;
 
 /* service routine to delay device activity */
 
+
 static t_stat dup_svc (UNIT *uptr)
 {
 DEVICE *dptr = DUPDPTR;
 int32 dup = (int32)(uptr-dptr->units);
 TMLN *lp = &dup_desc.ldsc[dup];
+t_bool txdone;
 
 sim_debug(DBG_TRC, DUPDPTR, "dup_svc(dup=%d)\n", dup);
-if (!(dup_txcsr[dup] & TXCSR_M_TXDONE) && (!tmxr_tpbusyln (lp))) {
+if (UNIBUS)
+    txdone = !(dup_txcsr[dup] & TXCSR_M_TXDONE);
+else
+    txdone = !(dup_txcsr[dup] & TXCSR_M_DPV_TBEMPTY);
+if (txdone && (!tmxr_tpbusyln (lp))) {
     uint8 data = dup_txdbuf[dup] & TXDBUF_M_TXDBUF;
 
     dup_put_msg_bytes (dup, &data, (dup_txdbuf[dup] & TXDBUF_M_TEOM) && (dptr == &dup_dev) ? 0 : 1, dup_txdbuf[dup] & TXDBUF_M_TSOM, (dup_txdbuf[dup] & TXDBUF_M_TEOM));
@@ -1023,7 +1373,10 @@ if ((tmxr_tpbusyln (lp) || dup_xmtpkbytes[dup]) && (lp->xmte || (!lp->conn))) {
             sim_activate_notbefore (uptr, dup_xmtpkstart[dup] + (uint32)((tmr_poll*clk_tps)*((double)dup_xmtpkbytes[dup]*8)/dup_speed[dup]));
             }
         else {
-            dup_txcsr[dup] &= ~TXCSR_M_TXACT;   /* Set idle */
+            if (UNIBUS)
+                dup_txcsr[dup] &= ~TXCSR_M_TXACT;   /* Set idle */
+            else
+                dup_txcsr[dup] &= ~TXCSR_M_DPV_TXACT;   /* Set idle */
             dup_xmtpkbytes[dup] = 0;
             dup_xmtpkdelaying[dup] = 0;
             if (dup_xmt_complete_callback[dup])
@@ -1038,7 +1391,7 @@ return SCPE_OK;
 
 static t_stat dup_poll_svc (UNIT *uptr)
 {
-int32 dup, active, attached;
+    int32 dup, active, attached, charmode;
 
 sim_debug(DBG_TRC, DUPDPTR, "dup_poll_svc()\n");
 
@@ -1062,21 +1415,29 @@ for (dup=active=attached=0; dup < dup_desc.lines; dup++) {
         uint16 size;
         t_stat r;
 
-        if (dup_parcsr[dup] & PARCSR_M_DECMODE)
+        charmode = ((UNIBUS) ? (dup_parcsr[dup] & PARCSR_M_DECMODE) : (dup_parcsr[dup] & PARCSR_M_DPV_PROTSEL));
+
+        if (charmode)
             r = ddcmp_tmxr_get_packet_ln (lp, &buf, &size, dup_corruption[dup]);
         else {
             size_t size_t_size;
 
             r = tmxr_get_packet_ln (lp, &buf, &size_t_size);
             size = (uint16)size_t_size;
-            }
+        }
+        /* in DEC mode add some SYN bytes to the end to deal with host drivers that 
+           implement the DDCMP CRC performance optimisation (DDCMP V4.0 section 5.1.2) */
         if ((r == SCPE_OK) && (buf)) {
-            if (dup_rcvpksize[dup] < size) {
-                dup_rcvpksize[dup] = size;
+            if (dup_rcvpksize[dup] < size + TRAILING_SYNS) {
+                dup_rcvpksize[dup] = size + TRAILING_SYNS;
                 dup_rcvpacket[dup] = (uint8 *)realloc (dup_rcvpacket[dup], dup_rcvpksize[dup]);
                 }
             memcpy (dup_rcvpacket[dup], buf, size);
             dup_rcvpkbytes[dup] = size;
+            if (!dup_kmc[dup] && charmode) {
+                memcpy(&(dup_rcvpacket[dup][size]), tsyns, TRAILING_SYNS);
+                dup_rcvpkbytes[dup] += TRAILING_SYNS ;
+            }
             dup_rcvpkinoff[dup] = 0;
             dup_rxcsr[dup] |= RXCSR_M_RXACT;
             dup_rcv_byte (dup);
@@ -1174,7 +1535,7 @@ sim_debug(DBG_TRC, DUPDPTR, "dup_clear(dup=%d,flag=%d)\n", dup, flag);
 dup_rxdbuf[dup] = 0;                                    /* silo empty */
 dup_txdbuf[dup] = 0;
 dup_parcsr[dup] = 0;                                    /* no params */
-dup_txcsr[dup] = TXCSR_M_TXDONE;                        /* clear CSR */
+dup_txcsr[dup] = ((UNIBUS) ? TXCSR_M_TXDONE : TXCSR_M_DPV_TBEMPTY);    /* clear CSR */
 dup_wait[dup] = DUP_WAIT;                               /* initial/default byte delay */
 if (flag) {                                             /* INIT? clr all */
     dup_rxcsr[dup] = 0;
@@ -1225,11 +1586,12 @@ if (dup_ldsc == NULL) {                                 /* First time startup */
             ++attached;
         }
     dup_units[dup_desc.lines] = dup_poll_unit_template;
-    /* Initialize to standard factory Option Jumper Settings */
+    /* Initialize to standard factory Option Jumper Settings and no associated KMC */
     for (i = 0; i < DUP_LINES; i++) {
         dup_W3[i] = TRUE;
         dup_W5[i] = FALSE;
         dup_W6[i] = TRUE;
+        dup_kmc[i] = FALSE;
         }
     }
 for (i = 0; i < dup_desc.lines; i++) {                  /* init each line */

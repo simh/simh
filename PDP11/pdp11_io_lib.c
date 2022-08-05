@@ -37,6 +37,10 @@
 #include "sim_tmxr.h"
 #include "sim_ether.h"
 
+#if !defined(DEV_MBUS)
+#define DEV_MBUS 0
+#endif
+
 extern int32 int_vec[IPL_HLVL][32];
 #if !defined(VEC_SET)
 #define VEC_SET 0
@@ -73,7 +77,7 @@ if (autcon_enb == val)
 autcon_enb = val;
 if (autcon_enb == 0) {
     sim_messagef (SCPE_OK, "Device auto configuration is now disabled.\n");
-    sim_messagef (SCPE_OK, "Explicitly setting any address or vector value tells the system\n");
+    sim_messagef (SCPE_OK, "Explicitly changing any address or vector value tells the system\n");
     sim_messagef (SCPE_OK, "that you are planning a specific configuration that may not use\n");
     sim_messagef (SCPE_OK, "use standard values.  You must explicitly specify bus address and\n");
     sim_messagef (SCPE_OK, "vector values for any device you enable or otherwise add to the\n");
@@ -119,9 +123,11 @@ if (r != SCPE_OK)
     return r;
 if ((newba <= IOPAGEBASE) ||                            /* > IO page base? */
     (newba % ((uint32) val)))                           /* check modulus */
-    return SCPE_ARG;
-dibp->ba = newba;                                       /* store */
-set_autocon (NULL, 0, NULL, NULL);                      /* autoconfig off */
+    return sim_messagef (SCPE_ARG, "Invalid bus address value: %s\n", cptr);
+if (dibp->ba != newba) {                                /* changed? */
+    dibp->ba = newba;                                   /* store */
+    set_autocon (NULL, 0, NULL, NULL);                  /* autoconfig off */
+    }
 return SCPE_OK;
 }
 
@@ -213,9 +219,11 @@ newvec = (uint32) get_uint (cptr, DEV_RDX, 01000, &r);
 if ((r != SCPE_OK) ||
     ((newvec + (dibp->vnum * 4)) >= 01000) ||           /* total too big? */
     (newvec & ((dibp->vnum > 1)? 07: 03)))              /* properly aligned value? */
-    return SCPE_ARG;
-dibp->vec = newvec;
-set_autocon (NULL, 0, NULL, NULL);                      /* autoconfig off */
+    return sim_messagef (SCPE_ARG, "Invalid vector value: %s\n", cptr);
+if (dibp->vec != newvec) {                              /* changed? */
+    dibp->vec = newvec;                                 /* store */
+    set_autocon (NULL, 0, NULL, NULL);                  /* autoconfig off */
+    }
 return SCPE_OK;
 }
 
@@ -317,6 +325,7 @@ int32 i, idx, vec, hivec, ilvl, ibit;
 DEVICE *cdptr;
 size_t j;
 const char *cdname;
+t_stat r = SCPE_OK;
 
 if ((dptr == NULL) || (dibp == NULL))                   /* validate args */
     return SCPE_IERR;
@@ -324,9 +333,9 @@ dibp->dptr = dptr;                                      /* save back pointer */
 if (dibp->vnum > VEC_DEVMAX)
     return SCPE_IERR;
 vec = dibp->vec;
+#if (VEC_SET != 0)
 ilvl = dibp->vloc / 32;
 ibit = dibp->vloc % 32;
-#if (VEC_SET != 0)
 if (vec)
     vec |= (int_vec_set[ilvl][ibit] & ~3);
 #endif
@@ -346,9 +355,9 @@ if (vec && !(sim_switches & SWMASK ('P'))) {
             continue;
             }
         cdvec = cdibp->vec;
+#if (VEC_SET != 0)
         ilvl = cdibp->vloc / 32;
         ibit = cdibp->vloc % 32;
-#if (VEC_SET != 0)
         if (cdvec)
             cdvec |= (int_vec_set[ilvl][ibit] & ~3);
 #endif
@@ -365,10 +374,10 @@ if (vec && !(sim_switches & SWMASK ('P'))) {
         if (!cdname) {
             cdname = "CPU";
         }
-        return sim_messagef (SCPE_STOP, (DEV_RDX == 16) ? 
-                                        "Device %s interrupt vector conflict with %s at 0x%X\n" :
-                                        "Device %s interrupt vector conflict with %s at 0%o\n",
-                             sim_dname (dptr), cdname, (int)dibp->vec);
+        r = sim_messagef (SCPE_STOP, (DEV_RDX == 16) ? 
+                                     "Device %s interrupt vector at 0x%X through 0x%X conflict with %s at 0x%X through 0x%X\n" :
+                                     "Device %s interrupt vector at 0%o through 0%o conflict with %s at 0%o through 0%o\n",
+                          sim_dname (dptr), vec, hivec, cdname, (int)dibp->vec, (int)cdhivec);
         }
     }
 /* Interrupt slot assignment and conflict check. */
@@ -385,8 +394,8 @@ for (i = 0; i < dibp->vnum; i++) {                      /* loop thru vec */
         (int_ack[ilvl][ibit] != dibp->ack[i])) ||
         (int_vec[ilvl][ibit] && vec &&
         (int_vec[ilvl][ibit] != vec))) {
-        return sim_messagef (SCPE_STOP, "Device %s interrupt slot conflict at %d\n",
-                             sim_dname (dptr), idx);
+        r = sim_messagef (SCPE_STOP, "Device %s interrupt slot conflict at %d\n",
+                          sim_dname (dptr), idx);
         }
     if (dibp->ack[i])
         int_ack[ilvl][ibit] = dibp->ack[i];
@@ -420,10 +429,10 @@ for (i = 0; i < (int32) dibp->lnt; i = i + 2) {         /* create entries */
         if (!cdname) {
             cdname = "CPU";
             }
-        return sim_messagef (SCPE_STOP, (DEV_RDX == 16) ? 
-                                        "Device %s address conflict with %s at 0x%X\n" :
-                                        "Device %s address conflict with %s at 0%o\n",
-                             sim_dname (dptr), cdname, (int)dibp->ba);
+        r = sim_messagef (SCPE_STOP, (DEV_RDX == 16) ? 
+                                     "Device %s address conflict with %s at 0x%X\n" :
+                                     "Device %s address conflict with %s at 0%o\n",
+                          sim_dname (dptr), cdname, (int)dibp->ba);
         }
     if ((dibp->rd == NULL) && (dibp->wr == NULL) && (dibp->vnum == 0)) {
         iodibp[idx] = NULL;                         /* deregister DIB */
@@ -438,7 +447,20 @@ for (i = 0; i < (int32) dibp->lnt; i = i + 2) {         /* create entries */
         iodibp[idx] = dibp;                         /* remember DIB */
         }
     }
-return SCPE_OK;
+for (j = 0; (cdptr = sim_devices[j]) != NULL; j++) { /* Look for enabled but unaddressed devices */
+    DIB *cdibp = (DIB *)(cdptr->ctxt);
+    
+    if (((sim_switches & SWMASK ('P')) != 0)          || 
+        (cdptr->flags & DEV_DIS)                      || 
+        (cdibp == NULL)                               || 
+        ((cdptr->flags & (DEV_UBUS | DEV_QBUS)) == 0) ||
+        ((cdptr->flags & DEV_MBUS) != 0)              ||
+        ((cdptr->flags & DEV_NOAUTOCON) != 0)         ||
+        (cdibp->ba != IOBA_AUTO))
+        continue;
+    r = sim_messagef (SCPE_STOP, "%s: Missing Address\n", cdptr->name);
+    }
+return r;
 }
 
 /* Show IO space */
@@ -462,8 +484,7 @@ if ((sim_switches & SWMASK('H')) || (sim_switch_number == 16))
     rdx = 16;
 vec_fmt = (rdx == 16) ? "X" : "o";
 
-if (build_dib_tab ())                                   /* build IO page */
-    return SCPE_OK;
+build_dib_tab ();                                       /* build IO page */
 
 maxaddr = 0;
 maxvec = 0;
@@ -742,8 +763,16 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
         {016500, 016510, 016520, 016530,
          016540, 016550, 016560, 016570,
          016600, 016610, 016620, 016630,
-         016740, 016750, 016760, 016770} },             /* KL11/DL11/DLV11/TU58 - fx CSRs */
-    { { NULL },          1,  2,  0, 8, { 0 } },         /* DLV11J - fx CSRs */
+         016640, 016650, 016660, 016670} },             /* KL11/DL11-A/DL11-B/DLV11/TU58 - fx CSRs */
+    { { "DLCJI" },       1,  2,  0, 8, 
+        {015610, 015620, 015630, 015640,
+         015650, 015660, 015670, 015700,
+         015710, 015720, 015730, 015740,
+         015750, 015760, 015770, 016000,
+         016010, 016020, 016030, 016040,
+         016050, 016060, 016070, 016100,
+         016110, 016120, 016130, 016140,
+         016150, 016160, 016170} },                     /* DL11-C/DL11-D/DL11-E/DLV11-J - fx CSRs */
     { { NULL },          1,  2,  8, 8 },                /* DJ11 */
     { { NULL },          1,  2, 16, 8 },                /* DH11 */
     { { "VT" },          1,  4,  0, 8,

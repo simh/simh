@@ -509,6 +509,7 @@ main_argc = argc;
 main_argv = argv;
 
 SDL_SetHint (SDL_HINT_RENDER_DRIVER, "software");
+SDL_SetHint (SDL_HINT_VIDEO_ALLOW_SCREENSAVER, "1");
 
 status = SDL_Init (SDL_INIT_VIDEO);
 
@@ -1961,6 +1962,26 @@ if (!initialized) {
      *  and should be allocated with SDL_RegisterEvents()
      */
     eventtypes[SDL_USEREVENT] = "USEREVENT";
+
+    /** 
+     * The SDL_HINT_VIDEO_ALLOW_SCREENSAVER at init time enables 
+     * the screensaver.  Once a video window is created, we default 
+     * to being consistent with behavior since SDL 2.0.2 and we disable 
+     * the screen saver.
+     * 
+     * We allow an environment variable SDL_VIDEO_ALLOW_SCREENSAVER 
+     * to specifically change this to enable the screensaver if the 
+     * value is "1".
+     */
+    if ((getenv ("SDL_VIDEO_ALLOW_SCREENSAVER") == NULL) ||
+        (strcmp (getenv ("SDL_VIDEO_ALLOW_SCREENSAVER"), "1") != 0)) {
+        if (SDL_IsScreenSaverEnabled () == SDL_TRUE)
+            SDL_DisableScreenSaver ();
+        }
+    else {
+        if (SDL_IsScreenSaverEnabled () == SDL_FALSE)
+            SDL_EnableScreenSaver ();
+        }
     }
 
 sim_debug (SIM_VID_DBG_VIDEO|SIM_VID_DBG_KEY|SIM_VID_DBG_MOUSE, vptr0->vid_dev, "vid_thread() - Starting\n");

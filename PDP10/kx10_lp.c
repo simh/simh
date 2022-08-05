@@ -34,6 +34,14 @@
 
 #if (NUM_DEVS_LP > 0)
 
+#if KL
+#define LP_DIS DEV_DIS
+#endif
+
+#ifndef LP_DIS
+#define LP_DIS 0
+#endif
+
 #define LP_DEVNUM 0124
 #define STATUS   u3
 #define COL      u4
@@ -90,8 +98,8 @@ UNIT lpt_unit = {
     };
 
 REG lpt_reg[] = {
-    { DRDATA (STATUS, lpt_unit.STATUS, 18), PV_LEFT | REG_UNIT },
-    { DRDATA (TIME, lpt_unit.wait, 24), PV_LEFT | REG_UNIT },
+    { URDATA (STATUS, lpt_unit.STATUS, 8, 18, 0, 1, PV_LEFT) },
+    { URDATA (TIME, lpt_unit.wait, 10, 24, 0, 1, PV_LEFT) },
     { BRDATA(BUFF, lpt_buffer, 16, 8, sizeof(lpt_buffer)), REG_HRO},
     { BRDATA(CBUFF, lpt_chbuf, 16, 8, sizeof(lpt_chbuf)), REG_HRO},
     { NULL }
@@ -114,7 +122,7 @@ DEVICE lpt_dev = {
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &lpt_reset,
     NULL, &lpt_attach, &lpt_detach,
-    &lpt_dib, DEV_DISABLE | DEV_DEBUG, 0, dev_debug,
+    &lpt_dib, DEV_DISABLE | DEV_DEBUG | LP_DIS, 0, dev_debug,
     NULL, NULL, &lpt_help, NULL, NULL, &lpt_description
 };
 

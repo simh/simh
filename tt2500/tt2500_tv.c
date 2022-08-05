@@ -60,7 +60,7 @@ DEVICE tv_dev = {
   1, 8, 16, 1, 8, 16,
   NULL, NULL, &tv_reset,
   NULL, NULL, NULL,
-  NULL, DEV_DISABLE | DEV_DEBUG | TV_DIS, 0, tv_deb,
+  NULL, DEV_DISABLE | DEV_DEBUG | TV_DIS | DEV_DISPLAY, 0, tv_deb,
   NULL, NULL, NULL, NULL, NULL, NULL
 };
 

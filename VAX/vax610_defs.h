@@ -199,6 +199,7 @@ extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, CONST void* desc
 #define DEV_UBUS        (1u << DEV_V_UBUS)
 #define DEV_QBUS        (1u << DEV_V_QBUS)
 #define DEV_Q18         (1u << DEV_V_Q18)
+#define DEV_NOAUTOCON   (0)
 
 #define UNIBUS          FALSE                           /* 22b only */
 

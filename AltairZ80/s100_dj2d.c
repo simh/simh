@@ -1368,13 +1368,13 @@ static t_stat dj2d_attach(UNIT *uptr, CONST char *cptr)
         return r;
     }
 
-    for (i = 0; i < DJ2D_UNITS; i++) {
+    for (i = 0; i < DJ2D_MAX_DRIVES; i++) {
         if (dj2d_dev.units[i].fileref == uptr->fileref) {
             break;
         }
     }
 
-    if (i >= DJ2D_UNITS) {
+    if (i >= DJ2D_MAX_DRIVES) {
         return SCPE_ARG;
     }
 
@@ -1630,14 +1630,14 @@ static t_offset calculate_dj2d_sec_offset(uint8 track, uint8 sector)
         offset = 0;
         format = FMT_SD;
     } else {
-        offset = dj2d_spt[FMT_SD] * dj2d_sector_len[FMT_SD]; /* Track 0 / Side 0 always SD */
-        offset += (track-1) * dj2d_spt[format] * dj2d_sector_len[format]; /* Track 1-153 */
+        offset = (t_offset)(dj2d_spt[FMT_SD]) * (t_offset)(dj2d_sector_len[FMT_SD]); /* Track 0 / Side 0 always SD */
+        offset += (t_offset)(track-1) * (t_offset)(dj2d_spt[format]) * (t_offset)(dj2d_sector_len[format]); /* Track 1-153 */
     }
 
     /*
     ** Add sector offset to track offset
     */
-    offset += (sector-1) * dj2d_sector_len[format];
+    offset += (t_offset)(sector-1) * (t_offset)(dj2d_sector_len[format]);
 
     sim_debug(DEBUG_MSG, &dj2d_dev, DJ2D_SNAME ": OFFSET=%08llx drive=%d side=%d format=%d track=%03d sector=%03d\r\n", offset, dj2d_info->currentDrive, ds, dj2d_info->format[dj2d_info->currentDrive], track, sector);
 
@@ -1721,6 +1721,9 @@ static uint8 DJ2D_Read(uint32 Addr)
                 cData |= (dj2d_info->headLoaded[dj2d_info->currentDrive]) ? DJ2DA_STAT_HEAD : 0;
                 cData |= (pWD1791->status & WD1791_STAT_NOTREADY) ? DJ2DA_STAT_NREADY : 0;
                 cData |= (dj2d_info->sides2[dj2d_info->currentDrive]) ? 0 : DJ2D_STAT_N2SIDED;
+            }
+            if (pDJ2D->status != cData) {
+                sim_debug(STATUS_MSG, &dj2d_dev, DJ2D_SNAME ": 2D_STATUS=%02X\n", cData);
             }
             pDJ2D->status = cData;
             break;

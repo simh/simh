@@ -162,6 +162,7 @@ int     pi_restore;                           /* Restore previous level */
 int     pi_hold;                              /* Hold onto interrupt */
 int     modify;                               /* Modify cycle */
 int     xct_flag;                             /* XCT flags */
+int     pi_vect;                              /* Last pi location used for IRQ */
 #if KI | KL | KS
 uint64  ARX;                                  /* Extension to AR */
 uint64  BRX;                                  /* Extension to BR */
@@ -184,13 +185,11 @@ int     t20_page;                             /* Tops 20 paging selected */
 int     ptr_flg;                              /* Access to pointer value */
 int     extend = 0;                           /* Process extended instruction */
 int     fe_xct = 0;                           /* Execute instruction at address */
-int     pi_vect;                              /* Last pi location used for IRQ */
 #if KS_ITS
 uint64  qua_time;                             /* Quantum clock value */
 uint8   pi_act;                               /* Current active PI level */
 #endif
 #elif KL
-int     pi_vect;                              /* Last pi location used for IRQ */
 int     ext_ac;                               /* Extended instruction AC */
 uint8   prev_ctx;                             /* Previous AC context */
 uint16  irq_enable;                           /* Apr IRQ enable bits */
@@ -404,7 +403,14 @@ t_bool build_dev_tab (void);
 #define DEFMEM 256
 #endif
 
-UNIT cpu_unit[] = { { UDATA (&rtc_srv, UNIT_IDLE|UNIT_FIX|UNIT_BINK|UNIT_TWOSEG, DEFMEM * 1024) },
+#if KI_22BIT
+#define DF_FLAG UNIT_DF10C
+#else
+#define DF_FLAG 0
+#endif
+
+UNIT cpu_unit[] = { { UDATA (&rtc_srv,
+            UNIT_IDLE|UNIT_FIX|UNIT_BINK|UNIT_TWOSEG|DF_FLAG, DEFMEM * 1024) },
 #if ITS
                     { UDATA (&qua_srv, UNIT_IDLE|UNIT_DIS, 0) }
 #endif
@@ -630,6 +636,12 @@ MTAB cpu_mod[] = {
     { UNIT_M_MPX, 0, NULL, "NOMPX", NULL, NULL, NULL,
               "Disables the MPX device"},
 #endif
+#if KI | KL
+    { UNIT_M_DF10, 0, "DF10", "DF10", NULL, NULL, NULL,
+              "18 bit DF10"},
+    { UNIT_M_DF10, UNIT_DF10C, "DF10C", "DF10C", NULL, NULL, NULL,
+              "22 bit DF10C"},
+#endif
 #if PDP6 | KA | KI
     { UNIT_MAOFF, UNIT_MAOFF, "MAOFF", "MAOFF", NULL, NULL,
               NULL, "Interrupts relocated to 140"},
@@ -655,6 +667,7 @@ DEBTAB              cpu_debug[] = {
 #endif
     {0, 0}
 };
+
 
 DEVICE cpu_dev = {
     "CPU", &cpu_unit[0], cpu_reg, cpu_mod,
@@ -1028,7 +1041,7 @@ t_stat dev_pi(uint32 dev, uint64 *data) {
         res |= ((uint64)(PIR) << 18);
 #endif
 #if !KL
-        res |= (parity_irq << 15);
+        res |= ((uint64)parity_irq << 15);
 #endif
         *data = res;
         sim_debug(DEBUG_CONI, &cpu_dev, "CONI PI %012llo\n", *data);
@@ -1306,7 +1319,7 @@ t_stat dev_mtr(uint32 dev, uint64 *data) {
         *data = mtr_irq;
         if (mtr_enable)
             *data |= 02000;
-        *data |= (uint64)(mtr_flags << 12);
+        *data |= (uint64)mtr_flags << 12;
         sim_debug(DEBUG_CONI, &cpu_dev, "CONI MTR %012llo\n", *data);
         break;
 
@@ -1770,7 +1783,7 @@ void check_apr_irq() {
 void cty_interrupt()
 {
      irq_flags |= CON_IRQ;
-        sim_debug(DEBUG_IRQ, &cpu_dev, "cty interrupt %06o\n", irq_enable);
+     sim_debug(DEBUG_IRQ, &cpu_dev, "cty interrupt %06o\n", irq_enable);
      check_apr_irq();
 }
 
@@ -2934,7 +2947,8 @@ int Mem_read_byte(int n, uint16 *data, int byte) {
            need -= 16;
         else
            need -= 8;
-        *data |= val << need;
+        if (need >= 0)
+           *data |= val << need;
     }
     return s;
 }
@@ -4058,7 +4072,7 @@ t_stat dev_apr(uint32 dev, uint64 *data) {
         res |= (((FLAGS & PCHNG) != 0) << 6) | (pcchg_irq << 7) ;
         res |= (clk_flg << 9) | (((uint64)clk_en) << 10) | (nxm_flag << 12);
         res |= (mem_prot << 13) | (((FLAGS & USER) != 0) << 14) | (user_io << 15);
-        res |= (push_ovf << 16);
+        res |= ((uint64)push_ovf << 16);
         *data = res;
         sim_debug(DEBUG_CONI, &cpu_dev, "CONI APR %012llo\n", *data);
         break;
@@ -4474,23 +4488,18 @@ no_fetch:
     if (QKLB && t20_page) {
         if (xct_flag != 0) {
             if (((xct_flag & 8) != 0 && !ptr_flg) ||
-                ((xct_flag & 2) != 0 && ptr_flg)
-/* The following two lines are needed for Tops20 V3 */
-#if 1
-                || ((xct_flag & 014) == 04 && !ptr_flg && prev_sect == 0) ||
-                ((xct_flag & 03)  == 01 && ptr_flg  && prev_sect == 0)
-#endif
-            )
+                ((xct_flag & 2) != 0 && ptr_flg))
             sect = cur_sect = prev_sect;
-        }
-        /* Short cut for extended pointer address */
-        if (ptr_flg && (glb_sect || cur_sect != 0) && (AR & BIT12) != 0) { /* Full pointer */
-            ind = 1;  /* Allow us to read word, xDB has already bumped AB */
-            goto in_loop;
+#if 1
+         /* The following lines are needed to run Tops 20 V3 on KL/B */
+         if (((xct_flag & 014) == 04 && !ptr_flg && prev_sect == 0)
+             || ((xct_flag & 03)  == 01 && ptr_flg  && prev_sect == 0))
+             sect = cur_sect = prev_sect;
+#endif
         }
     }
-
 #endif
+
     /* Handle indirection repeat until no longer indirect */
     do {
         ind = TST_IND(MB) != 0;
@@ -4539,7 +4548,7 @@ in_loop:
                  if (MB & SMASK || cur_sect == 0) {    /* Instruction format IFIW */
                      if (MB & BIT1 && cur_sect != 0) { /* Illegal index word */
                          fault_data = 024LL << 30 | (((FLAGS & USER) != 0)?SMASK:0) |
-                                      (MB & RMASK) | ((uint64)cur_sect << 18);
+                                      BIT8 | (AB & RMASK) | ((uint64)cur_sect << 18);
                          page_fault = 1;
                          goto last;
                      }
@@ -4581,9 +4590,10 @@ in_loop:
                          else
                             AR = get_reg(ix);
                          if ((AR & SMASK) != 0 || (AR & SECTM) == 0) { /* Local index word */
-                              AR = AB + (((AR & RSIGN) ? 0: 0)|(AR & RMASK));
+                              AR = AB + (AR & RMASK);
                          } else
-                              AR = AR + AB;
+                              AR = (AR & ~(SECTM|RMASK)) |
+                                     ((AR + AB) & (SECTM|RMASK));
                          AR &= FMASK;
                          MB = AR;
                      } else
@@ -4689,11 +4699,12 @@ st_pi:
 #if KL
         sect = cur_sect = 0;
         extend = 0;
-        pi_vect = AB;
 #endif
+        pi_vect = AB;
         Mem_read_nopage();
         goto no_fetch;
 #elif PDP6 | KA
+        pi_vect = AB;
         goto fetch;
 #endif
     }
@@ -5787,8 +5798,12 @@ dpnorm:
                   goto last;
               AR = MB;
               AB = (AB + 1) & RMASK;
+#if KI
+              FLAGS |= BYTI;
+#endif
               if (Mem_read(0, 0, 0, 0))
                    goto last;
+              FLAGS &= ~BYTI;
               MQ = MB;
               set_reg(AC, AR);
               set_reg(AC+1, MQ);
@@ -5799,8 +5814,12 @@ dpnorm:
                   goto last;
               AR = MB;
               AB = (AB + 1) & RMASK;
+#if KI
+              FLAGS |= BYTI;
+#endif
               if (Mem_read(0, 0, 0, 0))
                    goto last;
+              FLAGS &= ~BYTI;
               MQ = CCM(MB) + 1;   /* Low */
               /* High */
 #if KL | KS
@@ -5878,6 +5897,9 @@ dpnorm:
               if ((FLAGS & BYTI)) {
                   AB = (AB + 1) & RMASK;
                   MB = MQ;
+#if KL
+                  FLAGS &= ~BYTI;
+#endif
                   if (Mem_write(0, 0))
                      goto last;
                   FLAGS &= ~BYTI;
@@ -6404,6 +6426,14 @@ unasign:
                           if (Mem_write(0,0))
                               goto last;
                           AB = (AB - 1) & RMASK;
+                          AR &= PMASK;
+                          AR |= (uint64)(SCAD & 077) << 30;
+                          MB = AR;
+                          if (Mem_write(0, 0))
+                              goto last;
+                          if ((IR & 04) == 0)
+                              break;
+                          goto ldb_ptr;
                       } else
                           AR = (AR & LMASK) | ((AR + 1) & RMASK);
 #elif KI | KS
@@ -6475,10 +6505,11 @@ ldb_ptr:
 #endif
 #if KL
                   if (QKLB && t20_page && (SC < 36) &&
-                       pc_sect != 0 && (glb_sect || cur_sect != 0) &&
-                       (AR & BIT12) != 0) {
+                       pc_sect != 0 && (AR & BIT12) != 0) {
                       /* Full pointer */
                       AB = (AB + 1) & RMASK;
+                      ind = 1;
+                      goto in_loop;
                   } else
                       glb_sect = 0;
 #endif
@@ -12032,16 +12063,13 @@ last:
             trap_flag = 0;
         }
 #endif
+       /* Check if I/O and BLKI/O or DATAI/O */
        if ((IR & 0700) == 0700 && ((AC & 04) == 0)) {
            pi_hold = pi_ov;
-           if ((!pi_hold) & f_inst_fetch) {
+           if ((!pi_hold) && f_inst_fetch) {
                 pi_cycle = 0;
            } else {
-#if KL | KS
                 AB = pi_vect | pi_ov;
-#else
-                AB = 040 | (pi_enc << 1) | maoff | pi_ov;
-#endif
 #if KI | KL
                 Mem_read_nopage();
 #elif KS
@@ -12052,14 +12080,11 @@ last:
                 goto no_fetch;
            }
        } else if (pi_hold && !f_pc_inh) {
+            /* Check if I/O, then check if IRQ was raised */
             if ((IR & 0700) == 0700) {
                 (void)check_irq_level();
             }
-#if KL | KS
             AB = pi_vect | pi_ov;
-#else
-            AB = 040 | (pi_enc << 1) | maoff | pi_ov;
-#endif
             pi_ov = 0;
             pi_hold = 0;
 #if KI | KL
@@ -12222,7 +12247,7 @@ do_byte_setup(int n, int wr, int *pos, int *sz)
        temp = MB = (MB + temp) & FMASK;
        AB = MB & RMASK;
     }
-    while (ind && pi_pending && !check_irq_level()) {
+    if (ind) {
          if (Mem_read(0, 1, 0, 0)) {
              return 1;
          }
@@ -12262,7 +12287,7 @@ do_byte_setup(int n, int wr, int *pos, int *sz)
                  if (ix) {
                      temp = get_reg(ix);
                      if ((temp & SMASK) != 0 || (temp & SECTM) == 0) { /* Local index word */
-                          temp = AB + (((temp & RSIGN) ? 0: 0)|(temp & RMASK));
+                          temp = AB + (temp & RMASK);
                      } else
                           temp = temp + AB;
                      temp &= FMASK;
@@ -12307,10 +12332,13 @@ do_byte_setup(int n, int wr, int *pos, int *sz)
     set_reg(n+2, val2);
 
     /* Read final value */
+    ptr_flg = 1;
+    BYF5 = wr;
     if (Mem_read(0, 0, 0, wr)) {
         ptr_flg = BYF5 = 0;
         return 1;
     }
+    ptr_flg = BYF5 = 0;
     return 0;
 }
 
@@ -12329,11 +12357,9 @@ load_byte(int n, uint64 *data, uint64 fill, int cnt)
     }
 
     /* Fetch Pointer word */
-    ptr_flg = 1;
     if (do_byte_setup(n, 0, &p, &s))
         goto back;
 
-ptr_flg = 0;
     /* Generate mask for given size */
     msk = (uint64)(1) << s;
     msk--;
@@ -12348,7 +12374,6 @@ ptr_flg = 0;
     return 1;
 
 back:
-ptr_flg = 0;
     val1 = get_reg(n+1);
     val1 &= PMASK;
     val1 |= (uint64)(p + s) << 30;
@@ -12364,7 +12389,6 @@ store_byte(int n, uint64 data, int cnt)
     int       s, p;
 
     /* Fetch Pointer word */
-    BYF5 = 1;
     if (do_byte_setup(n, 1, &p, &s))
         goto back;
 
@@ -12374,10 +12398,11 @@ store_byte(int n, uint64 data, int cnt)
     msk <<= p;
     MB &= CM(msk);
     MB |= msk & ((uint64)(data) << p);
+    ptr_flg = BYF5 = 1;
     if (Mem_write(0, 0))
         goto back;
 
-    BYF5 = 0;
+    ptr_flg = BYF5 = 0;
     if (cnt) {
        /* Decrement count */
        val1 = get_reg(n);
@@ -12388,7 +12413,7 @@ store_byte(int n, uint64 data, int cnt)
     return 1;
 
 back:
-    BYF5 = 0;
+    ptr_flg = BYF5 = 0;
     val1 = get_reg(n+1);
     val1 &= PMASK;
     val1 |= (uint64)(p + s) << 30;

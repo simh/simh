@@ -1,6 +1,6 @@
 /* pdp11_ta.c: PDP-11 cassette tape simulator
 
-   Copyright (c) 2007-2013, Robert M Supnik
+   Copyright (c) 2007-2022, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    ta           TA11/TU60 cassette tape
    
+   26-Mar-22    RMS     Added extra case points for new MTSE definitions
    23-Oct-13    RMS     Revised for new boot setup routine
    06-Jun-13    RMS     Reset must set RDY (Ian Hammond)
                         Added CAPS-11 bootstrap (Ian Hammond)
@@ -530,6 +531,7 @@ switch (st) {
     case MTSE_UNATT:                                    /* unattached */
         ta_cs |= TACS_ERR|TACS_CRC;
     case MTSE_OK:                                       /* no error */
+    default:                                            /* unknown error*/
         return SCPE_IERR;                               /* never get here! */
 
     case MTSE_TMK:                                      /* end of file */

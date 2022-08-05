@@ -56,7 +56,7 @@ DEVICE crt_dev = {
   1, 8, 16, 1, 8, 16,
   NULL, NULL, &crt_reset,
   NULL, NULL, NULL,
-  NULL, DEV_DISABLE | DEV_DEBUG | CRT_DIS, 0, crt_deb,
+  NULL, DEV_DISABLE | DEV_DEBUG | CRT_DIS | DEV_DISPLAY, 0, crt_deb,
   NULL, NULL, NULL, NULL, NULL, NULL
 };
 

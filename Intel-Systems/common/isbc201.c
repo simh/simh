@@ -290,7 +290,7 @@ MTAB isbc201_mod[] = {
     { MTAB_XTD | MTAB_VDV, 0, NULL, "INT", &isbc201_set_int,
         NULL, NULL, "Sets the interrupt number for iSBC201"},
     { MTAB_XTD | MTAB_VDV, 0, "PARAM", NULL, NULL, &isbc201_show_param, NULL, 
-        "show configured parametes for iSBC201" },
+        "show configured parameters for iSBC201" },
     { 0 }
 };
 
@@ -300,8 +300,6 @@ DEBTAB isbc201_debug[] = {
     { "READ", DEBUG_read },
     { "WRITE", DEBUG_write },
     { "XACK", DEBUG_xack },
-    { "LEV1", DEBUG_level1 },
-    { "LEV2", DEBUG_level2 },
     { NULL }
 };
 
@@ -349,7 +347,7 @@ t_stat isbc201_cfg(uint16 baseport, uint16 devnum, uint8 intnum)
         uptr->u6 = i;               //fdd unit number
         uptr->flags &= ~UNIT_ATT;
     }
-    fdc201.baseport = baseport & 0xff;  //set port
+    fdc201.baseport = baseport & BYTEMASK;  //set port
     fdc201.intnum = intnum;             //set interrupt
     fdc201.verb = 0;                    //clear verb
     reg_dev(isbc201r0, fdc201.baseport, 0, 0); //read status
@@ -392,11 +390,11 @@ t_stat isbc201_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
     if (val & UNIT_WPMODE) {            /* write protect */
         uptr->flags |= val;
         if (fdc201.verb)
-            sim_printf("    sbc201: WP\n");
+            sim_printf("    sbc201%d: WP\n", uptr->u6);
     } else {                            /* read write */
         uptr->flags &= ~val;
         if (fdc201.verb)
-            sim_printf("    sbc201: RW\n");
+            sim_printf("    sbc201%d: RW\n", uptr->u6);
     }
     return SCPE_OK;
 }

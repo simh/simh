@@ -284,16 +284,16 @@ int32 fpc_OP;                                           /* shadow op for FPC acc
 
 int32 addr_mask = YMASK;
 
-t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
-t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
-t_stat cpu_reset (DEVICE *dptr);
-t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+static t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
+static t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
+static t_stat cpu_reset (DEVICE *dptr);
+static t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat cpu_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 int32 cpu_get_mode (void);
-t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
-t_stat cpu_set_ext (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
-t_stat cpu_set_noext (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+static t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+static t_stat cpu_set_ext (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+static t_stat cpu_set_noext (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+static t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat Read (void);
 t_stat Write (void);
 
@@ -1030,7 +1030,7 @@ t_stat Write (void)
 
 /* Reset routine */
 
-t_stat cpu_reset (DEVICE *dptr)
+static t_stat cpu_reset (DEVICE *dptr)
 {
     ios = 0;
     PF = 0;
@@ -1051,7 +1051,7 @@ t_stat cpu_reset (DEVICE *dptr)
 
 /* Memory examine */
 
-t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
+static t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 {
     if (addr >= MEMSIZE) return SCPE_NXM;
     if (vptr != NULL) *vptr = M[addr] & DMASK;
@@ -1061,7 +1061,7 @@ t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 
 /* Memory deposit */
 
-t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
+static t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 {
     if (addr >= MEMSIZE) return SCPE_NXM;
 
@@ -1072,7 +1072,7 @@ t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 
 /* Change memory size */
 
-t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+static t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
     int32 mc = 0;
     uint32 i;
@@ -1108,13 +1108,13 @@ t_stat cpu_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 
 /* Set TX-0 with Extended Instruction Set */
 
-t_stat cpu_set_ext (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+static t_stat cpu_set_ext (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
     sim_printf("Set CPU Extended Mode\n");
     return SCPE_OK;
 }
 
-t_stat cpu_set_noext (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+static t_stat cpu_set_noext (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
     sim_printf("Set CPU Non-Extended Mode\n");
     return SCPE_OK;
@@ -1129,7 +1129,7 @@ int32 cpu_get_mode (void)
 
 /* Set history */
 
-t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+static t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 i, lnt;
 t_stat r;
@@ -1157,7 +1157,7 @@ return SCPE_OK;
 
 /* Show history */
 
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+static t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 ov, pf, op, k, di, lnt;
 const char *cptr = (const char *) desc;
@@ -1230,9 +1230,10 @@ t_stat sim_load(FILE *fileref, CONST char *cptr, CONST char *fnam, int flag) {
     } else {
         lo = strtotv(cptr, &result, 8) & 0xFFFF;
         sz = sim_fsize(fileref);
-        sz_words = MIN (sz, sizeof (M)) / 4;
+        sz_words = MIN (sz, sizeof (M)) / sizeof (word);
         for (j = lo; j < sz_words; j++) {
-            sim_fread(&word, 4, 1, fileref);
+            if (1 != sim_fread(&word, 4, 1, fileref))
+                break;
             M[j] = word;
         }
     }

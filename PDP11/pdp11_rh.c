@@ -208,18 +208,18 @@ DIB mba0_dib = {
 UNIT mba0_unit = { UDATA (NULL, 0, 0) };
 
 REG mba0_reg[] = {
-    { ORDATA (CS1, massbus[0].cs1, 16) },
-    { ORDATA (WC, massbus[0].wc, 16) },
-    { ORDATA (BA, massbus[0].ba, 16) },
-    { ORDATA (CS2, massbus[0].cs2, 16) },
-    { ORDATA (DB, massbus[0].db, 16) },
-    { ORDATA (BAE, massbus[0].bae, 6) },
-    { ORDATA (CS3, massbus[0].cs3, 16) },
-    { FLDATA (IFF, massbus[0].iff, 0) },
-    { FLDATA (INT, IREQ (RP), INT_V_RP) },
-    { FLDATA (SC, massbus[0].cs1, CSR_V_ERR) },
-    { FLDATA (DONE, massbus[0].cs1, CSR_V_DONE) },
-    { FLDATA (IE, massbus[0].cs1, CSR_V_IE) },
+    { ORDATAD (CS1, massbus[0].cs1, 16, "control/status register 1") },
+    { ORDATAD (WC, massbus[0].wc, 16, "word count") },
+    { ORDATAD (BA, massbus[0].ba, 16, "bus address") },
+    { ORDATAD (CS2, massbus[0].cs2, 16, "control/status register 2") },
+    { ORDATAD (DB, massbus[0].db, 16, "data buffer") },
+    { ORDATAD (BAE, massbus[0].bae, 6, "bus address extension") },
+    { ORDATAD (CS3, massbus[0].cs3, 16, "control/status register 3") },
+    { FLDATAD (IFF, massbus[0].iff, 0, "transfer complete interrupt request flag") },
+    { FLDATAD (INT, IREQ (RP), INT_V_RP, "interrupt pending flag (RP)") },
+    { FLDATAD (SC, massbus[0].cs1, CSR_V_ERR, "special condition (CSR1<15>)") },
+    { FLDATAD (DONE, massbus[0].cs1, CSR_V_DONE, "device done flag (CSR1<7>)") },
+    { FLDATAD (IE, massbus[0].cs1, CSR_V_IE, "interrupt enable flag (CSR1<6>)") },
     { ORDATA (DEVADDR, mba0_dib.ba, 32), REG_HRO },
     { ORDATA (DEVVEC, mba0_dib.vec, 16), REG_HRO },
     { NULL }
@@ -227,9 +227,9 @@ REG mba0_reg[] = {
 
 MTAB mba0_mod[] = {
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0100, "ADDRESS", "ADDRESS",
-      &set_addr, &show_addr, NULL },
+      &set_addr, &show_addr, NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", "VECTOR",
-      &set_vec, &show_vec, NULL },
+      &set_vec, &show_vec, NULL, "Interrupt vector" },
     { 0 }
     };
 
@@ -241,18 +241,18 @@ DIB mba1_dib = {
 UNIT mba1_unit = { UDATA (NULL, 0, 0) };
 
 REG mba1_reg[] = {
-    { ORDATA (CS1, massbus[1].cs1, 16) },
-    { ORDATA (WC, massbus[1].wc, 16) },
-    { ORDATA (BA, massbus[1].ba, 16) },
-    { ORDATA (CS2, massbus[1].cs2, 16) },
-    { ORDATA (DB, massbus[1].db, 16) },
-    { ORDATA (BAE, massbus[1].bae, 6) },
-    { ORDATA (CS3, massbus[1].cs3, 16) },
-    { FLDATA (IFF, massbus[1].iff, 0) },
-    { FLDATA (INT, IREQ (TU), INT_V_TU) },
-    { FLDATA (SC, massbus[1].cs1, CSR_V_ERR) },
-    { FLDATA (DONE, massbus[1].cs1, CSR_V_DONE) },
-    { FLDATA (IE, massbus[1].cs1, CSR_V_IE) },
+    { ORDATAD (CS1, massbus[1].cs1, 16, "control/status register 1") },
+    { ORDATAD (WC, massbus[1].wc, 16, "word count") },
+    { ORDATAD (BA, massbus[1].ba, 16, "bus address") },
+    { ORDATAD (CS2, massbus[1].cs2, 16, "control/status register 2") },
+    { ORDATAD (DB, massbus[1].db, 16, "data buffer") },
+    { ORDATAD (BAE, massbus[1].bae, 6, "bus address extension") },
+    { ORDATAD (CS3, massbus[1].cs3, 16, "control/status register 3") },
+    { FLDATAD (IFF, massbus[1].iff, 0, "transfer complete interrupt request flag") },
+    { FLDATAD (INT, IREQ (TU), INT_V_TU, "interrupt pending flag (TU)") },
+    { FLDATAD (SC, massbus[1].cs1, CSR_V_ERR, "special condition (CSR1<15>)") },
+    { FLDATAD (DONE, massbus[1].cs1, CSR_V_DONE, "device done flag (CSR1<7>)") },
+    { FLDATAD (IE, massbus[1].cs1, CSR_V_IE, "interrupt enable flag (CSR1<6>)") },
     { ORDATA (DEVADDR, mba1_dib.ba, 32), REG_HRO },
     { ORDATA (DEVVEC, mba1_dib.vec, 16), REG_HRO },
     { NULL }
@@ -260,9 +260,9 @@ REG mba1_reg[] = {
 
 MTAB mba1_mod[] = {
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0040, "ADDRESS", "ADDRESS",
-      &set_addr, &show_addr, NULL },
+      &set_addr, &show_addr, NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", "VECTOR",
-      &set_vec, &show_vec, NULL },
+      &set_vec, &show_vec, NULL, "Interrupt vector" },
     { 0 }
     };
 
@@ -274,18 +274,18 @@ DIB mba2_dib = {
 UNIT mba2_unit = { UDATA (NULL, 0, 0) };
 
 REG mba2_reg[] = {
-    { ORDATA (CS1, massbus[2].cs1, 16) },
-    { ORDATA (WC, massbus[2].wc, 16) },
-    { ORDATA (BA, massbus[2].ba, 16) },
-    { ORDATA (CS2, massbus[2].cs2, 16) },
-    { ORDATA (DB, massbus[2].db, 16) },
-    { ORDATA (BAE, massbus[2].bae, 6) },
-    { ORDATA (CS3, massbus[2].cs3, 16) },
-    { FLDATA (IFF, massbus[2].iff, 0) },
-    { FLDATA (INT, IREQ (TU), INT_V_TU) },
-    { FLDATA (SC, massbus[2].cs1, CSR_V_ERR) },
-    { FLDATA (DONE, massbus[2].cs1, CSR_V_DONE) },
-    { FLDATA (IE, massbus[2].cs1, CSR_V_IE) },
+    { ORDATAD (CS1, massbus[2].cs1, 16, "control/status register 1") },
+    { ORDATAD (WC, massbus[2].wc, 16, "word count") },
+    { ORDATAD (BA, massbus[2].ba, 16, "bus address") },
+    { ORDATAD (CS2, massbus[2].cs2, 16, "control/status register 2") },
+    { ORDATAD (DB, massbus[2].db, 16, "data buffer") },
+    { ORDATAD (BAE, massbus[2].bae, 6, "bus address extension") },
+    { ORDATAD (CS3, massbus[2].cs3, 16, "control/status register 3") },
+    { FLDATAD (IFF, massbus[2].iff, 0, "transfer complete interrupt request flag") },
+    { FLDATAD (INT, IREQ (RS), INT_V_RS, "interrupt pending flag (RS)") },
+    { FLDATAD (SC, massbus[2].cs1, CSR_V_ERR, "special condition (CSR1<15>)") },
+    { FLDATAD (DONE, massbus[2].cs1, CSR_V_DONE, "device done flag (CSR1<7>)") },
+    { FLDATAD (IE, massbus[2].cs1, CSR_V_IE, "interrupt enable flag (CSR1<6>)") },
     { ORDATA (DEVADDR, mba2_dib.ba, 32), REG_HRO },
     { ORDATA (DEVVEC, mba2_dib.vec, 16), REG_HRO },
     { NULL }
@@ -293,9 +293,9 @@ REG mba2_reg[] = {
 
 MTAB mba2_mod[] = {
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0040, "ADDRESS", "ADDRESS",
-      &set_addr, &show_addr, NULL },
+      &set_addr, &show_addr, NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", "VECTOR",
-      &set_vec, &show_vec, NULL },
+      &set_vec, &show_vec, NULL, "Interrupt vector" },
     { 0 }
     };
 
@@ -930,11 +930,12 @@ t_stat rh_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr
 {
 const char *const text =
 /*567901234567890123456789012345678901234567890123456789012345678901234567890*/
-" RH70/RH11 Massbus adapters (RHA, RHB, RHC)\n"
+" RH11/RH70/RH70-emulating Massbus adapters (RHA, RHB, RHC)\n"
 "\n"
-" The RH70/RH11 Massbus adapters interface Massbus peripherals to the\n"
-" memory bus or Unibus of the CPU.  The simulator provides three Massbus\n"
-" adapters.  These adapters (RHA, RHB, and RHC) are used by (in order):\n"
+" The RH70/RH11/RH70-emulating Massbus adapters interface Massbus\n"
+" peripherals to the memory bus or Unibus of the CPU.  The simulator\n"
+" provides three Massbus adapters.  These adapters (RHA, RHB, and RHC)\n"
+" are used by (in order):\n"
 "       1) the RP family of disk drives.\n"
 "       2) the TU family of tape controllers.\n"
 "       3) the RS family of fixed head disks.\n"
@@ -968,7 +969,8 @@ else {
             break;
         }
     }
-sprintf (buf, "RH70/RH11 Massbus adapter%s%s%s", 
+sprintf (buf, "%s Massbus adapter%s%s%s", 
+               UNIBUS ? ((cpu_model == MOD_1170) ? "RH70" : "RH11") : "RH70 Emulating",
                dptr ? " (for " : "", dptr ? dptr->name : "", dptr ? ")" : "");
 return buf;
 }

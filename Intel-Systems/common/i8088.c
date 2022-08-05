@@ -1,374 +1,25 @@
-/* i8088.c: Intel 8086/8088 CPU simulator
+/*
+  Fake86: A portable, open-source 8086 PC emulator.
+  Copyright (C)2010-2012 Mike Chambers
 
-    Copyright (C) 1991 Jim Hudgens
+  This program is free software; you can redistribute it and/or
+  modify it under the terms of the GNU General Public License
+  as published by the Free Software Foundation; either version 2
+  of the License, or (at your option) any later version.
 
-    The file is part of GDE.
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
 
-    GDE is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 1, or (at your option)
-    any later version.
-
-    GDE is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with GDE; see the file COPYING.  If not, write to
-    the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
-    
-    This software was modified by Bill Beech, Mar 2011, from the software GDE
-    of Jim Hudgens as provided with the SIMH AltairZ80 emulation package. 
-
-    Copyright (c) 2011, William A. Beech
-
-    Permission is hereby granted, free of charge, to any person obtaining a
-    copy of this software and associated documentation files (the "Software"),
-    to deal in the Software without restriction, including without limitation
-    the rights to use, copy, modify, merge, publish, distribute, sublicense,
-    and/or sell copies of the Software, and to permit persons to whom the
-    Software is furnished to do so, subject to the following conditions:
-
-    The above copyright notice and this permission notice shall be included in
-    all copies or substantial portions of the Software.
-
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-    WILLIAM A. BEECH BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-    Except as contained in this notice, the name of William A. Beech shall not be
-    used in advertising or otherwise to promote the sale, use or other dealings
-    in this Software without prior written authorization from William A. Beech.
-
-    cpu          8088 CPU
-
-    17 Mar 11    WAB     Original code
-
-    The register state for the 8088 CPU is:
-
-    AX<0:15>             AH/AL Register Pair
-    BX<0:15>             BH/BL Register Pair
-    CX<0:15>             CH/CL Register Pair
-    DX<0:15>             DH/DL Register Pair
-    SI<0:15>             Source Index Register
-    DI<0:15>             Destination Index Register
-    BP<0:15>             Base Pointer
-    SP<0:15>             Stack Pointer
-    CS<0:15>             Code Segment Register
-    DS<0:15>             Date Segment Register
-    SS<0:15>             Stack Segment Register
-    ES<0:15>             Extra Segment Register
-    IP<0:15>             Program Counter
-
-    PSW<0:15>            Program Status Word - Contains the following flags:
-
-    AF                   Auxillary Flag
-    CF                   Carry Flag
-    OF                   Overflow Flag
-    SF                   Sign Flag
-    PF                   Parity Flag
-    ZF                   Zero Flag
-    DF                   Direction Flag
-    IF                   Interrupt Enable Flag
-    TF                   Trap Flag
-
-                        in bit positions:
-    15                    8  7                    0
-    |--|--|--|--|OF|DF|IF|TF|SF|ZF|--|AF|--|PF|--|CF|
-
-    The 8088 is an 8-bit CPU, which uses 16-bit offset and segment registers 
-    in combination with a dedicated adder to address up to 1MB of memory directly.
-    The offset register is added to the segment register shifted left 4 places
-    to obtain the 20-bit address.
-
-    The CPU utilizes two separate processing units - the Execution Unit (EU) and 
-    the Bus Interface Unit (BIU).  The EU executes instructions.  The BIU fetches 
-    instructions, reads operands and writes results.  The two units can operate 
-    independently of one another and are able, under most circumstances, to 
-    extensively overlap instruction fetch with execution.
-
-    The BIUs of the 8086 and 8088 are functionally identical, but are implemented 
-    differently to match the structure and performance characteristics of their 
-    respective buses.
-
-    The almost 300 instructions come in 1, 2, 3, 4, 5, 6 and 7-byte flavors.
-
-    This routine is the simulator for the 8088.  It is called from the 
-    simulator control program to execute instructions in simulated memory, 
-    starting at the simulated IP. It runs until 'reason' is set non-zero.
-
-    General notes:
-
-    1. Reasons to stop.  The simulator can be stopped by:
-
-        HALT instruction
-        I/O error in I/O simulator
-        Invalid OP code (if ITRAP is set on CPU)
-
-    2. Interrupts.
-        There are 256 possible levels of interrupt, and in effect they
-        do a hardware CALL instruction to one of 256 possible low
-        memory addresses.
-
-    3. Non-existent memory.  On the 8088, reads to non-existent memory
-        return 0FFh, and writes are ignored. 
-
-    Some algorithms were pulled from the GDE Dos/IP Emulator by Jim Hudgens
-
+  You should have received a copy of the GNU General Public License
+  along with this program; if not, write to the Free Software
+  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
-/* 
-  This algorithm was pulled from the GDE Dos/IP Emulator by Jim Hudgens
 
-CARRY CHAIN CALCULATION.
-   This represents a somewhat expensive calculation which is
-   apparently required to emulate the setting of the OF and
-   AF flag.  The latter is not so important, but the former is.
-   The overflow flag is the XOR of the top two bits of the
-   carry chain for an addition (similar for subtraction).
-   Since we do not want to simulate the addition in a bitwise
-   manner, we try to calculate the carry chain given the
-   two operands and the result.
+/* cpu.c: functions to emulate the 8086/V20 CPU in software. the heart of Fake86. */
 
-   So, given the following table, which represents the
-   addition of two bits, we can derive a formula for
-   the carry chain.
-
-       a   b   cin   r     cout
-       0   0   0     0     0
-       0   0   1     1     0
-       0   1   0     1     0
-       0   1   1     0     1
-       1   0   0     1     0
-       1   0   1     0     1
-       1   1   0     0     1
-       1   1   1     1     1
-
-    Construction of table for cout:
-
-               ab
-         r  \  00   01   11  10
-            |------------------
-         0  |   0    1    1   1
-         1  |   0    0    1   0
-
-    By inspection, one gets:  cc = ab +  r'(a + b)
-
-    That represents alot of operations, but NO CHOICE....
-
-BORROW CHAIN CALCULATION.
-   The following table represents the
-   subtraction of two bits, from which we can derive a formula for
-   the borrow chain.
-
-       a   b   bin   r     bout
-       0   0   0     0     0
-       0   0   1     1     1
-       0   1   0     1     1
-       0   1   1     0     1
-       1   0   0     1     0
-       1   0   1     0     0
-       1   1   0     0     0
-       1   1   1     1     1
-
-    Construction of table for cout:
-
-               ab
-         r  \  00   01   11  10
-            |------------------
-         0  |   0    1    0   0
-         1  |   1    1    1   0
-
-    By inspection, one gets:  bc = a'b +  r(a' + b)
-
-    Segment register selection and overrides are handled as follows:
-        If there is a segment override, the register number is stored
-        in seg_ovr. If there is no override, seg_ovr is zero.  Seg_ovr
-        is set to zero after each instruction except segment override 
-        instructions.
-
-        Get_ea sets the value of seg_reg to the override if present 
-        otherwise to the default value for the registers used in the
-        effective address calculation.
-
-        The get/put_smword/byte routines use the register number in 
-        seg_reg to obtain the segment value to calculate the absolute
-        memory address for the operation.
- */
-
-#include <stdio.h>
-#include "system_defs.h"
-
-#define UNIT_V_OPSTOP   (UNIT_V_UF)             /* Stop on Invalid OP? */
-#define UNIT_OPSTOP     (1 << UNIT_V_OPSTOP)
-#define UNIT_V_CHIP     (UNIT_V_UF+1)           /* 8088 or 8086 */
-#define UNIT_CHIP       (1 << UNIT_V_CHIP)
-
-/* Flag values to set proper positions in PSW */
-#define CF             0x0001
-#define PF             0x0004
-#define AF             0x0010
-#define ZF             0x0040
-#define SF             0x0080
-#define TF             0x0100
-#define IF             0x0200
-#define DF             0x0400
-#define OF             0x0800
-
-/* Macros to handle the flags in the PSW 
-    8088 has top 4 bits of the flags set to 1
-    also, bit#1 is set.  This is (not well) documented  behavior. */
-#define PSW_ALWAYS_ON       (0xF002)        /* for 8086 */
-#define PSW_MSK (CF|PF|AF|ZF|SF|TF|IF|DF|OF)
-#define TOGGLE_FLAG(FLAG)   (PSW ^= FLAG)
-#define SET_FLAG(FLAG)      (PSW |= FLAG)
-#define CLR_FLAG(FLAG)      (PSW &= ~FLAG)
-#define GET_FLAG(FLAG)      (PSW & FLAG)
-#define CONDITIONAL_SET_FLAG(COND,FLAG) \
-    if (COND) SET_FLAG(FLAG); else CLR_FLAG(FLAG)
-
-/* union of byte and word registers */
-union   {                       
-    uint8   b[2];                           /* two bytes */
-    uint16  w;                              /* one word */
-}   A, B, C, D;                             /* storage for AX, BX, CX and DX */
-
-/* macros for byte registers */
-#define AH              (A.b[1])
-#define AL              (A.b[0])
-#define BH              (B.b[1])
-#define BL              (B.b[0])
-#define CH              (C.b[1])
-#define CL              (C.b[0])
-#define DH              (D.b[1])
-#define DL              (D.b[0])
-
-/* macros for word registers */
-#define AX              (A.w)
-#define BX              (B.w)
-#define CX              (C.w)
-#define DX              (D.w)
-
-/* storage for the rest of the registers */
-int32 DI;                               /* Source Index Register */
-int32 SI;                               /* Destination Index Register */
-int32 BP;                               /* Base Pointer Register */
-int32 SP;                               /* Stack Pointer Register */
-int32 CS;                               /* Code Segment Register */
-int32 DS;                               /* Data Segment Register */
-int32 SS;                               /* Stack Segment Register */
-int32 ES;                               /* Extra Segment Register */
-uint32 IP;                              /* Program Counter */
-int32 PSW;                              /* Program Status Word (Flags) */
-uint32 saved_PC = 0;                    /* saved program counter */
-int32 int_req = 0;                      /* Interrupt request 0x01 = int, 0x02 = NMI*/
-uint16 port;                            //port called in dev_table[port]
-int32 chip = 0;                         /* 0 = 8088 chip, 1 = 8086 chip */
-#define CHIP_8088   0                   /* processor types */
-#define CHIP_8086   1
-#define CHIP_80188  2
-#define CHIP_80186  3
-#define CHIP_80286  4
-
-int32 seg_ovr = 0;                      /* segment override register */
-int32 seg_reg = 0;                      /* segment register to use for EA */
-#define SEG_NONE    0                   /* segmenr override register values */
-#define SEG_CS      8
-#define SEG_DS      9
-#define SEG_ES      10
-#define SEG_SS      11
-
-int32 PCX;                              /* External view of IP */
-
-/* handle prefix instructions */
-uint32 sysmode = 0;                     /* prefix flags */
-#define SYSMODE_SEG_DS_SS   0x01
-#define SYSMODE_SEGOVR_CS   0x02
-#define SYSMODE_SEGOVR_DS   0x04
-#define SYSMODE_SEGOVR_ES   0x08
-#define SYSMODE_SEGOVR_SS   0x10
-#define SYSMODE_SEGMASK  (SYSMODE_SEG_DS_SS | SYSMODE_SEGOVR_CS |   \
-        SYSMODE_SEGOVR_DS | SYSMODE_SEGOVR_ES | SYSMODE_SEGOVR_SS)
-#define SYSMODE_PREFIX_REPE     0x20
-#define SYSMODE_PREFIX_REPNE    0x40
-
-/* function prototypes */
-int32 sign_ext(int32 val);
-int32 fetch_byte(int32 flag);
-int32 fetch_word(void);
-int32 parity(int32 val);
-void i86_intr_raise(uint8 num);
-uint32 get_rbyte(uint32 reg);
-uint32 get_rword(uint32 reg);
-void put_rbyte(uint32 reg, uint32 val);
-void put_rword(uint32 reg, uint32 val);
-uint32 get_ea(uint32 mrr);
-void set_segreg(uint32 reg);
-void get_mrr_dec(uint32 mrr, uint32 *mod, uint32 *reg, uint32 *rm);
-void rm_byte_dec(uint32 rm);
-void rm_word_dec(uint32 rm);
-void rm_seg_dec(uint32 rm);
-
-/* emulator primitives function prototypes */
-uint8 aad_word(uint16 d);
-uint16 aam_word(uint8 d);
-uint8 adc_byte(uint8 d, uint8 s);
-uint16 adc_word(uint16 d, uint16 s);
-uint8 add_byte(uint8 d, uint8 s);
-uint16 add_word(uint16 d, uint16 s);
-uint8 and_byte(uint8 d, uint8 s);
-uint16 cmp_word(uint16 d, uint16 s);
-uint8 cmp_byte(uint8 d, uint8 s);
-uint16 and_word(uint16 d, uint16 s);
-uint8 dec_byte(uint8 d);
-uint16 dec_word(uint16 d);
-void div_byte(uint8 s);
-void div_word(uint16 s);
-void idiv_byte(uint8 s);
-void idiv_word(uint16 s);
-void imul_byte(uint8 s);
-void imul_word(uint16 s);
-uint8 inc_byte(uint8 d);
-uint16 inc_word(uint16 d);
-void mul_byte(uint8 s);
-void mul_word(uint16 s);
-uint8 neg_byte(uint8 s);
-uint16 neg_word(uint16 s);
-uint8 not_byte(uint8 s);
-uint16 not_word(uint16 s);
-uint8 or_byte(uint8 d, uint8 s);
-uint16 or_word(uint16 d, uint16 s);
-void push_word(uint16 val);
-uint16 pop_word(void);
-uint8 rcl_byte(uint8 d, uint8 s);
-uint16 rcl_word(uint16 d, uint16 s);
-uint8 rcr_byte(uint8 d, uint8 s);
-uint16 rcr_word(uint16 d, uint16 s);
-uint8 rol_byte(uint8 d, uint8 s);
-uint16 rol_word(uint16 d, uint16 s);
-uint8 ror_byte(uint8 d, uint8 s);
-uint16 ror_word(uint16 d, uint16 s);
-uint8 shl_byte(uint8 d, uint8 s);
-uint16 shl_word(uint16 d, uint16 s);
-uint8 shr_byte(uint8 d, uint8 s);
-uint16 shr_word(uint16 d, uint16 s);
-uint8 sar_byte(uint8 d, uint8 s);
-uint16 sar_word(uint16 d, uint16 s);
-uint8 sbb_byte(uint8 d, uint8 s);
-uint16 sbb_word(uint16 d, uint16 s);
-uint8 sub_byte(uint8 d, uint8 s);
-uint16 sub_word(uint16 d, uint16 s);
-void test_byte(uint8 d, uint8 s);
-void test_word(uint16 d, uint16 s);
-uint8 xor_byte(uint8 d, uint8 s);
-uint16 xor_word(uint16 d, uint16 s);
-int32 get_smbyte(int32 segreg, int32 addr);
-int32 get_smword(int32 segreg, int32 addr);
-void put_smbyte(int32 segreg, int32 addr, int32 val);
-void put_smword(int32 segreg, int32 addr, int32 val);
+#include "cpu.h"
 
 /* simulator routines */
 void set_cpuint(int32 int_num);
@@ -377,21 +28,150 @@ t_stat i8088_reset (DEVICE *dptr);
 t_stat i8088_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat i8088_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 
-/* external references */
-
 /* memory read and write absolute address routines */
 extern uint8 get_mbyte(uint32 addr);
 extern uint16 get_mword(uint32 addr);
 extern void put_mbyte(uint32 addr, uint8 val);
 extern void put_mword(uint32 addr, uint16 val);
 
-extern int32 sim_int_char;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
+extern void do_trace(void);
+uint16 port;                            //port called in dev_table[port]
 
 struct idev {
-    int32 (*routine)();
+    uint8 (*routine)(t_bool io, uint8 data, uint8 devnum); 
+    uint16 port;
+    uint16 devnum;
+    uint8 dummy;
 };
+
 extern struct idev dev_table[];
+
+uint64 curtimer, lasttimer, timerfreq;
+
+uint8 byteregtable[8] = { regal, regcl, regdl, regbl, regah, regch, regdh, regbh };
+
+static const uint8 parity[0x100] = {
+    1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
+    0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
+    0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
+    1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
+    0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
+    1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
+    1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
+    0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1
+};
+
+uint8    RAM[0x100000], readonly[0x100000];
+uint8    OP, segoverride, reptype, bootdrive = 0, hdcount = 0;
+uint16 segregs[4], SEG, OFF, IP, useseg, oldsp;
+uint8    tempcf, oldcf, cf, pf, af, zf, sf, tf, ifl, df, of, MOD, REGX, RM;
+uint16 oper1, oper2, res16, disp16, temp16, dummy, stacksize, frametemp;
+uint8    oper1b, oper2b, res8, disp8, temp8, nestlev, addrbyte;
+uint32 temp1, temp2, temp3, temp4, temp5, temp32, tempaddr32, EA;
+int32    result;
+uint64 totalexec;
+
+int32 AX, BX, CX, DX, DI, SI, BP, SP, CS, DS, SS, ES, PSW, PCX, SGX, DISP, DATA8, DATA16;
+
+//extern uint16    VGA_SC[0x100], VGA_CRTC[0x100], VGA_ATTR[0x100], VGA_GC[0x100];
+//extern uint8 updatedscreen;
+union _bytewordregs_ regs;
+
+//uint8    portram[0x10000];
+uint8    running = 0, debugmode, showcsip, verbose, mouseemu, didbootstrap = 0;
+//uint8    ethif;
+
+//extern uint8    vidmode;
+extern uint8 verbose;
+uint32 saved_PC = 0;                    /* saved program counter */
+int32 int_req = 0;                      /* Interrupt request 0x01 = int, 0x02 = NMI*/
+
+//extern void vidinterrupt();
+
+//extern uint8 readVGA (uint32 addr32);
+
+void intcall86 (uint8 intnum);
+
+#define makeflagsword() \
+    ( \
+    2 | (uint16) cf | ((uint16) pf << 2) | ((uint16) af << 4) | ((uint16) zf << 6) | ((uint16) sf << 7) | \
+    ((uint16) tf << 8) | ((uint16) ifl << 9) | ((uint16) df << 10) | ((uint16) of << 11) \
+    )
+
+#define decodeflagsword(x) { \
+    temp16 = x; \
+    cf = temp16 & 1; \
+    pf = (temp16 >> 2) & 1; \
+    af = (temp16 >> 4) & 1; \
+    zf = (temp16 >> 6) & 1; \
+    sf = (temp16 >> 7) & 1; \
+    tf = (temp16 >> 8) & 1; \
+    ifl = (temp16 >> 9) & 1; \
+    df = (temp16 >> 10) & 1; \
+    of = (temp16 >> 11) & 1; \
+    }
+
+//extern void    writeVGA (uint32 addr32, uint8 value);
+//extern void    portout (uint16 portnum, uint8 value);
+//extern void    portout16 (uint16 portnum, uint16 value);
+//extern uint8    portin (uint16 portnum);
+//extern uint16 portin16 (uint16 portnum);
+
+/*
+void write86 (uint32 addr32, uint8 value) {
+    tempaddr32 = addr32 & 0xFFFFF;
+    if (readonly[tempaddr32] || (tempaddr32 >= 0xC0000) ) {
+            return;
+        }
+
+    if ( (tempaddr32 >= 0xA0000) && (tempaddr32 <= 0xBFFFF) ) {
+            if ( (vidmode != 0x13) && (vidmode != 0x12) && (vidmode != 0xD) && (vidmode != 0x10) ) {
+                    RAM[tempaddr32] = value;
+                    updatedscreen = 1;
+                }
+            else if ( ( (VGA_SC[4] & 6) == 0) && (vidmode != 0xD) && (vidmode != 0x10) && (vidmode != 0x12) ) {
+                    RAM[tempaddr32] = value;
+                    updatedscreen = 1;
+                }
+            else {
+                    writeVGA (tempaddr32 - 0xA0000, value);
+                }
+
+            updatedscreen = 1;
+        }
+    else {
+            RAM[tempaddr32] = value;
+        }
+}
+
+void writew86 (uint32 addr32, uint16 value) {
+    write86 (addr32, (uint8) value);
+    write86 (addr32 + 1, (uint8) (value >> 8) );
+}
+
+uint8 read86 (uint32 addr32) {
+    addr32 &= 0xFFFFF;
+    if ( (addr32 >= 0xA0000) && (addr32 <= 0xBFFFF) ) {
+            if ( (vidmode == 0xD) || (vidmode == 0xE) || (vidmode == 0x10) ) return (readVGA (addr32 - 0xA0000) );
+            if ( (vidmode != 0x13) && (vidmode != 0x12) && (vidmode != 0xD) ) return (RAM[addr32]);
+            if ( (VGA_SC[4] & 6) == 0)
+                return (RAM[addr32]);
+            else
+                return (readVGA (addr32 - 0xA0000) );
+        }
+
+    if (!didbootstrap) {
+            RAM[0x410] = 0x41; //ugly hack to make BIOS always believe we have an EGA/VGA card installed
+            RAM[0x475] = hdcount; //the BIOS doesn't have any concept of hard drives, so here's another hack
+        }
+
+    return (RAM[addr32]);
+}
+
+uint16 readw86 (uint32 addr32) {
+    return ( (uint16) read86 (addr32) | (uint16) (read86 (addr32 + 1) << 8) );
+}
+*/
 
 /* 8088 CPU data structures
 
@@ -405,28 +185,11 @@ UNIT i8088_unit = { UDATA (NULL, 0, 0) };
 
 REG i8088_reg[] = {
     { HRDATA (IP, saved_PC, 16) },                  /* must be first for sim_PC */
-    { HRDATA (AX, AX, 16) },
-    { HRDATA (BX, BX, 16) },
-    { HRDATA (CX, CX, 16) },
-    { HRDATA (DX, DX, 16) },
-    { HRDATA (DI, DI, 16) },
-    { HRDATA (SI, SI, 16) },
-    { HRDATA (BP, BP, 16) },
-    { HRDATA (SP, SP, 16) },
-    { HRDATA (CS, CS, 16) },
-    { HRDATA (DS, DS, 16) },
-    { HRDATA (SS, SS, 16) },
-    { HRDATA (ES, ES, 16) },
-    { HRDATA (PSW, PSW, 16) },
     { HRDATA (WRU, sim_int_char, 8) },
     { NULL }
 };
 
 MTAB i8088_mod[] = {
-    { UNIT_CHIP, UNIT_CHIP, "8086", "8086", NULL },
-    { UNIT_CHIP, 0, "8088", "8088", NULL },
-    { UNIT_OPSTOP, UNIT_OPSTOP, "ITRAP", "ITRAP", NULL },
-    { UNIT_OPSTOP, 0, "NOITRAP", "NOITRAP", NULL },
     { 0 }
 };
 
@@ -443,7 +206,7 @@ DEBTAB i8088_debug[] = {
 };
 
 DEVICE i8088_dev = {
-    "8088",             //name
+    "I8088",             //name
     &i8088_unit,        //units
     i8088_reg,          //registers
     i8088_mod,          //modifiers
@@ -461,137 +224,1208 @@ DEVICE i8088_dev = {
     NULL,               //detach
     NULL,               //ctxt
     DEV_DEBUG,          //flags 
-//    0,                  //dctrl 
-    DEBUG_asm+DEBUG_level1,                  //dctrl 
-//    DEBUG_reg+DEBUG_asm+DEBUG_level1,                  //dctrl 
-//    DEBUG_asm,                  //dctrl 
+    DEBUG_reg+DEBUG_asm,//dctrl 
     i8088_debug,        //debflags
     NULL,               //msize
     NULL                //lname
 };
 
-uint8 xor_3_tab[] = { 0, 1, 1, 0 };
+void flag_szp8 (uint8 value) {
+    if (!value) {
+            zf = 1;
+        }
+    else {
+            zf = 0;    /* set or clear zero flag */
+        }
 
-static const char *opcode[256] = {
-"ADD\t", "ADD\t", "ADD\t", "ADD\t",                 /* 0x00 */
-"ADD\tAL,", "ADD\tAX,", "PUSH\tES", "POP\tES",
-"OR\t", "OR\t", "OR\t", "OR\t", 
-"OR\tAL,", "OR\tAX,", "PUSH\tCS", "0F\t", 
-"ADC\t", "ADC\t", "ADC\t", "ADC\t",                 /* 0x10 */
-"ADC\tAL,", "ADC\tAX,", "PUSH\tSS", "POP\tSS",
-"SBB\t", "SBB\t", "SBB\t", "SBB\t", 
-"SBB\tAL,", "SBB\tAX,", "PUSH\tDS", "POP\tDS",
-"AND\t", "AND\t", "AND\t", "AND\t",                 /* 0x20 */
-"AND\tAL,", "AND\tAX,", "ES:", "DAA",
-"SUB\t", "SUB\t", "SUB\t", "SUB\t", 
-"SUB\tAL,", "SUB\tAX,", "CS:", "DAS",
-"XOR\t", "XOR\t", "XOR\t", "XOR\t",                 /* 0x30 */
-"XOR\tAL,", "XOR\tAX,", "SS:", "AAA",
-"CMP\t", "CMP\t", "CMP\t", "CMP\t", 
-"CMP\tAL,", "CMP\tAX,", "DS:", "AAS",
-"INC\tAX", "INC\tCX", "INC\tDX", "INC\tBX",         /* 0x40 */
-"INC\tSP", "INC\tBP", "INC\tSI", "INC\tDI",
-"DEC\tAX", "DEC\tCX", "DEC\tDX", "DEC\tBX",
-"DEC\tSP", "DEC\tBP", "DEC\tSI", "DEC\tDI",
-"PUSH\tAX", "PUSH\tCX", "PUSH\tDX", "PUSH\tBX",     /* 0x50 */
-"PUSH\tSP", "PUSH\tBP", "PUSH\tSI", "PUSH\tDI",
-"POP\tAX", "POP\tCX", "POP\tDX", "POP\tBX",
-"POP\tSP", "POP\tBP", "POP\tSI", "POP\tDI",
-"60\t", "61\t", "62\t", "63\t",                 /* 0x60 */
-"64\t", "65\t", "66\t", "67\t",
-"68\t", "69\t", "6A\t", "6B\t",
-"6C\t", "6D\t", "6E\t", "6F\t",
-"JO\t", "JNO\t", "JC\t", "JNC\t",                    /* 0x70 */
-"JZ\t", "JNZ\t", "JNA\t", "JA\t",
-"JS\t", "JNS\t", "JP\t", "JNP\t",
-"JL\t", "JNL\t", "JLE\t", "JNLE\t",
-"80\t", "81\t", "82\t", "83\t",                 /* 0x80 */
-"TEST\t", "TEST\t", "XCHG\t", "XCHG\t",
-"MOV\t", "MOV\t", "MOV\t", "MOV\t",
-"MOV\t", "LEA\t", "MOV\t", "POP\t",
-"NOP", "XCHG\tAX,CX", "XCHG\tAX,DX", "XCHG\tAX,BX",/* 0x90 */
-"XCHG\tAX,SP", "XCHG\tAX,BP", "XCHG\tAX,SI", "XCHG\tAX,DI",
-"CBW", "CWD", "CALL\t", "WAIT",
-"PUSHF", "POPF", "SAHF", "LAHF",
-"MOV\tAL,", "MOV\tAX,", "MOV\t", "MOV\t",           /* 0xA0 */
-"MOVSB", "MOVSW", "CMPSB", "CMPSW",
-"TEST\tAL,", "TEST\tAX,", "STOSB", "STOSW",
-"LODSB", "LODSW", "SCASB", "SCASW",
-"MOV\tAL,", "MOV\tCL,", "MOV\tDL,", "MOV\tBL,",     /* 0xB0 */
-"MOV\tAH,", "MOV\tCH,", "MOV\tDH,", "MOV\tBH,",
-"MOV\tAX,", "MOV\tCX,", "MOV\tDX,", "MOV\tBX,",
-"MOV\tSP,", "MOV\tBP,", "MOV\tSI,", "MOV\tDI,"
-"C0\t", "C1\t", "RET ", "RET ",                 /* 0xC0 */
-"LES\t", "LDS\t", "MOV\t", "MOV\t",
-"C8\t", "C9\t", "RET ", "RET",
-"INT\t3", "INT\t", "INTO", "IRET",
-"SHL\t", "D1\t", "SHR\t", "D3\t",                 /* 0xD0 */
-"AAM", "AAD", "D6\t", "XLATB",
-"ESC\t", "ESC\t", "ESC\t", "ESC\t", 
-"ESC\t", "ESC\t", "ESC\t", "ESC\t", 
-"LOOPNZ\t", "LOOPZ\t", "LOOP\t", "JCXZ\t",            /* 0xE0 */
-"IN\tAL,", "IN\tAX,", "OUT\t", "OUT\t",
-"CALL\t", "JMP\t", "JMP\t", "JMP\t",
-"IN\tAL,DX", "IN\tAX,DX", "OUT\tDX,AL", "OUT\tDX,AX",
-"LOCK", "F1\t", "REPNZ", "REPZ",                /* 0xF0 */
-"HLT", "CMC", "F6\t", "F7\t",
-"CLC", "STC", "CLI", "STI",
-"CLD", "STD", "FE\t", "FF\t"
-};
+    if (value & 0x80) {
+            sf = 1;
+        }
+    else {
+            sf = 0;    /* set or clear sign flag */
+        }
 
-/*
-0 = 1 byte opcode
-1 = d8
-2 = d16
-3 = rel8
-4 = rel16
-5 = r/m8,r8
-6 = r/m16,r16
-7 = r/m8
-8 = r/m16
-20 = I haven't figured it out yet!
+    pf = parity[value]; /* retrieve parity state from lookup table */
+}
+
+void flag_szp16 (uint16 value) {
+    if (!value) {
+            zf = 1;
+        }
+    else {
+            zf = 0;    /* set or clear zero flag */
+        }
+
+    if (value & 0x8000) {
+            sf = 1;
+        }
+    else {
+            sf = 0;    /* set or clear sign flag */
+        }
+
+    pf = parity[value & 255];    /* retrieve parity state from lookup table */
+}
+
+void flag_log8 (uint8 value) {
+    flag_szp8 (value);
+    cf = 0;
+    of = 0; /* bitwise logic ops always clear carry and overflow */
+}
+
+void flag_log16 (uint16 value) {
+    flag_szp16 (value);
+    cf = 0;
+    of = 0; /* bitwise logic ops always clear carry and overflow */
+}
+
+void flag_adc8 (uint8 v1, uint8 v2, uint8 v3) {
+
+    /* v1 = destination operand, v2 = source operand, v3 = carry flag */
+    uint16    dst;
+
+    dst = (uint16) v1 + (uint16) v2 + (uint16) v3;
+    flag_szp8 ( (uint8) dst);
+    if ( ( (dst ^ v1) & (dst ^ v2) & 0x80) == 0x80) {
+            of = 1;
+        }
+    else {
+            of = 0; /* set or clear overflow flag */
+        }
+
+    if (dst & 0xFF00) {
+            cf = 1;
+        }
+    else {
+            cf = 0; /* set or clear carry flag */
+        }
+
+    if ( ( (v1 ^ v2 ^ dst) & 0x10) == 0x10) {
+            af = 1;
+        }
+    else {
+            af = 0; /* set or clear auxilliary flag */
+        }
+}
+
+void flag_adc16 (uint16 v1, uint16 v2, uint16 v3) {
+
+    uint32    dst;
+
+    dst = (uint32) v1 + (uint32) v2 + (uint32) v3;
+    flag_szp16 ( (uint16) dst);
+    if ( ( ( (dst ^ v1) & (dst ^ v2) ) & 0x8000) == 0x8000) {
+            of = 1;
+        }
+    else {
+            of = 0;
+        }
+
+    if (dst & 0xFFFF0000) {
+            cf = 1;
+        }
+    else {
+            cf = 0;
+        }
+
+    if ( ( (v1 ^ v2 ^ dst) & 0x10) == 0x10) {
+            af = 1;
+        }
+    else {
+            af = 0;
+        }
+}
+
+void flag_add8 (uint8 v1, uint8 v2) {
+    /* v1 = destination operand, v2 = source operand */
+    uint16    dst;
+
+    dst = (uint16) v1 + (uint16) v2;
+    flag_szp8 ( (uint8) dst);
+    if (dst & 0xFF00) {
+            cf = 1;
+        }
+    else {
+            cf = 0;
+        }
+
+    if ( ( (dst ^ v1) & (dst ^ v2) & 0x80) == 0x80) {
+            of = 1;
+        }
+    else {
+            of = 0;
+        }
+
+    if ( ( (v1 ^ v2 ^ dst) & 0x10) == 0x10) {
+            af = 1;
+        }
+    else {
+            af = 0;
+        }
+}
+
+void flag_add16 (uint16 v1, uint16 v2) {
+    /* v1 = destination operand, v2 = source operand */
+    uint32    dst;
+
+    dst = (uint32) v1 + (uint32) v2;
+    flag_szp16 ( (uint16) dst);
+    if (dst & 0xFFFF0000) {
+            cf = 1;
+        }
+    else {
+            cf = 0;
+        }
+
+    if ( ( (dst ^ v1) & (dst ^ v2) & 0x8000) == 0x8000) {
+            of = 1;
+        }
+    else {
+            of = 0;
+        }
+
+    if ( ( (v1 ^ v2 ^ dst) & 0x10) == 0x10) {
+            af = 1;
+        }
+    else {
+            af = 0;
+        }
+}
+
+void flag_sbb8 (uint8 v1, uint8 v2, uint8 v3) {
+
+    /* v1 = destination operand, v2 = source operand, v3 = carry flag */
+    uint16    dst;
+
+    v2 += v3;
+    dst = (uint16) v1 - (uint16) v2;
+    flag_szp8 ( (uint8) dst);
+    if (dst & 0xFF00) {
+            cf = 1;
+        }
+    else {
+            cf = 0;
+        }
+
+    if ( (dst ^ v1) & (v1 ^ v2) & 0x80) {
+            of = 1;
+        }
+    else {
+            of = 0;
+        }
+
+    if ( (v1 ^ v2 ^ dst) & 0x10) {
+            af = 1;
+        }
+    else {
+            af = 0;
+        }
+}
+
+void flag_sbb16 (uint16 v1, uint16 v2, uint16 v3) {
+
+    /* v1 = destination operand, v2 = source operand, v3 = carry flag */
+    uint32    dst;
+
+    v2 += v3;
+    dst = (uint32) v1 - (uint32) v2;
+    flag_szp16 ( (uint16) dst);
+    if (dst & 0xFFFF0000) {
+            cf = 1;
+        }
+    else {
+            cf = 0;
+        }
+
+    if ( (dst ^ v1) & (v1 ^ v2) & 0x8000) {
+            of = 1;
+        }
+    else {
+            of = 0;
+        }
+
+    if ( (v1 ^ v2 ^ dst) & 0x10) {
+            af = 1;
+        }
+    else {
+            af = 0;
+        }
+}
+
+void flag_sub8 (uint8 v1, uint8 v2) {
+
+    /* v1 = destination operand, v2 = source operand */
+    uint16    dst;
+
+    dst = (uint16) v1 - (uint16) v2;
+    flag_szp8 ( (uint8) dst);
+    if (dst & 0xFF00) {
+            cf = 1;
+        }
+    else {
+            cf = 0;
+        }
+
+    if ( (dst ^ v1) & (v1 ^ v2) & 0x80) {
+            of = 1;
+        }
+    else {
+            of = 0;
+        }
+
+    if ( (v1 ^ v2 ^ dst) & 0x10) {
+            af = 1;
+        }
+    else {
+            af = 0;
+        }
+}
+
+void flag_sub16 (uint16 v1, uint16 v2) {
+
+    /* v1 = destination operand, v2 = source operand */
+    uint32    dst;
+
+    dst = (uint32) v1 - (uint32) v2;
+    flag_szp16 ( (uint16) dst);
+    if (dst & 0xFFFF0000) {
+            cf = 1;
+        }
+    else {
+            cf = 0;
+        }
+
+    if ( (dst ^ v1) & (v1 ^ v2) & 0x8000) {
+            of = 1;
+        }
+    else {
+            of = 0;
+        }
+
+    if ( (v1 ^ v2 ^ dst) & 0x10) {
+            af = 1;
+        }
+    else {
+            af = 0;
+        }
+}
+
+void op_adc8() {
+    res8 = oper1b + oper2b + cf;
+    flag_adc8 (oper1b, oper2b, cf);
+}
+
+void op_adc16() {
+    res16 = oper1 + oper2 + cf;
+    flag_adc16 (oper1, oper2, cf);
+}
+
+void op_add8() {
+    res8 = oper1b + oper2b;
+    flag_add8 (oper1b, oper2b);
+}
+
+void op_add16() {
+    res16 = oper1 + oper2;
+    flag_add16 (oper1, oper2);
+}
+
+void op_and8() {
+    res8 = oper1b & oper2b;
+    flag_log8 (res8);
+}
+
+void op_and16() {
+    res16 = oper1 & oper2;
+    flag_log16 (res16);
+}
+
+void op_or8() {
+    res8 = oper1b | oper2b;
+    flag_log8 (res8);
+}
+
+void op_or16() {
+    res16 = oper1 | oper2;
+    flag_log16 (res16);
+}
+
+void op_xor8() {
+    res8 = oper1b ^ oper2b;
+    flag_log8 (res8);
+}
+
+void op_xor16() {
+    res16 = oper1 ^ oper2;
+    flag_log16 (res16);
+}
+
+void op_sub8() {
+    res8 = oper1b - oper2b;
+    flag_sub8 (oper1b, oper2b);
+}
+
+void op_sub16() {
+    res16 = oper1 - oper2;
+    flag_sub16 (oper1, oper2);
+}
+
+void op_sbb8() {
+    res8 = oper1b - (oper2b + cf);
+    flag_sbb8 (oper1b, oper2b, cf);
+}
+
+void op_sbb16() {
+    res16 = oper1 - (oper2 + cf);
+    flag_sbb16 (oper1, oper2, cf);
+}
+
+#define modregrm() { \
+    addrbyte = getmem8(segregs[regcs], IP); \
+    StepIP(1); \
+    MOD = addrbyte >> 6; \
+    REGX = (addrbyte >> 3) & 7; \
+    RM = addrbyte & 7; \
+    switch(MOD) \
+    { \
+    case 0: \
+    if(RM == 6) { \
+    disp16 = getmem16(segregs[regcs], IP); \
+    StepIP(2); \
+    } \
+    if(((RM == 2) || (RM == 3)) && !segoverride) { \
+    useseg = segregs[regss]; \
+    } \
+    break; \
+ \
+    case 1: \
+    disp16 = signext(getmem8(segregs[regcs], IP)); \
+    StepIP(1); \
+    if(((RM == 2) || (RM == 3) || (RM == 6)) && !segoverride) { \
+    useseg = segregs[regss]; \
+    } \
+    break; \
+ \
+    case 2: \
+    disp16 = getmem16(segregs[regcs], IP); \
+    StepIP(2); \
+    if(((RM == 2) || (RM == 3) || (RM == 6)) && !segoverride) { \
+    useseg = segregs[regss]; \
+    } \
+    break; \
+ \
+    default: \
+    disp8 = 0; \
+    disp16 = 0; \
+    } \
+    }
+
+void getea (uint8 rmval) {
+    uint32    tempea;
+
+    tempea = 0;
+    switch (MOD) {
+            case 0:
+                switch (rmval) {
+                        case 0:
+                            tempea = regs.wordregs[regbx] + regs.wordregs[regsi];
+                            break;
+                        case 1:
+                            tempea = regs.wordregs[regbx] + regs.wordregs[regdi];
+                            break;
+                        case 2:
+                            tempea = regs.wordregs[regbp] + regs.wordregs[regsi];
+                            break;
+                        case 3:
+                            tempea = regs.wordregs[regbp] + regs.wordregs[regdi];
+                            break;
+                        case 4:
+                            tempea = regs.wordregs[regsi];
+                            break;
+                        case 5:
+                            tempea = regs.wordregs[regdi];
+                            break;
+                        case 6:
+                            tempea = disp16;
+                            break;
+                        case 7:
+                            tempea = regs.wordregs[regbx];
+                            break;
+                    }
+                break;
+
+            case 1:
+            case 2:
+                switch (rmval) {
+                        case 0:
+                            tempea = regs.wordregs[regbx] + regs.wordregs[regsi] + disp16;
+                            break;
+                        case 1:
+                            tempea = regs.wordregs[regbx] + regs.wordregs[regdi] + disp16;
+                            break;
+                        case 2:
+                            tempea = regs.wordregs[regbp] + regs.wordregs[regsi] + disp16;
+                            break;
+                        case 3:
+                            tempea = regs.wordregs[regbp] + regs.wordregs[regdi] + disp16;
+                            break;
+                        case 4:
+                            tempea = regs.wordregs[regsi] + disp16;
+                            break;
+                        case 5:
+                            tempea = regs.wordregs[regdi] + disp16;
+                            break;
+                        case 6:
+                            tempea = regs.wordregs[regbp] + disp16;
+                            break;
+                        case 7:
+                            tempea = regs.wordregs[regbx] + disp16;
+                            break;
+                    }
+                break;
+        }
+
+    EA = (tempea & 0xFFFF) + (useseg << 4);
+}
+
+void push (uint16 pushval) {
+    putreg16 (regsp, getreg16 (regsp) - 2);
+    putmem16 (segregs[regss], getreg16 (regsp), pushval);
+}
+
+uint16 pop() {
+
+    uint16    tempval;
+
+    tempval = getmem16 (segregs[regss], getreg16 (regsp) );
+    putreg16 (regsp, getreg16 (regsp) + 2);
+    return tempval;
+}
+
+t_stat i8088_reset(DEVICE *dptr) {
+    //what about the flags?
+    segregs[regcs] = 0xFFFF;
+    IP = 0x0000;
+    //regs.wordregs[regsp] = 0xFFFE;
+    return SCPE_OK;
+}
+
+uint16 readrm16 (uint8 rmval) {
+    if (MOD < 3) {
+            getea (rmval);
+//            return read86 (EA) | ( (uint16) read86 (EA + 1) << 8);
+            return get_mbyte (EA) | (uint16) get_mbyte ((EA + 1) << 8);
+        }
+    else {
+            return getreg16 (rmval);
+        }
+}
+
+uint8 readrm8 (uint8 rmval) {
+    if (MOD < 3) {
+            getea (rmval);
+//            return read86 (EA);
+            return get_mbyte (EA);
+        }
+    else {
+            return getreg8 (rmval);
+        }
+}
+
+void writerm16 (uint8 rmval, uint16 value) {
+    if (MOD < 3) {
+            getea (rmval);
+//            write86 (EA, value & 0xFF);
+//            write86 (EA + 1, value >> 8);
+            put_mbyte (EA, value & 0xFF);
+            put_mbyte (EA + 1, value >> 8);
+        }
+    else {
+            putreg16 (rmval, value);
+        }
+}
+
+void writerm8 (uint8 rmval, uint8 value) {
+    if (MOD < 3) {
+            getea (rmval);
+//            write86 (EA, value);
+            put_mbyte (EA, value);
+        }
+    else {
+            putreg8 (rmval, value);
+        }
+}
+
+uint8 op_grp2_8 (uint8 cnt) {
+
+    uint16    s;
+    uint16    shift;
+    uint16    oldcf;
+    uint16    msb;
+
+    s = oper1b;
+    oldcf = cf;
+#ifdef CPU_V20 //80186/V20 class CPUs limit shift count to 31
+    cnt &= 0x1F;
+#endif
+    switch (REGX) {
+            case 0: /* ROL r/m8 */
+                for (shift = 1; shift <= cnt; shift++) {
+                        if (s & 0x80) {
+                                cf = 1;
+                            }
+                        else {
+                                cf = 0;
+                            }
+
+                        s = s << 1;
+                        s = s | cf;
+                    }
+
+                if (cnt == 1) {
+                        of = cf ^ ( (s >> 7) & 1);
+                    }
+                break;
+
+            case 1: /* ROR r/m8 */
+                for (shift = 1; shift <= cnt; shift++) {
+                        cf = s & 1;
+                        s = (s >> 1) | (cf << 7);
+                    }
+
+                if (cnt == 1) {
+                        of = (s >> 7) ^ ( (s >> 6) & 1);
+                    }
+                break;
+
+            case 2: /* RCL r/m8 */
+                for (shift = 1; shift <= cnt; shift++) {
+                        oldcf = cf;
+                        if (s & 0x80) {
+                                cf = 1;
+                            }
+                        else {
+                                cf = 0;
+                            }
+
+                        s = s << 1;
+                        s = s | oldcf;
+                    }
+
+                if (cnt == 1) {
+                        of = cf ^ ( (s >> 7) & 1);
+                    }
+                break;
+
+            case 3: /* RCR r/m8 */
+                for (shift = 1; shift <= cnt; shift++) {
+                        oldcf = cf;
+                        cf = s & 1;
+                        s = (s >> 1) | (oldcf << 7);
+                    }
+
+                if (cnt == 1) {
+                        of = (s >> 7) ^ ( (s >> 6) & 1);
+                    }
+                break;
+
+            case 4:
+            case 6: /* SHL r/m8 */
+                for (shift = 1; shift <= cnt; shift++) {
+                        if (s & 0x80) {
+                                cf = 1;
+                            }
+                        else {
+                                cf = 0;
+                            }
+
+                        s = (s << 1) & 0xFF;
+                    }
+
+                if ( (cnt == 1) && (cf == (s >> 7) ) ) {
+                        of = 0;
+                    }
+                else {
+                        of = 1;
+                    }
+
+                flag_szp8 ( (uint8) s);
+                break;
+
+            case 5: /* SHR r/m8 */
+                if ( (cnt == 1) && (s & 0x80) ) {
+                        of = 1;
+                    }
+                else {
+                        of = 0;
+                    }
+
+                for (shift = 1; shift <= cnt; shift++) {
+                        cf = s & 1;
+                        s = s >> 1;
+                    }
+
+                flag_szp8 ( (uint8) s);
+                break;
+
+            case 7: /* SAR r/m8 */
+                for (shift = 1; shift <= cnt; shift++) {
+                        msb = s & 0x80;
+                        cf = s & 1;
+                        s = (s >> 1) | msb;
+                    }
+
+                of = 0;
+                flag_szp8 ( (uint8) s);
+                break;
+        }
+
+    return s & 0xFF;
+}
+
+uint16 op_grp2_16 (uint8 cnt) {
+
+    uint32    s;
+    uint32    shift;
+    uint32    oldcf;
+    uint32    msb;
+
+    s = oper1;
+    oldcf = cf;
+#ifdef CPU_V20 //80186/V20 class CPUs limit shift count to 31
+    cnt &= 0x1F;
+#endif
+    switch (REGX) {
+            case 0: /* ROL r/m8 */
+                for (shift = 1; shift <= cnt; shift++) {
+                        if (s & 0x8000) {
+                                cf = 1;
+                            }
+                        else {
+                                cf = 0;
+                            }
+
+                        s = s << 1;
+                        s = s | cf;
+                    }
+
+                if (cnt == 1) {
+                        of = cf ^ ( (s >> 15) & 1);
+                    }
+                break;
+
+            case 1: /* ROR r/m8 */
+                for (shift = 1; shift <= cnt; shift++) {
+                        cf = s & 1;
+                        s = (s >> 1) | (cf << 15);
+                    }
+
+                if (cnt == 1) {
+                        of = (s >> 15) ^ ( (s >> 14) & 1);
+                    }
+                break;
+
+            case 2: /* RCL r/m8 */
+                for (shift = 1; shift <= cnt; shift++) {
+                        oldcf = cf;
+                        if (s & 0x8000) {
+                                cf = 1;
+                            }
+                        else {
+                                cf = 0;
+                            }
+
+                        s = s << 1;
+                        s = s | oldcf;
+                    }
+
+                if (cnt == 1) {
+                        of = cf ^ ( (s >> 15) & 1);
+                    }
+                break;
+
+            case 3: /* RCR r/m8 */
+                for (shift = 1; shift <= cnt; shift++) {
+                        oldcf = cf;
+                        cf = s & 1;
+                        s = (s >> 1) | (oldcf << 15);
+                    }
+
+                if (cnt == 1) {
+                        of = (s >> 15) ^ ( (s >> 14) & 1);
+                    }
+                break;
+
+            case 4:
+            case 6: /* SHL r/m8 */
+                for (shift = 1; shift <= cnt; shift++) {
+                        if (s & 0x8000) {
+                                cf = 1;
+                            }
+                        else {
+                                cf = 0;
+                            }
+
+                        s = (s << 1) & 0xFFFF;
+                    }
+
+                if ( (cnt == 1) && (cf == (s >> 15) ) ) {
+                        of = 0;
+                    }
+                else {
+                        of = 1;
+                    }
+
+                flag_szp16 ( (uint16) s);
+                break;
+
+            case 5: /* SHR r/m8 */
+                if ( (cnt == 1) && (s & 0x8000) ) {
+                        of = 1;
+                    }
+                else {
+                        of = 0;
+                    }
+
+                for (shift = 1; shift <= cnt; shift++) {
+                        cf = s & 1;
+                        s = s >> 1;
+                    }
+
+                flag_szp16 ( (uint16) s);
+                break;
+
+            case 7: /* SAR r/m8 */
+                for (shift = 1; shift <= cnt; shift++) {
+                        msb = s & 0x8000;
+                        cf = s & 1;
+                        s = (s >> 1) | msb;
+                    }
+
+                of = 0;
+                flag_szp16 ( (uint16) s);
+                break;
+        }
+
+    return (uint16) s & 0xFFFF;
+}
+
+void op_div8 (uint16 valdiv, uint8 divisor) {
+    if (divisor == 0) {
+            intcall86 (0);
+            return;
+        }
+
+    if ( (valdiv / (uint16) divisor) > 0xFF) {
+            intcall86 (0);
+            return;
+        }
+
+    regs.byteregs[regah] = valdiv % (uint16) divisor;
+    regs.byteregs[regal] = valdiv / (uint16) divisor;
+}
+
+void op_idiv8 (uint16 valdiv, uint8 divisor) {
+
+    uint16    s1;
+    uint16    s2;
+    uint16    d1;
+    uint16    d2;
+    int    sign;
+
+    if (divisor == 0) {
+            intcall86 (0);
+            return;
+        }
+
+    s1 = valdiv;
+    s2 = divisor;
+    sign = ( ( (s1 ^ s2) & 0x8000) != 0);
+    s1 = (s1 < 0x8000) ? s1 : ( (~s1 + 1) & 0xffff);
+    s2 = (s2 < 0x8000) ? s2 : ( (~s2 + 1) & 0xffff);
+    d1 = s1 / s2;
+    d2 = s1 % s2;
+    if (d1 & 0xFF00) {
+            intcall86 (0);
+            return;
+        }
+
+    if (sign) {
+            d1 = (~d1 + 1) & 0xff;
+            d2 = (~d2 + 1) & 0xff;
+        }
+
+    regs.byteregs[regah] = (uint8) d2;
+    regs.byteregs[regal] = (uint8) d1;
+}
+
+void op_grp3_8() {
+    oper1 = signext (oper1b);
+    oper2 = signext (oper2b);
+    switch (REGX) {
+            case 0:
+            case 1: /* TEST */
+                flag_log8 (oper1b & getmem8 (segregs[regcs], IP) );
+                StepIP (1);
+                break;
+
+            case 2: /* NOT */
+                res8 = ~oper1b;
+                break;
+
+            case 3: /* NEG */
+                res8 = (~oper1b) + 1;
+                flag_sub8 (0, oper1b);
+                if (res8 == 0) {
+                        cf = 0;
+                    }
+                else {
+                        cf = 1;
+                    }
+                break;
+
+            case 4: /* MUL */
+                temp1 = (uint32) oper1b * (uint32) regs.byteregs[regal];
+                putreg16 (regax, temp1 & 0xFFFF);
+                flag_szp8 ( (uint8) temp1);
+                if (regs.byteregs[regah]) {
+                        cf = 1;
+                        of = 1;
+                    }
+                else {
+                        cf = 0;
+                        of = 0;
+                    }
+#ifndef CPU_V20
+                zf = 0;
+#endif
+                break;
+
+            case 5: /* IMUL */
+                oper1 = signext (oper1b);
+                temp1 = signext (regs.byteregs[regal]);
+                temp2 = oper1;
+                if ( (temp1 & 0x80) == 0x80) {
+                        temp1 = temp1 | 0xFFFFFF00;
+                    }
+
+                if ( (temp2 & 0x80) == 0x80) {
+                        temp2 = temp2 | 0xFFFFFF00;
+                    }
+
+                temp3 = (temp1 * temp2) & 0xFFFF;
+                putreg16 (regax, temp3 & 0xFFFF);
+                if (regs.byteregs[regah]) {
+                        cf = 1;
+                        of = 1;
+                    }
+                else {
+                        cf = 0;
+                        of = 0;
+                    }
+#ifndef CPU_V20
+                zf = 0;
+#endif
+                break;
+
+            case 6: /* DIV */
+                op_div8 (getreg16 (regax), oper1b);
+                break;
+
+            case 7: /* IDIV */
+                op_idiv8 (getreg16 (regax), oper1b);
+                break;
+        }
+}
+
+void op_div16 (uint32 valdiv, uint16 divisor) {
+    if (divisor == 0) {
+            intcall86 (0);
+            return;
+        }
+
+    if ( (valdiv / (uint32) divisor) > 0xFFFF) {
+            intcall86 (0);
+            return;
+        }
+
+    putreg16 (regdx, valdiv % (uint32) divisor);
+    putreg16 (regax, valdiv / (uint32) divisor);
+}
+
+void op_idiv16 (uint32 valdiv, uint16 divisor) {
+
+    uint32    d1;
+    uint32    d2;
+    uint32    s1;
+    uint32    s2;
+    int    sign;
+
+    if (divisor == 0) {
+            intcall86 (0);
+            return;
+        }
+
+    s1 = valdiv;
+    s2 = divisor;
+    s2 = (s2 & 0x8000) ? (s2 | 0xffff0000) : s2;
+    sign = ( ( (s1 ^ s2) & 0x80000000) != 0);
+    s1 = (s1 < 0x80000000) ? s1 : ( (~s1 + 1) & 0xffffffff);
+    s2 = (s2 < 0x80000000) ? s2 : ( (~s2 + 1) & 0xffffffff);
+    d1 = s1 / s2;
+    d2 = s1 % s2;
+    if (d1 & 0xFFFF0000) {
+            intcall86 (0);
+            return;
+        }
+
+    if (sign) {
+            d1 = (~d1 + 1) & 0xffff;
+            d2 = (~d2 + 1) & 0xffff;
+        }
+
+    putreg16 (regax, d1);
+    putreg16 (regdx, d2);
+}
+
+void op_grp3_16() {
+    switch (REGX) {
+            case 0:
+            case 1: /* TEST */
+                flag_log16 (oper1 & getmem16 (segregs[regcs], IP) );
+                StepIP (2);
+                break;
+
+            case 2: /* NOT */
+                res16 = ~oper1;
+                break;
+
+            case 3: /* NEG */
+                res16 = (~oper1) + 1;
+                flag_sub16 (0, oper1);
+                if (res16) {
+                        cf = 1;
+                    }
+                else {
+                        cf = 0;
+                    }
+                break;
+
+            case 4: /* MUL */
+                temp1 = (uint32) oper1 * (uint32) getreg16 (regax);
+                putreg16 (regax, temp1 & 0xFFFF);
+                putreg16 (regdx, temp1 >> 16);
+                flag_szp16 ( (uint16) temp1);
+                if (getreg16 (regdx) ) {
+                        cf = 1;
+                        of = 1;
+                    }
+                else {
+                        cf = 0;
+                        of = 0;
+                    }
+#ifndef CPU_V20
+                zf = 0;
+#endif
+                break;
+
+            case 5: /* IMUL */
+                temp1 = getreg16 (regax);
+                temp2 = oper1;
+                if (temp1 & 0x8000) {
+                        temp1 |= 0xFFFF0000;
+                    }
+
+                if (temp2 & 0x8000) {
+                        temp2 |= 0xFFFF0000;
+                    }
+
+                temp3 = temp1 * temp2;
+                putreg16 (regax, temp3 & 0xFFFF);    /* into register ax */
+                putreg16 (regdx, temp3 >> 16);    /* into register dx */
+                if (getreg16 (regdx) ) {
+                        cf = 1;
+                        of = 1;
+                    }
+                else {
+                        cf = 0;
+                        of = 0;
+                    }
+#ifndef CPU_V20
+                zf = 0;
+#endif
+                break;
+
+            case 6: /* DIV */
+                op_div16 ( ( (uint32) getreg16 (regdx) << 16) + getreg16 (regax), oper1);
+                break;
+
+            case 7: /* DIV */
+                op_idiv16 ( ( (uint32) getreg16 (regdx) << 16) + getreg16 (regax), oper1);
+                break;
+        }
+}
+
+void op_grp5() {
+    switch (REGX) {
+            case 0: /* INC Ev */
+                oper2 = 1;
+                tempcf = cf;
+                op_add16();
+                cf = tempcf;
+                writerm16 (RM, res16);
+                break;
+
+            case 1: /* DEC Ev */
+                oper2 = 1;
+                tempcf = cf;
+                op_sub16();
+                cf = tempcf;
+                writerm16 (RM, res16);
+                break;
+
+            case 2: /* CALL Ev */
+                push (IP);
+                IP = oper1;
+                break;
+
+            case 3: /* CALL Mp */
+                push (segregs[regcs]);
+                push (IP);
+                getea (RM);
+//                IP = (uint16) read86 (EA) + (uint16) read86 (EA + 1) * 256;
+//                segregs[regcs] = (uint16) read86 (EA + 2) + (uint16) read86 (EA + 3) * 256;
+                IP = (uint16) get_mbyte (EA) + (uint16) get_mbyte ((EA + 1) * 256);
+                segregs[regcs] = (uint16) get_mbyte (EA + 2) + (uint16) get_mbyte ((EA + 3) * 256);
+                break;
+
+            case 4: /* JMP Ev */
+                IP = oper1;
+                break;
+
+            case 5: /* JMP Mp */
+                getea (RM);
+//                IP = (uint16) read86 (EA) + (uint16) read86 (EA + 1) * 256;
+//                segregs[regcs] = (uint16) read86 (EA + 2) + (uint16) read86 (EA + 3) * 256;
+                IP = (uint16) get_mbyte (EA) + (uint16) get_mbyte ((EA + 1) * 256);
+                segregs[regcs] = (uint16) get_mbyte (EA + 2) + (uint16) get_mbyte ((EA + 3) * 256);
+                break;
+
+            case 6: /* PUSH Ev */
+                push (oper1);
+                break;
+        }
+}
+
+uint8 dolog = 0, didintr = 0;
+FILE    *logout;
+uint8 printops = 0;
+
+//#ifdef NETWORKING_ENABLED
+//extern void nethandler();
+//#endif
+//extern void diskhandler();
+//extern void readdisk (uint8 drivenum, uint16 dstseg, uint16 dstoff, uint16 cyl, uint16 sect, uint16 head, uint16 sectcount);
+
+void intcall86 (uint8 intnum) {
+    static uint16 lastint10ax;
+//    uint16 oldregax;
+    didintr = 1;
+
+    if (intnum == 0x19) didbootstrap = 1;
+
+        /*
+    switch (intnum) {
+            case 0x10:
+                updatedscreen = 1;
+                if ( (regs.byteregs[regah]==0x00) || (regs.byteregs[regah]==0x10) ) {
+                        oldregax = regs.wordregs[regax];
+                        vidinterrupt();
+                        regs.wordregs[regax] = oldregax;
+                        if (regs.byteregs[regah]==0x10) return;
+                        if (vidmode==9) return;
+                    }
+                if ( (regs.byteregs[regah]==0x1A) && (lastint10ax!=0x0100) ) { //the 0x0100 is a cheap hack to make it not do this if DOS EDIT/QBASIC
+                        regs.byteregs[regal] = 0x1A;
+                        regs.byteregs[regbl] = 0x8;
+                        return;
+                    }
+                lastint10ax = regs.wordregs[regax];
+                break;
+#ifndef DISK_CONTROLLER_ATA
+            case 0x19: //bootstrap
+                if (bootdrive<255) { //read first sector of boot drive into 07C0:0000 and execute it
+                        regs.byteregs[regdl] = bootdrive;
+                        readdisk (regs.byteregs[regdl], 0x07C0, 0x0000, 0, 1, 0, 1);
+                        segregs[regcs] = 0x0000;
+                        IP = 0x7C00;
+                    }
+                else {
+                        segregs[regcs] = 0xF600;    //start ROM BASIC at bootstrap if requested
+                        IP = 0x0000;
+                    }
+                return;
+
+            case 0x13:
+            case 0xFD:
+                diskhandler();
+                return;
+#endif
+#ifdef NETWORKING_OLDCARD
+            case 0xFC:
+#ifdef NETWORKING_ENABLED
+                nethandler();
+#endif
+                return;
+#endif
+        }
 */
-
-int32 oplen[256] = {
- 5, 6, 5, 6, 1, 2, 0, 0,   5, 6, 5, 6, 1, 2, 0, 0, //0x00
- 5, 6, 5, 6, 1, 2, 0, 0,   5, 6, 5, 6, 1, 2, 0, 0, //0x10
- 5, 6, 5, 6, 1, 2, 0, 0,   5, 6, 5, 6, 1, 2, 0, 0, //0x20
- 5, 6, 5, 6, 1, 2, 0, 0,   5, 6, 5, 6, 1, 2, 0, 0, //0x30
- 0, 0, 0, 0, 0, 0, 0, 0,   0, 0, 0, 0, 0, 0, 0, 0, //0x40
- 0, 0, 0, 0, 0, 0, 0, 0,   0, 0, 0, 0, 0, 0, 0, 0, //0x50
-20,20,20,20,20,20,20,20,  20,20,20,20,20,20,20,20, //0x60
- 3, 3, 3, 3, 3, 3, 3, 3,   3, 3, 3, 3, 3, 3, 3, 3, //0x70
- 5, 6, 5, 6, 5, 6, 5, 6,   5, 6, 5, 6, 5, 6, 5, 6, //0x80
- 0, 0, 0, 0, 0, 0, 0, 0,   0,20, 0, 0, 0, 0, 0, 0, //0x90
-20,20,20,20, 0, 0, 0, 0,   1, 2, 0, 0, 0, 0, 0, 0, //0xA0
- 1, 1, 1, 1, 1, 1, 1, 1,   2, 2, 2, 2, 2, 2, 2, 2, //0xB0
- 0, 0, 2, 0,20,20,20,20,   0, 0, 2, 0, 0, 1, 0, 0, //0xC0
-20,20,20,20, 0, 0, 0, 0,  20,20,20,20,20,20,20,20, //0xD0
- 3, 3, 3, 3, 1, 1, 1, 1,   4, 4,20, 3, 0, 0, 0, 0, //0xE0
- 0, 0, 0, 0, 0, 0, 5, 6,   0, 0, 0, 0, 0, 0, 7, 8 //0xF0
-};
+    push (makeflagsword() );
+    push (segregs[regcs]);
+    push (IP);
+    segregs[regcs] = getmem16 (0, (uint16) intnum * 4 + 2);
+    IP = getmem16 (0, (uint16) intnum * 4);
+    ifl = 0;
+    tf = 0;
+}
+/*
+#if defined(NETWORKING_ENABLED)
+extern struct netstruct {
+    uint8    enabled;
+    uint8    canrecv;
+    uint16    pktlen;
+} net;
+#endif
+uint64    frametimer = 0, didwhen = 0, didticks = 0;
+uint32    makeupticks = 0;
+extern float    timercomp;
+uint64    timerticks = 0, realticks = 0;
+uint64    lastcountertimer = 0, counterticks = 10000;
+extern uint8    nextintr();
+extern void    timing();
+*/
 
 void set_cpuint(int32 int_num)
 {
     int_req |= int_num;
 }
 
+int32 sim_instr (void) {
 
-int32 sim_instr (void)
-{
-    extern int32 sim_interval;
-    uint32 IR, OP, reason;
-    uint32 MRR, REG, EA, MOD, RM, VAL, DATA, OFF, SEG, INC, VAL1;
+//    uint32    loopcount;
+    uint32 reason;
+    uint8    docontinue;
+    static uint16 firstip;
+    static uint16 trap_toggle = 0;
 
-    IP = saved_PC & ADDRMASK16;         /* load local IP */
+//    counterticks = (uint64) ( (double) timerfreq / (double) 65536.0);
+
+//    for (loopcount = 0; loopcount < execloops; loopcount++) {
+
     reason = 0;                         /* clear stop reason */
 
     /* Main instruction fetch/decode loop */
 
     while (reason == 0) {               /* loop until halted */
-        if (i8088_dev.dctrl & DEBUG_asm) 
-            sim_printf("\n");
-
         if (sim_interval <= 0) {        /* check clock queue */
             if ((reason = sim_process_event())) break;
         }
@@ -608,4083 +1442,2239 @@ int32 sim_instr (void)
 
         sim_interval--;                 /* countdown clock */
         PCX = IP;
-        IR = OP = fetch_byte(0);        /* fetch instruction */
+        SGX = CS;
 
-        /* The Big Instruction Decode Switch */
+//            if ( (totalexec & 31) == 0) timing();
 
-        switch (IR) {
-
-            /* instructions in numerical order */
-
-            case 0x00:                  /* ADD byte - REG = REG + (EA) */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    VAL = add_byte(get_rbyte(REG), get_smbyte(seg_reg, EA));  /* do operation */
-                    put_rbyte(REG, VAL); /* store result */
-                } else {                /* RM is second register */
-                    VAL = add_byte(get_rbyte(REG), get_rbyte(RM)); /* do operation */
-                    put_rbyte(REG, VAL); /* store result */
-                }
-                break;
-
-            case 0x01:                  /* ADD word - (EA) = (EA) + REG */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    VAL = add_word(get_rword(REG), get_smword(seg_reg, EA)); /* do operation */
-                    put_smword(seg_reg, EA, VAL); /* store result */
-                } else {                /* RM is second register */
-                    VAL = add_word(get_rword(REG), get_rword(RM)); /* do operation */
-                    put_rword(REG, VAL); /* store result */
-                }
-                break;
-
-            case 0x02:                  /* ADD byte - REG = REG + (EA) */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    VAL = add_byte(get_rbyte(REG), get_smbyte(seg_reg, EA));  /* do operation */
-                    put_rbyte(REG, VAL); /* store result */
-                } else {                /* RM is second register */
-                    VAL = add_byte(get_rbyte(REG), get_rbyte(RM)); /* do operation */
-                    put_rbyte(REG, VAL); /* store result */
-                }
-                break;
-
-            case 0x03:                  /* ADD word - (EA) = (EA) + REG */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    VAL = adc_word(get_rword(REG), get_smword(seg_reg, EA));  /* do operation */
-                    put_smword(seg_reg, EA, VAL); /* store result */
-                } else {                /* RM is second register */
-                    VAL = adc_word(get_rword(REG), get_rword(RM)); /* do operation */
-                    put_rword(REG, VAL); /* store result */
-                }
-                break;
-
-            case 0x04:                  /* ADD byte - AL = AL + DATA */
-                DATA = fetch_byte(1);
-                VAL = add_byte(AL, DATA); /* do operation */
-                AL = VAL;               /* store result */
-                break;
-
-            case 0x05:                  /* ADD word - (EA) = (EA) + REG */
-                DATA = fetch_word();
-                VAL = add_word(AX, DATA);  /* do operation */
-                AX = VAL;               /* store result */
-                break;
-
-            case 0x06:                  /* PUSH ES */
-                push_word(ES);
-                break;
-
-            case 0x07:                  /* POP ES */
-                ES = pop_word();
-                break;
-
-            case 0x08:                  /* OR byte - REG = REG OR (EA) */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    VAL = or_byte(get_rbyte(REG), get_smbyte(seg_reg, EA));  /* do operation */
-                    put_rbyte(REG, VAL); /* store result */
-                } else {                /* RM is second register */
-                    VAL = or_byte(get_rbyte(REG), get_rbyte(RM)); /* do operation */
-                    put_rbyte(REG, VAL); /* store result */
-                }
-                break;
-
-            case 0x09:                  /* OR word - (EA) = (EA) OR REG */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    VAL = or_word(get_rword(REG), get_smword(seg_reg, EA)); /* do operation */
-                    put_smword(seg_reg, EA, VAL); /* store result */
-                } else {                /* RM is second register */
-                    VAL = or_word(get_rword(REG), get_rword(RM)); /* do operation */
-                    put_rword(REG, VAL); /* store result */
-                }
-                break;
-
-            case 0x0A:                  /* OR byte - REG = REG OR (EA) */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    VAL = or_byte(get_rbyte(REG), get_smbyte(seg_reg, EA));  /* do operation */
-                    put_rbyte(REG, VAL); /* store result */
-                } else {                /* RM is second register */
-                    VAL = or_byte(get_rbyte(REG), get_rbyte(RM)); /* do operation */
-                    put_rbyte(REG, VAL); /* store result */
-                }
-                break;
-
-            case 0x0B:                  /* OR word - (EA) = (EA) OR REG */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    VAL = or_word(get_rword(REG), get_smword(seg_reg, EA));  /* do operation */
-                    put_smword(seg_reg, EA, VAL); /* store result */
-                } else {                /* RM is second register */
-                    VAL = or_word(get_rword(REG), get_rword(RM)); /* do operation */
-                    put_rword(REG, VAL); /* store result */
-                }
-                break;
-
-            case 0x0C:                  /* OR byte - AL = AL OR DATA */
-                DATA = fetch_byte(1);
-                VAL = or_byte(AL, DATA); /* do operation */
-                AL = VAL;               /* store result */
-                break;
-
-            case 0x0D:                  /* OR word - (EA) = (EA) OR REG */
-                DATA = fetch_word();
-                VAL = or_word(AX, DATA); /* do operation */
-                AX = VAL;               /* store result */
-                break;
-
-            case 0x0E:                  /* PUSH CS */
-                push_word(CS);
-                break;
-
-            /* 0x0F - Not implemented on 8086/8088 */
-
-            case 0x10:                  /* ADC byte - REG = REG + (EA) + CF */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    VAL = adc_byte(get_rbyte(REG), get_smbyte(seg_reg, EA));  /* do operation */
-                    put_rbyte(REG, VAL); /* store result */
-                } else {                /* RM is second register */
-                    VAL = adc_byte(get_rbyte(REG), get_rbyte(RM)); /* do operation */
-                    put_rbyte(REG, VAL); /* store result */
-                }
-                break;
-
-            case 0x11:                  /* ADC word - (EA) = (EA) + REG + CF */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    VAL = adc_word(get_rword(REG), get_smword(seg_reg, EA));  /* do operation */
-                    put_smword(seg_reg, EA, VAL); /* store result */
-                } else {                /* RM is second register */
-                    VAL = adc_word(get_rword(REG), get_rword(RM)); /* do operation */
-                    put_rword(REG, VAL); /* store result */
-                }
-                break;
-
-            case 0x12:                  /* ADC byte - REG = REG + (EA) + CF */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    VAL = adc_byte(get_rbyte(REG), get_smbyte(seg_reg, EA));  /* do operation */
-                    put_rbyte(REG, VAL); /* store result */
-                } else {                /* RM is second register */
-                    VAL = adc_byte(get_rbyte(REG), get_rbyte(RM)); /* do operation */
-                    put_rbyte(REG, VAL); /* store result */
-                }
-                break;
-
-            case 0x13:                  /* ADC word - (EA) = (EA) + REG + CF */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    VAL = adc_word(get_rword(REG), get_smword(seg_reg, EA));  /* do operation */
-                    put_smword(seg_reg, EA, VAL); /* store result */
-                } else {                /* RM is second register */
-                    VAL = adc_word(get_rword(REG), get_rword(RM)); /* do operation */
-                    put_rword(REG, VAL); /* store result */
-                }
-                break;
-
-            case 0x14:                  /* ADC byte - AL = AL + DATA + CF */
-                DATA = fetch_byte(1);
-                VAL = adc_byte(AL, DATA);  /* do operation */
-                AL = VAL;               /* store result */
-                break;
-
-            case 0x15:                  /* ADC word - (EA) = (EA) + REG + CF */
-                DATA = fetch_word();
-                VAL = adc_word(AX, DATA);  /* do operation */
-                AX = VAL;               /* store result */
-                break;
-
-            case 0x16:                  /* PUSH SS */
-                push_word(SS);
-                break;
-
-            case 0x17:                  /* POP SS */
-                SS = pop_word();
-                break;
-
-            case 0x18:                  /* SBB byte - REG = REG - (EA) - CF */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    VAL = sbb_byte(get_rbyte(REG), get_smbyte(seg_reg, EA));  /* do operation */
-                    put_rbyte(REG, VAL); /* store result */
-                } else {                /* RM is second register */
-                    VAL = sbb_byte(get_rbyte(REG), get_rbyte(RM)); /* do operation */
-                    put_rbyte(REG, VAL); /* store result */
-                }
-                break;
-
-            case 0x19:                  /* SBB word - (EA) = (EA) - REG - CF */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    VAL = sbb_word(get_rword(REG), get_smword(seg_reg, EA));  /* do operation */
-                    put_smword(seg_reg, EA, VAL); /* store result */
-                } else {                /* RM is second register */
-                    VAL = sbb_word(get_rword(REG), get_rword(RM)); /* do operation */
-                    put_rword(REG, VAL); /* store result */
-                }
-                break;
-
-            case 0x1A:                  /* SBB byte - REG = REG - (EA) - CF */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    VAL = sbb_byte(get_rbyte(REG), get_smbyte(seg_reg, EA));  /* do operation */
-                    put_rbyte(REG, VAL); /* store result */
-                } else {                /* RM is second register */
-                    VAL = sbb_byte(get_rbyte(REG), get_rbyte(RM)); /* do operation */
-                    put_rbyte(REG, VAL); /* store result */
-                }
-                break;
-
-            case 0x1B:                  /* SBB word - (EA) = (EA) - REG - CF */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    VAL = sbb_word(get_rword(REG), get_smword(seg_reg, EA));  /* do operation */
-                    put_smword(seg_reg, EA, VAL); /* store result */
-                } else {                /* RM is second register */
-                    VAL = sbb_word(get_rword(REG), get_rword(RM)); /* do operation */
-                    put_rword(REG, VAL); /* store result */
-                }
-                break;
-
-            case 0x1C:                  /* SBB byte - AL = AL - DATA - CF */
-                DATA = fetch_byte(1);
-                VAL = sbb_byte(AL, DATA);  /* do operation */
-                AL = VAL;               /* store result */
-                break;
-
-            case 0x1D:                  /* SBB word - (EA) = (EA) - REG - CF */
-                DATA = fetch_word();
-                VAL = sbb_word(AX, DATA);  /* do operation */
-                AX = VAL;               /* store result */
-                break;
-
-            case 0x1E:                  /* PUSH DS */
-                push_word(DS);
-                break;
-
-            case 0x1F:                  /* POP DS */
-                DS = pop_word();
-                break;
-
-            case 0x20:                  /* AND byte - REG = REG AND (EA) */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    VAL = and_byte(get_rbyte(REG), get_smbyte(seg_reg, EA));  /* do operation */
-                    put_rbyte(REG, VAL); /* store result */
-                } else {                /* RM is second register */
-                    VAL = and_byte(get_rbyte(REG), get_rbyte(RM)); /* do operation */
-                    put_rbyte(REG, VAL); /* store result */
-                }
-                break;
-
-            case 0x21:                  /* AND word - (EA) = (EA) AND REG */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    VAL = and_word(get_rword(REG), get_smword(seg_reg, EA));  /* do operation */
-                    put_smword(seg_reg, EA, VAL); /* store result */
-                } else {                /* RM is second register */
-                    VAL = and_word(get_rword(REG), get_rword(RM)); /* do operation */
-                    put_rword(REG, VAL); /* store result */
-                }
-                break;
-
-            case 0x22:                  /* AND byte - REG = REG AND (EA) */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    VAL = and_byte(get_rbyte(REG), get_smbyte(seg_reg, EA));  /* do operation */
-                    put_rbyte(REG, VAL); /* store result */
-                } else {                /* RM is second register */
-                    VAL = and_byte(get_rbyte(REG), get_rbyte(RM)); /* do operation */
-                    put_rbyte(REG, VAL); /* store result */
-                }
-                break;
-
-            case 0x23:                  /* AND word - (EA) = (EA) AND REG */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    VAL = and_word(get_rword(REG), get_smword(seg_reg, EA));  /* do operation */
-                    put_smword(seg_reg, EA, VAL); /* store result */
-                } else {                /* RM is second register */
-                    VAL = and_word(get_rword(REG), get_rword(RM)); /* do operation */
-                    put_rword(REG, VAL); /* store result */
-                }
-                break;
-
-            case 0x24:                  /* AND byte - AL = AL AND DATA */
-                DATA = fetch_byte(1);
-                VAL = and_byte(AL, DATA);  /* do operation */
-                AL = VAL;               /* store result */
-                break;
-
-            case 0x25:                  /* AND word - (EA) = (EA) AND REG */
-                DATA = fetch_word();
-                VAL = and_word(AX, DATA);  /* do operation */
-                AX = VAL;               /* store result */
-                break;
-
-            case 0x26:                  /* ES: - segment override prefix */
-                seg_ovr = SEG_ES;
-                sysmode |= SYSMODE_SEGOVR_ES;
-                break;
-
-            case 0x27:                  /* DAA */
-                if (((AL & 0xF) > 9) || GET_FLAG(AF)) {
-                    AL += 6;
-                    SET_FLAG(AF);
-                }
-                if ((AL > 0x9F) || GET_FLAG(CF)) {
-                    AL += 0x60;
-                    SET_FLAG(CF);
-                }
-                break;
-
-            case 0x28:                  /* SUB byte - REG = REG - (EA) */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    VAL = sub_byte(get_rbyte(REG), get_smbyte(seg_reg, EA));  /* do operation */
-                    put_rbyte(REG, VAL); /* store result */
-                } else {                /* RM is second register */
-                    VAL = sub_byte(get_rbyte(REG), get_rbyte(RM)); /* do operation */
-                    put_rbyte(REG, VAL); /* store result */
-                }
-                break;
-
-            case 0x29:                  /* SUB word - (EA) = (EA) - REG */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    VAL = sub_word(get_rword(REG), get_smword(seg_reg, EA));  /* do operation */
-                    put_smword(seg_reg, EA, VAL); /* store result */
-                } else {                /* RM is second register */
-                    VAL = sub_word(get_rword(REG), get_rword(RM)); /* do operation */
-                    put_rword(REG, VAL); /* store result */
-                }
-                break;
-
-            case 0x2A:                  /* SUB byte - REG = REG - (EA) */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    VAL = sub_byte(get_rbyte(REG), get_smbyte(seg_reg, EA));  /* do operation */
-                    put_rbyte(REG, VAL); /* store result */
-                } else {                /* RM is second register */
-                    VAL = sub_byte(get_rbyte(REG), get_rbyte(RM)); /* do operation */
-                    put_rbyte(REG, VAL); /* store result */
-                }
-                break;
-
-            case 0x2B:                  /* SUB word - (EA) = (EA) - REG */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    VAL = sub_word(get_rword(REG), get_smword(seg_reg, EA));  /* do operation */
-                    put_smword(seg_reg, EA, VAL); /* store result */
-                } else {                /* RM is second register */
-                    VAL = sub_word(get_rword(REG), get_rword(RM)); /* do operation */
-                    put_rword(REG, VAL); /* store result */
-                }
-                break;
-
-            case 0x2C:                  /* SUB byte - AL = AL - DATA */
-                DATA = fetch_byte(1);
-                VAL = sub_byte(AL, DATA);  /* do operation */
-                AL = VAL;               /* store result */
-                break;
-
-            case 0x2D:                  /* SUB word - (EA) = (EA) - REG */
-                DATA = fetch_word();
-                VAL = sub_word(AX, DATA);  /* do operation */
-                AX = VAL;               /* store result */
-                break;
-
-            case 0x2E:                  /* DS: - segment override prefix */
-                seg_ovr = SEG_DS;
-                sysmode |= SYSMODE_SEGOVR_DS;
-                break;
-
-            case 0x2F:                  /* DAS */
-                if (((AL & 0xF) > 9) || GET_FLAG(AF)) {
-                    AL -= 6;
-                    SET_FLAG(AF);
-                }
-                if ((AL > 0x9F) || GET_FLAG(CF)) {
-                    AL -= 0x60;
-                    SET_FLAG(CF);
-                }
-                break;
-
-            case 0x30:                  /* XOR byte - REG = REG XOR (EA) */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    VAL = xor_byte(get_rbyte(REG), get_smbyte(seg_reg, EA));  /* do operation */
-                    put_rbyte(REG, VAL); /* store result */
-                } else {                /* RM is second register */
-                    VAL = xor_byte(get_rbyte(REG), get_rbyte(RM)); /* do operation */
-                    put_rbyte(REG, VAL); /* store result */
-                }
-                break;
-
-            case 0x31:                  /* XOR word - (EA) = (EA) XOR REG */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    VAL = xor_word(get_rword(REG), get_smword(seg_reg, EA));  /* do operation */
-                    put_smword(seg_reg, EA, VAL); /* store result */
-                } else {                /* RM is second register */
-                    VAL = xor_word(get_rword(REG), get_rword(RM)); /* do operation */
-                    put_rword(REG, VAL); /* store result */
-                }
-                break;
-
-            case 0x32:                  /* XOR byte - REG = REG XOR (EA) */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    VAL = xor_byte(get_rbyte(REG), get_smbyte(seg_reg, EA));  /* do operation */
-                    put_rbyte(REG, VAL); /* store result */
-                } else {                /* RM is second register */
-                    VAL = xor_byte(get_rbyte(REG), get_rbyte(RM)); /* do operation */
-                    put_rbyte(REG, VAL); /* store result */
-                }
-                break;
-
-            case 0x33:                  /* XOR word - (EA) = (EA) XOR REG */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    VAL = xor_word(get_rword(REG), get_smword(seg_reg, EA));  /* do operation */
-                    put_smword(seg_reg, EA, VAL); /* store result */
-                } else {                /* RM is second register */
-                    VAL = xor_word(get_rword(REG), get_rword(RM)); /* do operation */
-                    put_rword(REG, VAL); /* store result */
-                }
-                break;
-
-            case 0x34:                  /* XOR byte - AL = AL XOR DATA */
-                DATA = fetch_byte(1);
-                VAL = xor_byte(AL, DATA);  /* do operation */
-                AL = VAL;               /* store result */
-                break;
-
-            case 0x35:                  /* XOR word - (EA) = (EA) XOR REG */
-                DATA = fetch_word();
-                VAL = xor_word(AX, DATA);  /* do operation */
-                AX = VAL;               /* store result */
-                break;
-
-            case 0x36:                  /* SS: - segment override prefix */
-                seg_ovr = SEG_SS;
-                sysmode |= SYSMODE_SEGOVR_SS;
-                break;
-
-            case 0x37:                  /* AAA */
-                if (((AL & 0xF) > 9) || GET_FLAG(AF)) {
-                    AL += 6;
-                    AH++;
-                    SET_FLAG(AF);
-                }
-                CONDITIONAL_SET_FLAG(GET_FLAG(AF), CF);
-                AL &= 0xF;
-                break;
-
-            case 0x38:                  /* CMP byte - CMP (REG, (EA)) */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    VAL = xor_byte(get_rbyte(REG), get_smbyte(seg_reg, EA));  /* do operation */
-                    put_rbyte(REG, VAL); /* store result */
-                } else {                /* RM is second register */
-                    VAL = xor_byte(get_rbyte(REG), get_rbyte(RM)); /* do operation */
-                    put_rbyte(REG, VAL); /* store result */
-                }
-                break;
-
-            case 0x39:                  /* CMP word - CMP ((EA), REG) */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    VAL = xor_word(get_rword(REG), get_smword(seg_reg, EA));  /* do operation */
-                    put_smword(seg_reg, EA, VAL); /* store result */
-                } else {                /* RM is second register */
-                    VAL = xor_word(get_rword(REG), get_rword(RM)); /* do operation */
-                    put_rword(REG, VAL); /* store result */
-                }
-                break;
-
-            case 0x3A:                  /* CMP byte - CMP (REG, (EA)) */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    VAL = xor_byte(get_rbyte(REG), get_smbyte(seg_reg, EA));  /* do operation */
-                    put_rbyte(REG, VAL); /* store result */
-                } else {                /* RM is second register */
-                    VAL = xor_byte(get_rbyte(REG), get_rbyte(RM)); /* do operation */
-                    put_rbyte(REG, VAL); /* store result */
-                }
-                break;
-
-            case 0x3B:                  /* CMP word - CMP ((EA), REG) */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    VAL = xor_word(get_rword(REG), get_smword(seg_reg, EA));  /* do operation */
-                    put_smword(seg_reg, EA, VAL); /* store result */
-                } else {                /* RM is second register */
-                    VAL = xor_word(get_rword(REG), get_rword(RM)); /* do operation */
-                    put_rword(REG, VAL); /* store result */
-                }
-                break;
-
-            case 0x3C:                  /* CMP byte - CMP (AL, DATA) */
-                DATA = fetch_byte(1);
-                VAL = xor_byte(AL, DATA); /* do operation */
-                AL = VAL;               /* store result */
-                break;
-
-            case 0x3D:                  /* CMP word - CMP ((EA), REG) */
-                DATA = fetch_word();
-                VAL = xor_word(AX, DATA); /* do operation */
-                AX = VAL;               /* store result */
-                break;
-
-            case 0x3E:                  /* DS: - segment override prefix */
-                seg_ovr = SEG_DS;
-                sysmode |= SYSMODE_SEGOVR_DS;
-                break;
-
-            case 0x3F:                  /* AAS */
-                if (((AL & 0xF) > 9) || GET_FLAG(AF)) {
-                    AL -= 6;
-                    AH--;
-                    SET_FLAG(AF);
-                }
-                CONDITIONAL_SET_FLAG(GET_FLAG(AF), CF);
-                AL &= 0xF;
-                break;
-
-            case 0x40:                  /* INC AX */
-                AX = inc_word(AX);
-                break;
-
-            case 0x41:                  /* INC CX */
-                CX = inc_word(CX);
-                break;
-
-            case 0x42:                  /* INC DX */
-                DX = inc_word(DX);
-                break;
-
-            case 0x43:                  /* INC BX */
-                BX = inc_word(BX);
-                break;
-
-            case 0x44:                  /* INC SP */
-                SP = inc_word(SP);
-                break;
-
-            case 0x45:                  /* INC BP */
-                BP = inc_word(BP);
-                break;
-
-            case 0x46:                  /* INC SI */
-                SI = inc_word(SI);
-                break;
-
-            case 0x47:                  /* INC DI */
-                DI = inc_word(DI);
-                break;
-
-            case 0x48:                  /* DEC AX */
-                AX = dec_word(AX);
-                break;
-
-            case 0x49:                  /* DEC CX */
-                CX = dec_word(CX);
-                break;
-
-            case 0x4A:                  /* DEC DX */
-                DX = dec_word(DX);
-                break;
-
-            case 0x4B:                  /* DEC BX */
-                BX = dec_word(BX);
-                break;
-
-            case 0x4C:                  /* DEC SP */
-                SP = dec_word(SP);
-                break;
-
-            case 0x4D:                  /* DEC BP */
-                BP = dec_word(BP);
-                break;
-
-            case 0x4E:                  /* DEC SI */
-                SI = dec_word(SI);
-                break;
-
-            case 0x4F:                  /* DEC DI */
-                DI = dec_word(DI);
-                break;
- 
-            case 0x50:                  /* PUSH AX */
-                push_word(AX);
-                break;
-
-            case 0x51:                  /* PUSH CX */
-                push_word(CX);
-                break;
-
-            case 0x52:                  /* PUSH DX */
-                push_word(DX);
-                break;
-
-            case 0x53:                  /* PUSH BX */
-                push_word(BX);
-                break;
-
-            case 0x54:                  /* PUSH SP */
-                push_word(SP);
-                break;
-
-            case 0x55:                  /* PUSH BP */
-                push_word(BP);
-                break;
-
-            case 0x56:                  /* PUSH SI */
-                push_word(SI);
-                break;
-
-            case 0x57:                  /* PUSH DI */
-                push_word(DI);
-                break;
-
-            case 0x58:                  /* POP AX */
-                AX = pop_word();
-                break;
-
-            case 0x59:                  /* POP CX */
-                CX = pop_word();
-                break;
-
-            case 0x5A:                  /* POP DX */
-                DX = pop_word();
-                break;
-
-            case 0x5B:                  /* POP BX */
-                BX = pop_word();
-                break;
-
-            case 0x5C:                  /* POP SP */
-                SP = pop_word();
-                break;
-
-            case 0x5D:                  /* POP BP */
-                BP = pop_word();
-                break;
-
-            case 0x5E:                  /* POP SI */
-                SI = pop_word();
-                break;
-
-            case 0x5F:                  /* POP DI */
-                DI = pop_word();
-                break;
-
-            /* 0x60 - 0x6F - Not implemented on 8086/8088 */
-
-            case 0x70:                  /* JO short label */
-                /* jump to byte offset if overflow flag is set */
-                OFF = sign_ext(fetch_byte(1));
-                EA = (IP + OFF) & ADDRMASK16;
-                if (GET_FLAG(OF))
-                    IP = EA;
-                break;
-
-            case 0x71:                  /* JNO short label */
-                /* jump to byte offset if overflow flag is clear */
-                OFF = sign_ext(fetch_byte(1));
-                EA = (IP + OFF) & ADDRMASK16;
-                if (!GET_FLAG(OF))
-                    IP = EA;
-                break;
-
-            case 0x72:                  /* JB/JNAE/JC short label */
-                /* jump to byte offset if carry flag is set. */
-                OFF = sign_ext(fetch_byte(1));
-                EA = (IP + OFF) & ADDRMASK16;
-                if (GET_FLAG(CF))
-                    IP = EA;
-                break;
-
-            case 0x73:                  /* JNB/JAE/JNC short label */
-                /* jump to byte offset if carry flsg is clear */
-                OFF = sign_ext(fetch_byte(1));
-                EA = (IP + OFF) & ADDRMASK16;
-                if (!GET_FLAG(CF))
-                    IP = EA;
-                break;
-
-            case 0x74:                  /* JE/JZ short label */
-                /* jump to byte offset if zero flag is set */
-                OFF = sign_ext(fetch_byte(1));
-                EA = (IP + OFF) & ADDRMASK16;
-                if (GET_FLAG(ZF))
-                    IP = EA;
-                break;
-
-            case 0x75:                  /* JNE/JNZ short label */
-                /* jump to byte offset if zero flag is clear */
-                OFF = sign_ext(fetch_byte(1));
-                EA = (IP + OFF) & ADDRMASK16;
-                if (!GET_FLAG(ZF))
-                    IP = EA;
-                break;
-
-            case 0x76:                  /* JBE/JNA short label */
-                /* jump to byte offset if carry flag is set or if the zero
-                    flag is set. */
-                OFF = sign_ext(fetch_byte(1));
-                EA = (IP + OFF) & ADDRMASK16;
-                if (GET_FLAG(CF) || GET_FLAG(ZF))
-                    IP = EA;
-                break;
-
-            case 0x77:                  /* JNBE/JA short label */
-                /* jump to byte offset if carry flag is clear and if the zero
-                    flag is clear */
-                OFF = sign_ext(fetch_byte(1));
-                EA = (IP + OFF) & ADDRMASK16;
-                if (!(GET_FLAG(CF) || GET_FLAG(ZF)))
-                    IP = EA;
-                break;
-
-            case 0x78:                  /* JS short label */
-                /* jump to byte offset if sign flag is set */
-                OFF = sign_ext(fetch_byte(1));
-                EA = (IP + OFF) & ADDRMASK16;
-                if (GET_FLAG(SF))
-                    IP = EA;
-                break;
-
-            case 0x79:                  /* JNS short label */
-                /* jump to byte offset if sign flag is clear */
-                OFF = sign_ext(fetch_byte(1));
-                EA = (IP + OFF) & ADDRMASK16;
-                if (!GET_FLAG(SF))
-                    IP = EA;
-                break;
-
-            case 0x7A:                  /* JP/JPE short label */
-                /* jump to byte offset if parity flag is set (even) */
-                OFF = sign_ext(fetch_byte(1));
-                EA = (IP + OFF) & ADDRMASK16;
-                if (GET_FLAG(PF))
-                    IP = EA;
-                break;
-
-            case 0x7B:                  /* JNP/JPO short label */
-                /* jump to byte offset if parity flsg is clear (odd) */
-                OFF = sign_ext(fetch_byte(1));
-                EA = (IP + OFF) & ADDRMASK16;
-                if (!GET_FLAG(PF))
-                    IP = EA;
-                break;
-
-            case 0x7C:                  /* JL/JNGE short label */
-                /* jump to byte offset if sign flag not equal to overflow flag. */
-                OFF = sign_ext(fetch_byte(1));
-                EA = (IP + OFF) & ADDRMASK16;
-                if ((GET_FLAG(SF) != 0) ^ (GET_FLAG(OF) != 0))
-                    IP = EA;
-                break;
-
-            case 0x7D:                  /* JNL/JGE short label */
-                /* jump to byte offset if sign flag equal to overflow flag. */
-                OFF = sign_ext(fetch_byte(1));
-                EA = (IP + OFF) & ADDRMASK16;
-                if ((GET_FLAG(SF) != 0) == (GET_FLAG(OF) != 0))
-                    IP = EA;
-                break;
-
-            case 0x7E:                  /* JLE/JNG short label */
-                /* jump to byte offset if sign flag not equal to overflow flag
-                    or the zero flag is set */
-                OFF = sign_ext(fetch_byte(1));
-                EA = (IP + OFF) & ADDRMASK16;
-                if (((GET_FLAG(SF) != 0) ^ (GET_FLAG(OF) != 0)) || GET_FLAG(ZF))
-                    IP = EA;
-                break;
-
-            case 0x7F:                  /* JNLE/JG short label */
-                /* jump to byte offset if sign flag equal to overflow flag.
-                    and the zero flag is clear*/
-                OFF = sign_ext(fetch_byte(1));
-                EA = (IP + OFF) & ADDRMASK16;
-                if (((GET_FLAG(SF) != 0) == (GET_FLAG(OF) != 0)) || !GET_FLAG(ZF))
-                    IP = EA;
-                break;
-
-            case 0x80:                  /* ADD/OR/ADC/SBB/AND/SUB/XOR/CMP byte operands */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    DATA = fetch_byte(1); /* must be done after DISP is collected */
-                    switch(REG) {
-                        case 0:
-                            VAL = add_byte(get_smbyte(seg_reg, EA), DATA);  /* ADD mem8, immed8 */
-                            break;
-                        case 1:
-                            VAL = or_byte(get_smbyte(seg_reg, EA), DATA);   /* OR  mem8, immed8 */
-                            break;
-                        case 2:
-                            VAL = adc_byte(get_smbyte(seg_reg, EA), DATA);  /* ADC mem8, immed8 */
-                            break;
-                        case 3:
-                            VAL = sbb_byte(get_smbyte(seg_reg, EA), DATA);  /* SBB mem8, immed8 */
-                            break;
-                        case 4:
-                            VAL = and_byte(get_smbyte(seg_reg, EA), DATA);  /* AND mem8, immed8 */
-                            break;
-                        case 5:
-                            VAL = sub_byte(get_smbyte(seg_reg, EA), DATA);  /* SUB mem8, immed8 */
-                            break;
-                        case 6:
-                            VAL = xor_byte(get_smbyte(seg_reg, EA), DATA);  /* XOR mem8, immed8 */
-                            break;
-                        case 7:
-                            VAL = cmp_byte(get_smbyte(seg_reg, EA), DATA);  /* CMP mem8, immed8 */
-                            break;
-                    }
-                    put_rbyte(EA, VAL); /* store result */
-                } else {                /* RM is second register */
-                    switch(REG) {
-                        case 0:
-                            VAL = add_byte(get_rbyte(RM), DATA);  /* ADD REG8, immed8 */
-                            break;
-                        case 1:
-                            VAL = or_byte(get_rbyte(RM), DATA);   /* OR  REG8, immed8 */
-                            break;
-                        case 2:
-                            VAL = adc_byte(get_rbyte(RM), DATA);  /* ADC REG8, immed8 */
-                            break;
-                        case 3:
-                            VAL = sbb_byte(get_rbyte(RM), DATA);  /* SBB REG8, immed8 */
-                            break;
-                        case 4:
-                            VAL = and_byte(get_rbyte(RM), DATA);  /* AND REG8, immed8 */
-                            break;
-                        case 5:
-                            VAL = sub_byte(get_rbyte(RM), DATA);  /* SUB REG8, immed8 */
-                            break;
-                        case 6:
-                            VAL = xor_byte(get_rbyte(RM), DATA);  /* XOR REG8, immed8 */
-                            break;
-                        case 7:
-                            VAL = cmp_byte(get_rbyte(RM), DATA);  /* CMP REG8, immed8 */
-                            break;
-                    }
-                    put_rbyte(REG, VAL); /* store result */
+            if (trap_toggle) {
+                    intcall86 (1);
                 }
-                break;
 
-            case 0x81:                  /* word operands */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    DATA = fetch_byte(1) << 8; /* must be done after DISP is collected */
-                    DATA |= fetch_byte(1);
-                    switch(REG) {
-                        case 0:
-                            VAL = add_word(get_smword(seg_reg, EA), DATA);  /* ADD mem16, immed16 */
-                            break;
-                        case 1:
-                            VAL = or_word(get_smword(seg_reg, EA), DATA);   /* OR  mem16, immed16 */
-                            break;
-                        case 2:
-                            VAL = adc_word(get_smword(seg_reg, EA), DATA);  /* ADC mem16, immed16 */
-                            break;
-                        case 3:
-                            VAL = sbb_word(get_smword(seg_reg, EA), DATA);  /* SBB mem16, immed16 */
-                            break;
-                        case 4:
-                            VAL = and_word(get_smword(seg_reg, EA), DATA);  /* AND mem16, immed16 */
-                            break;
-                        case 5:
-                            VAL = sub_word(get_smword(seg_reg, EA), DATA);  /* SUB mem16, immed16 */
-                            break;
-                        case 6:
-                            VAL = xor_word(get_smword(seg_reg, EA), DATA);  /* XOR mem16, immed16 */
-                            break;
-                        case 7:
-                            VAL = cmp_word(get_smword(seg_reg, EA), DATA);  /* CMP mem16, immed16 */
-                            break;
-                    }
-                    put_rword(EA, VAL); /* store result */
-                } else {                /* RM is second register */
-                    switch(REG) {
-                        case 0:
-                            VAL = add_word(get_rword(RM), DATA);  /* ADD reg16, immed16 */
-                            break;
-                        case 1:
-                            VAL = or_word(get_rword(RM), DATA);   /* OR  reg16, immed16 */
-                            break;
-                        case 2:
-                            VAL = adc_word(get_rword(RM), DATA);  /* ADC reg16, immed16 */
-                            break;
-                        case 3:
-                            VAL = sbb_word(get_rword(RM), DATA);  /* SBB reg16, immed16 */
-                            break;
-                        case 4:
-                            VAL = and_word(get_rword(RM), DATA);  /* AND reg16, immed16 */
-                            break;
-                        case 5:
-                            VAL = sub_word(get_rword(RM), DATA);  /* SUB reg16, immed16 */
-                            break;
-                        case 6:
-                            VAL = xor_word(get_rword(RM), DATA);  /* XOR reg16, immed16 */
-                            break;
-                        case 7:
-                            VAL = cmp_word(get_rword(RM), DATA);  /* CMP reg16, immed16 */
-                            break;
-                    }
-                    put_rword(RM, VAL); /* store result */
+            if (tf) {
+                    trap_toggle = 1;
                 }
-                break;
-
-            case 0x82:                  /* byte operands */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    DATA = fetch_byte(1); /* must be done after DISP is collected */
-                    switch(REG) {
-                        case 0:
-                            VAL = add_byte(get_smbyte(seg_reg, EA), DATA);  /* ADD mem8, immed8 */
-                            break;
-                        case 2:
-                            VAL = adc_byte(get_smbyte(seg_reg, EA), DATA);  /* ADC mem8, immed8 */
-                            break;
-                        case 3:
-                            VAL = sbb_byte(get_smbyte(seg_reg, EA), DATA);  /* SBB mem8, immed8 */
-                            break;
-                        case 5:
-                            VAL = sub_byte(get_smbyte(seg_reg, EA), DATA);  /* SUB mem8, immed8 */
-                            break;
-                        case 7:
-                            VAL = cmp_byte(get_smbyte(seg_reg, EA), DATA);  /* CMP mem8, immed8 */
-                            break;
-                        default:        /* bad opcodes */
-                            reason = STOP_OPCODE;
-                            IP -= 2;
-                            break;
-                    }
-                    put_rbyte(EA, VAL); /* store result */
-                } else {                /* RM is second register */
-                    switch(REG) {
-                        case 0:
-                            VAL = add_byte(get_rbyte(RM), DATA);  /* ADD reg8, immed8 */
-                            break;
-                        case 2:
-                            VAL = adc_byte(get_rbyte(RM), DATA);  /* ADC reg8, immed8 */
-                            break;
-                        case 3:
-                            VAL = sbb_byte(get_rbyte(RM), DATA);  /* SBB reg8, immed8 */
-                            break;
-                        case 5:
-                            VAL = sub_byte(get_rbyte(RM), DATA);  /* SUB reg8, immed8 */
-                            break;
-                        case 7:
-                            VAL = cmp_byte(get_rbyte(RM), DATA);  /* CMP reg8, immed8 */
-                            break;
-                        default:        /* bad opcodes */
-                            reason = STOP_OPCODE;
-                            IP -= 2;
-                            break;
-                    }
-                    put_rbyte(REG, VAL); /* store result */
-                }
-                break;
-
-            case 0x83:                  /* word operands */
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    DATA = fetch_byte(1) << 8; /* must be done after DISP is collected */
-                    if (DATA & 0x80)
-                        DATA |= 0xFF00;
-                    else
-                        DATA &= 0xFF;
-                    switch(REG) {
-                        case 0:
-                            VAL = add_word(get_smword(seg_reg, EA), DATA);  /* ADD mem16, immed8-SX */
-                            break;
-                        case 2:
-                            VAL = adc_word(get_smword(seg_reg, EA), DATA);  /* ADC mem16, immed8-SX */
-                            break;
-                        case 3:
-                            VAL = sbb_word(get_smword(seg_reg, EA), DATA);  /* SBB mem16, immed8-SX */
-                            break;
-                        case 5:
-                            VAL = sub_word(get_smword(seg_reg, EA), DATA);  /* SUB mem16, immed8-SX */
-                            break;
-                        case 7:
-                            VAL = cmp_word(get_smword(seg_reg, EA), DATA);  /* CMP mem16, immed8-SX */
-                            break;
-                        default:        /* bad opcodes */
-                            reason = STOP_OPCODE;
-                            IP -= 2;
-                            break;
-                    }
-                    put_rword(EA, VAL);  /* store result */
-                } else {                /* RM is second register */
-                    switch(REG) {
-                        case 0:
-                            VAL = add_word(get_rword(RM), DATA);  /* ADD reg16, immed8-SX */
-                            break;
-                        case 2:
-                            VAL = adc_word(get_rword(RM), DATA);  /* ADC reg16, immed8-SX */
-                            break;
-                        case 3:
-                            VAL = sbb_word(get_rword(RM), DATA);  /* SBB reg16, immed8-SX */
-                            break;
-                        case 5:
-                            VAL = sub_word(get_rword(RM), DATA);  /* CUB reg16, immed8-SX */
-                            break;
-                        case 7:
-                            VAL = cmp_word(get_rword(RM), DATA);  /* CMP reg16, immed8-SX */
-                            break;
-                        default:        /* bad opcodes */
-                            reason = STOP_OPCODE;
-                            IP -= 2;
-                            break;
-                    }
-                    put_rword(RM, VAL); /* store result */
-                }
-                break;
-
-            case 0x84:
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    test_byte(get_smbyte(seg_reg, EA),get_rbyte(REG));  /* TEST mem8, reg8 */
-                } else {
-                    test_byte(get_rbyte(REG),get_rbyte(RM));  /* TEST reg8, reg8 */
-                }
-                break;
-
-            case 0x85:
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    test_word(get_smword(seg_reg, EA),get_rword(REG));  /* TEST mem16, reg16 */
-                } else {
-                    test_word(get_rword(REG),get_rword(RM));  /* TEST reg16, reg16 */
-                }
-                break;
-
-            case 0x86:
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    VAL = get_rbyte(REG);/* XCHG mem8, reg8 */
-                    put_rbyte(REG, get_smbyte(seg_reg, EA));
-                    put_smbyte(seg_reg, EA, VAL);
-                } else {
-                    VAL = get_rbyte(RM);/* XCHG reg8, reg8 */
-                    put_rbyte(RM, get_rbyte(REG));
-                    put_rbyte(REG, VAL);
-                }
-                break;
-
-            case 0x87:
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    VAL = get_rword(REG);/* XCHG mem16, reg16 */
-                    put_rword(REG, get_smword(seg_reg, EA));
-                    put_smword(seg_reg, EA, VAL);
-                } else {
-                    VAL = get_rword(RM);/* XCHG reg16, reg16 */
-                    put_rword(RM, get_rword(REG));
-                    put_rword(REG, VAL);
-                }
-                break;
-
-            case 0x88:
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    put_smbyte(seg_reg, EA, get_rbyte(REG)); /* MOV mem8, reg8 */
-                } else
-                    put_rbyte(REG, get_rbyte(RM)); /* MOV reg8, reg8 */
-                break;
-
-            case 0x89:
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    put_smword(seg_reg, EA, get_rword(REG)); /* MOV mem16, reg16 */
-                } else
-                    put_rword(REG, get_rword(RM)); /* MOV reg16, reg16 */
-                break;
-
-            case 0x8A:
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    put_rbyte(REG, get_smbyte(seg_reg, EA)); /* MOV reg8, mem8 */
-                } else
-                    put_rbyte(REG, get_rbyte(RM)); /* MOV reg8, reg8 */
-                break;
-
-            case 0x8B:
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    put_rword(REG, get_smword(seg_reg, EA)); /* MOV reg16, mem16 */
-                } else
-                    put_rword(REG, get_rword(RM)); /* MOV reg16, reg16 */
-                break;
-
-            case 0x8C:
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    switch(REG) {
-                        case 0:         /* MOV mem16, ES */ 
-                            put_smword(seg_reg, EA, ES);
-                            break;
-                        case 1:         /* MOV mem16, CS */ 
-                            put_smword(seg_reg, EA, CS);
-                            break;
-                        case 2:         /* MOV mem16, SS */ 
-                            put_smword(seg_reg, EA, SS);
-                            break;
-                        case 3:         /* MOV mem16, DS */ 
-                            put_smword(seg_reg, EA, DS);
-                            break;
-                        default:        /* bad opcodes */
-                            reason = STOP_OPCODE;
-                            IP -= 2;
-                            break;
-                    }
-                } else {
-                    switch(REG) {
-                        case 0:         /* MOV reg16, ES */ 
-                            put_rword(RM, ES);
-                            break;
-                        case 1:         /* MOV reg16, CS */ 
-                            put_rword(RM, CS);
-                            break;
-                        case 2:         /* MOV reg16, SS */ 
-                            put_rword(RM, SS);
-                            break;
-                        case 3:         /* MOV reg16, DS */ 
-                            put_rword(RM, DS);
-                            break;
-                        default:        /* bad opcodes */
-                            reason = STOP_OPCODE;
-                            IP -= 2;
-                            break;
-                    }
-                }
-                break;
-
-            case 0x8D:
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    put_rword(REG, EA); /* LEA reg16, mem16 */
-                } else {
-                    reason = STOP_OPCODE;
-                    IP -= 2;
-                }
-                break;
-
-            case 0x8E:
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    switch(REG) {
-                        case 0:         /* MOV ES, mem16 */ 
-                            ES = get_smword(seg_reg, EA);
-                            break;
-                        case 1:         /* MOV CS, mem16 */ 
-                            CS = get_smword(seg_reg, EA);
-                            break;
-                        case 2:         /* MOV SS, mem16 */ 
-                            SS = get_smword(seg_reg, EA);
-                            break;
-                        case 3:         /* MOV DS, mem16 */ 
-                            DS = get_smword(seg_reg, EA);
-                            break;
-                        default:        /* bad opcodes */
-                            reason = STOP_OPCODE;
-                            IP -= 2;
-                            break;
-                    }
-                } else {
-                    switch(REG) {
-                        case 0:         /* MOV ES, reg16 */ 
-                            ES = get_rword(RM);
-                            break;
-                        case 1:         /* MOV CS, reg16 */ 
-                            CS = get_rword(RM);
-                            break;
-                        case 2:         /* MOV SS, reg16 */ 
-                            SS = get_rword(RM);
-                            break;
-                        case 3:         /* MOV DS, reg16 */ 
-                            DS = get_rword(RM);
-                            break;
-                        default:        /* bad opcodes */
-                            reason = STOP_OPCODE;
-                            IP -= 2;
-                            break;
-                    }
-                }
-                break;
-
-            case 0x8f:
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    put_smword(seg_reg, EA, pop_word());
-                } else {
-                    reason = STOP_OPCODE;
-                    IP -= 2;
-                }
-                break;
-
-            case 0x90:                  /* NOP */
-                break;
-
-            case 0x91:                  /* XCHG AX, CX */
-                VAL = AX;
-                AX = CX;
-                CX = VAL;
-                break;
-
-            case 0x92:                  /* XCHG AX, DX */
-                VAL = AX;
-                AX = DX;
-                DX = VAL;
-                break;
-
-            case 0x93:                  /* XCHG AX, BX */
-                VAL = AX;
-                AX = BX;
-                BX = VAL;
-                break;
-
-            case 0x94:                  /* XCHG AX, SP */
-                VAL = AX;
-                AX = SP;
-                SP = VAL;
-                break;
-
-            case 0x95:                  /* XCHG AX, BP */
-                VAL = AX;
-                AX = BP;
-                BP = VAL;
-                break;
-
-            case 0x96:                  /* XCHG AX, SI */
-                VAL = AX;
-                AX = SI;
-                SI = VAL;
-                break;
-
-            case 0x97:                  /* XCHG AX, DI */
-                VAL = AX;
-                AX = DI;
-                DI = VAL;
-                break;
-
-            case 0x98:                  /* cbw */
-               if (AL & 0x80)
-                  AH = 0xFF;
-               else
-                  AH = 0;
-                break;
-
-            case 0x99:                  /* cbw */
-               if (AX & 0x8000)
-                  DX = 0xffff;
-               else
-                  DX = 0x0;
-                break;
-
-            case 0x9A:                  /* CALL FAR proc */
-                OFF = fetch_word();     /* do operation */
-                SEG = fetch_word();
-                push_word(CS);
-                CS = SEG;
-                push_word(IP);
-                IP = OFF;
-                break;
-
-            case 0x9B:                  /* WAIT */
-                break;
-
-            case 0x9C:                  /* PUSHF */
-                VAL = PSW;
-                VAL &= PSW_MSK;
-                VAL |= PSW_ALWAYS_ON;
-                push_word(VAL);
-                break;
-
-            case 0x9D:                  /* POPF */
-                PSW = pop_word();
-                break;
-
-            case 0x9E:                  /* SAHF */
-                PSW &= 0xFFFFFF00;
-                PSW |= AH;
-                break;
-
-            case 0x9F:                  /* LAHF */
-                AH = PSW & 0xFF;
-                AH |= 0x2;
-                break;
-
-            case 0xA0:                  /* MOV AL, mem8 */
-                OFF = fetch_word();
-                set_segreg(SEG_DS);     /* to allow segment override */
-                AL = get_smbyte(seg_reg, OFF);
-                break;
-
-            case 0xA1:                  /* MOV AX, mem16 */
-                OFF = fetch_word();
-                set_segreg(SEG_DS);     /* to allow segment override */
-                AX = get_smword(seg_reg, OFF);
-                break;
-
-            case 0xA2:                  /* MOV mem8, AL */
-                OFF = fetch_word();
-                set_segreg(SEG_DS);     /* to allow segment override */
-                put_smbyte(seg_reg, OFF, AL);
-                break;
-
-            case 0xA3:                  /* MOV mem16, AX */
-                OFF = fetch_word();
-                set_segreg(SEG_DS);     /* to allow segment override */
-                put_smword(seg_reg, OFF, AX);
-                break;
-
-            case 0xA4:                  /* MOVS dest-str8, src-str8 */
-                if (GET_FLAG(DF))       /* down */
-                    INC = -1;
-                else
-                    INC = 1;
-                while (CX != 0) {
-                    VAL = get_smbyte(seg_reg, SI);
-                    put_smbyte(ES, DI, VAL);
-                    CX--;
-                    SI += INC;
-                    DI += INC;
-                }
-                break;
-
-            case 0xA5:                  /* MOVS dest-str16, src-str16 */
-                if (GET_FLAG(DF))       /* down */
-                    INC = -2;
-                else
-                    INC = 2;
-                while (CX != 0) {
-                    VAL = get_smword(seg_reg, SI);
-                    put_smword(ES, DI, VAL);
-                    CX--;
-                    SI += INC;
-                    DI += INC;
-                }
-                break;
-
-            case 0xA6:                  /* CMPS dest-str8, src-str8 */
-                if (GET_FLAG(DF))       /* down */
-                    INC = -1;
-                else
-                    INC = 1;
-                while (CX != 0) {
-                    VAL = get_smbyte(seg_reg, SI);
-                    VAL1 = get_smbyte(ES, DI);
-                    cmp_byte(VAL, VAL1);
-                    CX--;
-                    SI += INC;
-                    DI += INC;
-                    if (GET_FLAG(ZF) == 0)
-                        break;
-                }
-                break;
-
-            case 0xA7:                  /* CMPS dest-str16, src-str16 */
-                if (GET_FLAG(DF))       /* down */
-                    INC = -2;
-                else
-                    INC = 2;
-                while (CX != 0) {
-                    VAL = get_smword(seg_reg, SI);
-                    VAL1 = get_smword(ES, DI);
-                    cmp_word(VAL, VAL1);
-                    CX--;
-                    SI += INC;
-                    DI += INC;
-                    if (GET_FLAG(ZF) == 0)
-                        break;
-                }
-                break;
-
-            case 0xA8:                  /* TEST AL, immed8 */
-                VAL = fetch_byte(1);
-                test_byte(AL, VAL);
-                break;
-
-            case 0xA9:                  /* TEST AX, immed8 */
-                VAL = fetch_word();
-                test_word(AX, VAL);
-                break;
-
-            case 0xAA:                  /* STOS dest-str8 */
-                if (GET_FLAG(DF))       /* down */
-                    INC = -1;
-                else
-                    INC = 1;
-                if (sysmode & (SYSMODE_PREFIX_REPE | SYSMODE_PREFIX_REPNE)) {
-                    while (CX != 0) {
-                        put_smbyte(ES, DI, AL);
-                        CX--;
-                        DI += INC;
-                    }
-                sysmode &= ~(SYSMODE_PREFIX_REPE | SYSMODE_PREFIX_REPNE);
-                } else {
-                    put_smbyte(ES, DI, AL);
-                    DI += INC;
-                }
-                break;
-
-            case 0xAB:                  /* STOS dest-str16 */
-                if (GET_FLAG(DF))       /* down */
-                    INC = -1;
-                else
-                    INC = 1;
-                if (sysmode & (SYSMODE_PREFIX_REPE | SYSMODE_PREFIX_REPNE)) {
-                    while (CX != 0) {
-                        put_smword(ES, DI, AX);
-                        CX--;
-                        DI += INC;
-                    }
-                sysmode &= ~(SYSMODE_PREFIX_REPE | SYSMODE_PREFIX_REPNE);
-                } else {
-                    put_smword(ES, DI, AL);
-                    DI += INC;
-                }
-                break;
-
-            case 0xAC:                  /* LODS dest-str8 */
-                if (GET_FLAG(DF))       /* down */
-                    INC = -1;
-                else
-                    INC = 1;
-                set_segreg(SEG_DS);     /* allow overrides */
-                if (sysmode & (SYSMODE_PREFIX_REPE | SYSMODE_PREFIX_REPNE)) {
-                    while (CX != 0) {
-                        AL = get_smbyte(seg_reg, SI);
-                        CX--;
-                        SI += INC;
-                    }
-                sysmode &= ~(SYSMODE_PREFIX_REPE | SYSMODE_PREFIX_REPNE);
-                } else {
-                    AL = get_smbyte(seg_reg, SI);
-                    SI += INC;
-                }
-                break;
-
-            case 0xAD:                  /* LODS dest-str16 */
-                if (GET_FLAG(DF))       /* down */
-                    INC = -1;
-                else
-                    INC = 1;
-                set_segreg(SEG_DS);     /* allow overrides */
-                if (sysmode & (SYSMODE_PREFIX_REPE | SYSMODE_PREFIX_REPNE)) {
-                    while (CX != 0) {
-                        AX = get_smword(seg_reg, SI);
-                        CX--;
-                        SI += INC;
-                    }
-                sysmode &= ~(SYSMODE_PREFIX_REPE | SYSMODE_PREFIX_REPNE);
-                } else {
-                    AX = get_smword(seg_reg, SI);
-                    SI += INC;
-                }
-                break;
-
-            case 0xAE:                  /* SCAS dest-str8 */
-                if (GET_FLAG(DF))       /* down */
-                    INC = -1;
-                else
-                    INC = 1;
-                if (sysmode & (SYSMODE_PREFIX_REPE | SYSMODE_PREFIX_REPNE)) {
-                    while (CX != 0) {
-                        VAL = get_smbyte(ES, DI);
-                        cmp_byte(AL, VAL);
-                        CX--;
-                        DI += INC;
-                        if (GET_FLAG(ZF) == 0)
-                            break;
-                    }
-                sysmode &= ~(SYSMODE_PREFIX_REPE | SYSMODE_PREFIX_REPNE);
-                } else {
-                    VAL = get_smbyte(ES, DI);
-                    cmp_byte(AL, VAL);
-                    DI += INC;
-                }
-                break;
-
-            case 0xAF:                  /* SCAS dest-str16 */
-                if (GET_FLAG(DF))       /* down */
-                    INC = -2;
-                else
-                    INC = 2;
-                if (sysmode & (SYSMODE_PREFIX_REPE | SYSMODE_PREFIX_REPNE)) {
-                    while (CX != 0) {
-                        VAL = get_smword(ES, DI);
-                        cmp_word(AX, VAL);
-                        CX--;
-                        DI += INC;
-                        if (GET_FLAG(ZF) == 0)
-                            break;
-                    }
-                sysmode &= ~(SYSMODE_PREFIX_REPE | SYSMODE_PREFIX_REPNE);
-                } else {
-                    VAL = get_smword(ES, DI);
-                    cmp_byte(AL, VAL);
-                    DI += INC;
-                }
-                break;
-
-            case 0xB0:                  /* MOV AL,immed8 */
-                AL = fetch_byte(1);
-                break;
-
-            case 0xB1:                  /* MOV CL,immed8 */
-                CL = fetch_byte(1);
-                break;
-
-            case 0xB2:                  /* MOV DL,immed8 */
-                DL = fetch_byte(1);
-                break;
-
-            case 0xB3:                  /* MOV BL,immed8 */
-                BL = fetch_byte(1);
-                break;
-
-            case 0xB4:                  /* MOV AH,immed8 */
-                AH = fetch_byte(1);
-                break;
-
-            case 0xB5:                  /* MOV CH,immed8 */
-                CH = fetch_byte(1);
-                break;
-
-            case 0xB6:                  /* MOV DH,immed8 */
-                DH = fetch_byte(1);
-                break;
-
-            case 0xB7:                  /* MOV BH,immed8 */
-                BH = fetch_byte(1);
-                break;
-
-            case 0xB8:                  /* MOV AX,immed16 */
-                AX = fetch_word();
-                break;
-
-            case 0xB9:                  /* MOV CX,immed16 */
-                CX = fetch_word();
-                break;
-
-            case 0xBA:                  /* MOV DX,immed16 */
-                DX = fetch_word();
-                break;
-
-            case 0xBB:                  /* MOV BX,immed16 */
-                BX = fetch_word();
-                break;
-
-            case 0xBC:                  /* MOV SP,immed16 */
-                SP = fetch_word();
-                break;
-
-            case 0xBD:                  /* MOV BP,immed16 */
-                BP = fetch_word();
-                break;
-
-            case 0xBE:                  /* MOV SI,immed16 */
-                SI = fetch_word();
-                break;
-
-            case 0xBF:                  /* MOV DI,immed16 */
-                DI = fetch_word();
-                break;
-
-            /* 0xC0 - 0xC1 - Not implemented on 8086/8088 */
-
-            case 0xC2:                  /* RET immed16 (intrasegment) */
-                OFF = fetch_word();
-                IP = pop_word();
-                SP += OFF;
-                break;
-
-            case 0xC3:                  /* RET (intrasegment) */
-                IP = pop_word();
-                break;
-
-            case 0xC4: 
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    put_rword(REG, get_smword(seg_reg, EA)); /* LES mem16 */
-                    ES = get_smword(seg_reg, EA + 2);
-                } else {
-//                    put_rword(REG, get_rword(RM)); /* LES reg16 */
-//                    ES = get_rword(RM) + 2;
-                    /* not defined for 8086 */
-                    reason = STOP_OPCODE;
-                    IP -= 2;
-                }
-                break;
-
-            case 0xC5: 
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    put_rword(REG, get_smword(seg_reg, EA)); /* LDS mem16 */
-                    DS = get_smword(seg_reg, EA + 2);
-                } else {
-//                    put_rword(REG, get_rword(RM)); /* LDS reg16 */
-//                    DS = get_rword(RM) + 2;
-                    /* not defined for 8086 */
-                    reason = STOP_OPCODE;
-                    IP -= 2;
-                }
-                break;
-
-            case 0xC6: 
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (REG) {              /* has to be 0 */
-                    reason = STOP_OPCODE;
-                    IP -= 2;
-                }
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    DATA = fetch_byte(1); /* has to be after DISP */
-                    put_smbyte(seg_reg, EA, DATA); /* MOV mem8, immed8 */
-                } else {
-                    put_rbyte(RM, DATA); /* MOV reg8, immed8 */
-                }
-                break;
-
-            case 0xC7: 
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (REG) {              /* has to be 0 */
-                    reason = STOP_OPCODE;
-                    IP -= 2;
-                }
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    DATA = get_mword(IP); /* has to be after DISP */
-                    put_smword(seg_reg, EA, DATA); /* MOV mem16, immed16 */
-                } else {
-                    put_rword(RM, DATA); /* MOV reg16, immed16 */
-                }
-                break;
-
-            /* 0xC8 - 0xC9 - Not implemented on 8086/8088 */
-
-            case 0xCA:                  /* RET immed16 (intersegment) */
-                OFF = fetch_word();
-                IP = pop_word();
-                CS = pop_word();
-                SP += OFF;
-                break;
-
-            case 0xCB:                  /* RET (intersegment) */
-                IP = pop_word();
-                CS = pop_word();
-                break;
-
-            case 0xCC:                  /* INT 3 */
-                push_word(PSW);
-                CLR_FLAG(IF);
-                CLR_FLAG(TF);
-                push_word(CS);
-                push_word(IP);
-                CS = get_mword(14);
-                IP = get_mword(12); 
-                break;
-
-            case 0xCD:                  /* INT immed8 */
-                OFF = fetch_byte(1);
-                push_word(PSW);
-                CLR_FLAG(IF);
-                CLR_FLAG(TF);
-                push_word(CS);
-                push_word(IP);
-                CS = get_mword((OFF * 4) + 2);
-                IP = get_mword(OFF * 4); 
-                break;
-
-            case 0xCE:                  /* INT0 */
-                push_word(PSW);
-                CLR_FLAG(IF);
-                CLR_FLAG(TF);
-                push_word(CS);
-                push_word(IP);
-                CS = get_mword(18);
-                IP = get_mword(16); 
-                break;
-
-            case 0xCF:                  /* IRET */
-                IP = pop_word();
-                CS = pop_word();
-                PSW = pop_word();
-                break;
-
-            case 0xD0:
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    switch(REG) {
-                        case 0:
-                            VAL = rol_byte(get_smbyte(seg_reg, EA), 1);  /* ROL mem8, 1 */
-                            break;
-                        case 1:
-                            VAL = ror_byte(get_smbyte(seg_reg, EA), 1);  /* ROR mem8, 1 */
-                            break;
-                        case 2:
-                            VAL = rcl_byte(get_smbyte(seg_reg, EA), 1);  /* RCL mem8, 1 */
-                            break;
-                        case 3:
-                            VAL = rcr_byte(get_smbyte(seg_reg, EA), 1);  /* RCR mem8, 1 */
-                            break;
-                        case 4:
-                            VAL = shl_byte(get_smbyte(seg_reg, EA), 1);  /* SAL/SHL mem8, 1 */
-                            break;
-                        case 5:
-                            VAL = shr_byte(get_smbyte(seg_reg, EA), 1);  /* SHR mem8, 1 */
-                            break;
-                        case 7:
-                            VAL = sar_byte(get_smbyte(seg_reg, EA), 1);  /* SAR mem8, 1 */
-                            break;
-                        default:        /* bad opcodes */
-                            reason = STOP_OPCODE;
-                            IP -= 2;
-                            break;
-                    }
-                    put_rbyte(EA, VAL); /* store result */
-                } else {                /* RM is second register */
-                    switch(REG) {
-                        case 0:
-                            VAL = rol_byte(get_rbyte(RM), 1);  /* RCL reg8, 1 */
-                            break;
-                        case 1:
-                            VAL = ror_byte(get_rbyte(RM), 1);  /* ROR reg8, 1 */
-                            break;
-                        case 2:
-                            VAL = rcl_byte(get_rbyte(RM), 1);  /* RCL reg8, 1 */
-                            break;
-                        case 3:
-                            VAL = rcr_byte(get_rbyte(RM), 1);  /* RCR reg8, 1 */
-                            break;
-                        case 4:
-                            VAL = shl_byte(get_rbyte(RM), 1);  /* SHL/SAL reg8, 1*/
-                            break;
-                        case 5:
-                            VAL = shr_byte(get_rbyte(RM), 1);  /* SHR reg8, 1 */
-                            break;
-                        case 7:
-                            VAL = sar_byte(get_rbyte(RM), 1);  /* SAR reg8, 1 */
-                            break;
-                        default:        /* bad opcodes */
-                            reason = STOP_OPCODE;
-                            IP -= 2;
-                            break;
-                    }
-                    put_rbyte(RM, VAL); /* store result */
-                }
-                break;
-
-            case 0xD1:
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    switch(REG) {
-                        case 0:
-                            VAL = rol_word(get_smword(seg_reg, EA), 1);  /* ROL mem16, 1 */
-                            break;
-                        case 1:
-                            VAL = ror_word(get_smword(seg_reg, EA), 1);  /* ROR mem16, 1 */
-                            break;
-                        case 2:
-                            VAL = rcl_word(get_smword(seg_reg, EA), 1);  /* RCL mem16, 1 */
-                            break;
-                        case 3:
-                            VAL = rcr_word(get_smword(seg_reg, EA), 1);  /* RCR mem16, 1 */
-                            break;
-                        case 4:
-                            VAL = shl_word(get_smword(seg_reg, EA), 1);  /* SAL/SHL mem16, 1 */
-                            break;
-                        case 5:
-                            VAL = shr_word(get_smword(seg_reg, EA), 1);  /* SHR mem16, 1 */
-                            break;
-                        case 7:
-                            VAL = sar_word(get_smword(seg_reg, EA), 1);  /* SAR mem16, 1 */
-                            break;
-                        default:        /* bad opcodes */
-                            reason = STOP_OPCODE;
-                            IP -= 2;
-                            break;
-                    }
-                    put_rword(EA, VAL); /* store result */
-                } else {                /* RM is second register */
-                    switch(REG) {
-                        case 0:
-                            VAL = rol_word(get_rword(RM), 1);  /* RCL reg16, 1 */
-                            break;
-                        case 1:
-                            VAL = ror_word(get_rword(RM), 1);  /* ROR reg16, 1 */
-                            break;
-                        case 2:
-                            VAL = rcl_word(get_rword(RM), 1);  /* RCL reg16, 1 */
-                            break;
-                        case 3:
-                            VAL = rcr_word(get_rword(RM), 1);  /* RCR reg16, 1 */
-                            break;
-                        case 4:
-                            VAL = shl_word(get_rword(RM), 1);  /* SHL/SAL reg16, 1 */
-                            break;
-                        case 5:
-                            VAL = shr_word(get_rword(RM), 1);  /* SHR reg16, 1 */
-                            break;
-                        case 7:
-                            VAL = sar_word(get_rword(RM), 1);  /* SAR reg16, 1 */
-                            break;
-                        default:        /* bad opcodes */
-                            reason = STOP_OPCODE;
-                            IP -= 2;
-                            break;
-                    }
-                    put_rbyte(RM, VAL); /* store result */
-                }
-                break;
-
-            case 0xD2:
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    switch(REG) {
-                        case 0:
-                            VAL = rol_byte(get_smbyte(seg_reg, EA), CL);  /* ROL mem8, CL */
-                            break;
-                        case 1:
-                            VAL = ror_byte(get_smbyte(seg_reg, EA), CL);  /* ROR mem8, CL */
-                            break;
-                        case 2:
-                            VAL = rcl_byte(get_smbyte(seg_reg, EA), CL);  /* RCL mem8, CL */
-                            break;
-                        case 3:
-                            VAL = rcr_byte(get_smbyte(seg_reg, EA), CL);  /* RCR mem8, CL */
-                            break;
-                        case 4:
-                            VAL = shl_byte(get_smbyte(seg_reg, EA), CL);  /* SAL/SHL mem8, CL */
-                            break;
-                        case 5:
-                            VAL = shr_byte(get_smbyte(seg_reg, EA), CL);  /* SHR mem8, CL */
-                            break;
-                        case 7:
-                            VAL = sar_byte(get_smbyte(seg_reg, EA), CL);  /* SAR mem8, CL */
-                            break;
-                        default:        /* bad opcodes */
-                            reason = STOP_OPCODE;
-                            IP -= 2;
-                            break;
-                    }
-                    put_rbyte(EA, VAL); /* store result */
-                } else {                /* RM is second register */
-                    switch(REG) {
-                        case 0:
-                            VAL = rol_byte(get_rbyte(RM), CL);  /* RCL reg8, CL */
-                            break;
-                        case 1:
-                            VAL = ror_byte(get_rbyte(RM), CL);  /* ROR reg8, CL */
-                            break;
-                        case 2:
-                            VAL = rcl_byte(get_rbyte(RM), CL);  /* RCL reg8, CL */
-                            break;
-                        case 3:
-                            VAL = rcr_byte(get_rbyte(RM), CL);  /* RCR reg8, CL */
-                            break;
-                        case 4:
-                            VAL = shl_byte(get_rbyte(RM), CL);  /* SHL/SAL reg8, CL*/
-                            break;
-                        case 5:
-                            VAL = shr_byte(get_rbyte(RM), CL);  /* SHR reg8, CL */
-                            break;
-                        case 7:
-                            VAL = sar_byte(get_rbyte(RM), CL);  /* SAR reg8, CL */
-                            break;
-                        default:        /* bad opcodes */
-                            reason = STOP_OPCODE;
-                            IP -= 2;
-                            break;
-                    }
-                    put_rbyte(RM, VAL); /* store result */
-                }
-                break;
-
-            case 0xD3:
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    switch(REG) {
-                        case 0:
-                            VAL = rol_word(get_smword(seg_reg, EA), CL);  /* ROL mem16, CL */
-                            break;
-                        case 1:
-                            VAL = ror_word(get_smword(seg_reg, EA), CL);  /* ROR mem16, CL */
-                            break;
-                        case 2:
-                            VAL = rcl_word(get_smword(seg_reg, EA), CL);  /* RCL mem16, CL */
-                            break;
-                        case 3:
-                            VAL = rcr_word(get_smword(seg_reg, EA), CL);  /* RCR mem16, CL */
-                            break;
-                        case 4:
-                            VAL = shl_word(get_smword(seg_reg, EA), CL);  /* SAL/SHL mem16, CL */
-                            break;
-                        case 5:
-                            VAL = shr_word(get_smword(seg_reg, EA), CL);  /* SHR mem16, CL */
-                            break;
-                        case 7:
-                            VAL = sar_word(get_smword(seg_reg, EA), CL);  /* SAR mem16, CL */
-                            break;
-                        default:        /* bad opcodes */
-                            reason = STOP_OPCODE;
-                            IP -= 2;
-                            break;
-                    }
-                    put_rword(EA, VAL); /* store result */
-                } else {                /* RM is second register */
-                    switch(REG) {
-                        case 0:
-                            VAL = rol_word(get_rword(RM), CL);  /* RCL reg16, CL */
-                            break;
-                        case 1:
-                            VAL = ror_word(get_rword(RM), CL);  /* ROR reg16, CL */
-                            break;
-                        case 2:
-                            VAL = rcl_word(get_rword(RM), CL);  /* RCL reg16, CL */
-                            break;
-                        case 3:
-                            VAL = rcr_word(get_rword(RM), CL);  /* RCR reg16, CL */
-                            break;
-                        case 4:
-                            VAL = shl_word(get_rword(RM), CL);  /* SHL/SAL reg16, CL */
-                            break;
-                        case 5:
-                            VAL = shr_word(get_rword(RM), CL);  /* SHR reg16, CL */
-                            break;
-                        case 7:
-                            VAL = sar_word(get_rword(RM), CL);  /* SAR reg16, CL */
-                            break;
-                        default:        /* bad opcodes */
-                            reason = STOP_OPCODE;
-                            IP -= 2;
-                            break;
-                    }
-                    put_rbyte(RM, VAL); /* store result */
-                }
-                break;
-
-            case 0xD4:                  /* AAM */
-                VAL = fetch_word();
-                if (VAL != 10) {
-                    reason = STOP_OPCODE;
-                    IP -= 2;
-                }
-                /* note the type change here --- returning AL and AH in AX. */
-                AX = aam_word(AL);
-                break;
-
-            case 0xD5:                  /* AAD */
-                VAL = fetch_word();
-                if (VAL != 10) {
-                    reason = STOP_OPCODE;
-                    IP -= 2;
-                }
-                AX = aad_word(AX);
-                break;
-
-            /* 0xD6 - Not implemented on 8086/8088 */
-
-            case 0xD7:                  /* XLAT */
-                OFF = BX + (uint8)AL;
-                AL = get_smbyte(SEG_CS, OFF);
-                break;
-
-            case 0xD8:                  /* ESC */
-            case 0xD9:
-            case 0xDA:
-            case 0xDB:
-            case 0xDC:
-            case 0xDD:
-            case 0xDE:
-            case 0xDF:
-                /* for now, do nothing, NOP for 8088 */
-                break;
-
-            case 0xE0:                  /* LOOPNE label */
-                OFF = fetch_byte(1);
-                OFF = sign_ext(OFF);
-                OFF += (int16)IP;
-                CX -= 1;
-                if (CX != 0 && !GET_FLAG(ZF))  /* CX != 0 and !ZF */
-                    IP = OFF;
-                break;
-
-            case 0xE1:                  /* LOOPE label */
-                OFF = fetch_byte(1);
-                OFF = sign_ext(OFF);
-                OFF += (int16)IP;
-                CX -= 1;
-                if (CX != 0 && GET_FLAG(ZF))  /* CX != 0 and ZF */
-                    IP = OFF;
-                break;
-
-            case 0xE2:                  /* LOOP label */
-                OFF = fetch_byte(1);
-                OFF = sign_ext(OFF);
-                OFF += (int16)IP;
-                CX -= 1;
-                if (CX != 0)            /* CX != 0 */
-                    IP = OFF;
-                break;
-
-            case 0xE3:                  /* JCXZ label */
-                OFF = fetch_byte(1);
-                OFF = sign_ext(OFF);
-                OFF += (int16)IP;
-                if (CX == 0)            /* CX != 0 */
-                    IP = OFF;
-                break;
-
-            case 0xE4:                  /* IN AL, port8 */
-                DATA = fetch_byte(1);
-                port = DATA;
-                AL = dev_table[DATA].routine(0, 0);
-                break;
-
-            case 0xE5:                  /* IN AX, port16 */
-                DATA = fetch_byte(1);
-                port = DATA;
-                AH = dev_table[DATA].routine(0, 0);
-                AL = dev_table[DATA+1].routine(0, 0);
-                break;
-
-            case 0xE6:                  /* OUT AL, port8 */
-                DATA = fetch_byte(1);
-                port = DATA;
-                dev_table[DATA].routine(1, AL);
-                //sim_printf("OUT AL: DATA=%04X\n", DATA);
-                break;
-
-            case 0xE7:                  /* OUT AX, port16 */
-                DATA = fetch_byte(1);
-                port = DATA;
-                dev_table[DATA].routine(1, AH);
-                dev_table[DATA+1].routine(1, AL);
-                break;
-
-            case 0xE8:                  /* CALL NEAR proc */
-                OFF = fetch_word();
-                push_word(IP);
-                IP = (OFF + IP) & ADDRMASK16;
-                break;
-
-            case 0xE9:                  /* JMP NEAR label */
-                OFF = fetch_word();
-                IP = (OFF + IP) & ADDRMASK16;
-                break;
-
-            case 0xEA:                  /* JMP FAR label */
-                OFF = fetch_word();
-                SEG = fetch_word();
-                CS = SEG;
-                IP = OFF;
-                break;
-
-            case 0xEB:                  /* JMP short-label */
-                OFF = fetch_byte(1);
-                if (OFF & 0x80)         /* if negative, sign extend */
-                    OFF |= 0XFF00;
-                IP = (IP + OFF) & ADDRMASK16;
-                break;
-
-            case 0xEC:                  /* IN AL,DX */
-                port = DX;
-                AL = dev_table[DX].routine(0, 0);
-                break;
-
-            case 0xED:                  /* IN AX,DX */
-                port = DX;
-                AH = dev_table[DX].routine(0, 0);
-                AL = dev_table[DX+1].routine(0, 0);
-                break;
-
-            case 0xEE:                  /* OUT AL,DX */
-                port = DX;
-                dev_table[DX].routine(1, AL);
-                break;
-
-            case 0xEF:                  /* OUT AX,DX */
-                port = DX;
-                dev_table[DX].routine(1, AH);
-                dev_table[DX+1].routine(1, AL);
-                break;
-
-            case 0xF0:                  /* LOCK */
-                /* do nothing for now */
-                break;
-
-            /* 0xF1 - Not implemented on 8086/8088 */
-
-            case 0xF2:                  /* REPNE/REPNZ */
-                sysmode |= SYSMODE_PREFIX_REPNE;
-                break;
-
-            case 0xF3:                  /* REP/REPE/REPZ */
-                sysmode |= SYSMODE_PREFIX_REPE;
-                break;
-
-            case 0xF4:                  /* HLT */
-                reason = STOP_HALT;
-                IP--;
-                break;
-
-            case 0xF5:                  /* CMC */
-                TOGGLE_FLAG(CF);
-                break;
-
-            case 0xF6:
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    switch(REG) {
-                        case 0:         /* TEST mem8, immed8 */
-                            DATA = fetch_byte(1);
-                            test_byte(get_smbyte(seg_reg, EA), DATA);
-                            break;
-                        case 2:         /* NOT mem8 */
-                            VAL = not_byte(get_smbyte(seg_reg, EA));
-                            put_smbyte(seg_reg, EA, VAL);  /* store result */
-                            break;
-                        case 3:         /* NEG mem8 */
-                            VAL = neg_byte(get_smbyte(seg_reg, EA));
-                            put_smbyte(seg_reg, EA, VAL);  /* store result */
-                            break;
-                        case 4:         /* MUL mem8 */
-                            mul_byte(get_smbyte(seg_reg, EA));
-                            break;
-                        case 5:         /* IMUL mem8 */
-                            imul_byte(get_smbyte(seg_reg, EA));
-                            break;
-                        case 6:         /* DIV mem8 */
-                            div_byte(get_smbyte(seg_reg, EA));
-                            break;
-                        case 7:         /* IDIV mem8 */
-                            idiv_byte(get_smbyte(seg_reg, EA));
-                            break;
-                        default:        /* bad opcode */
-                            reason = STOP_OPCODE;
-                            IP -= 2;
-                            break;
-                    }
-                } else {                /* RM is second register */
-                    switch(REG) {
-                        case 0:         /* TEST reg8, immed8 */
-                            DATA = fetch_byte(1);
-                            test_byte(get_rbyte(RM), DATA);
-                            break;
-                        case 2:         /* NOT reg8 */
-                            VAL = not_byte(get_rbyte(RM));
-                            put_rbyte(RM, VAL);  /* store result */
-                            break;
-                        case 3:         /* NEG reg8 */
-                            VAL = neg_byte(get_rbyte(RM));
-                            put_rbyte(RM, VAL);  /* store result */
-                            break;
-                        case 4:         /* MUL reg8 */
-                            mul_byte(get_rbyte(RM));
-                            break;
-                        case 5:         /* IMUL reg8 */
-                            imul_byte(get_rbyte(RM));
-                            break;
-                        case 6:         /* DIV reg8 */
-                            div_byte(get_rbyte(RM));
-                            break;
-                        case 7:         /* IDIV reg8 */
-                            idiv_byte(get_rbyte(RM));
-                            break;
-                        default:        /* bad opcode */
-                            reason = STOP_OPCODE;
-                            IP -= 2;
-                            break;
-                    }
-                    put_rbyte(RM, VAL); /* store result */
-                }
-                break;
-
-            case 0xF7:
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    switch(REG) {
-                        case 0:         /* TEST mem16, immed16 */
-                            DATA = fetch_word();
-                            test_word(get_smword(seg_reg, EA), DATA);
-                            break;
-                        case 2:         /* NOT mem16 */
-                            VAL = not_word(get_smword(seg_reg, EA));
-                            put_smword(seg_reg, EA, VAL);  /* store result */
-                            break;
-                        case 3:         /* NEG mem16 */
-                            VAL = neg_word(get_smword(seg_reg, EA));
-                            put_smword(seg_reg, EA, VAL);  /* store result */
-                            break;
-                        case 4:         /* MUL mem16 */
-                            mul_word(get_smword(seg_reg, EA));
-                            break;
-                        case 5:         /* IMUL mem16 */
-                            imul_word(get_smword(seg_reg, EA));
-                            break;
-                        case 6:         /* DIV mem16 */
-                            div_word(get_smword(seg_reg, EA));
-                            break;
-                        case 7:         /* IDIV mem16 */
-                            idiv_word(get_smword(seg_reg, EA));
-                            break;
-                        default:        /* bad opcode */
-                            reason = STOP_OPCODE;
-                            IP -= 2;
-                            break;
-                    }
-                } else {                /* RM is second register */
-                    switch(REG) {
-                        case 0:         /* TEST reg16, immed16 */
-                            DATA = fetch_word();
-                            test_word(get_rword(RM), DATA);
-                            break;
-                        case 2:         /* NOT reg16 */
-                            VAL = not_word(get_rword(RM));
-                            put_rword(RM, VAL);  /* store result */
-                            break;
-                        case 3:         /* NEG reg16 */
-                            VAL = neg_word(get_rword(RM));
-                            put_rword(RM, VAL);  /* store result */
-                            break;
-                        case 4:         /* MUL reg16 */
-                            mul_word(get_rword(RM));
-                            break;
-                        case 5:         /* IMUL reg16 */
-                            imul_word(get_rword(RM));
-                            break;
-                        case 6:         /* DIV reg16 */
-                            div_word(get_rword(RM));
-                            break;
-                        case 7:         /* IDIV reg16 */
-                            idiv_word(get_rword(RM));
-                            break;
-                        default:        /* bad opcode */
-                            reason = STOP_OPCODE;
-                            IP -= 2;
-                            break;
-                    }
-                    put_rbyte(RM, VAL); /* store result */
-                }
-                break;
-
-            case 0xF8:                  /* CLC */
-                CLR_FLAG(CF);
-                break;
-
-            case 0xF9:                  /* STC */
-                SET_FLAG(CF);
-                break;
-
-            case 0xFA:                  /* CLI */
-                CLR_FLAG(IF);
-                break;
-
-            case 0xFB:                  /* STI */
-                SET_FLAG(IF);
-                break;
-
-            case 0xFC:                  /* CLD */
-                CLR_FLAG(DF);
-                break;
-
-            case 0xFD:                  /* STD */
-                SET_FLAG(DF);
-                break;
-
-            case 0xFE:
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    switch(REG) {
-                        case 0:         /* INC mem16 */
-                            VAL = inc_byte(get_smbyte(seg_reg, EA));  /* do operation */
-                            put_smbyte(seg_reg, EA, VAL);  /* store result */
-                            break;
-                        case 1:         /* DEC mem16 */
-                            VAL = dec_byte(get_smbyte(seg_reg, EA));  /* do operation */
-                            put_smbyte(seg_reg, EA, VAL);  /* store result */
-                            break;
-                        default:        /* bad opcodes */
-                            reason = STOP_OPCODE;
-                            IP -= 2;
-                            break;
-                    }
-                } else {                /* RM is second register */
-                    switch(REG) {
-                        case 0:
-                            VAL = inc_byte(get_rbyte(RM));  /* do operation */
-                            put_rbyte(RM, VAL);  /* store result */
-                            break;
-                        case 1:
-                            VAL = dec_byte(get_rbyte(RM));  /* do operation */
-                            put_rbyte(RM, VAL);  /* store result */
-                            break;
-                        default:        /* bad opcodes */
-                            reason = STOP_OPCODE;
-                            IP -= 2;
-                            break;
-                    }
-                    put_rbyte(RM, VAL); /* store result */
+            else {
+                    trap_toggle = 0;
                 }
-                break;
-
-            case 0xFF:
-                MRR = fetch_byte(1);
-                get_mrr_dec(MRR, &MOD, &REG, &RM);
-                if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
-                    EA = get_ea(MRR);   /* get effective address */
-                    switch(REG) {
-                        case 0:         /* INC mem16 */
-                            VAL = inc_word(get_smword(seg_reg, EA));  /* do operation */
-                            put_smword(seg_reg, EA, VAL);  /* store result */
-                            break;
-                        case 1:         /* DEC mem16 */
-                            VAL = dec_word(get_smword(seg_reg, EA));  /* do operation */
-                            put_smword(seg_reg, EA, VAL);  /* store result */
-                            break;
-                        case 2:         /* CALL NEAR mem16 */
-                            OFF = get_smword(SEG_CS, EA);  /* do operation */
-                            push_word(IP);
-                            IP = OFF;
-                            break;
-                        case 3:         /* CALL FAR mem16 */
-                            OFF = get_smword(SEG_CS, EA);  /* do operation */
-                            SEG = get_smword(SEG_CS, EA + 2);
-                            push_word(CS);
-                            CS = SEG;
-                            push_word(IP);
-                            IP = OFF;
-                            break;
-                        case 4:         /* JMP NEAR mem16 */
-                            OFF = get_smword(SEG_CS, EA);  /* do operation */
-                            IP = OFF;
-                            break;
-                        case 5:         /* JMP FAR mem16 */
-                            OFF = get_smword(SEG_CS, EA);  /* do operation */
-                            SEG = get_smword(SEG_CS, EA + 2);
-                            CS = SEG;
-                            IP = OFF;
-                            break;
-                        case 6:         /* PUSH mem16 */
-                            VAL = get_smword(seg_reg, EA);  /* do operation */
-                            push_word(VAL);
-                            break;
-                        case 7:         /* bad opcode */
-                            reason = STOP_OPCODE;
-                            IP -= 2;
-                            break;
-                    }
-                } else {                /* RM is second register */
-                    switch(REG) {
-                        case 2:         /* CALL NEAR reg16 */
-                            OFF = get_rword(RM);  /* do operation */
-                            push_word(IP);
-                            IP = OFF;
-                            break;
-                        case 4:         /* JMP NEAR reg16 */
-                            OFF = get_rword(RM);  /* do operation */
-                            IP = OFF;
-                            break;
-                        default:        /* bad opcode */
-                            reason = STOP_OPCODE;
-                            IP -= 2;
-                            break;
-                    }
-                    put_rbyte(RM, VAL); /* store result */
-                }
-                break;
-
 
-            default: 
-//                if (i8088_unit.flags & UNIT_OPSTOP) {
-                    reason = STOP_OPCODE;
-                    IP--;
+//            if (!trap_toggle && (ifl && (i8259.irr & (~i8259.imr) ) ) ) {
+//                    intcall86 (nextintr() );    /* get next interrupt from the i8259, if any */
 //                }
-                break;
-            }
-            /* not segment override */
-            if ((IR == 0x26) || (IR == 0x2E) || (IR == 0x36) || (IR == 0x3E)) {
-                seg_ovr = SEG_NONE;     /* clear segment override */
-            sysmode &= 0x0000001E;      /* clear flags */
-            sysmode |= 0x00000001;
-            }
-            if (i8088_dev.dctrl & DEBUG_asm) {
-                sim_printf("%04X:%04X   %s", CS, IP, opcode[IR]);
-                switch (oplen[IR]) {
-                    case 0:             //one byte opcode
+
+            reptype = 0;
+            segoverride = 0;
+            useseg = segregs[regds];
+            docontinue = 0;
+            firstip = IP;
+
+//            if ( (segregs[regcs] == 0xF000) && (IP == 0xE066) ) didbootstrap = 0; //detect if we hit the BIOS entry point to clear didbootstrap because we've rebooted
+
+            while (!docontinue) {
+                    segregs[regcs] = segregs[regcs] & 0xFFFF;
+                    IP = IP & 0xFFFF;
+                    SEG = segregs[regcs];
+                    OFF = IP;
+                    OP = getmem8 (segregs[regcs], IP);
+                    StepIP (1);
+
+                    switch (OP) {
+                                /* segment prefix check */
+                            case 0x2E:    /* segment segregs[regcs] */
+                                useseg = segregs[regcs];
+                                segoverride = 1;
+                                break;
+
+                            case 0x3E:    /* segment segregs[regds] */
+                                useseg = segregs[regds];
+                                segoverride = 1;
+                                break;
+
+                            case 0x26:    /* segment segregs[reges] */
+                                useseg = segregs[reges];
+                                segoverride = 1;
+                                break;
+
+                            case 0x36:    /* segment segregs[regss] */
+                                useseg = segregs[regss];
+                                segoverride = 1;
+                                break;
+
+                                /* repetition prefix check */
+                            case 0xF3:    /* REP/REPE/REPZ */
+                                reptype = 1;
+                                break;
+
+                            case 0xF2:    /* REPNE/REPNZ */
+                                reptype = 2;
+                                break;
+
+                            default:
+                                docontinue = 1;
+                                break;
+                        }
+                }
+
+            totalexec++;
+
+            /*
+             * if (printops == 1) { printf("%04X:%04X - %s\n", SEG, OFF, oplist[OP]);
+             * }
+             */
+            switch (OP) {
+                    case 0x0:    /* 00 ADD Eb Gb */
+                        modregrm();
+                        oper1b = readrm8 (RM);
+                        oper2b = getreg8 (REGX);
+                        op_add8();
+                        writerm8 (RM, res8);
                         break;
-                    case 1:             //IMMED8
-                        sim_printf(" 0%02XH", DATA);
+
+                    case 0x1:    /* 01 ADD Ev Gv */
+                        modregrm();
+                        oper1 = readrm16 (RM);
+                        oper2 = getreg16 (REGX);
+                        op_add16();
+                        writerm16 (RM, res16);
                         break;
-                    case 2:             //IMMED16
-                        sim_printf(" 0%04XH", DATA);
+
+                    case 0x2:    /* 02 ADD Gb Eb */
+                        modregrm();
+                        oper1b = getreg8 (REGX);
+                        oper2b = readrm8 (RM);
+                        op_add8();
+                        putreg8 (REGX, res8);
                         break;
-                    case 3:             //IP-INC8
-                        sim_printf(" 0%02XH", EA);
+
+                    case 0x3:    /* 03 ADD Gv Ev */
+                        modregrm();
+                        oper1 = getreg16 (REGX);
+                        oper2 = readrm16 (RM);
+                        op_add16();
+                        putreg16 (REGX, res16);
                         break;
-                    case 4:             //IP-INC16
-                        sim_printf(" 0%04XH", EA);
+
+                    case 0x4:    /* 04 ADD regs.byteregs[regal] Ib */
+                        oper1b = regs.byteregs[regal];
+                        oper2b = getmem8 (segregs[regcs], IP);
+                        StepIP (1);
+                        op_add8();
+                        regs.byteregs[regal] = res8;
                         break;
+
+                    case 0x5:    /* 05 ADD eAX Iv */
+                        oper1 = (getreg16 (regax) );
+                        oper2 = getmem16 (segregs[regcs], IP);
+                        StepIP (2);
+                        op_add16();
+                        putreg16 (regax, res16);
+                        break;
+
+                    case 0x6:    /* 06 PUSH segregs[reges] */
+                        push (segregs[reges]);
+                        break;
+
+                    case 0x7:    /* 07 POP segregs[reges] */
+                        segregs[reges] = pop();
+                        break;
+
+                    case 0x8:    /* 08 OR Eb Gb */
+                        modregrm();
+                        oper1b = readrm8 (RM);
+                        oper2b = getreg8 (REGX);
+                        op_or8();
+                        writerm8 (RM, res8);
+                        break;
+
+                    case 0x9:    /* 09 OR Ev Gv */
+                        modregrm();
+                        oper1 = readrm16 (RM);
+                        oper2 = getreg16 (REGX);
+                        op_or16();
+                        writerm16 (RM, res16);
+                        break;
+
+                    case 0xA:    /* 0A OR Gb Eb */
+                        modregrm();
+                        oper1b = getreg8 (REGX);
+                        oper2b = readrm8 (RM);
+                        op_or8();
+                        putreg8 (REGX, res8);
+                        break;
+
+                    case 0xB:    /* 0B OR Gv Ev */
+                        modregrm();
+                        oper1 = getreg16 (REGX);
+                        oper2 = readrm16 (RM);
+                        op_or16();
+                        if ( (oper1 == 0xF802) && (oper2 == 0xF802) ) {
+                                sf = 0;    /* cheap hack to make Wolf 3D think we're a 286 so it plays */
+                            }
+
+                        putreg16 (REGX, res16);
+                        break;
+
+                    case 0xC:    /* 0C OR regs.byteregs[regal] Ib */
+                        oper1b = regs.byteregs[regal];
+                        oper2b = getmem8 (segregs[regcs], IP);
+                        StepIP (1);
+                        op_or8();
+                        regs.byteregs[regal] = res8;
+                        break;
+
+                    case 0xD:    /* 0D OR eAX Iv */
+                        oper1 = getreg16 (regax);
+                        oper2 = getmem16 (segregs[regcs], IP);
+                        StepIP (2);
+                        op_or16();
+                        putreg16 (regax, res16);
+                        break;
+
+                    case 0xE:    /* 0E PUSH segregs[regcs] */
+                        push (segregs[regcs]);
+                        break;
+
+                    case 0xF: //0F POP CS
+#ifndef CPU_V20
+                        segregs[regcs] = pop();
+#endif
+                        break;
+
+                    case 0x10:    /* 10 ADC Eb Gb */
+                        modregrm();
+                        oper1b = readrm8 (RM);
+                        oper2b = getreg8 (REGX);
+                        op_adc8();
+                        writerm8 (RM, res8);
+                        break;
+
+                    case 0x11:    /* 11 ADC Ev Gv */
+                        modregrm();
+                        oper1 = readrm16 (RM);
+                        oper2 = getreg16 (REGX);
+                        op_adc16();
+                        writerm16 (RM, res16);
+                        break;
+
+                    case 0x12:    /* 12 ADC Gb Eb */
+                        modregrm();
+                        oper1b = getreg8 (REGX);
+                        oper2b = readrm8 (RM);
+                        op_adc8();
+                        putreg8 (REGX, res8);
+                        break;
+
+                    case 0x13:    /* 13 ADC Gv Ev */
+                        modregrm();
+                        oper1 = getreg16 (REGX);
+                        oper2 = readrm16 (RM);
+                        op_adc16();
+                        putreg16 (REGX, res16);
+                        break;
+
+                    case 0x14:    /* 14 ADC regs.byteregs[regal] Ib */
+                        oper1b = regs.byteregs[regal];
+                        oper2b = getmem8 (segregs[regcs], IP);
+                        StepIP (1);
+                        op_adc8();
+                        regs.byteregs[regal] = res8;
+                        break;
+
+                    case 0x15:    /* 15 ADC eAX Iv */
+                        oper1 = getreg16 (regax);
+                        oper2 = getmem16 (segregs[regcs], IP);
+                        StepIP (2);
+                        op_adc16();
+                        putreg16 (regax, res16);
+                        break;
+
+                    case 0x16:    /* 16 PUSH segregs[regss] */
+                        push (segregs[regss]);
+                        break;
+
+                    case 0x17:    /* 17 POP segregs[regss] */
+                        segregs[regss] = pop();
+                        break;
+
+                    case 0x18:    /* 18 SBB Eb Gb */
+                        modregrm();
+                        oper1b = readrm8 (RM);
+                        oper2b = getreg8 (REGX);
+                        op_sbb8();
+                        writerm8 (RM, res8);
+                        break;
+
+                    case 0x19:    /* 19 SBB Ev Gv */
+                        modregrm();
+                        oper1 = readrm16 (RM);
+                        oper2 = getreg16 (REGX);
+                        op_sbb16();
+                        writerm16 (RM, res16);
+                        break;
+
+                    case 0x1A:    /* 1A SBB Gb Eb */
+                        modregrm();
+                        oper1b = getreg8 (REGX);
+                        oper2b = readrm8 (RM);
+                        op_sbb8();
+                        putreg8 (REGX, res8);
+                        break;
+
+                    case 0x1B:    /* 1B SBB Gv Ev */
+                        modregrm();
+                        oper1 = getreg16 (REGX);
+                        oper2 = readrm16 (RM);
+                        op_sbb16();
+                        putreg16 (REGX, res16);
+                        break;
+
+                    case 0x1C:    /* 1C SBB regs.byteregs[regal] Ib */
+                        oper1b = regs.byteregs[regal];
+                        oper2b = getmem8 (segregs[regcs], IP);
+                        StepIP (1);
+                        op_sbb8();
+                        regs.byteregs[regal] = res8;
+                        break;
+
+                    case 0x1D:    /* 1D SBB eAX Iv */
+                        oper1 = getreg16 (regax);
+                        oper2 = getmem16 (segregs[regcs], IP);
+                        StepIP (2);
+                        op_sbb16();
+                        putreg16 (regax, res16);
+                        break;
+
+                    case 0x1E:    /* 1E PUSH segregs[regds] */
+                        push (segregs[regds]);
+                        break;
+
+                    case 0x1F:    /* 1F POP segregs[regds] */
+                        segregs[regds] = pop();
+                        break;
+
+                    case 0x20:    /* 20 AND Eb Gb */
+                        modregrm();
+                        oper1b = readrm8 (RM);
+                        oper2b = getreg8 (REGX);
+                        op_and8();
+                        writerm8 (RM, res8);
+                        break;
+
+                    case 0x21:    /* 21 AND Ev Gv */
+                        modregrm();
+                        oper1 = readrm16 (RM);
+                        oper2 = getreg16 (REGX);
+                        op_and16();
+                        writerm16 (RM, res16);
+                        break;
+
+                    case 0x22:    /* 22 AND Gb Eb */
+                        modregrm();
+                        oper1b = getreg8 (REGX);
+                        oper2b = readrm8 (RM);
+                        op_and8();
+                        putreg8 (REGX, res8);
+                        break;
+
+                    case 0x23:    /* 23 AND Gv Ev */
+                        modregrm();
+                        oper1 = getreg16 (REGX);
+                        oper2 = readrm16 (RM);
+                        op_and16();
+                        putreg16 (REGX, res16);
+                        break;
+
+                    case 0x24:    /* 24 AND regs.byteregs[regal] Ib */
+                        oper1b = regs.byteregs[regal];
+                        oper2b = getmem8 (segregs[regcs], IP);
+                        StepIP (1);
+                        op_and8();
+                        regs.byteregs[regal] = res8;
+                        break;
+
+                    case 0x25:    /* 25 AND eAX Iv */
+                        oper1 = getreg16 (regax);
+                        oper2 = getmem16 (segregs[regcs], IP);
+                        StepIP (2);
+                        op_and16();
+                        putreg16 (regax, res16);
+                        break;
+
+                    case 0x27:    /* 27 DAA */
+                        if ( ( (regs.byteregs[regal] & 0xF) > 9) || (af == 1) ) {
+                                oper1 = regs.byteregs[regal] + 6;
+                                regs.byteregs[regal] = oper1 & 255;
+                                if (oper1 & 0xFF00) {
+                                        cf = 1;
+                                    }
+                                else {
+                                        cf = 0;
+                                    }
+
+                                af = 1;
+                            }
+                        else {
+                                af = 0;
+                            }
+
+                        if ( ( (regs.byteregs[regal] & 0xF0) > 0x90) || (cf == 1) ) {
+                                regs.byteregs[regal] = regs.byteregs[regal] + 0x60;
+                                cf = 1;
+                            }
+                        else {
+                                cf = 0;
+                            }
+
+                        regs.byteregs[regal] = regs.byteregs[regal] & 255;
+                        flag_szp8 (regs.byteregs[regal]);
+                        break;
+
+                    case 0x28:    /* 28 SUB Eb Gb */
+                        modregrm();
+                        oper1b = readrm8 (RM);
+                        oper2b = getreg8 (REGX);
+                        op_sub8();
+                        writerm8 (RM, res8);
+                        break;
+
+                    case 0x29:    /* 29 SUB Ev Gv */
+                        modregrm();
+                        oper1 = readrm16 (RM);
+                        oper2 = getreg16 (REGX);
+                        op_sub16();
+                        writerm16 (RM, res16);
+                        break;
+
+                    case 0x2A:    /* 2A SUB Gb Eb */
+                        modregrm();
+                        oper1b = getreg8 (REGX);
+                        oper2b = readrm8 (RM);
+                        op_sub8();
+                        putreg8 (REGX, res8);
+                        break;
+
+                    case 0x2B:    /* 2B SUB Gv Ev */
+                        modregrm();
+                        oper1 = getreg16 (REGX);
+                        oper2 = readrm16 (RM);
+                        op_sub16();
+                        putreg16 (REGX, res16);
+                        break;
+
+                    case 0x2C:    /* 2C SUB regs.byteregs[regal] Ib */
+                        oper1b = regs.byteregs[regal];
+                        oper2b = getmem8 (segregs[regcs], IP);
+                        StepIP (1);
+                        op_sub8();
+                        regs.byteregs[regal] = res8;
+                        break;
+
+                    case 0x2D:    /* 2D SUB eAX Iv */
+                        oper1 = getreg16 (regax);
+                        oper2 = getmem16 (segregs[regcs], IP);
+                        StepIP (2);
+                        op_sub16();
+                        putreg16 (regax, res16);
+                        break;
+
+                    case 0x2F:    /* 2F DAS */
+                        if ( ( (regs.byteregs[regal] & 15) > 9) || (af == 1) ) {
+                                oper1 = regs.byteregs[regal] - 6;
+                                regs.byteregs[regal] = oper1 & 255;
+                                if (oper1 & 0xFF00) {
+                                        cf = 1;
+                                    }
+                                else {
+                                        cf = 0;
+                                    }
+
+                                af = 1;
+                            }
+                        else {
+                                af = 0;
+                            }
+
+                        if ( ( (regs.byteregs[regal] & 0xF0) > 0x90) || (cf == 1) ) {
+                                regs.byteregs[regal] = regs.byteregs[regal] - 0x60;
+                                cf = 1;
+                            }
+                        else {
+                                cf = 0;
+                            }
+
+                        flag_szp8 (regs.byteregs[regal]);
+                        break;
+
+                    case 0x30:    /* 30 XOR Eb Gb */
+                        modregrm();
+                        oper1b = readrm8 (RM);
+                        oper2b = getreg8 (REGX);
+                        op_xor8();
+                        writerm8 (RM, res8);
+                        break;
+
+                    case 0x31:    /* 31 XOR Ev Gv */
+                        modregrm();
+                        oper1 = readrm16 (RM);
+                        oper2 = getreg16 (REGX);
+                        op_xor16();
+                        writerm16 (RM, res16);
+                        break;
+
+                    case 0x32:    /* 32 XOR Gb Eb */
+                        modregrm();
+                        oper1b = getreg8 (REGX);
+                        oper2b = readrm8 (RM);
+                        op_xor8();
+                        putreg8 (REGX, res8);
+                        break;
+
+                    case 0x33:    /* 33 XOR Gv Ev */
+                        modregrm();
+                        oper1 = getreg16 (REGX);
+                        oper2 = readrm16 (RM);
+                        op_xor16();
+                        putreg16 (REGX, res16);
+                        break;
+
+                    case 0x34:    /* 34 XOR regs.byteregs[regal] Ib */
+                        oper1b = regs.byteregs[regal];
+                        oper2b = getmem8 (segregs[regcs], IP);
+                        StepIP (1);
+                        op_xor8();
+                        regs.byteregs[regal] = res8;
+                        break;
+
+                    case 0x35:    /* 35 XOR eAX Iv */
+                        oper1 = getreg16 (regax);
+                        oper2 = getmem16 (segregs[regcs], IP);
+                        StepIP (2);
+                        op_xor16();
+                        putreg16 (regax, res16);
+                        break;
+
+                    case 0x37:    /* 37 AAA ASCII */
+                        if ( ( (regs.byteregs[regal] & 0xF) > 9) || (af == 1) ) {
+                                regs.byteregs[regal] = regs.byteregs[regal] + 6;
+                                regs.byteregs[regah] = regs.byteregs[regah] + 1;
+                                af = 1;
+                                cf = 1;
+                            }
+                        else {
+                                af = 0;
+                                cf = 0;
+                            }
+
+                        regs.byteregs[regal] = regs.byteregs[regal] & 0xF;
+                        break;
+
+                    case 0x38:    /* 38 CMP Eb Gb */
+                        modregrm();
+                        oper1b = readrm8 (RM);
+                        oper2b = getreg8 (REGX);
+                        flag_sub8 (oper1b, oper2b);
+                        break;
+
+                    case 0x39:    /* 39 CMP Ev Gv */
+                        modregrm();
+                        oper1 = readrm16 (RM);
+                        oper2 = getreg16 (REGX);
+                        flag_sub16 (oper1, oper2);
+                        break;
+
+                    case 0x3A:    /* 3A CMP Gb Eb */
+                        modregrm();
+                        oper1b = getreg8 (REGX);
+                        oper2b = readrm8 (RM);
+                        flag_sub8 (oper1b, oper2b);
+                        break;
+
+                    case 0x3B:    /* 3B CMP Gv Ev */
+                        modregrm();
+                        oper1 = getreg16 (REGX);
+                        oper2 = readrm16 (RM);
+                        flag_sub16 (oper1, oper2);
+                        break;
+
+                    case 0x3C:    /* 3C CMP regs.byteregs[regal] Ib */
+                        oper1b = regs.byteregs[regal];
+                        oper2b = getmem8 (segregs[regcs], IP);
+                        StepIP (1);
+                        flag_sub8 (oper1b, oper2b);
+                        break;
+
+                    case 0x3D:    /* 3D CMP eAX Iv */
+                        oper1 = getreg16 (regax);
+                        oper2 = getmem16 (segregs[regcs], IP);
+                        StepIP (2);
+                        flag_sub16 (oper1, oper2);
+                        break;
+
+                    case 0x3F:    /* 3F AAS ASCII */
+                        if ( ( (regs.byteregs[regal] & 0xF) > 9) || (af == 1) ) {
+                                regs.byteregs[regal] = regs.byteregs[regal] - 6;
+                                regs.byteregs[regah] = regs.byteregs[regah] - 1;
+                                af = 1;
+                                cf = 1;
+                            }
+                        else {
+                                af = 0;
+                                cf = 0;
+                            }
+
+                        regs.byteregs[regal] = regs.byteregs[regal] & 0xF;
+                        break;
+
+                    case 0x40:    /* 40 INC eAX */
+                        oldcf = cf;
+                        oper1 = getreg16 (regax);
+                        oper2 = 1;
+                        op_add16();
+                        cf = oldcf;
+                        putreg16 (regax, res16);
+                        break;
+
+                    case 0x41:    /* 41 INC eCX */
+                        oldcf = cf;
+                        oper1 = getreg16 (regcx);
+                        oper2 = 1;
+                        op_add16();
+                        cf = oldcf;
+                        putreg16 (regcx, res16);
+                        break;
+
+                    case 0x42:    /* 42 INC eDX */
+                        oldcf = cf;
+                        oper1 = getreg16 (regdx);
+                        oper2 = 1;
+                        op_add16();
+                        cf = oldcf;
+                        putreg16 (regdx, res16);
+                        break;
+
+                    case 0x43:    /* 43 INC eBX */
+                        oldcf = cf;
+                        oper1 = getreg16 (regbx);
+                        oper2 = 1;
+                        op_add16();
+                        cf = oldcf;
+                        putreg16 (regbx, res16);
+                        break;
+
+                    case 0x44:    /* 44 INC eSP */
+                        oldcf = cf;
+                        oper1 = getreg16 (regsp);
+                        oper2 = 1;
+                        op_add16();
+                        cf = oldcf;
+                        putreg16 (regsp, res16);
+                        break;
+
+                    case 0x45:    /* 45 INC eBP */
+                        oldcf = cf;
+                        oper1 = getreg16 (regbp);
+                        oper2 = 1;
+                        op_add16();
+                        cf = oldcf;
+                        putreg16 (regbp, res16);
+                        break;
+
+                    case 0x46:    /* 46 INC eSI */
+                        oldcf = cf;
+                        oper1 = getreg16 (regsi);
+                        oper2 = 1;
+                        op_add16();
+                        cf = oldcf;
+                        putreg16 (regsi, res16);
+                        break;
+
+                    case 0x47:    /* 47 INC eDI */
+                        oldcf = cf;
+                        oper1 = getreg16 (regdi);
+                        oper2 = 1;
+                        op_add16();
+                        cf = oldcf;
+                        putreg16 (regdi, res16);
+                        break;
+
+                    case 0x48:    /* 48 DEC eAX */
+                        oldcf = cf;
+                        oper1 = getreg16 (regax);
+                        oper2 = 1;
+                        op_sub16();
+                        cf = oldcf;
+                        putreg16 (regax, res16);
+                        break;
+
+                    case 0x49:    /* 49 DEC eCX */
+                        oldcf = cf;
+                        oper1 = getreg16 (regcx);
+                        oper2 = 1;
+                        op_sub16();
+                        cf = oldcf;
+                        putreg16 (regcx, res16);
+                        break;
+
+                    case 0x4A:    /* 4A DEC eDX */
+                        oldcf = cf;
+                        oper1 = getreg16 (regdx);
+                        oper2 = 1;
+                        op_sub16();
+                        cf = oldcf;
+                        putreg16 (regdx, res16);
+                        break;
+
+                    case 0x4B:    /* 4B DEC eBX */
+                        oldcf = cf;
+                        oper1 = getreg16 (regbx);
+                        oper2 = 1;
+                        op_sub16();
+                        cf = oldcf;
+                        putreg16 (regbx, res16);
+                        break;
+
+                    case 0x4C:    /* 4C DEC eSP */
+                        oldcf = cf;
+                        oper1 = getreg16 (regsp);
+                        oper2 = 1;
+                        op_sub16();
+                        cf = oldcf;
+                        putreg16 (regsp, res16);
+                        break;
+
+                    case 0x4D:    /* 4D DEC eBP */
+                        oldcf = cf;
+                        oper1 = getreg16 (regbp);
+                        oper2 = 1;
+                        op_sub16();
+                        cf = oldcf;
+                        putreg16 (regbp, res16);
+                        break;
+
+                    case 0x4E:    /* 4E DEC eSI */
+                        oldcf = cf;
+                        oper1 = getreg16 (regsi);
+                        oper2 = 1;
+                        op_sub16();
+                        cf = oldcf;
+                        putreg16 (regsi, res16);
+                        break;
+
+                    case 0x4F:    /* 4F DEC eDI */
+                        oldcf = cf;
+                        oper1 = getreg16 (regdi);
+                        oper2 = 1;
+                        op_sub16();
+                        cf = oldcf;
+                        putreg16 (regdi, res16);
+                        break;
+
+                    case 0x50:    /* 50 PUSH eAX */
+                        push (getreg16 (regax) );
+                        break;
+
+                    case 0x51:    /* 51 PUSH eCX */
+                        push (getreg16 (regcx) );
+                        break;
+
+                    case 0x52:    /* 52 PUSH eDX */
+                        push (getreg16 (regdx) );
+                        break;
+
+                    case 0x53:    /* 53 PUSH eBX */
+                        push (getreg16 (regbx) );
+                        break;
+
+                    case 0x54:    /* 54 PUSH eSP */
+                        push (getreg16 (regsp) - 2);
+                        break;
+
+                    case 0x55:    /* 55 PUSH eBP */
+                        push (getreg16 (regbp) );
+                        break;
+
+                    case 0x56:    /* 56 PUSH eSI */
+                        push (getreg16 (regsi) );
+                        break;
+
+                    case 0x57:    /* 57 PUSH eDI */
+                        push (getreg16 (regdi) );
+                        break;
+
+                    case 0x58:    /* 58 POP eAX */
+                        putreg16 (regax, pop() );
+                        break;
+
+                    case 0x59:    /* 59 POP eCX */
+                        putreg16 (regcx, pop() );
+                        break;
+
+                    case 0x5A:    /* 5A POP eDX */
+                        putreg16 (regdx, pop() );
+                        break;
+
+                    case 0x5B:    /* 5B POP eBX */
+                        putreg16 (regbx, pop() );
+                        break;
+
+                    case 0x5C:    /* 5C POP eSP */
+                        putreg16 (regsp, pop() );
+                        break;
+
+                    case 0x5D:    /* 5D POP eBP */
+                        putreg16 (regbp, pop() );
+                        break;
+
+                    case 0x5E:    /* 5E POP eSI */
+                        putreg16 (regsi, pop() );
+                        break;
+
+                    case 0x5F:    /* 5F POP eDI */
+                        putreg16 (regdi, pop() );
+                        break;
+
+#ifdef CPU_V20
+                    case 0x60:    /* 60 PUSHA (80186+) */
+                        oldsp = getreg16 (regsp);
+                        push (getreg16 (regax) );
+                        push (getreg16 (regcx) );
+                        push (getreg16 (regdx) );
+                        push (getreg16 (regbx) );
+                        push (oldsp);
+                        push (getreg16 (regbp) );
+                        push (getreg16 (regsi) );
+                        push (getreg16 (regdi) );
+                        break;
+
+                    case 0x61:    /* 61 POPA (80186+) */
+                        putreg16 (regdi, pop() );
+                        putreg16 (regsi, pop() );
+                        putreg16 (regbp, pop() );
+                        dummy = pop();
+                        putreg16 (regbx, pop() );
+                        putreg16 (regdx, pop() );
+                        putreg16 (regcx, pop() );
+                        putreg16 (regax, pop() );
+                        break;
+
+                    case 0x62: /* 62 BOUND Gv, Ev (80186+) */
+                        modregrm();
+                        getea (RM);
+                        if (signext32 (getreg16 (REGX) ) < signext32 ( getmem16 (EA >> 4, EA & 15) ) ) {
+                                intcall86 (5); //bounds check exception
+                            }
+                        else {
+                                EA += 2;
+                                if (signext32 (getreg16 (REGX) ) > signext32 ( getmem16 (EA >> 4, EA & 15) ) ) {
+                                        intcall86(5); //bounds check exception
+                                    }
+                            }
+                        break;
+
+                    case 0x68:    /* 68 PUSH Iv (80186+) */
+                        push (getmem16 (segregs[regcs], IP) );
+                        StepIP (2);
+                        break;
+
+                    case 0x69:    /* 69 IMUL Gv Ev Iv (80186+) */
+                        modregrm();
+                        temp1 = readrm16 (RM);
+                        temp2 = getmem16 (segregs[regcs], IP);
+                        StepIP (2);
+                        if ( (temp1 & 0x8000L) == 0x8000L) {
+                                temp1 = temp1 | 0xFFFF0000L;
+                            }
+
+                        if ( (temp2 & 0x8000L) == 0x8000L) {
+                                temp2 = temp2 | 0xFFFF0000L;
+                            }
+
+                        temp3 = temp1 * temp2;
+                        putreg16 (REGX, temp3 & 0xFFFFL);
+                        if (temp3 & 0xFFFF0000L) {
+                                cf = 1;
+                                of = 1;
+                            }
+                        else {
+                                cf = 0;
+                                of = 0;
+                            }
+                        break;
+
+                    case 0x6A:    /* 6A PUSH Ib (80186+) */
+                        push (getmem8 (segregs[regcs], IP) );
+                        StepIP (1);
+                        break;
+
+                    case 0x6B:    /* 6B IMUL Gv Eb Ib (80186+) */
+                        modregrm();
+                        temp1 = readrm16 (RM);
+                        temp2 = signext (getmem8 (segregs[regcs], IP) );
+                        StepIP (1);
+                        if ( (temp1 & 0x8000L) == 0x8000L) {
+                                temp1 = temp1 | 0xFFFF0000L;
+                            }
+
+                        if ( (temp2 & 0x8000L) == 0x8000L) {
+                                temp2 = temp2 | 0xFFFF0000L;
+                            }
+
+                        temp3 = temp1 * temp2;
+                        putreg16 (REGX, temp3 & 0xFFFFL);
+                        if (temp3 & 0xFFFF0000L) {
+                                cf = 1;
+                                of = 1;
+                            }
+                        else {
+                                cf = 0;
+                                of = 0;
+                            }
+                        break;
+
+                    case 0x6C:    /* 6E INSB */
+                        if (reptype && (getreg16 (regcx) == 0) ) {
+                                break;
+                            }
+
+                        putmem8 (useseg, getreg16 (regsi) , portin (regs.wordregs[regdx]) );
+                        if (df) {
+                                putreg16 (regsi, getreg16 (regsi) - 1);
+                                putreg16 (regdi, getreg16 (regdi) - 1);
+                            }
+                        else {
+                                putreg16 (regsi, getreg16 (regsi) + 1);
+                                putreg16 (regdi, getreg16 (regdi) + 1);
+                            }
+
+                        if (reptype) {
+                                putreg16 (regcx, getreg16 (regcx) - 1);
+                            }
+
+                        totalexec++;
+//                        loopcount++;
+                        if (!reptype) {
+                                break;
+                            }
+
+                        IP = firstip;
+                        break;
+
+                    case 0x6D:    /* 6F INSW */
+                        if (reptype && (getreg16 (regcx) == 0) ) {
+                                break;
+                            }
+
+                        putmem16 (useseg, getreg16 (regsi) , portin16 (regs.wordregs[regdx]) );
+                        if (df) {
+                                putreg16 (regsi, getreg16 (regsi) - 2);
+                                putreg16 (regdi, getreg16 (regdi) - 2);
+                            }
+                        else {
+                                putreg16 (regsi, getreg16 (regsi) + 2);
+                                putreg16 (regdi, getreg16 (regdi) + 2);
+                            }
+
+                        if (reptype) {
+                                putreg16 (regcx, getreg16 (regcx) - 1);
+                            }
+
+                        totalexec++;
+//                        loopcount++;
+                        if (!reptype) {
+                                break;
+                            }
+
+                        IP = firstip;
+                        break;
+
+                    case 0x6E:    /* 6E OUTSB */
+                        if (reptype && (getreg16 (regcx) == 0) ) {
+                                break;
+                            }
+
+                        portout (regs.wordregs[regdx], getmem8 (useseg, getreg16 (regsi) ) );
+                        if (df) {
+                                putreg16 (regsi, getreg16 (regsi) - 1);
+                                putreg16 (regdi, getreg16 (regdi) - 1);
+                            }
+                        else {
+                                putreg16 (regsi, getreg16 (regsi) + 1);
+                                putreg16 (regdi, getreg16 (regdi) + 1);
+                            }
+
+                        if (reptype) {
+                                putreg16 (regcx, getreg16 (regcx) - 1);
+                            }
+
+                        totalexec++;
+//                        loopcount++;
+                        if (!reptype) {
+                                break;
+                            }
+
+                        IP = firstip;
+                        break;
+
+                    case 0x6F:    /* 6F OUTSW */
+                        if (reptype && (getreg16 (regcx) == 0) ) {
+                                break;
+                            }
+
+                        portout16 (regs.wordregs[regdx], getmem16 (useseg, getreg16 (regsi) ) );
+                        if (df) {
+                                putreg16 (regsi, getreg16 (regsi) - 2);
+                                putreg16 (regdi, getreg16 (regdi) - 2);
+                            }
+                        else {
+                                putreg16 (regsi, getreg16 (regsi) + 2);
+                                putreg16 (regdi, getreg16 (regdi) + 2);
+                            }
+
+                        if (reptype) {
+                                putreg16 (regcx, getreg16 (regcx) - 1);
+                            }
+
+                        totalexec++;
+//                        loopcount++;
+                        if (!reptype) {
+                                break;
+                            }
+
+                        IP = firstip;
+                        break;
+#endif
+
+                    case 0x70:    /* 70 JO Jb */
+                        temp16 = signext (getmem8 (segregs[regcs], IP) );
+                        StepIP (1);
+                        if (of) {
+                                IP = IP + temp16;
+                            }
+                        break;
+
+                    case 0x71:    /* 71 JNO Jb */
+                        temp16 = signext (getmem8 (segregs[regcs], IP) );
+                        StepIP (1);
+                        if (!of) {
+                                IP = IP + temp16;
+                            }
+                        break;
+
+                    case 0x72:    /* 72 JB Jb */
+                        temp16 = signext (getmem8 (segregs[regcs], IP) );
+                        StepIP (1);
+                        if (cf) {
+                                IP = IP + temp16;
+                            }
+                        break;
+
+                    case 0x73:    /* 73 JNB Jb */
+                        temp16 = signext (getmem8 (segregs[regcs], IP) );
+                        StepIP (1);
+                        if (!cf) {
+                                IP = IP + temp16;
+                            }
+                        break;
+
+                    case 0x74:    /* 74 JZ Jb */
+                        temp16 = signext (getmem8 (segregs[regcs], IP) );
+                        StepIP (1);
+                        if (zf) {
+                                IP = IP + temp16;
+                            }
+                        break;
+
+                    case 0x75:    /* 75 JNZ Jb */
+                        temp16 = signext (getmem8 (segregs[regcs], IP) );
+                        StepIP (1);
+                        if (!zf) {
+                                IP = IP + temp16;
+                            }
+                        break;
+
+                    case 0x76:    /* 76 JBE Jb */
+                        temp16 = signext (getmem8 (segregs[regcs], IP) );
+                        StepIP (1);
+                        if (cf || zf) {
+                                IP = IP + temp16;
+                            }
+                        break;
+
+                    case 0x77:    /* 77 JA Jb */
+                        temp16 = signext (getmem8 (segregs[regcs], IP) );
+                        StepIP (1);
+                        if (!cf && !zf) {
+                                IP = IP + temp16;
+                            }
+                        break;
+
+                    case 0x78:    /* 78 JS Jb */
+                        temp16 = signext (getmem8 (segregs[regcs], IP) );
+                        StepIP (1);
+                        if (sf) {
+                                IP = IP + temp16;
+                            }
+                        break;
+
+                    case 0x79:    /* 79 JNS Jb */
+                        temp16 = signext (getmem8 (segregs[regcs], IP) );
+                        StepIP (1);
+                        if (!sf) {
+                                IP = IP + temp16;
+                            }
+                        break;
+
+                    case 0x7A:    /* 7A JPE Jb */
+                        temp16 = signext (getmem8 (segregs[regcs], IP) );
+                        StepIP (1);
+                        if (pf) {
+                                IP = IP + temp16;
+                            }
+                        break;
+
+                    case 0x7B:    /* 7B JPO Jb */
+                        temp16 = signext (getmem8 (segregs[regcs], IP) );
+                        StepIP (1);
+                        if (!pf) {
+                                IP = IP + temp16;
+                            }
+                        break;
+
+                    case 0x7C:    /* 7C JL Jb */
+                        temp16 = signext (getmem8 (segregs[regcs], IP) );
+                        StepIP (1);
+                        if (sf != of) {
+                                IP = IP + temp16;
+                            }
+                        break;
+
+                    case 0x7D:    /* 7D JGE Jb */
+                        temp16 = signext (getmem8 (segregs[regcs], IP) );
+                        StepIP (1);
+                        if (sf == of) {
+                                IP = IP + temp16;
+                            }
+                        break;
+
+                    case 0x7E:    /* 7E JLE Jb */
+                        temp16 = signext (getmem8 (segregs[regcs], IP) );
+                        StepIP (1);
+                        if ( (sf != of) || zf) {
+                                IP = IP + temp16;
+                            }
+                        break;
+
+                    case 0x7F:    /* 7F JG Jb */
+                        temp16 = signext (getmem8 (segregs[regcs], IP) );
+                        StepIP (1);
+                        if (!zf && (sf == of) ) {
+                                IP = IP + temp16;
+                            }
+                        break;
+
+                    case 0x80:
+                    case 0x82:    /* 80/82 GRP1 Eb Ib */
+                        modregrm();
+                        oper1b = readrm8 (RM);
+                        oper2b = getmem8 (segregs[regcs], IP);
+                        StepIP (1);
+                        switch (REGX) {
+                                case 0:
+                                    op_add8();
+                                    break;
+                                case 1:
+                                    op_or8();
+                                    break;
+                                case 2:
+                                    op_adc8();
+                                    break;
+                                case 3:
+                                    op_sbb8();
+                                    break;
+                                case 4:
+                                    op_and8();
+                                    break;
+                                case 5:
+                                    op_sub8();
+                                    break;
+                                case 6:
+                                    op_xor8();
+                                    break;
+                                case 7:
+                                    flag_sub8 (oper1b, oper2b);
+                                    break;
+                                default:
+                                    break;    /* to avoid compiler warnings */
+                            }
+
+                        if (REGX < 7) {
+                                writerm8 (RM, res8);
+                            }
+                        break;
+
+                    case 0x81:    /* 81 GRP1 Ev Iv */
+                    case 0x83:    /* 83 GRP1 Ev Ib */
+                        modregrm();
+                        oper1 = readrm16 (RM);
+                        if (OP == 0x81) {
+                                oper2 = getmem16 (segregs[regcs], IP);
+                                StepIP (2);
+                            }
+                        else {
+                                oper2 = signext (getmem8 (segregs[regcs], IP) );
+                                StepIP (1);
+                            }
+
+                        switch (REGX) {
+                                case 0:
+                                    op_add16();
+                                    break;
+                                case 1:
+                                    op_or16();
+                                    break;
+                                case 2:
+                                    op_adc16();
+                                    break;
+                                case 3:
+                                    op_sbb16();
+                                    break;
+                                case 4:
+                                    op_and16();
+                                    break;
+                                case 5:
+                                    op_sub16();
+                                    break;
+                                case 6:
+                                    op_xor16();
+                                    break;
+                                case 7:
+                                    flag_sub16 (oper1, oper2);
+                                    break;
+                                default:
+                                    break;    /* to avoid compiler warnings */
+                            }
+
+                        if (REGX < 7) {
+                                writerm16 (RM, res16);
+                            }
+                        break;
+
+                    case 0x84:    /* 84 TEST Gb Eb */
+                        modregrm();
+                        oper1b = getreg8 (REGX);
+                        oper2b = readrm8 (RM);
+                        flag_log8 (oper1b & oper2b);
+                        break;
+
+                    case 0x85:    /* 85 TEST Gv Ev */
+                        modregrm();
+                        oper1 = getreg16 (REGX);
+                        oper2 = readrm16 (RM);
+                        flag_log16 (oper1 & oper2);
+                        break;
+
+                    case 0x86:    /* 86 XCHG Gb Eb */
+                        modregrm();
+                        oper1b = getreg8 (REGX);
+                        putreg8 (REGX, readrm8 (RM) );
+                        writerm8 (RM, oper1b);
+                        break;
+
+                    case 0x87:    /* 87 XCHG Gv Ev */
+                        modregrm();
+                        oper1 = getreg16 (REGX);
+                        putreg16 (REGX, readrm16 (RM) );
+                        writerm16 (RM, oper1);
+                        break;
+
+                    case 0x88:    /* 88 MOV Eb Gb */
+                        modregrm();
+                        writerm8 (RM, getreg8 (REGX) );
+                        break;
+
+                    case 0x89:    /* 89 MOV Ev Gv */
+                        modregrm();
+                        writerm16 (RM, getreg16 (REGX) );
+                        break;
+
+                    case 0x8A:    /* 8A MOV Gb Eb */
+                        modregrm();
+                        putreg8 (REGX, readrm8 (RM) );
+                        break;
+
+                    case 0x8B:    /* 8B MOV Gv Ev */
+                        modregrm();
+                        putreg16 (REGX, readrm16 (RM) );
+                        break;
+
+                    case 0x8C:    /* 8C MOV Ew Sw */
+                        modregrm();
+                        writerm16 (RM, getsegreg (REGX) );
+                        break;
+
+                    case 0x8D:    /* 8D LEA Gv M */
+                        modregrm();
+                        getea (RM);
+                        putreg16 (REGX, EA - segbase (useseg) );
+                        break;
+
+                    case 0x8E:    /* 8E MOV Sw Ew */
+                        modregrm();
+                        putsegreg (REGX, readrm16 (RM) );
+                        break;
+
+                    case 0x8F:    /* 8F POP Ev */
+                        modregrm();
+                        writerm16 (RM, pop() );
+                        break;
+
+                    case 0x90:    /* 90 NOP */
+                        break;
+
+                    case 0x91:    /* 91 XCHG eCX eAX */
+                        oper1 = getreg16 (regcx);
+                        putreg16 (regcx, getreg16 (regax) );
+                        putreg16 (regax, oper1);
+                        break;
+
+                    case 0x92:    /* 92 XCHG eDX eAX */
+                        oper1 = getreg16 (regdx);
+                        putreg16 (regdx, getreg16 (regax) );
+                        putreg16 (regax, oper1);
+                        break;
+
+                    case 0x93:    /* 93 XCHG eBX eAX */
+                        oper1 = getreg16 (regbx);
+                        putreg16 (regbx, getreg16 (regax) );
+                        putreg16 (regax, oper1);
+                        break;
+
+                    case 0x94:    /* 94 XCHG eSP eAX */
+                        oper1 = getreg16 (regsp);
+                        putreg16 (regsp, getreg16 (regax) );
+                        putreg16 (regax, oper1);
+                        break;
+
+                    case 0x95:    /* 95 XCHG eBP eAX */
+                        oper1 = getreg16 (regbp);
+                        putreg16 (regbp, getreg16 (regax) );
+                        putreg16 (regax, oper1);
+                        break;
+
+                    case 0x96:    /* 96 XCHG eSI eAX */
+                        oper1 = getreg16 (regsi);
+                        putreg16 (regsi, getreg16 (regax) );
+                        putreg16 (regax, oper1);
+                        break;
+
+                    case 0x97:    /* 97 XCHG eDI eAX */
+                        oper1 = getreg16 (regdi);
+                        putreg16 (regdi, getreg16 (regax) );
+                        putreg16 (regax, oper1);
+                        break;
+
+                    case 0x98:    /* 98 CBW */
+                        if ( (regs.byteregs[regal] & 0x80) == 0x80) {
+                                regs.byteregs[regah] = 0xFF;
+                            }
+                        else {
+                                regs.byteregs[regah] = 0;
+                            }
+                        break;
+
+                    case 0x99:    /* 99 CWD */
+                        if ( (regs.byteregs[regah] & 0x80) == 0x80) {
+                                putreg16 (regdx, 0xFFFF);
+                            }
+                        else {
+                                putreg16 (regdx, 0);
+                            }
+                        break;
+
+                    case 0x9A:    /* 9A CALL Ap */
+                        oper1 = getmem16 (segregs[regcs], IP);
+                        StepIP (2);
+                        oper2 = getmem16 (segregs[regcs], IP);
+                        StepIP (2);
+                        push (segregs[regcs]);
+                        push (IP);
+                        IP = oper1;
+                        segregs[regcs] = oper2;
+                        break;
+
+                    case 0x9B:    /* 9B WAIT */
+                        break;
+
+                    case 0x9C:    /* 9C PUSHF */
+                        push (makeflagsword() | 0xF800);
+                        break;
+
+                    case 0x9D:    /* 9D POPF */
+                        temp16 = pop();
+                        decodeflagsword (temp16);
+                        break;
+
+                    case 0x9E:    /* 9E SAHF */
+                        decodeflagsword ( (makeflagsword() & 0xFF00) | regs.byteregs[regah]);
+                        break;
+
+                    case 0x9F:    /* 9F LAHF */
+                        regs.byteregs[regah] = makeflagsword() & 0xFF;
+                        break;
+
+                    case 0xA0:    /* A0 MOV regs.byteregs[regal] Ob */
+                        regs.byteregs[regal] = getmem8 (useseg, getmem16 (segregs[regcs], IP) );
+                        StepIP (2);
+                        break;
+
+                    case 0xA1:    /* A1 MOV eAX Ov */
+                        oper1 = getmem16 (useseg, getmem16 (segregs[regcs], IP) );
+                        StepIP (2);
+                        putreg16 (regax, oper1);
+                        break;
+
+                    case 0xA2:    /* A2 MOV Ob regs.byteregs[regal] */
+                        putmem8 (useseg, getmem16 (segregs[regcs], IP), regs.byteregs[regal]);
+                        StepIP (2);
+                        break;
+
+                    case 0xA3:    /* A3 MOV Ov eAX */
+                        putmem16 (useseg, getmem16 (segregs[regcs], IP), getreg16 (regax) );
+                        StepIP (2);
+                        break;
+
+                    case 0xA4:    /* A4 MOVSB */
+                        if (reptype && (getreg16 (regcx) == 0) ) {
+                                break;
+                            }
+
+                        putmem8 (segregs[reges], getreg16 (regdi), getmem8 (useseg, getreg16 (regsi) ) );
+                        if (df) {
+                                putreg16 (regsi, getreg16 (regsi) - 1);
+                                putreg16 (regdi, getreg16 (regdi) - 1);
+                            }
+                        else {
+                                putreg16 (regsi, getreg16 (regsi) + 1);
+                                putreg16 (regdi, getreg16 (regdi) + 1);
+                            }
+
+                        if (reptype) {
+                                putreg16 (regcx, getreg16 (regcx) - 1);
+                            }
+
+                        totalexec++;
+//                        loopcount++;
+                        if (!reptype) {
+                                break;
+                            }
+
+                        IP = firstip;
+                        break;
+
+                    case 0xA5:    /* A5 MOVSW */
+                        if (reptype && (getreg16 (regcx) == 0) ) {
+                                break;
+                            }
+
+                        putmem16 (segregs[reges], getreg16 (regdi), getmem16 (useseg, getreg16 (regsi) ) );
+                        if (df) {
+                                putreg16 (regsi, getreg16 (regsi) - 2);
+                                putreg16 (regdi, getreg16 (regdi) - 2);
+                            }
+                        else {
+                                putreg16 (regsi, getreg16 (regsi) + 2);
+                                putreg16 (regdi, getreg16 (regdi) + 2);
+                            }
+
+                        if (reptype) {
+                                putreg16 (regcx, getreg16 (regcx) - 1);
+                            }
+
+                        totalexec++;
+//                        loopcount++;
+                        if (!reptype) {
+                                break;
+                            }
+
+                        IP = firstip;
+                        break;
+
+                    case 0xA6:    /* A6 CMPSB */
+                        if (reptype && (getreg16 (regcx) == 0) ) {
+                                break;
+                            }
+
+                        oper1b = getmem8 (useseg, getreg16 (regsi) );
+                        oper2b = getmem8 (segregs[reges], getreg16 (regdi) );
+                        if (df) {
+                                putreg16 (regsi, getreg16 (regsi) - 1);
+                                putreg16 (regdi, getreg16 (regdi) - 1);
+                            }
+                        else {
+                                putreg16 (regsi, getreg16 (regsi) + 1);
+                                putreg16 (regdi, getreg16 (regdi) + 1);
+                            }
+
+                        flag_sub8 (oper1b, oper2b);
+                        if (reptype) {
+                                putreg16 (regcx, getreg16 (regcx) - 1);
+                            }
+
+                        if ( (reptype == 1) && !zf) {
+                                break;
+                            }
+                        else if ( (reptype == 2) && (zf == 1) ) {
+                                break;
+                            }
+
+                        totalexec++;
+//                        loopcount++;
+                        if (!reptype) {
+                                break;
+                            }
+
+                        IP = firstip;
+                        break;
+
+                    case 0xA7:    /* A7 CMPSW */
+                        if (reptype && (getreg16 (regcx) == 0) ) {
+                                break;
+                            }
+
+                        oper1 = getmem16 (useseg, getreg16 (regsi) );
+                        oper2 = getmem16 (segregs[reges], getreg16 (regdi) );
+                        if (df) {
+                                putreg16 (regsi, getreg16 (regsi) - 2);
+                                putreg16 (regdi, getreg16 (regdi) - 2);
+                            }
+                        else {
+                                putreg16 (regsi, getreg16 (regsi) + 2);
+                                putreg16 (regdi, getreg16 (regdi) + 2);
+                            }
+
+                        flag_sub16 (oper1, oper2);
+                        if (reptype) {
+                                putreg16 (regcx, getreg16 (regcx) - 1);
+                            }
+
+                        if ( (reptype == 1) && !zf) {
+                                break;
+                            }
+
+                        if ( (reptype == 2) && (zf == 1) ) {
+                                break;
+                            }
+
+                        totalexec++;
+//                        loopcount++;
+                        if (!reptype) {
+                                break;
+                            }
+
+                        IP = firstip;
+                        break;
+
+                    case 0xA8:    /* A8 TEST regs.byteregs[regal] Ib */
+                        oper1b = regs.byteregs[regal];
+                        oper2b = getmem8 (segregs[regcs], IP);
+                        StepIP (1);
+                        flag_log8 (oper1b & oper2b);
+                        break;
+
+                    case 0xA9:    /* A9 TEST eAX Iv */
+                        oper1 = getreg16 (regax);
+                        oper2 = getmem16 (segregs[regcs], IP);
+                        StepIP (2);
+                        flag_log16 (oper1 & oper2);
+                        break;
+
+                    case 0xAA:    /* AA STOSB */
+                        if (reptype && (getreg16 (regcx) == 0) ) {
+                                break;
+                            }
+
+                        putmem8 (segregs[reges], getreg16 (regdi), regs.byteregs[regal]);
+                        if (df) {
+                                putreg16 (regdi, getreg16 (regdi) - 1);
+                            }
+                        else {
+                                putreg16 (regdi, getreg16 (regdi) + 1);
+                            }
+
+                        if (reptype) {
+                                putreg16 (regcx, getreg16 (regcx) - 1);
+                            }
+
+                        totalexec++;
+ //                       loopcount++;
+                        if (!reptype) {
+                                break;
+                            }
+
+                        IP = firstip;
+                        break;
+
+                    case 0xAB:    /* AB STOSW */
+                        if (reptype && (getreg16 (regcx) == 0) ) {
+                                break;
+                            }
+
+                        putmem16 (segregs[reges], getreg16 (regdi), getreg16 (regax) );
+                        if (df) {
+                                putreg16 (regdi, getreg16 (regdi) - 2);
+                            }
+                        else {
+                                putreg16 (regdi, getreg16 (regdi) + 2);
+                            }
+
+                        if (reptype) {
+                                putreg16 (regcx, getreg16 (regcx) - 1);
+                            }
+
+                        totalexec++;
+//                        loopcount++;
+                        if (!reptype) {
+                                break;
+                            }
+
+                        IP = firstip;
+                        break;
+
+                    case 0xAC:    /* AC LODSB */
+                        if (reptype && (getreg16 (regcx) == 0) ) {
+                                break;
+                            }
+
+                        regs.byteregs[regal] = getmem8 (useseg, getreg16 (regsi) );
+                        if (df) {
+                                putreg16 (regsi, getreg16 (regsi) - 1);
+                            }
+                        else {
+                                putreg16 (regsi, getreg16 (regsi) + 1);
+                            }
+
+                        if (reptype) {
+                                putreg16 (regcx, getreg16 (regcx) - 1);
+                            }
+
+                        totalexec++;
+//                        loopcount++;
+                        if (!reptype) {
+                                break;
+                            }
+
+                        IP = firstip;
+                        break;
+
+                    case 0xAD:    /* AD LODSW */
+                        if (reptype && (getreg16 (regcx) == 0) ) {
+                                break;
+                            }
+
+                        oper1 = getmem16 (useseg, getreg16 (regsi) );
+                        putreg16 (regax, oper1);
+                        if (df) {
+                                putreg16 (regsi, getreg16 (regsi) - 2);
+                            }
+                        else {
+                                putreg16 (regsi, getreg16 (regsi) + 2);
+                            }
+
+                        if (reptype) {
+                                putreg16 (regcx, getreg16 (regcx) - 1);
+                            }
+
+                        totalexec++;
+//                        loopcount++;
+                        if (!reptype) {
+                                break;
+                            }
+
+                        IP = firstip;
+                        break;
+
+                    case 0xAE:    /* AE SCASB */
+                        if (reptype && (getreg16 (regcx) == 0) ) {
+                                break;
+                            }
+
+                        oper1b = getmem8 (segregs[reges], getreg16 (regdi) );
+                        oper2b = regs.byteregs[regal];
+                        flag_sub8 (oper1b, oper2b);
+                        if (df) {
+                                putreg16 (regdi, getreg16 (regdi) - 1);
+                            }
+                        else {
+                                putreg16 (regdi, getreg16 (regdi) + 1);
+                            }
+
+                        if (reptype) {
+                                putreg16 (regcx, getreg16 (regcx) - 1);
+                            }
+
+                        if ( (reptype == 1) && !zf) {
+                                break;
+                            }
+                        else if ( (reptype == 2) && (zf == 1) ) {
+                                break;
+                            }
+
+                        totalexec++;
+//                        loopcount++;
+                        if (!reptype) {
+                                break;
+                            }
+
+                        IP = firstip;
+                        break;
+
+                    case 0xAF:    /* AF SCASW */
+                        if (reptype && (getreg16 (regcx) == 0) ) {
+                                break;
+                            }
+
+                        oper1 = getmem16 (segregs[reges], getreg16 (regdi) );
+                        oper2 = getreg16 (regax);
+                        flag_sub16 (oper1, oper2);
+                        if (df) {
+                                putreg16 (regdi, getreg16 (regdi) - 2);
+                            }
+                        else {
+                                putreg16 (regdi, getreg16 (regdi) + 2);
+                            }
+
+                        if (reptype) {
+                                putreg16 (regcx, getreg16 (regcx) - 1);
+                            }
+
+                        if ( (reptype == 1) && !zf) {
+                                break;
+                            }
+                        else if ( (reptype == 2) & (zf == 1) ) {
+                                break;
+                            }
+
+                        totalexec++;
+//                        loopcount++;
+                        if (!reptype) {
+                                break;
+                            }
+
+                        IP = firstip;
+                        break;
+
+                    case 0xB0:    /* B0 MOV regs.byteregs[regal] Ib */
+                        DATA8 = regs.byteregs[regal] = getmem8 (segregs[regcs], IP);
+                        StepIP (1);
+                        break;
+
+                    case 0xB1:    /* B1 MOV regs.byteregs[regcl] Ib */
+                        DATA8 = regs.byteregs[regcl] = getmem8 (segregs[regcs], IP);
+                        StepIP (1);
+                        break;
+
+                    case 0xB2:    /* B2 MOV regs.byteregs[regdl] Ib */
+                        DATA8 = regs.byteregs[regdl] = getmem8 (segregs[regcs], IP);
+                        StepIP (1);
+                        break;
+
+                    case 0xB3:    /* B3 MOV regs.byteregs[regbl] Ib */
+                        DATA8 = regs.byteregs[regbl] = getmem8 (segregs[regcs], IP);
+                        StepIP (1);
+                        break;
+
+                    case 0xB4:    /* B4 MOV regs.byteregs[regah] Ib */
+                        DATA8 = regs.byteregs[regah] = getmem8 (segregs[regcs], IP);
+                        StepIP (1);
+                        break;
+
+                    case 0xB5:    /* B5 MOV regs.byteregs[regch] Ib */
+                        DATA8 = regs.byteregs[regch] = getmem8 (segregs[regcs], IP);
+                        StepIP (1);
+                        break;
+
+                    case 0xB6:    /* B6 MOV regs.byteregs[regdh] Ib */
+                        DATA8 = regs.byteregs[regdh] = getmem8 (segregs[regcs], IP);
+                        StepIP (1);
+                        break;
+
+                    case 0xB7:    /* B7 MOV regs.byteregs[regbh] Ib */
+                        DATA8 = regs.byteregs[regbh] = getmem8 (segregs[regcs], IP);
+                        StepIP (1);
+                        break;
+
+                    case 0xB8:    /* B8 MOV eAX Iv */
+                        DATA16 = oper1 = getmem16 (segregs[regcs], IP);
+                        StepIP (2);
+                        putreg16 (regax, oper1);
+                        break;
+
+                    case 0xB9:    /* B9 MOV eCX Iv */
+                        DATA16 = oper1 = getmem16 (segregs[regcs], IP);
+                        StepIP (2);
+                        putreg16 (regcx, oper1);
+                        break;
+
+                    case 0xBA:    /* BA MOV eDX Iv */
+                        DATA16 = oper1 = getmem16 (segregs[regcs], IP);
+                        StepIP (2);
+                        putreg16 (regdx, oper1);
+                        break;
+
+                    case 0xBB:    /* BB MOV eBX Iv */
+                        DATA16 = oper1 = getmem16 (segregs[regcs], IP);
+                        StepIP (2);
+                        putreg16 (regbx, oper1);
+                        break;
+
+                    case 0xBC:    /* BC MOV eSP Iv */
+                        putreg16 (regsp, DATA16 = getmem16 (segregs[regcs], IP) );
+                        StepIP (2);
+                        break;
+
+                    case 0xBD:    /* BD MOV eBP Iv */
+                        putreg16 (regbp, DATA16 = getmem16 (segregs[regcs], IP) );
+                        StepIP (2);
+                        break;
+
+                    case 0xBE:    /* BE MOV eSI Iv */
+                        putreg16 (regsi, DATA16 = getmem16 (segregs[regcs], IP) );
+                        StepIP (2);
+                        break;
+
+                    case 0xBF:    /* BF MOV eDI Iv */
+                        putreg16 (regdi, DATA16 = getmem16 (segregs[regcs], IP) );
+                        StepIP (2);
+                        break;
+
+                    case 0xC0:    /* C0 GRP2 byte imm8 (80186+) */
+                        modregrm();
+                        oper1b = readrm8 (RM);
+                        DATA8 = oper2b = getmem8 (segregs[regcs], IP);
+                        StepIP (1);
+                        writerm8 (RM, op_grp2_8 (oper2b) );
+                        break;
+
+                    case 0xC1:    /* C1 GRP2 word imm8 (80186+) */
+                        modregrm();
+                        oper1 = readrm16 (RM);
+                        DATA8 = oper2 = getmem8 (segregs[regcs], IP);
+                        StepIP (1);
+                        writerm16 (RM, op_grp2_16 ( (uint8) oper2) );
+                        break;
+
+                    case 0xC2:    /* C2 RET Iw */
+                        DATA16 = oper1 = getmem16 (segregs[regcs], IP);
+                        IP = pop();
+                        putreg16 (regsp, getreg16 (regsp) + oper1);
+                        break;
+
+                    case 0xC3:    /* C3 RET */
+                        IP = pop();
+                        break;
+
+                    case 0xC4:    /* C4 LES Gv Mp */
+                        modregrm();
+                        getea (RM);
+//                        putreg16 (REGX, read86 (EA) + read86 (EA + 1) * 256);
+//                        segregs[reges] = read86 (EA + 2) + read86 (EA + 3) * 256;
+                        putreg16 (REGX, get_mbyte (EA) + get_mbyte ((EA + 1) * 256));
+                        segregs[reges] = get_mbyte (EA + 2) + get_mbyte ((EA + 3) * 256);
+                        break;
+
+                    case 0xC5:    /* C5 LDS Gv Mp */
+                        modregrm();
+                        getea (RM);
+//                        putreg16 (REGX, read86 (EA) + read86 (EA + 1) * 256);
+//                        segregs[regds] = read86 (EA + 2) + read86 (EA + 3) * 256;
+                        putreg16 (REGX, get_mbyte (EA) + get_mbyte ((EA + 1) * 256));
+                        segregs[regds] = get_mbyte (EA + 2) + get_mbyte ((EA + 3) * 256);
+                        break;
+
+                    case 0xC6:    /* C6 MOV Eb Ib */
+                        modregrm();
+                        writerm8 (RM, getmem8 (segregs[regcs], IP) );
+                        StepIP (1);
+                        break;
+
+                    case 0xC7:    /* C7 MOV Ev Iv */
+                        modregrm();
+                        writerm16 (RM, getmem16 (segregs[regcs], IP) );
+                        StepIP (2);
+                        break;
+
+                    case 0xC8:    /* C8 ENTER (80186+) */
+                        stacksize = getmem16 (segregs[regcs], IP);
+                        StepIP (2);
+                        nestlev = getmem8 (segregs[regcs], IP);
+                        StepIP (1);
+                        push (getreg16 (regbp) );
+                        frametemp = getreg16 (regsp);
+                        if (nestlev) {
+                                for (temp16 = 1; temp16 < nestlev; temp16++) {
+                                        putreg16 (regbp, getreg16 (regbp) - 2);
+                                        push (getreg16 (regbp) );
+                                    }
+
+                                push (getreg16 (regsp) );
+                            }
+
+                        putreg16 (regbp, frametemp);
+                        putreg16 (regsp, getreg16 (regbp) - stacksize);
+
+                        break;
+
+                    case 0xC9:    /* C9 LEAVE (80186+) */
+                        putreg16 (regsp, getreg16 (regbp) );
+                        putreg16 (regbp, pop() );
+
+                        break;
+
+                    case 0xCA:    /* CA RETF Iw */
+                        oper1 = getmem16 (segregs[regcs], IP);
+                        IP = pop();
+                        segregs[regcs] = pop();
+                        putreg16 (regsp, getreg16 (regsp) + oper1);
+                        break;
+
+                    case 0xCB:    /* CB RETF */
+                        IP = pop();;
+                        segregs[regcs] = pop();
+                        break;
+
+                    case 0xCC:    /* CC INT 3 */
+                        intcall86 (3);
+                        break;
+
+                    case 0xCD:    /* CD INT Ib */
+                        oper1b = getmem8 (segregs[regcs], IP);
+                        StepIP (1);
+                        intcall86 (oper1b);
+                        break;
+
+                    case 0xCE:    /* CE INTO */
+                        if (of) {
+                                intcall86 (4);
+                            }
+                        break;
+
+                    case 0xCF:    /* CF IRET */
+                        IP = pop();
+                        segregs[regcs] = pop();
+                        decodeflagsword (pop() );
+
                         /*
-                    case 5:             //MAR
-                        sim_printf(" 0%02XH", MAR);
+                         * if (net.enabled) net.canrecv = 1;
+                         */
                         break;
-                        */
+
+                    case 0xD0:    /* D0 GRP2 Eb 1 */
+                        modregrm();
+                        oper1b = readrm8 (RM);
+                        writerm8 (RM, op_grp2_8 (1) );
+                        break;
+
+                    case 0xD1:    /* D1 GRP2 Ev 1 */
+                        modregrm();
+                        oper1 = readrm16 (RM);
+                        writerm16 (RM, op_grp2_16 (1) );
+                        break;
+
+                    case 0xD2:    /* D2 GRP2 Eb regs.byteregs[regcl] */
+                        modregrm();
+                        oper1b = readrm8 (RM);
+                        writerm8 (RM, op_grp2_8 (regs.byteregs[regcl]) );
+                        break;
+
+                    case 0xD3:    /* D3 GRP2 Ev regs.byteregs[regcl] */
+                        modregrm();
+                        oper1 = readrm16 (RM);
+                        writerm16 (RM, op_grp2_16 (regs.byteregs[regcl]) );
+                        break;
+
+                    case 0xD4:    /* D4 AAM I0 */
+                        oper1 = getmem8 (segregs[regcs], IP);
+                        StepIP (1);
+                        if (!oper1) {
+                                intcall86 (0);
+                                break;
+                            }    /* division by zero */
+
+                        regs.byteregs[regah] = (regs.byteregs[regal] / oper1) & 255;
+                        regs.byteregs[regal] = (regs.byteregs[regal] % oper1) & 255;
+                        flag_szp16 (getreg16 (regax) );
+                        break;
+
+                    case 0xD5:    /* D5 AAD I0 */
+                        oper1 = getmem8 (segregs[regcs], IP);
+                        StepIP (1);
+                        regs.byteregs[regal] = (regs.byteregs[regah] * oper1 + regs.byteregs[regal]) & 255;
+                        regs.byteregs[regah] = 0;
+                        flag_szp16 (regs.byteregs[regah] * oper1 + regs.byteregs[regal]);
+                        sf = 0;
+                        break;
+
+                    case 0xD6:    /* D6 XLAT on V20/V30, SALC on 8086/8088 */
+#ifndef CPU_V20
+                        regs.byteregs[regal] = cf ? 0xFF : 0x00;
+                        break;
+#endif
+
+                    case 0xD7:    /* D7 XLAT */
+//                        regs.byteregs[regal] = read86(useseg * 16 + (regs.wordregs[regbx]) + regs.byteregs[regal]);
+                        regs.byteregs[regal] = get_mbyte(useseg * 16 + (regs.wordregs[regbx]) + regs.byteregs[regal]);
+                        break;
+
+                    case 0xD8:
+                    case 0xD9:
+                    case 0xDA:
+                    case 0xDB:
+                    case 0xDC:
+                    case 0xDE:
+                    case 0xDD:
+                    case 0xDF:    /* escape to x87 FPU (unsupported) */
+                        modregrm();
+                        break;
+
+                    case 0xE0:    /* E0 LOOPNZ Jb */
+                        temp16 = signext (getmem8 (segregs[regcs], IP) );
+                        StepIP (1);
+                        putreg16 (regcx, getreg16 (regcx) - 1);
+                        if ( (getreg16 (regcx) ) && !zf) {
+                                IP = IP + temp16;
+                            }
+                        break;
+
+                    case 0xE1:    /* E1 LOOPZ Jb */
+                        temp16 = signext (getmem8 (segregs[regcs], IP) );
+                        StepIP (1);
+                        putreg16 (regcx, (getreg16 (regcx) ) - 1);
+                        if ( (getreg16 (regcx) ) && (zf == 1) ) {
+                                IP = IP + temp16;
+                            }
+                        break;
+
+                    case 0xE2:    /* E2 LOOP Jb */
+                        temp16 = signext (getmem8 (segregs[regcs], IP) );
+                        StepIP (1);
+                        putreg16 (regcx, (getreg16 (regcx) ) - 1);
+                        if (getreg16 (regcx) ) {
+                                IP = IP + temp16;
+                            }
+                        break;
+
+                    case 0xE3:    /* E3 JCXZ Jb */
+                        temp16 = signext (getmem8 (segregs[regcs], IP) );
+                        StepIP (1);
+                        if (! (getreg16 (regcx) ) ) {
+                                IP = IP + temp16;
+                            }
+                        break;
+
+                    case 0xE4:    /* E4 IN regs.byteregs[regal] Ib */
+                        port = DATA8 = oper1b = getmem8 (segregs[regcs], IP);
+                        StepIP (1);
+//                        regs.byteregs[regal] = (uint8) portin (oper1b);
+                        regs.byteregs[regal] = dev_table[oper1b].routine(0, 0, dev_table[oper1b].devnum & 0xff);
+                        break;
+
+                    case 0xE5:    /* E5 IN eAX Ib */
+                        port = DATA8 = oper1b = getmem8 (segregs[regcs], IP);
+                        StepIP (1);
+//                        putreg16 (regax, portin16 (oper1b) );
+//                        putreg16 (regax, 
+                        putreg8(regal, dev_table[oper1b+1].routine(0, 0, dev_table[oper1b+1].devnum & 0xff));
+                        putreg8(regah, dev_table[oper1b].routine(0, 0, dev_table[oper1b].devnum & 0xff));
+                        break;
+
+                    case 0xE6:    /* E6 OUT Ib regs.byteregs[regal] */
+                        port = DATA8 = oper1b = getmem8 (segregs[regcs], IP);
+                        StepIP (1);
+//                        portout (oper1b, regs.byteregs[regal]);
+                        dev_table[oper1b].routine(1, regs.byteregs[regal], dev_table[oper1b].devnum & 0xff);
+                        break;
+
+                    case 0xE7:    /* E7 OUT Ib eAX */
+                        port = DATA8 = oper1b = getmem8 (segregs[regcs], IP);
+                        StepIP (1);
+//                        portout16 (oper1b, (getreg16 (regax) ) );
+                        dev_table[oper1b].routine(1, regs.byteregs[regah], dev_table[oper1b].devnum & 0xff);
+                        dev_table[oper1b+1].routine(1, regs.byteregs[regal], dev_table[oper1b+1].devnum & 0xff);
+                        break;
+
+                    case 0xE8:    /* E8 CALL Jv */
+                        oper1 = getmem16 (segregs[regcs], IP);
+                        StepIP (2);
+                        push (IP);
+                        IP = IP + oper1;
+                        break;
+
+                    case 0xE9:    /* E9 JMP Jv */
+                        oper1 = getmem16 (segregs[regcs], IP);
+                        StepIP (2);
+                        IP = IP + oper1;
+                        break;
+
+                    case 0xEA:    /* EA JMP Ap */
+                        oper1 = getmem16 (segregs[regcs], IP);
+                        StepIP (2);
+                        oper2 = getmem16 (segregs[regcs], IP);
+                        IP = oper1;
+                        CS = segregs[regcs] = oper2;
+                        break;
+
+                    case 0xEB:    /* EB JMP Jb */
+                        oper1 = signext (getmem8 (segregs[regcs], IP) );
+                        StepIP (1);
+                        IP = IP + oper1;
+                        break;
+
+                    case 0xEC:    /* EC IN regs.byteregs[regal] regdx */
+                        port = oper1 = (getreg16 (regdx) );
+//                        regs.byteregs[regal] = (uint8) portin (oper1);
+                        regs.byteregs[regal] = dev_table[oper1].routine(0, 0, dev_table[oper1].devnum & 0xff);
+                        break;
+
+                    case 0xED:    /* ED IN eAX regdx */
+                        port = oper1 = (getreg16 (regdx) );
+//                        putreg16 (regax, portin16 (oper1) );
+                        regs.byteregs[regah] = dev_table[oper1].routine(0, 0, dev_table[oper1].devnum & 0xff);
+                        regs.byteregs[regal] = dev_table[oper1+1].routine(0, 0, dev_table[oper1+1].devnum & 0xff);
+                        break;
+
+                    case 0xEE:    /* EE OUT regdx regs.byteregs[regal] */
+                        port = oper1 = (getreg16 (regdx) );
+//                        portout (oper1, regs.byteregs[regal]);
+                        dev_table[oper1].routine(1, regs.byteregs[regal], dev_table[oper1].devnum & 0xff);
+                        break;
+
+                    case 0xEF:    /* EF OUT regdx eAX */
+                        port = oper1 = (getreg16 (regdx) );
+//                        portout16 (oper1, (getreg16 (regax) ) );
+                        dev_table[oper1].routine(1, regs.byteregs[regah], dev_table[oper1].devnum & 0xff);
+                        dev_table[oper1+1].routine(1, regs.byteregs[regal], dev_table[oper1+1].devnum & 0xff);
+                        break;
+
+                    case 0xF0:    /* F0 LOCK */
+                        break;
+
+                    case 0xF4:    /* F4 HLT */
+                        reason = STOP_HALT;
+                        IP--;
+                        break;
+
+                    case 0xF5:    /* F5 CMC */
+                        if (!cf) {
+                                cf = 1;
+                            }
+                        else {
+                                cf = 0;
+                            }
+                        break;
+
+                    case 0xF6:    /* F6 GRP3a Eb */
+                        modregrm();
+                        oper1b = readrm8 (RM);
+                        op_grp3_8();
+                        if ( (REGX > 1) && (REGX < 4) ) {
+                                writerm8 (RM, res8);
+                            }
+                        break;
+
+                    case 0xF7:    /* F7 GRP3b Ev */
+                        modregrm();
+                        oper1 = readrm16 (RM);
+                        op_grp3_16();
+                        if ( (REGX > 1) && (REGX < 4) ) {
+                                writerm16 (RM, res16);
+                            }
+                        break;
+
+                    case 0xF8:    /* F8 CLC */
+                        cf = 0;
+                        break;
+
+                    case 0xF9:    /* F9 STC */
+                        cf = 1;
+                        break;
+
+                    case 0xFA:    /* FA CLI */
+                        ifl = 0;
+                        break;
+
+                    case 0xFB:    /* FB STI */
+                        ifl = 1;
+                        break;
+
+                    case 0xFC:    /* FC CLD */
+                        df = 0;
+                        break;
+
+                    case 0xFD:    /* FD STD */
+                        df = 1;
+                        break;
+
+                    case 0xFE:    /* FE GRP4 Eb */
+                        modregrm();
+                        oper1b = readrm8 (RM);
+                        oper2b = 1;
+                        if (!REGX) {
+                                tempcf = cf;
+                                res8 = oper1b + oper2b;
+                                flag_add8 (oper1b, oper2b);
+                                cf = tempcf;
+                                writerm8 (RM, res8);
+                            }
+                        else {
+                                tempcf = cf;
+                                res8 = oper1b - oper2b;
+                                flag_sub8 (oper1b, oper2b);
+                                cf = tempcf;
+                                writerm8 (RM, res8);
+                            }
+                        break;
+
+                    case 0xFF:    /* FF GRP5 Ev */
+                        modregrm();
+                        oper1 = readrm16 (RM);
+                        op_grp5();
+                        break;
+
                     default:
+#ifdef CPU_V20
+                        intcall86 (6); /* trip invalid OP exception (this occurs on the 80186+, 8086/8088 CPUs treat them as NOPs. */
+                                       /* technically they aren't exactly like NOPs in most cases, but for our pursoses, that's accurate enough. */
+#endif
+                        if (verbose) {
+                                printf ("Illegal OP: %02X @ %04X:%04X\n", OP, SEG, OFF);
+                            }
                         break;
                 }
-            }
-            if (i8088_dev.dctrl & DEBUG_reg) {
-                sim_printf("\nRegs: AX=%04X BX=%04X CX=%04X DX=%04X SP=%04X BP=%04X SI=%04X DI=%04X IP=%04X\n",
-                    AX, BX, CX, DX, SP, BP, SI, DI, IP);
-                sim_printf("Segs: CS=%04X DS=%04X ES=%04X SS=%04X Flags: %04X\n", CS, DS, ES, SS, PSW);
-            }
-        }
-/* Simulation halted */
+                if (i8088_dev.dctrl & DEBUG_asm) {
+                    AX = (getreg16 (regax) );
+                    BX = (getreg16 (regbx) );
+                    CX = (getreg16 (regcx) );
+                    DX = (getreg16 (regdx) );
+                    SP = (getreg16 (regsp) );
+                    BP = (getreg16 (regbp) );
+                    SI = (getreg16 (regsi) );
+                    DI = (getreg16 (regdi) );
+                    DISP = temp16;
+                    PSW = makeflagsword();
+                    do_trace();
+                }
+                if (i8088_dev.dctrl & DEBUG_reg) {
+                    sim_printf("Regs: AX=%04X BX=%04X CX=%04X DX=%04X SP=%04X BP=%04X SI=%04X DI=%04X IP=%04X\n",
+                        AX, BX, CX, DX, SP, BP, SI, DI, IP);
+                    sim_printf("Segs: CS=%04X DS=%04X ES=%04X SS=%04X Flags: %04X\n", CS, DS, ES, SS, PSW);
+                }
 
+//            if (!running) {
+//                    return;
+//                }
+//        }
+    }
     saved_PC = IP;
     return reason;
-}
-
-/* emulation subfunctions */
-
-int32 sign_ext(int32 val)
-{
-    int32 res;
-
-    res = val;
-    if (val & 0x80)
-        res |= 0xFF00;
-    return res;
-}
-
-int32 fetch_byte(int32 flag)
-{
-    uint8 val;
-
-    val = get_smbyte(SEG_CS, IP) & 0xFF; /* fetch byte */
-    if (i8088_dev.dctrl & DEBUG_asm) {  /* display source code */
-        switch (flag) {
-            case 0:                     /* opcode fetch */
-//                if (i8088_dev.dctrl & DEBUG_asm) 
-//                    sim_printf("%04X:%04X %02X  %s ", CS, IP, val, opcode[val]);
-                break;
-            case 1:                     /* byte operand fetch */
-//                if (i8088_dev.dctrl & DEBUG_asm) 
-//                    sim_printf("0%02XH", val);
-                break;
-        }
-    }
-    IP++;                           /* increment IP */
-    IP &= ADDRMASK16;
-    return val;
-}
-
-int32 fetch_word(void)
-{
-    uint16 val;
-
-    val = get_smbyte(SEG_CS, IP) & 0xFF; /* fetch low byte */
-    val |= get_smbyte(SEG_CS, IP + 1) << 8; /* fetch high byte */
-//    if (i8088_dev.dctrl & DEBUG_asm)
-//        sim_printf("0%04XH", val);
-    IP += 2;;                           /* increment IP */
-    IP &= ADDRMASK16;
-    return val;
-}
-
-/* calculate parity on a 8- or 16-bit value */
-
-int32 parity(int32 val)
-{
-    int32 bc = 0;
-
-    if (val & 0x0001) bc++;
-    if (val & 0x0002) bc++;
-    if (val & 0x0004) bc++;
-    if (val & 0x0008) bc++;
-    if (val & 0x0010) bc++;
-    if (val & 0x0020) bc++;
-    if (val & 0x0040) bc++;
-    if (val & 0x0080) bc++;
-    if (val & 0x0100) bc++;
-    if (val & 0x0200) bc++;
-    if (val & 0x0400) bc++;
-    if (val & 0x0800) bc++;
-    if (val & 0x1000) bc++;
-    if (val & 0x2000) bc++;
-    if (val & 0x4000) bc++;
-    if (val & 0x8000) bc++;
-    return bc & 1;
-}
-
-void i86_intr_raise(uint8 num)
-{
-    /* do nothing for now */
-}
-
-/* return byte register */
-
-uint32 get_rbyte(uint32 reg)
-{
-    uint32 val = 0;
-
-    switch(reg) {
-        case 0: val = AL; break;
-        case 1: val = CL; break;
-        case 2: val = DL; break;
-        case 3: val = BL; break;
-        case 4: val = AH; break;
-        case 5: val = CH; break;
-        case 6: val = DH; break;
-        case 7: val = BH; break;
-    }
-    return val;
-}
-
-/* return word register - added segment registers as 8-11 */
-
-uint32 get_rword(uint32 reg)
-{
-    uint32 val = 0;
-
-    switch(reg) {
-        case 0: val = AX; break;
-        case 1: val = CX; break;
-        case 2: val = DX; break;
-        case 3: val = BX; break;
-        case 4: val = SP; break;
-        case 5: val = BP; break;
-        case 6: val = SI; break;
-        case 7: val = DI; break;
-        case 8: val = CS; break;
-        case 9: val = DS; break;
-        case 10: val = ES; break;
-        case 11: val = SS; break;
-    }
-    return val;
-}
-
-/* set byte register */
-
-void put_rbyte(uint32 reg, uint32 val)
-{
-    val &= 0xFF;                            /* force byte */
-    switch(reg){
-        case 0: AL = val; break;
-        case 1: CL = val; break;
-        case 2: DL = val; break;
-        case 3: BL = val; break;
-        case 4: AH = val; break;
-        case 5: CH = val; break;
-        case 6: DH = val; break;
-        case 7: BH = val; break;
-    }
-}
-
-/* set word register */
-
-void put_rword(uint32 reg, uint32 val)
-{
-    val &= 0xFFFF;                          /* force word */
-    switch(reg){
-        case 0: AX = val; break;
-        case 1: CX = val; break;
-        case 2: DX = val; break;
-        case 3: BX = val; break;
-        case 4: SP = val; break;
-        case 5: BP = val; break;
-        case 6: SI = val; break;
-        case 7: DI = val; break;
-    }
-}
-
-/* set seg_reg as required for EA */
-
-void set_segreg(uint32 reg)
-{
-    if (seg_ovr)
-        seg_reg = seg_ovr;
-    else
-        seg_reg = seg_ovr = reg;
-}
-
-/* return effective address from mrr - also set seg_reg */
-
-uint32 get_ea(uint32 mrr)
-{
-    uint32 MOD, REG, RM, DISP, EA = 0;
-
-    get_mrr_dec(mrr, &MOD, &REG, &RM);
-    switch(MOD) {
-        case 0:             /* DISP = 0 */
-            DISP = 0;
-            switch(RM) {
-                case 0:
-                    EA = BX + SI;
-                    set_segreg(SEG_DS);
-                    break;
-                case 1:
-                    EA = BX + DI; 
-                    set_segreg(SEG_DS);
-                    break;
-                case 2:
-                    EA = BP + SI;
-                    set_segreg(SEG_SS);
-                    break;
-                case 3:
-                    EA = BP + DI;
-                    set_segreg(SEG_SS);
-                    break;
-                case 4:
-                    EA = SI;
-                    set_segreg(SEG_DS);
-                    break;
-                case 5:
-                    EA = DI;
-                    set_segreg(SEG_ES);
-                    break;
-                case 6:
-                    DISP = fetch_word();
-                    EA = DISP;
-                    set_segreg(SEG_DS);
-                    break;
-                case 7:
-                    EA = BX;
-                    set_segreg(SEG_DS);
-                    break;
-            }
-            break;
-        case 1:             /* DISP is byte */
-            DISP = fetch_byte(1);
-            switch(RM) {
-                case 0:
-                    EA = BX + SI + DISP;
-                    set_segreg(SEG_DS);
-                    break;
-                case 1:
-                    EA = BX + DI + DISP; 
-                    set_segreg(SEG_DS);
-                    break;
-                case 2:
-                    EA = BP + SI + DISP;
-                    set_segreg(SEG_SS);
-                    break;
-                case 3:
-                    EA = BP + DI + DISP;
-                    set_segreg(SEG_SS);
-                    break;
-                case 4:
-                    EA = SI + DISP;
-                    set_segreg(SEG_DS);
-                    break;
-                case 5:
-                    EA = DI + DISP;
-                    set_segreg(SEG_ES);
-                    break;
-                case 6:
-                    EA = BP + DISP;
-                    set_segreg(SEG_SS);
-                    break;
-                case 7:
-                    EA = BX + DISP;
-                    set_segreg(SEG_DS);
-                    break;
-            }
-            break;
-        case 2:             /* DISP is word */
-            DISP = fetch_word();
-            switch(RM) {
-                case 0:
-                    EA = BX + SI + DISP;
-                    set_segreg(SEG_DS);
-                    break;
-                case 1:
-                    EA = BX + DI + DISP; 
-                    set_segreg(SEG_DS);
-                    break;
-                case 2:
-                    EA = BP + SI + DISP;
-                    set_segreg(SEG_SS);
-                    break;
-                case 3:
-                    EA = BP + DI + DISP;
-                    set_segreg(SEG_SS);
-                    break;
-                case 4:
-                    EA = SI + DISP;
-                    set_segreg(SEG_DS);
-                    break;
-                case 5:
-                    EA = DI + DISP;
-                    set_segreg(SEG_ES);
-                    break;
-                case 6:
-                    EA = BP + DISP;
-                    set_segreg(SEG_SS);
-                    break;
-                case 7:
-                    EA = BX + DISP;
-                    set_segreg(SEG_SS);
-                    break;
-            }
-            break;
-        case 3:             /* RM is register field */
-            break;
-    }
-//    if (i8088_dev.dctrl & DEBUG_level1) 
-//        sim_printf("get_ea: DISP=%04X EA=%04X\n",
-//            DISP, EA);
-    return EA;
-}
-/*  return mod, reg and rm field from mrr */
-
-void get_mrr_dec(uint32 mrr, uint32 *mod, uint32 *reg, uint32 *rm)
-{
-    *mod = (mrr >> 6) & 0x3;
-    *reg = (mrr >> 3) & 0x7;
-    *rm = mrr & 0x7;
-//    if (i8088_dev.dctrl & DEBUG_level1) 
-//        sim_printf("get_mrr_dec: MRR=%02X MOD=%02X REG=%02X R/M=%02X\n",
-//            mrr, *mod, *reg, *rm);
-}
-
-/* decode byte register for disassembly */
-
-void rm_byte_dec(uint32 rm)
-{
-    switch (rm) {
-        case 0:
-            sim_printf("AL");
-            break;
-        case 1:
-            sim_printf("CL");
-            break;
-        case 2:
-            sim_printf("DL");
-            break;
-        case 3:
-            sim_printf("BL");
-            break;
-        case 4:
-            sim_printf("AH");
-            break;
-        case 5:
-            sim_printf("CH");
-            break;
-        case 6:
-            sim_printf("DH");
-            break;
-        case 7:
-            sim_printf("CH");
-            break;
-    }
-}
-/* decode word register for disassembly */
-
-void rm_word_dec(uint32 rm)
-{
-    switch (rm) {
-        case 0:
-            sim_printf("AX");
-            break;
-        case 1:
-            sim_printf("CX");
-            break;
-        case 2:
-            sim_printf("DX");
-            break;
-        case 3:
-            sim_printf("BX");
-            break;
-        case 4:
-            sim_printf("SP");
-            break;
-        case 5:
-            sim_printf("BP");
-            break;
-        case 6:
-            sim_printf("SI");
-            break;
-        case 7:
-            sim_printf("DI");
-            break;
-    }
-}
-
-/* decode segment register for disassembly */
-
-void rm_seg_dec(uint32 rm)
-{
-    switch (rm) {
-        case 0:
-            sim_printf("ES");
-            break;
-        case 1:
-            sim_printf("CS");
-            break;
-        case 2:
-            sim_printf("SS");
-            break;
-        case 3:
-            sim_printf("DS");
-            break;
-    }
-}
-
-/* 
-  Most of the primitive algorithms were pulled from the GDE Dos/IP Emulator by Jim Hudgens
-*/
-
-/* aad primitive */
-uint8 aad_word(uint16 d)
-{
-    uint16 VAL;
-    uint8  HI, LOW;
-
-    HI = (d >> 8) & 0xFF;
-    LOW = d & 0xFF;
-    VAL = LOW + 10 * HI;
-    CONDITIONAL_SET_FLAG(VAL & 0x80, SF);
-    CONDITIONAL_SET_FLAG(VAL == 0, ZF);
-    CONDITIONAL_SET_FLAG(parity(VAL & 0xFF), PF);
-    return (uint8) VAL;
-}
-
-/* aam primitive */
-uint16 aam_word(uint8 d)
-{
-    uint16 VAL, HI;
-
-    HI = d / 10;
-    VAL = d % 10;
-    VAL |= (HI << 8);
-    CONDITIONAL_SET_FLAG(VAL & 0x80, SF);
-    CONDITIONAL_SET_FLAG(VAL == 0, ZF);
-    CONDITIONAL_SET_FLAG(parity(VAL & 0xFF), PF);
-    return VAL;
-}
-
-/* add with carry byte primitive */
-uint8 adc_byte(uint8 d, uint8 s)
-{
-    register uint16 res;
-    register uint16 cc;
-
-    if (GET_FLAG(CF))
-        res = 1 + d + s;
-    else
-        res =  d + s;
-    /* set the flags based on the result */
-    CONDITIONAL_SET_FLAG(res & 0x0100, CF);
-    CONDITIONAL_SET_FLAG((res & 0xff) == 0, ZF);
-    CONDITIONAL_SET_FLAG(res & 0x80, SF);
-    CONDITIONAL_SET_FLAG(parity(res & 0xff), PF);
-    /* calculate the carry chain  SEE NOTE AT TOP.*/
-    cc =  (s & d) | ((~res) & (s | d));
-    /* set the flags based on the carry chain */
-    CONDITIONAL_SET_FLAG(xor_3_tab[(cc >> 6) & 0x3], OF);
-    CONDITIONAL_SET_FLAG(cc & 0x08, AF);
-    return (uint8) res;
-}
-
-/* add with carry word primitive */
-uint16 adc_word(uint16 d, uint16 s)
-{
-    register uint32 res;
-    register uint32 cc;
-
-    if (GET_FLAG(CF))
-        res = 1 + d + s;
-    else
-        res =  d + s;
-    /* set the flags based on the result */
-    CONDITIONAL_SET_FLAG(res & 0x10000, CF);
-    CONDITIONAL_SET_FLAG((res & 0xFFFF) == 0, ZF);
-    CONDITIONAL_SET_FLAG(res & 0x8000, SF);
-    CONDITIONAL_SET_FLAG(parity(res & 0xFF), PF);
-    /* calculate the carry chain  SEE NOTE AT TOP.*/
-    cc =  (s & d) | ((~res) & (s | d));
-    /* set the flags based on the carry chain */
-    CONDITIONAL_SET_FLAG(xor_3_tab[(cc >> 14) & 0x3], OF);
-    CONDITIONAL_SET_FLAG(cc & 0x08, AF);
-    return res;
-}
-
-/* add byte primitive */
-uint8 add_byte(uint8 d, uint8 s)
-{
-    register uint16 res;
-    register uint16 cc;
-
-    res = d + s;
-    /* set the flags based on the result */
-    CONDITIONAL_SET_FLAG(res & 0x0100, CF);
-    CONDITIONAL_SET_FLAG((res & 0xFF) == 0, ZF);
-    CONDITIONAL_SET_FLAG(res & 0x80, SF);
-    CONDITIONAL_SET_FLAG(parity(res & 0xFF), PF);
-    /* calculate the carry chain  SEE NOTE AT TOP.*/
-    cc =  (s & d) | ((~res) & (s | d));
-    /* set the flags based on the carry chain */
-    CONDITIONAL_SET_FLAG(xor_3_tab[(cc >> 6) & 0x3], OF);
-    CONDITIONAL_SET_FLAG(cc & 0x08, AF);
-    return (uint8) res;
-}
-
-/* add word primitive */
-uint16 add_word(uint16 d, uint16 s)
-{
-    register uint32 res;
-    register uint32 cc;
-
-    res = d + s;
-    /* set the flags based on the result */
-    CONDITIONAL_SET_FLAG(res & 0x10000, CF);
-    CONDITIONAL_SET_FLAG((res & 0xFFFF) == 0, ZF);
-    CONDITIONAL_SET_FLAG(res & 0x8000, SF);
-    CONDITIONAL_SET_FLAG(parity(res & 0xff), PF);
-    /* calculate the carry chain  SEE NOTE AT TOP.*/
-    cc =  (s & d) | ((~res) & (s | d));
-    /* set the flags based on the carry chain */
-    CONDITIONAL_SET_FLAG(xor_3_tab[(cc >> 14) & 0x3], OF);
-    CONDITIONAL_SET_FLAG(cc & 0x08, AF);
-    return res;
-}
-
-/* and byte primitive */
-uint8 and_byte(uint8 d, uint8 s)
-{
-    register uint8 res;
-    res = d & s;
-
-    /* clear flags  */
-    CLR_FLAG(OF);
-    CLR_FLAG(CF);
-    /* set the flags based on the result */
-    CONDITIONAL_SET_FLAG(res & 0x80, SF);
-    CONDITIONAL_SET_FLAG(res == 0, ZF);
-    CONDITIONAL_SET_FLAG(parity(res), PF);
-    return res;
-}
-
-/* and word primitive */
-uint16 and_word(uint16 d, uint16 s)
-{
-    register uint16 res;
-    res = d & s;
-
-    /* clear flags  */
-    CLR_FLAG(OF);
-    CLR_FLAG(CF);
-    /* set the flags based on the result */
-    CONDITIONAL_SET_FLAG(res & 0x8000, SF);
-    CONDITIONAL_SET_FLAG(res == 0, ZF);
-    CONDITIONAL_SET_FLAG(parity(res & 0xFF), PF);
-    return res;
-}
-
-/* cmp byte primitive */
-uint8 cmp_byte(uint8 d, uint8 s)
-{
-    register uint32 res;
-    register uint32 bc;
-
-    res = d - s;
-    /* clear flags  */
-    CLR_FLAG(CF);
-    /* set the flags based on the result */
-    CONDITIONAL_SET_FLAG(res & 0x80, SF);
-    CONDITIONAL_SET_FLAG((res & 0xFF)==0, ZF);
-    CONDITIONAL_SET_FLAG(parity(res & 0xFF), PF);
-    /* calculate the borrow chain.  See note at top */
-    bc= (res&(~d|s))|(~d&s);
-    /* set flags based on borrow chain */
-    CONDITIONAL_SET_FLAG(bc & 0x80, CF);
-    CONDITIONAL_SET_FLAG(xor_3_tab[(bc >> 6) & 0x3], OF);
-    CONDITIONAL_SET_FLAG(bc & 0x8, AF);
-    return d;  /* long story why this is needed.  Look at opcode
-          0x80 in ops.c, for an idea why this is necessary.*/
-}
-
-/* cmp word primitive */
-uint16 cmp_word(uint16 d, uint16 s)
-{
-    register uint32 res; 
-    register uint32 bc;
-
-    res = d - s;
-    /* set the flags based on the result */
-    CONDITIONAL_SET_FLAG(res & 0x8000, SF);
-    CONDITIONAL_SET_FLAG((res & 0xFFFF) == 0, ZF);
-    CONDITIONAL_SET_FLAG(parity(res & 0xFF), PF);
-    /* calculate the borrow chain.  See note at top */
-    bc = (res & (~d | s)) | (~d  &s);
-    /* set flags based on borrow chain */
-    CONDITIONAL_SET_FLAG(bc & 0x8000, CF);
-    CONDITIONAL_SET_FLAG(xor_3_tab[(bc >> 14) & 0x3], OF);
-    CONDITIONAL_SET_FLAG(bc & 0x8, AF);
-    return d;  /* long story why this is needed.  Look at opcode
-          0x80 in ops.c, for an idea why this is necessary.*/
-}
-
-/* dec byte primitive */
-uint8 dec_byte(uint8 d)
-{
-    register uint32 res;
-    register uint32 bc;
-
-    res = d - 1;
-    /* set the flags based on the result */
-    CONDITIONAL_SET_FLAG(res & 0x80, SF);
-    CONDITIONAL_SET_FLAG((res & 0xff)==0, ZF);
-    CONDITIONAL_SET_FLAG(parity(res & 0xff), PF);
-    /* calculate the borrow chain.  See note at top */
-    /* based on sub_byte, uses s=1.  */
-    bc = (res & (~d | 1)) | (~d & 1);
-    /* carry flag unchanged */
-    /* set flags based on borrow chain */
-    CONDITIONAL_SET_FLAG(xor_3_tab[(bc >> 6) & 0x3], OF);
-    CONDITIONAL_SET_FLAG(bc & 0x8, AF);
-    return res;
-}
-
-/* dec word primitive */
-uint16 dec_word(uint16 d)
-{
-    register uint32 res;
-    register uint32 bc;
-
-    res = d - 1;
-    /* set the flags based on the result */
-    CONDITIONAL_SET_FLAG(res & 0x8000, SF);
-    CONDITIONAL_SET_FLAG((res & 0xffff) == 0, ZF);
-    CONDITIONAL_SET_FLAG(parity(res & 0xff), PF);
-    /* calculate the borrow chain.  See note at top */
-    /* based on the sub_byte routine, with s==1 */
-    bc = (res & (~d | 1)) | (~d & 1);
-    /* carry flag unchanged */
-    /* set flags based on borrow chain */
-    CONDITIONAL_SET_FLAG(xor_3_tab[(bc >> 14) & 0x3], OF);
-    CONDITIONAL_SET_FLAG(bc & 0x8, AF);
-    return res;
-}
-
-/* div byte primitive */
-void div_byte(uint8 s)
-{
-    uint32 dvd, dvs, div, mod;
-
-    dvs = s;
-    dvd =  AX;
-    if (s == 0) {
-       i86_intr_raise(0);
-       return;
-    }
-    div = dvd / dvs;
-    mod = dvd % dvs;
-    if (abs(div) > 0xFF) {
-       i86_intr_raise(0);
-       return;
-    }
-    /* Undef --- Can't hurt */
-    CLR_FLAG(SF);
-    CONDITIONAL_SET_FLAG(div == 0, ZF);
-    AL = (uint8)div;
-    AH = (uint8)mod;
-}
-
-/* div word primitive */
-void div_word(uint16 s)
-{
-    uint32 dvd, dvs, div, mod;
-
-    dvd = DX;
-    dvd = (dvd << 16) | AX;
-    dvs = s;
-    if (dvs == 0) {
-       i86_intr_raise(0);
-       return;
-    }
-    div = dvd / dvs;
-    mod = dvd % dvs;
-    if (abs(div) > 0xFFFF) {
-       i86_intr_raise(0);
-       return;
-    }
-    /* Undef --- Can't hurt */
-    CLR_FLAG(SF);
-    CONDITIONAL_SET_FLAG(div == 0, ZF);
-    AX = div;
-    DX = mod;
-}
-
-/* idiv byte primitive */
-void idiv_byte(uint8 s)
-{
-    int32 dvd, div, mod;
-
-    dvd = (int16)AX;
-    if (s == 0) {
-       i86_intr_raise(0);
-       return;
-    }
-    div = dvd / (int8)s;
-    mod = dvd % (int8)s;
-    if (abs(div) > 0x7F) {
-       i86_intr_raise(0);
-       return;
-    }
-    /* Undef --- Can't hurt */
-    CONDITIONAL_SET_FLAG(div & 0x80, SF);
-    CONDITIONAL_SET_FLAG(div == 0, ZF);
-    AL = (int8)div;
-    AH = (int8)mod;
-}
-
-/* idiv word primitive */
-void idiv_word(uint16 s)
-{
-    int32 dvd, dvs, div, mod;
-
-    dvd = DX;
-    dvd = (dvd << 16) | AX;
-    if (s == 0) {
-       i86_intr_raise(0);
-       return;
-    }
-    dvs = (int16)s;
-    div = dvd / dvs;
-    mod = dvd % dvs;
-    if (abs(div) > 0x7FFF) {
-       i86_intr_raise(0);
-       return;
-    }
-    /* Undef --- Can't hurt */
-    CONDITIONAL_SET_FLAG(div & 0x8000, SF);
-    CONDITIONAL_SET_FLAG(div == 0, ZF);
-    AX = div;
-    DX = mod;
-}
-
-/* imul byte primitive */
-void imul_byte(uint8 s)
-{
-    int16 res;
-
-    res = (int8)AL * (int8)s;
-    AX = res;
-    /* Undef --- Can't hurt */
-    CONDITIONAL_SET_FLAG(res & 0x8000, SF);
-    CONDITIONAL_SET_FLAG(res == 0, ZF);
-    if ( AH == 0 ||  AH == 0xFF) {
-       CLR_FLAG(CF);
-       CLR_FLAG(OF);
-    } else {
-       SET_FLAG(CF);
-       SET_FLAG(OF);
-    }
-}
-
-/* imul word primitive */
-void imul_word(uint16 s)
-{
-    int32 res;
-
-    res = (int16)AX * (int16)s;
-    AX = res & 0xFFFF;
-    DX = (res >> 16) & 0xFFFF;
-    /* Undef --- Can't hurt */
-    CONDITIONAL_SET_FLAG(res & 0x80000000, SF);
-    CONDITIONAL_SET_FLAG(res == 0, ZF);
-    if (DX == 0 || DX == 0xFFFF) {
-       CLR_FLAG(CF);
-       CLR_FLAG(OF);
-    } else {
-       SET_FLAG(CF);
-       SET_FLAG(OF);
-    }
-}
-
-/* inc byte primitive */
-uint8 inc_byte(uint8 d)
-{
-    register uint32 res;
-    register uint32 cc;
-
-    res = d + 1;
-    /* set the flags based on the result */
-    CONDITIONAL_SET_FLAG((res & 0xFF) == 0, ZF);
-    CONDITIONAL_SET_FLAG(res & 0x80, SF);
-    CONDITIONAL_SET_FLAG(parity(res & 0xFF), PF);
-    /* calculate the carry chain  SEE NOTE AT TOP.*/
-    cc =  ((1 & d) | (~res)) & (1 | d);
-    /* set the flags based on the carry chain */
-    CONDITIONAL_SET_FLAG(xor_3_tab[(cc >> 6) & 0x3], OF);
-    CONDITIONAL_SET_FLAG(cc & 0x8, AF);
-    return  res;
-}
-
-/* inc word primitive */
-uint16 inc_word(uint16 d)
-{
-    register uint32 res;
-    register uint32 cc;
-
-    res = d + 1;
-    /* set the flags based on the result */
-    CONDITIONAL_SET_FLAG((res & 0xFFFF) == 0, ZF);
-    CONDITIONAL_SET_FLAG(res & 0x8000,  SF);
-    CONDITIONAL_SET_FLAG(parity(res & 0xff), PF);
-    /* calculate the carry chain  SEE NOTE AT TOP.*/
-    cc =  (1 & d) | ((~res) & (1 | d));
-    /* set the flags based on the carry chain */
-    CONDITIONAL_SET_FLAG(xor_3_tab[(cc >> 14) & 0x3], OF);
-    CONDITIONAL_SET_FLAG(cc & 0x8, AF);
-    return res ;
-}
-
-/* mul byte primitive */
-void mul_byte(uint8 s)
-{
-    uint16 res;
-
-    res = AL * s;
-    AX = res;
-    /* Undef --- Can't hurt */
-    CLR_FLAG(SF);
-    CONDITIONAL_SET_FLAG(res == 0, ZF);
-    if (AH == 0) {
-       CLR_FLAG(CF);
-       CLR_FLAG(OF);
-    } else {
-       SET_FLAG(CF);
-       SET_FLAG(OF);
-    }
-}
-
-/* mul word primitive */
-void mul_word(uint16 s)
-{
-    uint32 res;
-
-    res = AX * s;
-    /* Undef --- Can't hurt */
-    CLR_FLAG(SF);
-    CONDITIONAL_SET_FLAG(res == 0, ZF);
-    AX = res & 0xFFFF;
-    DX = (res >> 16) & 0xFFFF;
-    if (DX == 0) {
-       CLR_FLAG(CF);
-       CLR_FLAG(OF);
-    } else {
-       SET_FLAG(CF);
-       SET_FLAG(OF);
-    }
-}
-
-/* neg byte primitive */
-uint8 neg_byte(uint8 s)
-{
-    register uint8 res;
-    register uint8 bc;
-
-    CONDITIONAL_SET_FLAG(s != 0, CF);
-    res = -s;
-    CONDITIONAL_SET_FLAG((res & 0xff) == 0, ZF);
-    CONDITIONAL_SET_FLAG(res & 0x80, SF);
-    CONDITIONAL_SET_FLAG(parity(res), PF);
-    /* calculate the borrow chain --- modified such that d=0. */
-    bc= res | s;
-    CONDITIONAL_SET_FLAG(xor_3_tab[(bc >> 6) & 0x3], OF);
-    CONDITIONAL_SET_FLAG(bc & 0x8, AF);
-    return res;
-}
-
-/* neg word primitive */
-uint16 neg_word(uint16 s)
-{
-    register uint16 res;
-    register uint16 bc;
-
-    CONDITIONAL_SET_FLAG(s != 0, CF);
-    res = -s;
-    CONDITIONAL_SET_FLAG((res & 0xFFFF) == 0, ZF);
-    CONDITIONAL_SET_FLAG(res & 0x8000, SF);
-    CONDITIONAL_SET_FLAG(parity(res & 0xFF), PF);
-    /* calculate the borrow chain --- modified such that d=0 */
-    bc= res | s;
-    CONDITIONAL_SET_FLAG(xor_3_tab[(bc >> 6) & 0x3], OF);
-    CONDITIONAL_SET_FLAG(bc & 0x8, AF);
-    return res;
-}
-
-/* not byte primitive */
-uint8 not_byte(uint8 s)
-{
-    return ~s;
-}
-
-/* not word primitive */
-uint16 not_word(uint16 s)
-{
-    return ~s;
-}
-
-/* or byte primitive */
-uint8 or_byte(uint8 d, uint8 s)
-{
-    register uint8 res;
-
-    res = d | s;
-    /* clear flags  */
-    CLR_FLAG(OF);
-    CLR_FLAG(CF);
-    /* set the flags based on the result */
-    CONDITIONAL_SET_FLAG(res & 0x80, SF);
-    CONDITIONAL_SET_FLAG(res == 0, ZF);
-    CONDITIONAL_SET_FLAG(parity(res), PF);
-    return res;
-}
-
-/* or word primitive */
-uint16 or_word(uint16 d, uint16 s)
-{
-    register uint16 res;
-
-    res = d | s;
-    /* clear flags  */
-    CLR_FLAG(OF);
-    CLR_FLAG(CF);
-    /* set the flags based on the result */
-    CONDITIONAL_SET_FLAG(res & 0x8000, SF);
-    CONDITIONAL_SET_FLAG(res == 0, ZF);
-    CONDITIONAL_SET_FLAG(parity(res & 0xFF), PF);
-    return res;
-}
-
-/* push word primitive */
-void push_word(uint16 val)
-{
-    SP--;
-    put_smbyte(SEG_SS, SP, val >> 8);
-    SP--;
-    put_smbyte(SEG_SS, SP, val & 0xFF);
-}
-
-/* pop word primitive */
-uint16 pop_word(void)
-{
-    register uint16 res;
-
-    //sim_printf("pop_word: entered SS=%04X SP=%04X\n", get_rword(SEG_SS), SP);
-    res = get_smbyte(SEG_SS, SP);
-    SP++;
-    //sim_printf("pop_word: first byte=%04X SS=%04X SP=%04X\n", res, get_rword(SEG_SS), SP);
-    res |= (get_smbyte(SEG_SS, SP) << 8);
-    SP++;
-    //sim_printf("pop_word: val=%04X SS=%04X SP=%04X\n", res, get_rword(SEG_SS), SP);
-    return res;
-}
-
-/* rcl byte primitive */
-uint8 rcl_byte(uint8 d, uint8 s)
-{
-    register uint32  res, cnt, mask, cf;
-
-    res = d;
-    if ((cnt = s % 9)) 
-    {
-        cf =  (d >> (8-cnt)) & 0x1;
-        res = (d << cnt) & 0xFF;
-        mask = (1<<(cnt-1)) - 1;
-        res |= (d >> (9-cnt)) & mask;
-        if (GET_FLAG(CF))
-            res |=  1 << (cnt-1);
-        CONDITIONAL_SET_FLAG(cf, CF);
-        CONDITIONAL_SET_FLAG(cnt == 1 && xor_3_tab[cf + ((res >> 6) & 0x2)], OF);
-    }
-    return res & 0xFF;
-}
-
-/* rcl word primitive */
-uint16  rcl_word(uint16 d, uint16 s)
-{
-    register uint32  res, cnt, mask, cf;
-
-    res = d;
-    if ((cnt = s % 17))
-    {
-        cf =  (d >> (16-cnt)) & 0x1;
-        res = (d << cnt) & 0xFFFF;
-        mask = (1<<(cnt-1)) - 1;
-        res |= (d >> (17-cnt)) & mask;
-        if (GET_FLAG(CF))
-            res |=  1 << (cnt-1);
-        CONDITIONAL_SET_FLAG(cf, CF);
-        CONDITIONAL_SET_FLAG(cnt == 1 && xor_3_tab[cf + ((res >> 14) & 0x2)], OF);
-    }
-    return res & 0xFFFF;
-}
-
-/* rcr byte primitive */
-uint8 rcr_byte(uint8 d, uint8 s)
-{
-    uint8 res, cnt;
-    uint8 mask, cf, ocf = 0;
-
-    res = d;
-
-    if ((cnt = s % 9)) {
-        if (cnt == 1) {
-            cf = d & 0x1;
-            ocf = GET_FLAG(CF) != 0;
-        } else
-            cf =  (d >> (cnt - 1)) & 0x1;
-        mask = (1 <<( 8 - cnt)) - 1;
-        res = (d >> cnt) & mask;
-        res |= (d << (9-cnt));
-        if (GET_FLAG(CF))
-            res |=  1 << (8 - cnt);
-        CONDITIONAL_SET_FLAG(cf, CF);
-        if (cnt == 1)
-            CONDITIONAL_SET_FLAG(xor_3_tab[ocf + ((d >> 6) & 0x2)], OF);
-    }
-    return res;
-}
-
-/* rcr word primitive */
-uint16 rcr_word(uint16 d, uint16 s)
-{
-    uint16 res, cnt;
-    uint16 mask, cf, ocf = 0;
-
-    res = d;
-    if ((cnt = s % 17)) {
-        if (cnt == 1) {
-            cf = d & 0x1;
-            ocf = GET_FLAG(CF) != 0;
-        } else
-            cf =  (d >> (cnt-1)) & 0x1;
-        mask = (1 <<( 16 - cnt)) - 1;
-        res = (d >> cnt) & mask;
-        res |= (d << (17 - cnt));
-        if (GET_FLAG(CF))
-            res |=  1 << (16 - cnt);
-        CONDITIONAL_SET_FLAG(cf, CF);
-        if (cnt == 1)
-            CONDITIONAL_SET_FLAG(xor_3_tab[ocf + ((d >> 14) & 0x2)], OF);
-    }
-    return res;
-}
-
-/* rol byte primitive */
-uint8 rol_byte(uint8 d, uint8 s)
-{
-    register uint32  res, cnt, mask;
-
-    res =d;
-
-    if ((cnt = s % 8)) {
-       res = (d << cnt);
-       mask = (1 << cnt) - 1;
-       res |= (d >> (8-cnt)) & mask;
-       CONDITIONAL_SET_FLAG(res & 0x1, CF);
-       CONDITIONAL_SET_FLAG(cnt == 1 && xor_3_tab[(res & 0x1) + ((res >> 6) & 0x2)], OF);
-    }
-    return res & 0xFF;
-}
-
-/* rol word primitive */
-uint16 rol_word(uint16 d, uint16 s)
-{
-    register uint32  res, cnt, mask;
-
-    res = d;
-    if ((cnt = s % 16)) {
-       res = (d << cnt);
-       mask = (1 << cnt) - 1;
-       res |= (d >> (16 - cnt)) & mask;
-       CONDITIONAL_SET_FLAG(res & 0x1, CF);
-       CONDITIONAL_SET_FLAG(cnt == 1 && xor_3_tab[(res & 0x1) + ((res >> 14) & 0x2)], OF);
-    }
-    return res&0xFFFF;
-}
-
-/* ror byte primitive */
-uint8 ror_byte(uint8 d, uint8 s)
-{
-    register uint32  res, cnt, mask;
-
-    res = d;
-    if ((cnt = s % 8)) {
-       res = (d << (8-cnt));
-       mask = (1 << (8-cnt)) - 1;
-       res |= (d >> (cnt)) & mask;
-       CONDITIONAL_SET_FLAG(res & 0x80, CF);
-       CONDITIONAL_SET_FLAG(cnt == 1 && xor_3_tab[(res >> 6) & 0x3], OF);
-    }
-    return res & 0xFF;
-}
-
-/* ror word primitive */
-uint16 ror_word(uint16 d, uint16 s)
-{
-    register uint32  res, cnt, mask;
-
-    res = d;
-    if ((cnt = s % 16)) {
-       res = (d << (16-cnt));
-       mask = (1 << (16-cnt)) - 1;
-       res |= (d >> (cnt)) & mask;
-       CONDITIONAL_SET_FLAG(res & 0x8000, CF);
-       CONDITIONAL_SET_FLAG(cnt == 1  && xor_3_tab[(res >> 14) & 0x3], OF);
-    }
-    return res & 0xFFFF;
-}
-
-/* shl byte primitive */
-uint8 shl_byte(uint8 d, uint8 s)
-{
-    uint32 cnt, res, cf;
-
-    if (s < 8) {
-        cnt = s % 8;
-        if (cnt > 0) {
-            res = d << cnt;
-            cf = d & (1 << (8 - cnt));
-            CONDITIONAL_SET_FLAG(cf, CF);
-            CONDITIONAL_SET_FLAG((res & 0xFF)==0, ZF);
-            CONDITIONAL_SET_FLAG(res & 0x80, SF);
-            CONDITIONAL_SET_FLAG(parity(res & 0xFF), PF);
-        } else
-            res = (uint8) d;
-        if (cnt == 1)
-            CONDITIONAL_SET_FLAG((((res & 0x80) == 0x80) ^ 
-                (GET_FLAG( CF) != 0)), OF);
-        else
-            CLR_FLAG(OF);
-    } else {
-        res = 0;
-        CONDITIONAL_SET_FLAG((s == 8) && (d & 1), CF);
-        CLR_FLAG(OF);
-        CLR_FLAG(SF);
-        CLR_FLAG(PF);
-        SET_FLAG(ZF);
-    }
-    return res & 0xFF;
-}
-
-/* shl word primitive */
-uint16 shl_word(uint16 d, uint16 s)
-{
-    uint32 cnt, res, cf;
-
-    if (s < 16) {
-        cnt = s % 16;
-        if (cnt > 0) {
-            res = d << cnt;
-            cf = d & (1<<(16-cnt));
-            CONDITIONAL_SET_FLAG(cf, CF);
-            CONDITIONAL_SET_FLAG((res & 0xFFFF) == 0, ZF);
-            CONDITIONAL_SET_FLAG(res & 0x8000, SF);
-            CONDITIONAL_SET_FLAG(parity(res & 0xFF), PF);
-        } else
-            res = (uint16) d;
-        if (cnt == 1)
-            CONDITIONAL_SET_FLAG((((res & 0x8000) == 0x8000) ^
-            (GET_FLAG(CF) != 0)), OF);
-        else
-            CLR_FLAG(OF);
-    } else {
-        res = 0;
-        CONDITIONAL_SET_FLAG((s == 16) && (d & 1), CF);
-        CLR_FLAG(OF);
-        SET_FLAG(ZF);
-        CLR_FLAG(SF);
-        CLR_FLAG(PF);
-    }
-    return res & 0xFFFF;
-}
-
-/* shr byte primitive */
-uint8 shr_byte(uint8 d, uint8 s)
-{
-    uint32 cnt, res, cf, mask;
-
-    if (s < 8) {
-        cnt = s % 8;
-        if (cnt > 0) {
-            mask = (1 << (8 - cnt)) - 1;
-            cf = d & (1 << (cnt - 1));
-            res = (d >> cnt) & mask;
-            CONDITIONAL_SET_FLAG(cf, CF);
-            CONDITIONAL_SET_FLAG((res & 0xFF) == 0, ZF);
-            CONDITIONAL_SET_FLAG(res & 0x80, SF);
-            CONDITIONAL_SET_FLAG(parity(res & 0xFF), PF);
-        } else
-            res = (uint8) d;
-        if (cnt == 1)
-            CONDITIONAL_SET_FLAG(xor_3_tab[(res >> 6) & 0x3], OF);
-        else
-            CLR_FLAG(OF);
-    } else {
-        res = 0;
-        CONDITIONAL_SET_FLAG((s == 8) && (d & 0x80), CF);
-        CLR_FLAG(OF);
-        SET_FLAG(ZF);
-        CLR_FLAG(SF);
-        CLR_FLAG(PF);
-    }
-    return res & 0xFF;
-}
-
-/* shr word primitive */
-uint16 shr_word(uint16 d, uint16 s)
-{
-    uint32 cnt, res, cf, mask;
-
-    res = d;
-    if (s < 16) {
-        cnt = s % 16;
-        if (cnt > 0) {
-            mask = (1 << (16 - cnt)) - 1;
-            cf = d & (1 << (cnt - 1));
-            res = (d >> cnt) & mask;
-            CONDITIONAL_SET_FLAG(cf, CF);
-            CONDITIONAL_SET_FLAG((res & 0xFFFF) == 0, ZF);
-            CONDITIONAL_SET_FLAG(res & 0x8000, SF);
-            CONDITIONAL_SET_FLAG(parity(res & 0xFF), PF);
-        } else
-            res = d;
-        if (cnt == 1)
-            CONDITIONAL_SET_FLAG(xor_3_tab[(res >> 14) & 0x3], OF);
-        else
-             CLR_FLAG(OF);
-    } else {
-        res = 0;
-        CONDITIONAL_SET_FLAG((s == 16) && (d & 0x8000), CF);
-        CLR_FLAG(OF);
-        SET_FLAG(ZF);
-        CLR_FLAG(SF);
-        CLR_FLAG(PF);
-    }
-    return res & 0xFFFF;
-}
-
-/* sar byte primitive */
-uint8 sar_byte(uint8 d, uint8 s)
-{
-    uint32 cnt, res, cf, mask, sf;
-
-    res = d;
-    sf = d & 0x80;
-    cnt = s % 8;
-    if (cnt > 0 && cnt < 8) {
-        mask = (1 << (8 - cnt)) - 1;
-        cf = d & (1 << (cnt -1 ));
-        res = (d >> cnt) & mask;
-        CONDITIONAL_SET_FLAG(cf, CF);
-        if (sf)
-             res |= ~mask;
-        CONDITIONAL_SET_FLAG((res & 0xFF)==0, ZF);
-        CONDITIONAL_SET_FLAG(parity(res & 0xFF), PF);
-        CONDITIONAL_SET_FLAG(res & 0x80, SF);
-    } else if (cnt >= 8) {
-        if (sf) {
-            res = 0xFF;
-            SET_FLAG(CF);
-            CLR_FLAG(ZF);
-            SET_FLAG(SF);
-            SET_FLAG(PF);
-        } else {
-            res = 0;
-            CLR_FLAG(CF);
-            SET_FLAG(ZF);
-            CLR_FLAG(SF);
-            CLR_FLAG(PF);
-        }
-    }
-    return res & 0xFF;
-}
-
-/* sar word primitive */
-uint16 sar_word(uint16 d, uint16 s)
-{
-    uint32 cnt, res, cf, mask, sf;
-
-    sf = d & 0x8000;
-    cnt = s % 16;
-    res = d;
-    if (cnt > 0 && cnt < 16) {
-        mask = (1 << (16 - cnt)) - 1;
-        cf = d & (1 << (cnt - 1));
-        res = (d >> cnt) & mask;
-        CONDITIONAL_SET_FLAG(cf, CF);
-        if (sf)
-            res |= ~mask;
-        CONDITIONAL_SET_FLAG((res & 0xFFFF) == 0, ZF);
-        CONDITIONAL_SET_FLAG(res & 0x8000, SF);
-        CONDITIONAL_SET_FLAG(parity(res & 0xFF), PF);
-    } else if (cnt >= 16) {
-        if (sf) {
-            res = 0xFFFF;
-            SET_FLAG(CF);
-            CLR_FLAG(ZF);
-            SET_FLAG(SF);
-            SET_FLAG(PF);
-        } else {
-            res = 0;
-            CLR_FLAG(CF);
-            SET_FLAG(ZF);
-            CLR_FLAG(SF);
-            CLR_FLAG(PF);
-        }
-    }
-    return res & 0xFFFF;
-}
-
-/* sbb byte primitive */
-uint8 sbb_byte(uint8 d, uint8 s)
-{
-    register uint32 res;
-    register uint32 bc;
-
-    if (GET_FLAG(CF))
-        res = d - s - 1;
-    else
-        res =  d - s;
-    /* set the flags based on the result */
-    CONDITIONAL_SET_FLAG(res & 0x80, SF);
-    CONDITIONAL_SET_FLAG((res & 0xFF) == 0, ZF);
-    CONDITIONAL_SET_FLAG(parity(res & 0xFF), PF);
-    /* calculate the borrow chain.  See note at top */
-    bc= (res&(~d|s))|(~d&s);
-    /* set flags based on borrow chain */
-    CONDITIONAL_SET_FLAG(bc & 0x80, CF);
-    CONDITIONAL_SET_FLAG(xor_3_tab[(bc >> 6) & 0x3], OF);
-    CONDITIONAL_SET_FLAG(bc & 0x8, AF);
-//    return res & 0x0FF;
-    return (uint8) res;
-}
-
-/* sbb word primitive */
-uint16 sbb_word(uint16 d, uint16 s)
-{
-    register uint32 res;
-    register uint32 bc;
-
-    if (GET_FLAG(CF))
-        res = d - s - 1;
-    else
-        res =  d - s;
-    /* set the flags based on the result */
-    CONDITIONAL_SET_FLAG(res & 0x8000, SF);
-    CONDITIONAL_SET_FLAG((res & 0xFFFF) == 0, ZF);
-    CONDITIONAL_SET_FLAG(parity(res & 0xFF), PF);
-    /* calculate the borrow chain.  See note at top */
-    bc= (res&(~d|s))|(~d&s);
-    /* set flags based on borrow chain */
-    CONDITIONAL_SET_FLAG(bc & 0x8000, CF);
-    CONDITIONAL_SET_FLAG(xor_3_tab[(bc >> 14) & 0x3], OF);
-    CONDITIONAL_SET_FLAG(bc & 0x8, AF);
-//    return res & 0xFFFF;
-    return (uint16) res;
-}
-
-/* sub byte primitive */
-uint8 sub_byte(uint8 d, uint8 s)
-{
-    register uint32 res;
-    register uint32 bc;
-
-    res = d - s;
-    /* set the flags based on the result */
-    CONDITIONAL_SET_FLAG(res & 0x80, SF);
-    CONDITIONAL_SET_FLAG((res & 0xFF) == 0, ZF);
-    CONDITIONAL_SET_FLAG(parity(res & 0xFF), PF);
-    /* calculate the borrow chain.  See note at top */
-    bc= (res&(~d|s))|(~d&s);
-    /* set flags based on borrow chain */
-    CONDITIONAL_SET_FLAG(bc & 0x80, CF);
-    CONDITIONAL_SET_FLAG(xor_3_tab[(bc >> 6) & 0x3], OF);
-    CONDITIONAL_SET_FLAG(bc & 0x8, AF);
-//    return res & 0xff;
-    return (uint8) res;
-}
-
-/* sub word primitive */
-uint16 sub_word(uint16 d, uint16 s)
-{
-    register uint32 res;
-    register uint32 bc;
-
-    res = d - s;
-    /* set the flags based on the result */
-    CONDITIONAL_SET_FLAG(res  &0x8000, SF);
-    CONDITIONAL_SET_FLAG((res  &0xFFFF) == 0, ZF);
-    CONDITIONAL_SET_FLAG(parity(res & 0xFF), PF);
-    /* calculate the borrow chain.  See note at top */
-    bc= (res&(~d|s))|(~d&s);
-    /* set flags based on borrow chain */
-    CONDITIONAL_SET_FLAG(bc & 0x8000, CF);
-    CONDITIONAL_SET_FLAG(xor_3_tab[(bc >> 14) & 0x3], OF);
-    CONDITIONAL_SET_FLAG(bc & 0x8, AF);
-//    return res & 0xffff;
-    return (uint16) res;
-}
-
-/* test byte primitive */
-void test_byte(uint8 d, uint8 s)
-{
-    register uint32 res;
-
-    res = d & s;
-    CLR_FLAG(OF);
-    CONDITIONAL_SET_FLAG(res & 0x80, SF);
-    CONDITIONAL_SET_FLAG(res == 0, ZF);
-    CONDITIONAL_SET_FLAG(parity(res & 0xFF), PF);
-    /* AF == dont care*/
-    CLR_FLAG(CF);
-}
-
-/* test word primitive */
-void test_word(uint16 d, uint16 s)
-{
-    register uint32 res;
-
-    res = d & s;
-    CLR_FLAG(OF);
-    CONDITIONAL_SET_FLAG(res & 0x8000, SF);
-    CONDITIONAL_SET_FLAG(res == 0, ZF);
-    CONDITIONAL_SET_FLAG(parity(res & 0xff), PF);
-    /* AF == dont care*/
-    CLR_FLAG(CF);
-}
-
-/* xor byte primitive */
-uint8 xor_byte(uint8 d, uint8 s)
-{
-    register uint8 res;
-    res = d ^ s;
-
-    /* clear flags  */
-    CLR_FLAG(OF);
-    CLR_FLAG(CF);
-    /* set the flags based on the result */
-    CONDITIONAL_SET_FLAG(res & 0x80, SF);
-    CONDITIONAL_SET_FLAG(res == 0, ZF);
-    CONDITIONAL_SET_FLAG(parity(res), PF);
-    return res;
-}
-
-/* xor word primitive */
-uint16 xor_word(uint16 d, uint16 s)
-{
-    register uint16 res;
-
-    res = d ^ s;
-    /* clear flags  */
-    CLR_FLAG(OF);
-    CLR_FLAG(CF);
-    /* set the flags based on the result */
-    CONDITIONAL_SET_FLAG(res & 0x8000, SF);
-    CONDITIONAL_SET_FLAG(res == 0, ZF);
-    CONDITIONAL_SET_FLAG(parity(res & 0xFF), PF);
-    return res;
-}
-
-/*  memory routines.  These use the segment register (segreg) value and offset
-    (addr) to calculate the proper source or destination memory address */
-
-/*  get a byte from memory */
-
-int32 get_smbyte(int32 segreg, int32 addr)
-{
-    int32 abs_addr, val;
-
-    abs_addr = addr + (get_rword(segreg) << 4);
-    val = get_mbyte(abs_addr);
-//     if (i8088_dev.dctrl & DEBUG_level1) 
-//        sim_printf("get_smbyte: seg=%04X addr=%04X abs_addr=%05X val=%02X\n",
-//            get_rword(segreg), addr, abs_addr, val);
-    return val;
-}
-
-/*  get a word from memory using addr and segment register */
-
-int32 get_smword(int32 segreg, int32 addr)
-{
-    int32 val;
-
-    val = get_smbyte(segreg, addr);
-    val |= (get_smbyte(segreg, addr+1) << 8);
-    return val;
-}
-
-/*  put a byte to memory using addr and segment register */
-
-void put_smbyte(int32 segreg, int32 addr, int32 val)
-{
-    int32 abs_addr;
-
-    abs_addr = addr + (get_rword(segreg) << 4);
-    put_mbyte(abs_addr, val);
-//    if (i8088_dev.dctrl & DEBUG_level1) 
-//        sim_printf("put_smbyte: seg=%04X addr=%04X abs_addr=%08X val=%02X\n",
-//            get_rword(segreg), addr, abs_addr, val);
-}
-
-/*  put a word to memory using addr and segment register */
-
-void put_smword(int32 segreg, int32 addr, int32 val)
-{
-    put_smbyte(segreg, addr, val);
-    put_smbyte(segreg, addr+1, val << 8);
-}
-
-/* Reset routine using addr and segment register */
-
-t_stat i8088_reset (DEVICE *dptr)
-{
-    PSW = 0;
-    CS = 0xFFFF;
-    DS = 0;
-    SS = 0;
-    ES = 0;
-    saved_PC = 0;
-    int_req = 0;
-    sim_brk_types = sim_brk_dflt = SWMASK ('E');
-    sim_printf("   8088 Reset\n");
-    return SCPE_OK;
 }
 
 /* Memory examine */
@@ -4743,38 +3733,7 @@ t_stat sim_load (FILE *fileref, const char *cptr, const char *fnam, int flag)
 t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
     UNIT *uptr, int32 sw)
 {
-    int32 cflag, c1, c2, inst, adr;
-
-    cflag = (uptr == NULL) || (uptr == &i8088_unit);
-    c1 = (val[0] >> 8) & 0177;
-    c2 = val[0] & 0177;
-    if (sw & SWMASK ('A')) {
-        fprintf (of, (c2 < 040)? "<%02X>": "%c", c2);
-        return SCPE_OK;
-    }
-    if (sw & SWMASK ('C')) {
-        fprintf (of, (c1 < 040)? "<%02X>": "%c", c1);
-        fprintf (of, (c2 < 040)? "<%02X>": "%c", c2);
-        return SCPE_OK;
-    }
-    if (!(sw & SWMASK ('M'))) return SCPE_ARG;
-    inst = val[0];
-    fprintf (of, "%s", opcode[inst]);
-    if (oplen[inst] == 2) {
-        if (strchr(opcode[inst], ' ') != NULL)
-            fprintf (of, ",");
-        else fprintf (of, " ");
-        fprintf (of, "%x", val[1]);
-    }
-    if (oplen[inst] == 3) {
-        adr = val[1] & 0xFF;
-        adr |= (val[2] << 8) & 0xff00;
-        if (strchr(opcode[inst], ' ') != NULL)
-            fprintf (of, ",");
-        else fprintf (of, " ");
-        fprintf (of, "%x", adr);
-    }
-    return -(oplen[inst] - 1);
+    return (SCPE_OK);
 }
 
 /* Symbolic input
@@ -4791,86 +3750,7 @@ t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
 
 t_stat parse_sym (const char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
-    int32 cflag, i = 0, j, r;
-    char gbuf[CBUFSIZE];
-
-    memset (gbuf, 0, sizeof (gbuf));
-    cflag = (uptr == NULL) || (uptr == &i8088_unit);
-    while (isspace (*cptr)) cptr++;                         /* absorb spaces */
-    if ((sw & SWMASK ('A')) || ((*cptr == '\'') && cptr++)) { /* ASCII char? */
-        if (cptr[0] == 0) return SCPE_ARG;                  /* must have 1 char */
-        val[0] = (uint32) cptr[0];
-        return SCPE_OK;
-    }
-    if ((sw & SWMASK ('C')) || ((*cptr == '"') && cptr++)) { /* ASCII string? */
-        if (cptr[0] == 0) return SCPE_ARG;                  /* must have 1 char */
-        val[0] = ((uint32) cptr[0] << 8) + (uint32) cptr[1];
-        return SCPE_OK;
-    }
-
-/* An instruction: get opcode (all characters until null, comma,
-   or numeric (including spaces).
-*/
-
-    while (i < sizeof (gbuf) - 4) {
-        if (*cptr == ',' || *cptr == '\0' ||
-             isdigit(*cptr))
-                break;
-        gbuf[i] = toupper(*cptr);
-        cptr++;
-        i++;
-    }
-
-/* Allow for RST which has numeric as part of opcode */
-
-    if (toupper(gbuf[0]) == 'R' &&
-        toupper(gbuf[1]) == 'S' &&
-        toupper(gbuf[2]) == 'T') {
-        gbuf[i] = toupper(*cptr);
-        cptr++;
-        i++;
-    }
-
-/* Allow for 'MOV' which is only opcode that has comma in it. */
-
-    if (toupper(gbuf[0]) == 'M' &&
-        toupper(gbuf[1]) == 'O' &&
-        toupper(gbuf[2]) == 'V') {
-        gbuf[i] = toupper(*cptr);
-        cptr++;
-        i++;
-        gbuf[i] = toupper(*cptr);
-        cptr++;
-        i++;
-    }
-
-/* kill trailing spaces if any */
-    gbuf[i] = '\0';
-    for (j = i - 1; gbuf[j] == ' '; j--) {
-        gbuf[j] = '\0';
-    }
-
-/* find opcode in table */
-    for (j = 0; j < 256; j++) {
-        if (strcmp(gbuf, opcode[j]) == 0)
-            break;
-    }
-    if (j > 255)                                            /* not found */
-        return SCPE_ARG;
-
-    val[0] = j;                                             /* store opcode */
-    if (oplen[j] < 2)                                       /* if 1-byter we are done */
-        return SCPE_OK;
-    if (*cptr == ',') cptr++;
-    cptr = get_glyph(cptr, gbuf, 0);                        /* get address */
-    sscanf(gbuf, "%o", &r);
-    if (oplen[j] == 2) {
-        val[1] = r & 0xFF;
-        return (-1);
-    }
-    val[1] = r & 0xFF;
-    val[2] = (r >> 8) & 0xFF;
-    return (-2);
+    return (SCPE_OK);
 }
 
 /* end of i8088.c */

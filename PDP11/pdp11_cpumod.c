@@ -1248,6 +1248,7 @@ if (opt & BUS_U)                                        /* Unibus variant? */
 else if (MEMSIZE <= UNIMEMSIZE)                         /* 18b Qbus devices? */
     mask = DEV_QBUS | DEV_Q18;
 else mask = DEV_QBUS;                                   /* must be 22b */
+mask |= DEV_MBUS;                                       /* leave Massbus devices */
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
     if ((dptr->flags & DEV_DISABLE) &&                  /* disable-able? */
         !(dptr->flags & DEV_DIS) &&                     /* enabled? */

@@ -137,7 +137,7 @@ void printer_control (int num, uint32 cmd)
         besm6_debug(">>> АЦПУ%d команда %o", num, cmd);
     if (READY & (PRN1_NOT_READY >> num)) {
         if (printer_dev.dctrl)
-            besm6_debug(">>> АЦПУ%d не готово", num, cmd);
+            besm6_debug(">>> АЦПУ%d не готово", num);
         return;
     }
     switch (cmd) {

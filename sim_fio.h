@@ -79,6 +79,7 @@ int sim_mkdir(const char *path);
 int sim_rmdir(const char *path);
 t_stat sim_copyfile (const char *source_file, const char *dest_file, t_bool overwrite_existing);
 char *sim_filepath_parts (const char *pathname, const char *parts);
+const char *sim_relative_path (const char *filepath);
 char *sim_getcwd (char *buf, size_t buf_size);
 #include <sys/stat.h>
 typedef void (*DIR_ENTRY_CALLBACK)(const char *directory, 
@@ -94,6 +95,14 @@ void sim_print_filelist (char **filelist);
 void sim_buf_swap_data (void *bptr, size_t size, size_t count);
 void sim_byte_swap_data (void *bptr, size_t size, size_t count);
 void sim_buf_copy_swapped (void *dptr, const void *bptr, size_t size, size_t count);
+t_bool sim_buf_pack_unpack (const void *sptr,          /* source buffer pointer */
+                            void *dptr,                /* destination buffer pointer */
+                            uint32 sbits,              /* source buffer element size in bits */
+                            t_bool sLSB_o_numbering,   /* source numbered using LSB ordering */
+                            uint32 scount,             /* count of source elements */
+                            uint32 dbits,              /* interesting bits of each destination element */
+                            t_bool dLSB_o_numbering);  /* destination numbered using LSB ordering */
+t_stat sim_fio_test (const char *cptr);
 const char *sim_get_os_error_text (int error);
 typedef struct SHMEM SHMEM;
 t_stat sim_shmem_open (const char *name, size_t size, SHMEM **shmem, void **addr);

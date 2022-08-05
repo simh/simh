@@ -113,10 +113,10 @@
 
 #define UNIT_V_OPSTOP   (UNIT_V_UF)     /* Stop on Invalid OP? */
 #define UNIT_OPSTOP     (1 << UNIT_V_OPSTOP)
-#define UNIT_V_8085     (UNIT_V_UF+1)   /* 8080/8085 switch */
+#define UNIT_V_MSTOP    (UNIT_V_UF+1)   /* Stop on Invalid memory? */
+#define UNIT_MSTOP      (1 << UNIT_V_MSTOP)
+#define UNIT_V_8085     (UNIT_V_UF+2)   /* 8080/8085 switch */
 #define UNIT_8085       (1 << UNIT_V_8085)
-#define UNIT_V_TRACE    (UNIT_V_UF+2)   /*  Trace switch */
-#define UNIT_TRACE      (1 << UNIT_V_TRACE)
 #define UNIT_V_XACK     (UNIT_V_UF+3)   /*  XACK switch */
 #define UNIT_XACK       (1 << UNIT_V_XACK)
 
@@ -159,6 +159,24 @@
 
 #define i8080_NAME    "Intel i8080/85 Processor Chip"
 
+#define HIST_MIN        64
+#define HIST_MAX        (1u << 18)
+#define HIST_ILNT       3                               /* max inst length */
+
+typedef struct {
+    uint16              pc;
+    uint16              sp;
+    uint8               psw;
+    uint8               a;
+    uint8               b;
+    uint8               c;
+    uint8               d;
+    uint8               e;
+    uint8               h;
+    uint8               l;
+    t_value             inst[HIST_ILNT];
+    } InstHistory;
+
 /* storage for the rest of the registers */
 uint32 PSW = 0;                         /* program status word */
 uint32 A = 0;                           /* accumulator */
@@ -179,6 +197,11 @@ uint16 port;                            //port used in any IN/OUT
 uint16 addr;                            //addr used for operand fetch
 uint32 IR;
 uint16 devnum = 0;
+uint8 cpu_onetime = 0;
+
+int32 hst_p = 0;                        /* history pointer */
+int32 hst_lnt = 0;                      /* history length */
+InstHistory *hst = NULL;                /* instruction history */
 
 static const char* i8080_desc(DEVICE *dptr) {
     return i8080_NAME;
@@ -203,6 +226,8 @@ void    putpush(int32 reg, int32 data);
 void    putpair(int32 reg, int32 val);
 void    parity(int32 reg);
 int32   cond(int32 con);
+t_stat  cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat  cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat  i8080_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat  i8080_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat  i8080_reset (DEVICE *dptr);
@@ -256,14 +281,16 @@ REG i8080_reg[] = {
 };
 
 MTAB i8080_mod[] = {
+    { UNIT_OPSTOP, UNIT_OPSTOP, "ITRAP", "ITRAP", NULL },
+    { UNIT_OPSTOP, 0, "NOITRAP", "NOITRAP", NULL },
+    { UNIT_MSTOP, UNIT_MSTOP, "MTRAP", "MTRAP", NULL },
+    { UNIT_MSTOP, 0, "NOMTRAP", "NOMTRAP", NULL },
     { UNIT_8085, 0, "8080", "8080", NULL },
     { UNIT_8085, UNIT_8085, "8085", "8085", NULL },
-    { UNIT_OPSTOP, 0, "ITRAP", "ITRAP", NULL },
-    { UNIT_OPSTOP, UNIT_OPSTOP, "NOITRAP", "NOITRAP", NULL },
-    { UNIT_TRACE, 0, "NOTRACE", "NOTRACE", NULL },
-    { UNIT_TRACE, UNIT_TRACE, "TRACE", "TRACE", NULL },
     { UNIT_XACK, 0, "NOXACK", "NOXACK", NULL },
     { UNIT_XACK, UNIT_XACK, "XACK", "XACK", NULL },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP|MTAB_NC, 0, "HISTORY", "HISTORY=n",
+      &cpu_set_hist, &cpu_show_hist, NULL, "Enable/Display instruction history" },
     { 0 }
 };
 
@@ -272,15 +299,12 @@ DEBTAB i8080_debug[] = {
     { "FLOW", DEBUG_flow },
     { "READ", DEBUG_read },
     { "WRITE", DEBUG_write },
-    { "LEV1", DEBUG_level1 },
-    { "LEV2", DEBUG_level2 },
-    { "REG", DEBUG_reg },
-    { "ASM", DEBUG_asm },
+    { "XACK", DEBUG_xack },
     { NULL }
 };
 
 DEVICE i8080_dev = {
-    "I8080",                            //name
+    "CPU",                            //name
     &i8080_unit,                        //units
     i8080_reg,                          //registers
     i8080_mod,                          //modifiers
@@ -292,7 +316,7 @@ DEVICE i8080_dev = {
     8,                                  //dwidth
     &i8080_ex,                          //examine 
     &i8080_dep,                         //deposit 
-    NULL,                               //reset
+    &i8080_reset,                       //reset
     NULL,                               //boot
     NULL,                               //attach 
     NULL,                               //detach
@@ -405,15 +429,17 @@ void set_cpuint(int32 int_num)
 int32 sim_instr(void)
 {
     extern int32 sim_interval;
-    uint32 OP, DAR, reason, adr, i8080_onetime = 0;
+    uint32 OP, DAR, reason, adr;
+    int i;
+    InstHistory *hst_ent = NULL;
 
     PC = saved_PC & WORD_R;             /* load local PC */
     reason = 0;
 
     uptr = i8080_dev.units;
 
-    if (i8080_onetime++ == 0) {
-        if (uptr->flags & UNIT_8085)
+    if (cpu_onetime++ == 0) {
+        if ((uptr->flags & UNIT_8085))
             sim_printf("    CPU = 8085\n");
         else
             sim_printf("    CPU = 8080\n");
@@ -462,7 +488,7 @@ int32 sim_instr(void)
                 if (IM & IE) {          /* enabled? */
                     INTA = 1;
                     push_word(PC);      /* do an RST 2 */
-                    PC = 0x0010;
+                    PC = 0x0038;
                     int_req = 0;
 //                    sim_printf("8080 Interrupt\n");
                 }
@@ -471,13 +497,28 @@ int32 sim_instr(void)
 
         if (sim_brk_summ &&
             sim_brk_test (PC, SWMASK ('E'))) { /* breakpoint? */
+//            dumpregs();
             reason = STOP_IBKPT;        /* stop simulation */
             break;
         }
 
-        if (uptr->flags & UNIT_TRACE) {
-            dumpregs();
-//            sim_printf("\n");
+        if (hst_lnt) {                  /* record history? */
+            hst_ent = &hst[hst_p];
+            hst_ent->pc = PC;
+            hst_ent->sp = SP;
+            hst_ent->psw = PSW;
+            hst_ent->a = A;
+            hst_ent->b = (BC >> 8) & 0xFF;
+            hst_ent->c = (BC & 0xFF);
+            hst_ent->d = (DE >> 8) & 0xFF;
+            hst_ent->e = (DE & 0xFF);
+            hst_ent->h = (HL >> 8) & 0xFF;
+            hst_ent->l = (HL & 0xFF);
+            for (i = 0; i < HIST_ILNT; i++)
+                hst_ent->inst[i] = (t_value)get_mbyte (PC + i);
+            hst_p = (hst_p + 1);
+            if (hst_p >= hst_lnt)
+                hst_p = 0;
         }
 
         sim_interval--;                 /* countdown clock */
@@ -897,13 +938,13 @@ int32 sim_instr(void)
         case 0xDB:                  /* IN */
             SET_XACK(1);            /* good I/O address */
             port = fetch_byte(1);
-            A = dev_table[port].routine(0, 0, dev_table[port].devnum & 0xff);
+            A = dev_table[port].routine(0, 0, dev_table[port].devnum & BYTEMASK);
             break;
 
         case 0xD3:                  /* OUT */
             SET_XACK(1);            /* good I/O address */
             port = fetch_byte(1);
-            dev_table[port].routine(1, A, dev_table[port].devnum & 0xff);
+            dev_table[port].routine(1, A, dev_table[port].devnum & BYTEMASK);
             break;
 
         default:                    /* undefined opcode */ 
@@ -955,7 +996,7 @@ int32 fetch_byte(int32 flag)
 
     val = get_mbyte(PC) & 0xFF;         /* fetch byte */
     PC = (PC + 1) & ADDRMASK;           /* increment PC */
-    addr = val & 0xff;
+    addr = val & BYTEMASK;
     return val;
 }
 
@@ -1240,7 +1281,7 @@ void putpair(int32 reg, int32 val)
 
 /* Reset routine */
 
-t_stat i8080_reset (DEVICE *dptr)
+t_stat i8080_reset(DEVICE *dptr)
 {
     PSW = PSW_ALWAYS_ON;
     CLR_FLAG(CF);
@@ -1253,54 +1294,106 @@ t_stat i8080_reset (DEVICE *dptr)
     return SCPE_OK;
 }
 
-/* Memory examine */
-
-t_stat i8080_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
-{
-    if (addr >= MEMSIZE) 
-        return SCPE_NXM;
-    if (vptr != NULL) 
-        *vptr = get_mbyte(addr);
-    return SCPE_OK;
-}
-
-/* Memory deposit */
-
-t_stat i8080_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
-{
-    if (addr >= MEMSIZE) 
-        return SCPE_NXM;
-    put_mbyte(addr, val);
-    return SCPE_OK;
-}
-
-/* This is the binary loader.  The input file is considered to be
-   a string of literal bytes with no special format. The load 
-   starts at the current value of the PC.
+/* This is the dumper/loader. This command uses the -h to signify a
+    hex dump/load vice a binary one.  If no address is given to load, it
+    takes the address from the hex record or the current PC for binary.
 */
 
-int32 sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
-{
-    int32 i, addr = 0, cnt = 0;
+#define HLEN    16
 
-    if ((*cptr != 0)) return SCPE_ARG;
-    if (flag == 0) {                     //load
-//        addr = saved_PC;
-        while ((i = getc (fileref)) != EOF) {
-            put_mbyte(addr, i);
-            addr++;
-            cnt++;
-        }                               /* end while */
-        sim_printf ("%d Bytes loaded.\n", cnt);
+int32 sim_load(FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
+{
+    int32 i, addr = 0, addr0 = 0, cnt = 0, cnt0 = 0, start = 0x10000;
+    int32 addr1 = 0, end = 0, byte, chk, rtype, flag0 = 1;
+    char buf[128], data[128], *p;
+
+    printf("sim_load cptr=%s fnam=%s flag=%d\n", cptr, fnam, flag);
+    cnt = sscanf(cptr, " %04X %04X", &start, &end);
+    addr=start;
+    printf("cnt=%d start=%05X end=%05X\n", cnt, start, end);
+    if (flag == 0) {                    //load
+        if (sim_switches & SWMASK ('H')) { //hex
+            if (cnt > 1)                //2 arguments - error
+                return SCPE_ARG;
+            cnt = 0;
+            while (fgets(buf, sizeof(buf)-1, fileref)) {
+                sscanf(buf, " :%02x%04x%02x%s", &cnt, &addr, &rtype, data);
+                if (rtype == 0) {
+                    chk = 0;
+                    chk -= HLEN;
+                    chk -= addr & BYTEMASK;
+                    chk -= addr >> 8;
+                    p = (char *) data;
+                    for (i=0; i<=cnt; i++) {
+                        sscanf (p, "%2x", &byte);
+                        p += 2;
+                        put_mbyte(addr + i, byte);
+                        chk -= byte; chk &= BYTEMASK;
+                        cnt++;
+                    }
+                    sscanf (p, "%2x", &byte);
+                    if (chk == 0)
+                        printf("+");
+                    else
+                        printf("-");
+                } else 
+                    return SCPE_ARG;
+            }
+        } else {                        //binary
+            cnt = 0;
+            addr1 = addr;
+            while ((i = getc (fileref)) != EOF) {
+                put_mbyte(addr, i);
+                addr++; cnt++;
+            }
+        }
+        printf ("%d Bytes loaded at %04X\n", cnt, addr1);
         return (SCPE_OK);
     } else {                            //dump
-//        addr = saved_PC;
-        while (addr <= 0xffff) {
-            i = get_mbyte(addr);
-            putc(i, fileref);
-            addr++;
-            cnt++;
+        if (cnt != 2)                   //must be 2 arguments
+            return SCPE_ARG;
+        cnt = 0;
+        addr0 = addr;
+        if (sim_switches & SWMASK ('H')) { //hex
+            while((addr + HLEN) < end) { //full records
+                fprintf(fileref,":%02X%04X00", HLEN, addr);
+                chk = 0;
+                chk -= HLEN;
+                chk -= addr & BYTEMASK;
+                chk -= addr >> 8;
+                for (i=0; i<HLEN; i++) {
+                    byte = get_mbyte(addr + i);
+                    fprintf(fileref, "%02X", byte & BYTEMASK);	
+                    chk -= byte; chk &= BYTEMASK;
+                    cnt++;
+                }
+                fprintf(fileref,"%02X\n", chk & BYTEMASK);
+	        addr += HLEN;
+            }
+            if(addr < end) { //last record
+                fprintf(fileref, ":%02X%04X00", end - addr, addr);
+                chk = 0;
+                chk -= end - addr;
+                chk -= addr & BYTEMASK;
+                chk -= addr >> 8;
+                for (i=0; i<=(end - addr); i++) {
+                    byte = get_mbyte(addr + i);
+                    fprintf(fileref, "%02X", byte & BYTEMASK);	
+                    chk -= byte; chk &= BYTEMASK;
+                    cnt++;
+                }
+                fprintf(fileref, "%02X\n", chk);
+	        addr = end;
+            }
+            fprintf(fileref,":00000001FF\n"); //EOF record
+        } else {                        //binary
+            while (addr <= end) {
+                i = get_mbyte(addr);
+                putc(i, fileref);
+                addr++; cnt++;
+            }
         }
+        printf ("%d Bytes dumped from %04X\n", cnt, addr0);
     }
     return (SCPE_OK);
 }
@@ -1316,7 +1409,7 @@ int32 sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
         status  =       error code
 */
 
-t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
+t_stat fprint_sym(FILE *of, t_addr addr, t_value *val,
     UNIT *uptr, int32 sw)
 {
     int32 cflag, c1, c2, inst, adr;
@@ -1364,7 +1457,7 @@ t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
         status  =       error status
 */
 
-t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
+t_stat parse_sym(CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
     int32 cflag, i = 0, j, r;
     char gbuf[CBUFSIZE];
@@ -1446,6 +1539,92 @@ t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32
     val[1] = r & 0xFF;
     val[2] = (r >> 8) & 0xFF;
     return (-2);
+}
+
+/* Set history */
+
+t_stat cpu_set_hist(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+    int i, lnt;
+    t_stat r;
+
+    if (cptr == NULL) {
+        for (i = 0; i < hst_lnt; i++)
+            hst[i].pc = 0;
+        hst_p = 0;
+        return SCPE_OK;
+        }
+    lnt = (int32) get_uint (cptr, 10, HIST_MAX, &r);
+    if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN)))
+        return SCPE_ARG;
+    hst_p = 0;
+    if (hst_lnt) {
+        free (hst);
+        hst_lnt = 0;
+        hst = NULL;
+        }
+    if (lnt) {
+        hst = (InstHistory *) calloc (lnt, sizeof (InstHistory));
+        if (hst == NULL)
+            return SCPE_MEM;
+        hst_lnt = lnt;
+        }
+    return SCPE_OK;
+}
+
+/* Show history */
+
+t_stat cpu_show_hist(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+    int k, di, lnt, ir;
+    const char *cptr = (const char *) desc;
+    t_stat r;
+    InstHistory *h;
+
+    if (hst_lnt == 0)                       /* enabled? */
+        return SCPE_NOFNC;
+    if (cptr) {
+        lnt = (int32) get_uint (cptr, 10, hst_lnt, &r);
+        if ((r != SCPE_OK) || (lnt == 0))
+            return SCPE_ARG;
+        }
+    else lnt = hst_lnt;
+    di = hst_p - lnt;                       /* work forward */
+    if (di < 0)
+        di = di + hst_lnt;
+    fprintf (st, "PC   SP   CC A  B  C  D  E  F  H  L  Instruction\n\n");
+    for (k = 0; k < lnt; k++) {             /* print specified */
+        h = &hst[(di++) % hst_lnt];         /* entry pointer */
+        ir = h->inst[0];
+        fprintf (st, "%04X %04X %02X ", h->pc , h->sp, h->psw);
+        fprintf (st, "%02X %02X %02X %02X %02X %02X %02X ", 
+            h->a, h->b, h->c, h->d, h->e, h->h, h->l);
+        if ((fprint_sym (st, h->pc, h->inst, &i8080_unit, SWMASK ('M'))) > 0)
+            fprintf (st, "(undefined) %02X", h->inst[0]);
+        fputc ('\n', st);                               /* end line */
+        }
+    return SCPE_OK;
+}
+
+/* Memory examine */
+
+t_stat i8080_ex(t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
+{
+    if (addr >= MEMSIZE) 
+        return SCPE_NXM;
+    if (vptr != NULL) 
+        *vptr = get_mbyte(addr);
+    return SCPE_OK;
+}
+
+/* Memory deposit */
+
+t_stat i8080_dep(t_value val, t_addr addr, UNIT *uptr, int32 sw)
+{
+    if (addr >= MEMSIZE) 
+        return SCPE_NXM;
+    put_mbyte(addr, val);
+    return SCPE_OK;
 }
 
 /* end of i8080.c */

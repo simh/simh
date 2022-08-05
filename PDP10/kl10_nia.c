@@ -1080,6 +1080,8 @@ void nia_packet_debug(struct nia_device *nia, const char *action,
         case ICMP_PROTO:
             icmp = (struct icmp *)payload;
             len = ntohs(ip->ip_len) - (ip->ip_v_hl & 0xf) * 4;
+            if (len > 1500)
+                len = 1500;
             sim_debug(DEBUG_ICMP, &nia_dev, "%s %s %d byte packet from %s to %s\n", action,
                 (icmp->type < sizeof(icmp_types)/sizeof(icmp_types[0])) ? icmp_types[icmp->type] : "", (int)len, src_ip, dst_ip);
             if (len && (nia_dev.dctrl & DEBUG_ICMP))

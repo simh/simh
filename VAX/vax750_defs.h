@@ -258,6 +258,7 @@ extern t_stat vax750_show_bootdev (FILE *st, UNIT *uptr, int32 val, CONST void *
 #define DEV_CI          (1u << DEV_V_CI)
 #define DEV_QBUS        (0)
 #define DEV_Q18         (0)
+#define DEV_NOAUTOCON   (0)
 
 #define UNIBUS          TRUE                            /* Unibus only */
 

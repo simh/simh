@@ -1,6 +1,6 @@
 /* scp.c: simulator control program
 
-   Copyright (c) 1993-2016, Robert M Supnik
+   Copyright (c) 1993-2022, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,10 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   21-Oct-21    RMS     Fixed bug in byte deposits if aincr > 1
+   16-Feb-21    JDB     Rewrote get_rval, put_rval to support arrays of structures
+   25-Jan-21    JDB     REG "size" field now determines access size
+                        REG "maxval" field now determines maximum allowed value
    08-Mar-16    RMS     Added shutdown flag for detach_all
    20-Mar-12    MP      Fixes to "SHOW <x> SHOW" commands
    06-Jan-12    JDB     Fixed "SHOW DEVICE" with only one enabled unit (Dave Bryan)  
@@ -248,6 +252,9 @@
 #ifndef MIN
 #define MIN(a,b)  (((a) <= (b)) ? (a) : (b))
 #endif
+/* Max width of a value expressed as a formatted string */
+#define MAX_WIDTH ((int) ((CHAR_BIT * sizeof (t_value) * 4 + 3)/3))
+
 
 /* search logical and boolean ops */
 
@@ -286,7 +293,9 @@
     else                                                        \
         (void)0
 
+/* Size of a DEVICE's data element */
 #define SZ_D(dp) (size_map[((dp)->dwidth + CHAR_BIT - 1) / CHAR_BIT])
+/* Size of a REGister's data element */
 #define SZ_R(rp) \
     (size_map[((rp)->width + (rp)->offset + CHAR_BIT - 1) / CHAR_BIT])
 #if defined (USE_INT64)
@@ -526,7 +535,7 @@ void put_rval (REG *rptr, uint32 idx, t_value val);
 void fprint_help (FILE *st);
 void fprint_stopped (FILE *st, t_stat r);
 void fprint_capac (FILE *st, DEVICE *dptr, UNIT *uptr);
-void fprint_sep (FILE *st, int32 *tokens);
+void fprint_sep (FILE *st, int32 *tokens, int32 flag);
 REG *find_reg_glob (CONST char *ptr, CONST char **optr, DEVICE **gdptr);
 REG *find_reg_glob_reason (CONST char *cptr, CONST char **optr, DEVICE **gdptr, t_stat *stat);
 const char *sim_eval_expression (const char *cptr, t_svalue *value, t_bool parens_required, t_stat *stat);
@@ -539,7 +548,9 @@ t_bool qdisable (DEVICE *dptr);
 t_stat attach_err (UNIT *uptr, t_stat stat);
 t_stat detach_all (int32 start_device, t_bool shutdown);
 t_stat assign_device (DEVICE *dptr, const char *cptr);
+t_stat assign_unit (UNIT *uptr, const char *cptr);
 t_stat deassign_device (DEVICE *dptr);
+t_stat deassign_unit (UNIT *uptr);
 t_stat ssh_break_one (FILE *st, int32 flg, t_addr lo, int32 cnt, CONST char *aptr);
 t_stat exdep_reg_loop (FILE *ofile, SCHTAB *schptr, int32 flag, CONST char *cptr,
     REG *lowr, REG *highr, uint32 lows, uint32 highs);
@@ -547,7 +558,7 @@ t_stat ex_reg (FILE *ofile, t_value val, int32 flag, REG *rptr, uint32 idx);
 t_stat dep_reg (int32 flag, CONST char *cptr, REG *rptr, uint32 idx);
 t_stat exdep_addr_loop (FILE *ofile, SCHTAB *schptr, int32 flag, const char *cptr,
     t_addr low, t_addr high, DEVICE *dptr, UNIT *uptr);
-t_stat ex_addr (FILE *ofile, int32 flag, t_addr addr, DEVICE *dptr, UNIT *uptr);
+t_stat ex_addr (FILE *ofile, int32 flag, t_addr addr, DEVICE *dptr, UNIT *uptr, int32 dfltinc);
 t_stat dep_addr (int32 flag, const char *cptr, t_addr addr, DEVICE *dptr,
     UNIT *uptr, int32 dfltinc);
 void fprint_fields (FILE *stream, t_value before, t_value after, BITFIELD* bitdefs);
@@ -569,6 +580,7 @@ t_stat set_runlimit (int32 flag, CONST char *cptr);
 t_stat sim_set_asynch (int32 flag, CONST char *cptr);
 static const char *_get_dbg_verb (uint32 dbits, DEVICE* dptr, UNIT *uptr);
 static t_stat sim_sanity_check_register_declarations (DEVICE **devices);
+static t_stat sim_device_unit_tests (const char *cptr);
 static void fix_writelock_mtab (DEVICE *dptr);
 static t_stat _sim_debug_flush (void);
 
@@ -820,6 +832,7 @@ const struct scp_error {
          {"FSSIZE",    "File System size larger than disk size"},
          {"RUNTIME",   "Run time limit exhausted"},
          {"INCOMPDSK", "Incompatible Disk Container"},
+         {"AMBASSIGN", "Ambiguous logical name"},
     };
 
 const size_t size_map[] = { sizeof (int8),
@@ -1116,12 +1129,14 @@ static const char simh_help1[] =
       "5Removing Breakpoints\n"
       " Breakpoints can be cleared by the NOBREAK or the SET NOBREAK commands.\n"
       "5Examples\n"
-      "++BREAK                      set E break at current PC\n"
-      "++BREAK -e 200               set E break at 200\n"
-      "++BREAK 2000/2[2]            set E breaks at 2000,2001 with count = 2\n"
-      "++BREAK 100;EX AC;D MQ 0     set E break at 100 with actions EX AC and\n"
-      "+++++++++D MQ 0\n"
-      "++BREAK 100;                 delete action on break at 100\n\n"
+      "++BREAK                       set E break at current PC\n"
+      "++BREAK -e 200                set E break at 200\n"
+      "++BREAK 2000/2[2]             set E breaks at 2000,2001 with count = 2\n"
+      "++BREAK 100;EX AC;D MQ 0      set E break at 100 with actions EX AC\n"
+      "+++++++++and D MQ 0\n"
+      "++BREAK 100;                  delete action on break at 100\n"
+      "++HELP CPU BREAK              display the breakpoint types supported\n"
+      "+++++++++by the CPU device\n\n"
        /***************** 80 character line width template *************************/
 #define HLP_DEBUG       "*Commands Stopping_The_Simulator User_Specified_Stop_Conditions DEBUG"
 #define HLP_NODEBUG     "*Commands Stopping_The_Simulator User_Specified_Stop_Conditions DEBUG"
@@ -1554,40 +1569,40 @@ static const char simh_help2[] =
       /***************** 80 character line width template *************************/
 #define HLP_SHOW        "*Commands SHOW"
       "2SHOW\n"
-      "+sh{ow} {-c} br{eak} <list>  show breakpoints\n"
-      "+sh{ow} con{figuration}      show configuration\n"
-      "+sh{ow} cons{ole} {arg}      show console options\n"
-      "+sh{ow} {-ei} dev{ices}      show devices\n"
-      "+sh{ow} fea{tures}           show system devices with descriptions\n"
-      "+sh{ow} m{odifiers}          show modifiers for all devices\n" 
-      "+sh{ow} s{how}               show SHOW commands for all devices\n" 
-      "+sh{ow} n{ames}              show logical names\n"
-      "+sh{ow} q{ueue}              show event queue\n"
-      "+sh{ow} ti{me}               show simulated time\n"
-      "+sh{ow} th{rottle}           show simulation rate\n"
-      "+sh{ow} a{synch}             show asynchronous I/O state\n" 
-      "+sh{ow} ve{rsion}            show simulator version\n"
-      "+sh{ow} def{ault}            show current directory\n" 
-      "+sh{ow} re{mote}             show remote console configuration\n" 
-      "+sh{ow} <dev> RADIX          show device display radix\n"
-      "+sh{ow} <dev> DEBUG          show device debug flags\n"
-      "+sh{ow} <dev> MODIFIERS      show device modifiers\n"
-      "+sh{ow} <dev> NAMES          show device logical name\n"
-      "+sh{ow} <dev> SHOW           show device SHOW commands\n"
-      "+sh{ow} <dev> {arg,...}      show device parameters\n"
-      "+sh{ow} <unit> {arg,...}     show unit parameters\n"
-      "+sh{ow} ethernet             show ethernet devices\n"
-      "+sh{ow} serial               show serial devices\n"
-      "+sh{ow} synchronous          show DDCMP synchronous interface devices\n"
-      "+sh{ow} multiplexer {dev}    show open multiplexer device info\n"
-      "+sh{ow} video                show video capabilities\n"
-      "+sh{ow} clocks               show calibrated timer information\n"
-      "+sh{ow} throttle             show throttle info\n"
-      "+sh{ow} on                   show on condition actions\n"
-      "+sh{ow} do                   show do nesting state\n"
-      "+sh{ow} runlimit             show execution limit states\n"
-      "+h{elp} <dev> show           displays the device specific show commands\n"
-      "++++++++                     available\n"
+      "+sh{ow} {-c} br{eak} <list>   show breakpoints\n"
+      "+sh{ow} {-ei} con{figuration} show configuration\n"
+      "+sh{ow} cons{ole} {arg}       show console options\n"
+      "+sh{ow} {-ei} dev{ices}       show devices\n"
+      "+sh{ow} {-ei} fea{tures}      show system devices with descriptions\n"
+      "+sh{ow} m{odifiers}           show modifiers for all devices\n" 
+      "+sh{ow} s{how}                show SHOW commands for all devices\n" 
+      "+sh{ow} n{ames}               show logical names\n"
+      "+sh{ow} q{ueue}               show event queue\n"
+      "+sh{ow} ti{me}                show simulated time\n"
+      "+sh{ow} th{rottle}            show simulation rate\n"
+      "+sh{ow} a{synch}              show asynchronous I/O state\n" 
+      "+sh{ow} ve{rsion}             show simulator version\n"
+      "+sh{ow} def{ault}             show current directory\n" 
+      "+sh{ow} re{mote}              show remote console configuration\n" 
+      "+sh{ow} <dev> RADIX           show device display radix\n"
+      "+sh{ow} <dev> DEBUG           show device debug flags\n"
+      "+sh{ow} <dev> MODIFIERS       show device modifiers\n"
+      "+sh{ow} <dev> NAMES           show device logical name\n"
+      "+sh{ow} <dev> SHOW            show device SHOW commands\n"
+      "+sh{ow} <dev> {arg,...}       show device parameters\n"
+      "+sh{ow} <unit> {arg,...}      show unit parameters\n"
+      "+sh{ow} ethernet              show ethernet devices\n"
+      "+sh{ow} serial                show serial devices\n"
+      "+sh{ow} synchronous           show DDCMP synchronous interface devices\n"
+      "+sh{ow} multiplexer {dev}     show open multiplexer device info\n"
+      "+sh{ow} video                 show video capabilities\n"
+      "+sh{ow} clocks                show calibrated timer information\n"
+      "+sh{ow} throttle              show throttle info\n"
+      "+sh{ow} on                    show on condition actions\n"
+      "+sh{ow} do                    show do nesting state\n"
+      "+sh{ow} runlimit              show execution limit states\n"
+      "+h{elp} <dev> show            displays the device specific show commands\n"
+      "++++++++                      available\n"
 #define HLP_SHOW_CONFIG         "*Commands SHOW"
 #define HLP_SHOW_DEVICES        "*Commands SHOW"
 #define HLP_SHOW_FEATURES       "*Commands SHOW"
@@ -1643,12 +1658,13 @@ static const char simh_help2[] =
       "2Logical Names\n"
       " The standard device names can be supplemented with logical names.  Logical\n"
       " names must be unique within a simulator (that is, they cannot be the same\n"
-      " as an existing device name).  To assign a logical name to a device:\n\n"
-      "++ASSIGN <device> <log-name>      assign log-name to device\n\n"
+      " as an existing device or logical name).  To assign a logical name to a\n"
+      " device or unit:\n\n"
+      "++ASSIGN <device>|<unit> <log-name>   assign log-name to device\n\n"
       " To remove a logical name:\n\n"
-      "++DEASSIGN <device>               remove logical name\n\n"
+      "++DEASSIGN <device>|<unit>            remove logical name\n\n"
       " To show the current logical name assignment:\n\n"
-      "++SHOW <device> NAMES            show logical name, if any\n\n"
+      "++SHOW <device> NAMES                 show logical name, if any\n\n"
       " To show all logical names:\n\n"
       "++SHOW NAMES\n\n"
        /***************** 80 character line width template *************************/
@@ -2714,6 +2730,7 @@ char **targv = NULL;
 int32 i, sw;
 t_bool lookswitch;
 t_bool register_check = FALSE;
+t_bool device_unit_tests = FALSE;
 t_stat stat = SCPE_OK;
 CTAB *docmdp = NULL;
 
@@ -2735,10 +2752,19 @@ sim_prog_name = argv [0];                               /* save a pointer to the
 if (argc > 1) {                                         /* Check for special argument to invoke register test */
     if (sim_strcasecmp (argv[1], "RegisterSanityCheck") == 0) {
         register_check = TRUE;
-        --argc;                                         /* Remove special argument to avoid confusion later */
+        /* Remove special argument to avoid confusion later */
         for (i = 1; i < argc; i++)
             argv[i] = argv[i+1];
-        argv[i+1] = NULL;
+        --argc;
+        }
+    }
+if (argc > 1) {                                         /* Check for special argument to invoke register test */
+    if (sim_strcasecmp (argv[1], "DeviceUnitTests") == 0) {
+        device_unit_tests = TRUE;
+        /* Remove special argument to avoid confusion later */
+        for (i = 1; i < argc; i++)
+            argv[i] = argv[i+1];
+        --argc;
         }
     }
 for (i = 1; i < argc; i++) {                            /* loop thru args */
@@ -2888,6 +2914,36 @@ if ((stat = sim_brk_init ()) != SCPE_OK) {
 /* always check for register definition problems */
 sim_sanity_check_register_declarations (NULL);
 
+if (device_unit_tests) {
+    int i;
+    DEVICE *dptr;
+    int devices_with_tests = 0;
+
+    /* This test is explicitly run after the above reset_all_p() so that 
+       the simulator is in its well initialized state before testing. */
+    for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
+        if (dptr->unit_test)
+            ++devices_with_tests;
+        }
+    if (devices_with_tests == 0) {
+        sim_printf ("*** No device unit tests in this %s simulator.\n", sim_name);
+        sim_exit_status = EXIT_SUCCESS;
+        goto cleanup_and_exit;
+        }
+    sim_printf (" Running device unit tests on %s simulator.\n", sim_name);
+    if ((stat = sim_device_unit_tests (argv[1])) != SCPE_OK) {
+        sim_printf ("Simulator device unit tests error\n");
+        if (sim_ttisatty())
+            read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
+        sim_exit_status = EXIT_FAILURE;
+        goto cleanup_and_exit;
+        }
+    sim_printf ("*** Good device unit tests in %s simulator.\n", sim_name);
+    if (argc < 2) {                                 /* No remaining command arguments? */
+        sim_exit_status = EXIT_SUCCESS;             /* then we're done */
+        goto cleanup_and_exit;
+        }
+    }
 signal (SIGINT, int_handler);
 if (!sim_quiet) {
     printf ("\n");
@@ -2911,32 +2967,34 @@ if (cptr == NULL) {
 else
     cptr2 = NULL;
 docmdp = find_cmd ("DO");
-if (docmdp && cptr && (sizeof (nbuf) > strlen (cptr) + strlen ("/simh.ini") + 3)) {
-    snprintf(nbuf, sizeof (nbuf), "\"%s%s%ssimh.ini\"", cptr2 ? cptr2 : "", cptr, strchr (cptr, '/') ? "/" : "\\");
-    stat = docmdp->action (-1, nbuf);                   /* simh.ini proc cmd file */
-    }
-if (SCPE_BARE_STATUS(stat) == SCPE_OPENERR)
-    stat = docmdp->action (-1, "simh.ini");             /* simh.ini proc cmd file */
-if (*cbuf)                                              /* cmd file arg? */
-    stat = docmdp->action (0, cbuf);                    /* proc cmd file */
-else {
-    if (*argv[0]) {                                    /* sim name arg? */
-        char *np;                                      /* "path.ini" */
-        nbuf[0] = '"';                                 /* starting " */
-        strlcpy (nbuf + 1, argv[0], PATH_MAX + 2);     /* copy sim name */
-        if ((np = (char *)match_ext (nbuf, "EXE")))    /* remove .exe */
-            *np = 0;
-        strlcat (nbuf, ".ini\"", sizeof (nbuf));       /* add .ini" */
-        stat = docmdp->action (-1, nbuf) & ~SCPE_NOMESSAGE; /* proc default cmd file */
-        if (stat == SCPE_OPENERR) {                    /* didn't exist/can't open? */
-            np = strrchr (nbuf, '/');                  /* stript path and try again in cwd */
-            if (np == NULL)
-                np = strrchr (nbuf, '\\');             /* windows path separator */
-            if (np == NULL)
-                np = strrchr (nbuf, ']');              /* VMS path separator */
-            if (np != NULL) {
-                *np = '"';
-                stat = docmdp->action (-1, np) & ~SCPE_NOMESSAGE;/* proc default cmd file */
+if (docmdp) {
+    if (cptr && (sizeof (nbuf) > strlen (cptr) + strlen ("/simh.ini") + 3)) {
+        snprintf(nbuf, sizeof (nbuf), "\"%s%s%ssimh.ini\"", cptr2 ? cptr2 : "", cptr, strchr (cptr, '/') ? "/" : "\\");
+        stat = docmdp->action (-1, nbuf);                   /* simh.ini proc cmd file */
+        }
+    if (SCPE_BARE_STATUS(stat) == SCPE_OPENERR)
+        stat = docmdp->action (-1, "simh.ini");             /* simh.ini proc cmd file */
+    if (*cbuf)                                              /* cmd file arg? */
+        stat = docmdp->action (0, cbuf);                    /* proc cmd file */
+    else {
+        if (*argv[0]) {                                    /* sim name arg? */
+            char *np;                                      /* "path.ini" */
+            nbuf[0] = '"';                                 /* starting " */
+            strlcpy (nbuf + 1, argv[0], PATH_MAX + 2);     /* copy sim name */
+            if ((np = (char *)match_ext (nbuf, "EXE")))    /* remove .exe */
+                *np = 0;
+            strlcat (nbuf, ".ini\"", sizeof (nbuf));       /* add .ini" */
+            stat = docmdp->action (-1, nbuf) & ~SCPE_NOMESSAGE; /* proc default cmd file */
+            if (stat == SCPE_OPENERR) {                    /* didn't exist/can't open? */
+                np = strrchr (nbuf, '/');                  /* stript path and try again in cwd */
+                if (np == NULL)
+                    np = strrchr (nbuf, '\\');             /* windows path separator */
+                if (np == NULL)
+                    np = strrchr (nbuf, ']');              /* VMS path separator */
+                if (np != NULL) {
+                    *np = '"';
+                    stat = docmdp->action (-1, np) & ~SCPE_NOMESSAGE;/* proc default cmd file */
+                    }
                 }
             }
         }
@@ -3406,7 +3464,7 @@ if (enabled_units == 1) {
     if (found_unit == 0)
         snprintf (unit_spec, sizeof (unit_spec), "%s", sim_dname (dptr));
     else
-        snprintf (unit_spec, sizeof (unit_spec), "%s%u", sim_dname (dptr), found_unit);
+        snprintf (unit_spec, sizeof (unit_spec), "%s", sim_uname (&dptr->units[found_unit]));
     }
 else
     snprintf (unit_spec, sizeof (unit_spec), "%sn", sim_dname (dptr));
@@ -3666,6 +3724,11 @@ while (brkt->btyp) {
     ++brkt;
     }
 fprintf (st, "The default breakpoint type is: %s\n", put_switches (gbuf, sizeof(gbuf), sim_brk_dflt));
+}
+
+void fprint_brk_help (FILE *st, DEVICE *dptr)
+{
+fprint_brk_help_ex (st, dptr, TRUE);
 }
 
 t_stat help_dev_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
@@ -4021,7 +4084,7 @@ static char *do_position(void)
 {
 static char cbuf[4*CBUFSIZE];
 
-snprintf (cbuf, sizeof (cbuf), "%s%s%s-%d", sim_do_filename[sim_do_depth], sim_do_label[sim_do_depth] ? "::" : "", sim_do_label[sim_do_depth] ? sim_do_label[sim_do_depth] : "", sim_goto_line[sim_do_depth]);
+snprintf (cbuf, sizeof (cbuf), "%s%s%s-%d", sim_relative_path (sim_do_filename[sim_do_depth]), sim_do_label[sim_do_depth] ? "::" : "", sim_do_label[sim_do_depth] ? sim_do_label[sim_do_depth] : "", sim_goto_line[sim_do_depth]);
 return cbuf;
 }
 
@@ -4301,24 +4364,26 @@ t_stat sim_call_argv (int (*main_like_routine)(int argc, char *argv[]), const ch
 {
 int argc = 1;
 char **argv = (char **)calloc ((1 + argc), sizeof (*argv));
-size_t cptr_len = strlen (cptr);
-char *argline = (char *)malloc (2 + 2 * cptr_len);
+size_t arg_size;
+char *argline = NULL;
 char *cp, quote;
 t_stat result = SCPE_OK;
 
-if ((argv == NULL) || (argline == NULL)) {
-    free (argv);
-    free (argline);
-    return SCPE_MEM;
-    }
 if (cptr == NULL) {
     free (argv);
     free (argline);
     return SCPE_ARG;
     }
-strcpy (argline, cptr);
-cp = argline + cptr_len + 1;
-strcpy (cp, cptr);
+arg_size = 2 + (2 * strlen (cptr));
+argline = (char *)malloc (arg_size);
+if ((argv == NULL) || (argline == NULL)) {
+    free (argv);
+    free (argline);
+    return SCPE_MEM;
+    }
+strlcpy (argline, cptr, arg_size);
+cp = argline + (arg_size / 2);
+strlcpy (cp, cptr, arg_size / 2);
 argv[0] = argline;                  /* argv[0] points to unparsed arguments */
 argv[argc + 1] = NULL;              /* make sure the argument list always ends with a NULL */
 while (*cp) {
@@ -5897,6 +5962,8 @@ if ((dptr = find_dev (gbuf))) {                         /* device match? */
     ctbr = set_dev_tab;                                 /* global table */
     lvl = MTAB_VDV;                                     /* device match */
     GET_SWITCHES (cptr);                                /* get more switches */
+    if (dptr->numunits == 1)                            /* Single unit devices have optional */
+        lvl |= MTAB_VUN;                                /*  unit number */
     }
 else {
     if ((dptr = find_unit (gbuf, &uptr))) {             /* unit match? */
@@ -5971,11 +6038,14 @@ while (*cptr != 0) {                                    /* do all mods */
                     if (r != SCPE_OK)
                         return r;
                     }
-                else if (!mptr->desc)                   /* value desc? */
-                    break;
-                else if (cvptr)                         /* = value? */
-                    return SCPE_ARG;
-                else *((int32 *) mptr->desc) = mptr->match;
+                else 
+                    if (!mptr->desc)                    /* value desc? */
+                        break;
+                    else 
+                        if (cvptr)                      /* = value? */
+                            return SCPE_ARG;
+                        else 
+                            *((int32 *) mptr->desc) = mptr->match;
                 }                                       /* end if xtd */
             else {                                      /* old style */
                 if (cvptr)                              /* = value? */
@@ -5997,9 +6067,11 @@ while (*cptr != 0) {                                    /* do all mods */
             if (r != SCPE_OK)
                 return r;
             }
-        else if (!dptr->modifiers)                      /* no modifiers? */
-            return SCPE_NOPARAM;
-        else return sim_messagef (SCPE_NXPAR, "%s device: Non-existent parameter - %s\n", dptr->name, gbuf);
+        else
+            if (!dptr->modifiers)                      /* no modifiers? */
+                return sim_messagef (SCPE_NOPARAM, "%s device has no parameters\n", dptr->name);
+            else
+                return sim_messagef (SCPE_NXPAR, "%s device: Non-existent parameter - %s\n", dptr->name, gbuf);
         }                                               /* end if no mat */
     }                                                   /* end while */
 return SCPE_OK;                                         /* done all */
@@ -6156,7 +6228,7 @@ if (0 == sim_fseek (uptr->fileref, 0, SEEK_END)) {
     return SCPE_OK;
     }
 
-return sim_messagef (SCPE_IERR, "%s Can't seek to end of file: %s - %s\n", sim_uname (uptr), uptr->filename, strerror (errno));
+return sim_messagef (SCPE_IERR, "%s Can't seek to end of file: %s - %s\n", sim_uname (uptr), sim_attach_name (uptr), strerror (errno));
 }
 
 /* Show command */
@@ -6343,12 +6415,17 @@ const char *_sim_dname_space (void)
 return _sim_dname_prefix (NULL, "");
 }
 
+const char *_sim_uname_space (void)
+{
+return _sim_uname_prefix (NULL, "");
+}
+
 void _set_dname_len (DEVICE *dptr)
 {
 uint32 i;
 
-if (dev_name_len < strlen (dptr->name))
-    dev_name_len = strlen (dptr->name);
+if (dev_name_len < strlen (sim_dname (dptr)))
+    dev_name_len = strlen (sim_dname (dptr));
 for (i = 0; i < dptr->numunits; i++) {
     UNIT *uptr = &dptr->units[i];
 
@@ -6382,14 +6459,15 @@ else {
     }
 if (qdisable (dptr)) {                                  /* disabled? */
     fprintf (st, "%s\n", "disabled");
-    return SCPE_OK;
+    goto Cleanup_Return;
     }
 for (j = ucnt = udbl = 0; j < dptr->numunits; j++) {    /* count units */
     uptr = dptr->units + j;
     if (!(uptr->flags & UNIT_DIS))                      /* count enabled units */
         ucnt++;
-    else if (uptr->flags & UNIT_DISABLE)
-        udbl++;                                         /* count user-disabled */
+    else
+        if (uptr->flags & UNIT_DISABLE)
+            udbl++;                                     /* count user-disabled */
     }
 show_all_mods (st, dptr, dptr->units, MTAB_VDV, &toks); /* show dev mods */
 if (dptr->numunits == 0) {
@@ -6398,33 +6476,41 @@ if (dptr->numunits == 0) {
     }
 else {
     if (ucnt == 0) {
-        fprint_sep (st, &toks);
-        fprintf (st, "all units disabled\n");
+        fprint_sep (st, &toks, MTAB_VDV);
+        fprintf (st, "all %d units disabled\n", udbl);
         }
-    else if ((ucnt > 1) || (udbl > 0)) {
-        fprint_sep (st, &toks);
-        fprintf (st, "%d units\n", ucnt + udbl);
+    else {
+        if ((ucnt > 1) || (udbl > 0)) {
+            fprint_sep (st, &toks, MTAB_VDV);
+            fprintf (st, "%d units\n", ucnt + udbl);
+            }
+        else {
+            if ((flag != 2) || !dptr->description || toks) {
+                if ((ucnt == 1) && (toks < 0) && (flag != 2) &&
+                    (dptr->description) && ((sim_switches & SWMASK ('D')) == 0))
+                    fprintf (st, "%s", dptr->description (dptr));
+                fprintf (st, "\n");
+                }
+            }
         }
-    else
-        if ((flag != 2) || !dptr->description || toks) 
-            fprintf (st, "\n");
     toks = 0;
     }
 if (flag)                                               /* dev only? */
-    return SCPE_OK;
+    goto Cleanup_Return;
 for (j = 0; j < dptr->numunits; j++) {                  /* loop thru units */
     uptr = dptr->units + j;
     if ((uptr->flags & UNIT_DIS) == 0)
         show_unit (st, dptr, uptr, ucnt + udbl);
     }
+Cleanup_Return:
 if (did_set_dname_len)
     dev_name_len = unit_name_len = 0;
 return SCPE_OK;
 }
 
-void fprint_sep (FILE *st, int32 *tokens)
+void fprint_sep (FILE *st, int32 *tokens, int32 flag)
 {
-fprintf (st, "%s", (*tokens > 0) ? ", " : ((*tokens < 0) ? "" : _sim_dname_space ()));
+fprintf (st, "%s", (*tokens > 0) ? ", " : ((*tokens < 0) ? "" : ((flag == MTAB_VDV) ? _sim_dname_space () : _sim_uname_space ())));
 *tokens += 1;
 if (*tokens == 0)
     *tokens = 1;
@@ -6442,18 +6528,18 @@ else
     else
         toks = 0;
 if (uptr->flags & UNIT_FIX) {
-    fprint_sep (st, &toks);
+    fprint_sep (st, &toks, MTAB_VUN);
     fprint_capac (st, dptr, uptr);
     }
 if (uptr->flags & UNIT_ATT) {
-    fprint_sep (st, &toks);
-    fprintf (st, "attached to %s", uptr->filename);
+    fprint_sep (st, &toks, MTAB_VUN);
+    fprintf (st, "attached to %s", sim_attach_name (uptr));
     if (uptr->flags & UNIT_RO)
         fprintf (st, ", read only");
     }
 else {
     if (uptr->flags & UNIT_ATTABLE) {
-        fprint_sep (st, &toks);
+        fprint_sep (st, &toks, MTAB_VUN);
         fprintf (st, "not attached");
         }
     }
@@ -6465,11 +6551,11 @@ return SCPE_OK;
 
 const char *sprint_capac (DEVICE *dptr, UNIT *uptr)
 {
-static char capac_buf[((CHAR_BIT * sizeof (t_value) * 4 + 3)/3) + 12];
-t_addr kval = (uptr->flags & UNIT_BINK)? 1024: 1000;
-t_addr mval;
+static char capac_buf[MAX_WIDTH + 12];
+t_offset kval = (uptr->flags & UNIT_BINK)? 1024: 1000;
+t_offset mval;
 double remfrac;
-t_addr psize = uptr->capac;
+t_offset psize = (t_offset)uptr->capac;
 const char *scale, *width;
 
 if (sim_switches & SWMASK ('B'))
@@ -6637,6 +6723,7 @@ if (flag) {
         fprintf (st, "\n        Virtual Hard Disk (VHD) support");
     if (sim_disk_raw_support())
         fprintf (st, "\n        RAW disk and CD/DVD ROM support");
+    fprintf (st, "\n        Autosizing of disks is %s", sim_disk_autosize_disabled() ? "disabled" : "enabled");
 #if defined (SIM_ASYNCH_IO)
     fprintf (st, "\n        Asynchronous I/O support (%s)", AIO_QUEUE_MODE);
 #endif
@@ -6934,10 +7021,20 @@ return SCPE_OK;
 
 t_stat show_dev_logicals (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr)
 {
+uint32 u;
+t_bool found = FALSE;
+
+for (u = 0; u < dptr->numunits; u++) {
+    if (dptr->units[u].lname) {
+        found = TRUE;
+        fprintf (st, "%s -> %s%u\n", dptr->units[u].lname, dptr->name, u);
+        }
+    }
 if (dptr->lname)
     fprintf (st, "%s -> %s\n", dptr->lname, dptr->name);
-else if (!flag)
-    fputs ("no logical name assigned\n", st);
+else
+    if ((!flag) && (!found))
+        fputs ("no logical name assigned\n", st);
 return SCPE_OK;
 }
 
@@ -7214,7 +7311,7 @@ for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
             *toks = 0;
             }
         if (r == SCPE_OK)
-            fprint_sep (st, toks);
+            fprint_sep (st, toks, flag);
         r = show_one_mod (st, dptr, uptr, mptr, NULL, 0);
         }
     }
@@ -8368,7 +8465,7 @@ if ((uptr->flags & UNIT_BUF) && (uptr->filebuf)) {
     uint32 cap = (uptr->hwmark + dptr->aincr - 1) / dptr->aincr;
     if (((uptr->flags & UNIT_RO) == 0) && 
         (memcmp (uptr->filebuf, uptr->filebuf2, (size_t)(SZ_D (dptr) * (uptr->capac / dptr->aincr))) != 0)) {
-        sim_messagef (SCPE_OK, "%s: writing buffer to file: %s\n", sim_uname (uptr), uptr->filename);
+        sim_messagef (SCPE_OK, "%s: writing buffer to file: %s\n", sim_uname (uptr), sim_attach_name (uptr));
         rewind (uptr->fileref);
         sim_fwrite (uptr->filebuf, SZ_D (dptr), cap, uptr->fileref);
         if (ferror (uptr->fileref))
@@ -8392,18 +8489,20 @@ if (uptr->fileref) {                        /* Only close open file */
         }
     uptr->fileref = NULL;
     }
+uptr->dynflags &= ~UNIT_NO_FIO;
 return SCPE_OK;
 }
 
 /* Assign command
 
-   as[sign] device name assign logical name to device
+   as[sign] device name assign logical name to device or unit
 */
 
 t_stat assign_cmd (int32 flag, CONST char *cptr)
 {
 char gbuf[CBUFSIZE];
 DEVICE *dptr;
+UNIT *uptr, *tuptr;
 
 GET_SWITCHES (cptr);                                    /* get switches */
 if (*cptr == 0)                                         /* must be more */
@@ -8412,24 +8511,35 @@ cptr = get_glyph (cptr, gbuf, 0);                       /* get next glyph */
 GET_SWITCHES (cptr);                                    /* get switches */
 if (*cptr == 0)                                         /* now eol? */
     return SCPE_2FARG;
-dptr = find_dev (gbuf);                                 /* locate device */
+dptr = find_unit (gbuf, &uptr);                         /* locate device */
 if (dptr == NULL)                                       /* found dev? */
     return sim_messagef (SCPE_NXDEV, "Non-existent device: %s\n", gbuf);
 cptr = get_glyph (cptr, gbuf, 0);                       /* get next glyph */
 if (*cptr != 0)                                         /* must be eol */
-    return SCPE_2MARG;
-if (find_dev (gbuf))                                    /* name in use */
-    return SCPE_ARG;
-deassign_device (dptr);                                 /* release current */
+    return sim_messagef (SCPE_2MARG, "Unexpected additional arguments: %s\n", cptr);
+if ((find_dev (gbuf) != NULL) ||                        /* name in use? */
+    (find_unit (gbuf, &tuptr) != NULL))
+    return sim_messagef (SCPE_AMBASSIGN, "%s is already in use\n", gbuf);
+if ((dptr->numunits > 1) || (uptr != dptr->units))
+    return assign_unit (uptr, gbuf);
 return assign_device (dptr, gbuf);
 }
 
 t_stat assign_device (DEVICE *dptr, const char *cptr)
 {
-dptr->lname = (char *) calloc (1 + strlen (cptr), sizeof (char));
+dptr->lname = (char *) realloc (dptr->lname, (1 + strlen (cptr)) * sizeof (char));
 if (dptr->lname == NULL)
     return SCPE_MEM;
 strcpy (dptr->lname, cptr);
+return SCPE_OK;
+}
+
+t_stat assign_unit (UNIT *uptr, const char *cptr)
+{
+uptr->lname = (char *) realloc (uptr->lname, (1 + strlen (cptr)) * sizeof (char));
+if (uptr->lname == NULL)
+    return SCPE_MEM;
+strcpy (uptr->lname, cptr);
 return SCPE_OK;
 }
 
@@ -8442,6 +8552,7 @@ t_stat deassign_cmd (int32 flag, CONST char *cptr)
 {
 char gbuf[CBUFSIZE];
 DEVICE *dptr;
+UNIT *uptr;
 
 GET_SWITCHES (cptr);                                    /* get switches */
 if (*cptr == 0)                                         /* must be more */
@@ -8449,16 +8560,26 @@ if (*cptr == 0)                                         /* must be more */
 cptr = get_glyph (cptr, gbuf, 0);                       /* get next glyph */
 if (*cptr != 0)                                         /* now eol? */
     return SCPE_2MARG;
-dptr = find_dev (gbuf);                                 /* locate device */
+dptr = find_unit (gbuf, &uptr);                         /* locate device or unit */
 if (dptr == NULL)                                       /* found dev? */
     return sim_messagef (SCPE_NXDEV, "Non-existent device: %s\n", gbuf);
-return deassign_device (dptr);
+if (uptr == NULL)
+    return deassign_device (dptr);
+else
+    return deassign_unit (uptr);
 }
 
 t_stat deassign_device (DEVICE *dptr)
 {
 free (dptr->lname);
 dptr->lname = NULL;
+return SCPE_OK;
+}
+
+t_stat deassign_unit (UNIT *uptr)
+{
+free (uptr->lname);
+uptr->lname = NULL;
 return SCPE_OK;
 }
 
@@ -8478,6 +8599,8 @@ char uname[CBUFSIZE];
 
 if (!uptr)
     return "";
+if (uptr->lname)
+    return uptr->lname;             /* Prefer user defined Logical Name defined? */
 if (uptr->uname)
     return uptr->uname;
 d = find_dev_from_unit(uptr);
@@ -8494,6 +8617,21 @@ const char *sim_set_uname (UNIT *uptr, const char *uname)
 {
 free (uptr->uname);
 return uptr->uname = strcpy ((char *)malloc (1 + strlen (uname)), uname);
+}
+
+/* Get attach display name */
+
+const char *sim_attach_name (UNIT *uptr)
+{
+DEVICE *dptr = find_dev_from_unit (uptr);
+
+if ((uptr == NULL) || ((uptr->flags & UNIT_ATT) == 0))
+    return "";
+if ((DEV_TYPE (uptr->dptr) != DEV_MUX) &&
+    (DEV_TYPE (uptr->dptr) != DEV_ETHER))
+    return sim_relative_path (uptr->filename);
+else
+    return uptr->filename;
 }
 
 
@@ -8593,7 +8731,9 @@ for (i = 0; i < (device_count + sim_internal_device_count); i++) {/* loop thru d
         fprintf (sfile, "%.0f\n", uptr->usecs_remaining);/* [V4.0] remaining wait */
         WRITE_I (uptr->pos);
         if (uptr->flags & UNIT_ATT) {
-            fputs (uptr->filename, sfile);
+            if ((uptr->drvtyp != NULL) && (sim_disk_drive_type_set_string (uptr) != NULL))
+                fprintf (sfile, "\001DriveType=%s\001", sim_disk_drive_type_set_string (uptr));
+            fputs (sim_attach_name (uptr), sfile);
             if ((uptr->flags & UNIT_BUF) &&             /* writable buffered */
                 uptr->hwmark &&                         /* files need to be */
                 ((uptr->flags & UNIT_RO) == 0)) {       /* written on save */
@@ -8702,7 +8842,7 @@ void *mbuf = NULL;
 int32 j, blkcnt, limit, unitno, time, flg;
 uint32 us, depth;
 t_addr k, high, old_capac;
-t_value val, mask;
+t_value val, max;
 t_stat r;
 size_t sz;
 t_bool v40, v35, v32;
@@ -8796,7 +8936,7 @@ else {
             for (j = 0; j < dptr->numunits; j++) {      /* loop thru units */
                 uptr = (dptr->units) + j;
                 if (uptr->flags & UNIT_ATT) {           /* attached? */
-                    sim_printf ("warning - leaving %s attached to '%s'\n", sim_uname (uptr), uptr->filename);
+                    sim_printf ("warning - leaving %s attached to '%s'\n", sim_uname (uptr), sim_attach_name (uptr));
                     warned = TRUE;
                     }
                 }
@@ -8875,7 +9015,7 @@ for ( ;; ) {                                            /* device loop */
             (!dont_detach_attach)) {
             r = scp_detach_unit (dptr, uptr);           /* detach it */
             if (r != SCPE_OK) {
-                sim_printf ("Error detaching %s from %s: %s\n", sim_uname (uptr), uptr->filename, sim_error_text (r));
+                sim_printf ("Error detaching %s from %s: %s\n", sim_uname (uptr), sim_attach_name (uptr), sim_error_text (r));
                 r = SCPE_INCOMP;
                 goto Cleanup_Return;
                 }
@@ -8971,10 +9111,13 @@ for ( ;; ) {                                            /* device loop */
             if (depth > rptr->depth)
                 depth = rptr->depth;
             }
-        mask = width_mask[rptr->width];                 /* get mask */
+        if (rptr->maxval > 0)                           /* if a maximum value is defined */
+            max = rptr->maxval;                         /*   then use it */
+        else                                            /* otherwise */
+            max = width_mask[rptr->width];              /*   the mask defines the maximum value */
         for (us = 0; us < depth; us++) {                /* loop thru values */
             READ_I (val);                               /* read value */
-            if (val > mask) {                           /* value ok? */
+            if (val > max) {                            /* value ok? */
                 sim_printf ("Invalid register value: %s %s\n", sim_dname (dptr), buf);
                 }
             else {
@@ -8991,8 +9134,21 @@ for (j=0, r = SCPE_OK; j<attcnt; j++) {
     if ((r == SCPE_OK) && (!dont_detach_attach)) {
         struct stat fstat;
         t_addr saved_pos;
+        char drivetype[CBUFSIZE], filename[CBUFSIZE], cmd[CBUFSIZE * 2];
 
-        sim_debug (SIM_DBG_RESTORE, &sim_scp_dev, "ATTACHING=%s to %s\n", sim_uname (attunits[j]), attnames[j]);
+        if (0 != memcmp (attnames[j], "\001DriveType=", 11)) {
+            strlcpy (filename, attnames[j], sizeof (filename));
+            cmd[0] = drivetype[0] = '\0';
+            }
+        else {
+            const char *fname = get_glyph (attnames[j] + 11, drivetype, '\001');
+
+            strlcpy (filename, fname, sizeof (filename));
+            snprintf (cmd, sizeof (cmd), "%s %s", sim_uname (attunits[j]), drivetype);
+            }
+        sim_debug (SIM_DBG_RESTORE, &sim_scp_dev, "ATTACHING=%s to %s%s%s\n", sim_uname (attunits[j]), filename, drivetype[0] ? " as " : "", drivetype);
+        if (cmd[0])
+            set_cmd (0, cmd);
         dptr = find_dev_from_unit (attunits[j]);
         if ((!force_restore) && 
             (!stat(attnames[j], &fstat)))
@@ -9125,7 +9281,9 @@ if ((flag == RU_RUN) || (flag == RU_GO)) {              /* run or go */
             else
                 new_pcv = strtotv (gbuf, &tptr, sim_PC->radix);/* parse PC */
             if ((tptr == gbuf) || (*tptr != 0) ||       /* error? */
-                (new_pcv > width_mask[sim_PC->width]))
+                (new_pcv > ((sim_PC->maxval > 0)
+                            ? sim_PC->maxval
+                            : (width_mask[sim_PC->width]))))
                 return SCPE_ARG;
             new_pc = TRUE;
             }
@@ -9248,7 +9406,7 @@ for (i = 1; (dptr = sim_devices[i]) != NULL; i++) {     /* reposition all */
         if ((uptr->flags & (UNIT_ATT + UNIT_SEQ)) == (UNIT_ATT + UNIT_SEQ))
             if (sim_can_seek (uptr->fileref) &&
                 (0 != sim_fseek (uptr->fileref, uptr->pos, SEEK_SET)))
-                return sim_messagef (SCPE_IERR, "Can't seek to %u in %s for %s\n", (unsigned)uptr->pos, uptr->filename, sim_uname (uptr));
+                return sim_messagef (SCPE_IERR, "Can't seek to %u in %s for %s\n", (unsigned)uptr->pos, sim_attach_name (uptr), sim_uname (uptr));
         }
     }
 if ((r = sim_ttrun ()) != SCPE_OK) {                    /* set console mode */
@@ -9724,7 +9882,7 @@ t_stat exdep_addr_loop (FILE *ofile, SCHTAB *schptr, int32 flag, const char *cpt
     t_addr low, t_addr high, DEVICE *dptr, UNIT *uptr)
 {
 t_addr i, mask;
-t_stat reason;
+t_stat reason, dfltinc;
 int32 saved_switches = sim_switches;
 
 if (uptr->flags & UNIT_DIS)                             /* disabled? */
@@ -9732,22 +9890,25 @@ if (uptr->flags & UNIT_DIS)                             /* disabled? */
 mask = (t_addr) width_mask[dptr->awidth];
 if ((low > mask) || (high > mask) || (low > high))
     return SCPE_ARG;
+dfltinc =  parse_sym ("0", 0, uptr, sim_eval, sim_switches);
+if (dfltinc > 0)                                        /* parse_sym doing nums? */
+    dfltinc = 1 - dptr->aincr;                          /* no, use std dflt incr */
 for (i = low; i <= high; ) {                            /* all paths must incr!! */
     reason = get_aval (i, dptr, uptr);                  /* get data */
     sim_switches = saved_switches;
     if (reason != SCPE_OK)                              /* return if error */
         return reason;
     if (schptr && !test_search (sim_eval, schptr))
-        i = i + dptr->aincr;                            /* sch fails, incr */
+        i = i + (1 - dfltinc);                          /* sch fails, incr */
     else {                                              /* no sch or success */
         if (flag != EX_D) {                             /* ex, ie, or id? */
-            reason = ex_addr (ofile, flag, i, dptr, uptr);
+            reason = ex_addr (ofile, flag, i, dptr, uptr, dfltinc);
             sim_switches = saved_switches;
             if (reason > SCPE_OK)
                 return reason;
             }
         else
-            reason = 1 - dptr->aincr;                   /* no, dflt incr */
+            reason = dfltinc;                           /* no, dflt incr */
         if (flag != EX_E) {                             /* ie, id, or d? */
             reason = dep_addr (flag, cptr, i, dptr, uptr, reason);
             sim_switches = saved_switches;
@@ -9811,53 +9972,47 @@ return SCPE_OK;
         idx     =       index
    Outputs:
         return  =       register value
+
+   Implementation notes:
+
+    1. The stride is the size of the element spacing for arrays, which is
+       equivalent to the addressing increment for array subscripting.  For
+       scalar registers, the stride will be zero (as will the idx value), so the
+       access pointer is same as the specified location pointer.
+
+    2. The size of the t_value type is determined by the USE_INT64 symbol and
+       will be either a 32-bit or a 64-bit type.  It represents the largest
+       value that can be returned and so is the default if one of the smaller
+       sizes is not indicated.  If USE_INT64 is not defined, t_value will be
+       identical to uint32.  In this case, compilers are generally smart enough
+       to eliminate the 32-bit size test and combine the two assignments into a
+       single default assignment.
 */
 
 t_value get_rval (REG *rptr, uint32 idx)
 {
-size_t sz;
 t_value val;
-uint32 *ptr;
+void    *ptr;
 
-sz = SZ_R (rptr);
-if ((rptr->depth > 1) && (rptr->flags & REG_CIRC)) {
-    idx = idx + rptr->qptr;
-    if (idx >= rptr->depth) idx = idx - rptr->depth;
-    }
-if ((rptr->depth > 1) && (rptr->flags & REG_UNIT)) {
-    ptr = (uint32 *)(((UNIT *) rptr->loc) + idx);
-#if defined (USE_INT64)
-    if (sz <= sizeof (uint32))
-        val = *ptr;
-    else val = *((t_uint64 *) ptr);
-#else
-    val = *ptr;
-#endif
-    }
-else if ((rptr->depth > 1) && (rptr->flags & REG_STRUCT)) {
-    ptr = (uint32 *)(((size_t) rptr->loc) + (idx * rptr->str_size));
-#if defined (USE_INT64)
-    if (sz <= sizeof (uint32))
-        val = *ptr;
-    else val = *((t_uint64 *) ptr);
-#else
-    val = *ptr;
-#endif
-    }
-else if (((rptr->depth > 1) || (rptr->flags & REG_FIT)) &&
-    (sz == sizeof (uint8)))
-    val = *(((uint8 *) rptr->loc) + idx);
-else if (((rptr->depth > 1) || (rptr->flags & REG_FIT)) &&
-    (sz == sizeof (uint16)))
-    val = *(((uint16 *) rptr->loc) + idx);
-#if defined (USE_INT64)
-else if (sz <= sizeof (uint32))
-     val = *(((uint32 *) rptr->loc) + idx);
-else val = *(((t_uint64 *) rptr->loc) + idx);
-#else
-else val = *(((uint32 *) rptr->loc) + idx);
-#endif
-val = (val >> rptr->offset) & width_mask[rptr->width];
+if ((rptr->depth > 1) && (rptr->flags & REG_CIRC))      /* if the register is a circular queue */
+    idx = (idx + rptr->qptr) % rptr->depth;             /*   then adjust the index relative to the queue (wrapped as needed) */
+
+ptr = ((char *) rptr->loc) + (idx * rptr->stride);      /* point at the starting byte of the item */
+
+if (rptr->size == sizeof (uint8))                       /* get the value */
+    val = *((uint8 *) ptr);                             /*   using a size */
+                                                        /*     appropriate to */
+else if (rptr->size == sizeof (uint16))                 /*       the size of */
+    val = *((uint16 *) ptr);                            /*         the underlying type */
+
+else if (rptr->size == sizeof (uint32))
+    val = *((uint32 *) ptr);
+
+else                                                    /* if the element size is non-standard */
+    val = *((t_value *) ptr);                           /*   then access using the largest size permitted */
+
+val = (val >> rptr->offset) & width_mask[rptr->width];  /* shift and mask to obtain the final value */
+
 return val;
 }
 
@@ -9875,7 +10030,7 @@ return val;
 t_stat dep_reg (int32 flag, CONST char *cptr, REG *rptr, uint32 idx)
 {
 t_stat r;
-t_value val, mask;
+t_value val, max;
 int32 rdx;
 CONST char *tptr;
 char gbuf[CBUFSIZE];
@@ -9887,24 +10042,27 @@ if (rptr->flags & REG_RO)
 if (flag & EX_I) {
     cptr = read_line (gbuf, sizeof(gbuf), stdin);
     if (sim_log)
-        fprintf (sim_log, "%s\n", cptr? cptr: "");
+        fprintf (sim_log, "%s\n", cptr? cptr: "");      /* fix clang error */
     if (cptr == NULL)                                   /* force exit */
         return 1;
     if (*cptr == 0)                                     /* success */
         return SCPE_OK;
     }
-mask = width_mask[rptr->width];
+if (rptr->maxval > 0)                                   /* if a maximum value is defined */
+    max = rptr->maxval;                                 /*   then use it */
+else                                                    /* otherwise */
+    max = width_mask[rptr->width];                      /*   the mask defines the maximum value */
 GET_RADIX (rdx, rptr->radix);
 if ((rptr->flags & REG_VMAD) && sim_vm_parse_addr) {    /* address form? */
     val = sim_vm_parse_addr (sim_dflt_dev, cptr, &tptr);
-    if ((tptr == cptr) || (*tptr != 0) || (val > mask))
+    if ((tptr == cptr) || (*tptr != 0) || (val > max))
         return SCPE_ARG;
     }
 else
     if (!(rptr->flags & REG_VMFLAGS) ||                 /* dont use sym? */
         (parse_sym ((CONST char *)cptr, (rptr->flags & REG_UFMASK) | rdx, NULL,
                     &val, sim_switches | SIM_SW_REG) > SCPE_OK)) {
-    val = get_uint (cptr, rdx, mask, &r);
+    val = get_uint (cptr, rdx, max, &r);
     if (r != SCPE_OK)
         return SCPE_ARG;
     }
@@ -9923,76 +10081,56 @@ return SCPE_OK;
         mask    =       mask
    Outputs:
         none
+
+
+   Implementation notes:
+
+    1. mask and val are of type t_value, so an explicit cast is not needed for
+       that type of assignment.
+
+    2. See the notes for the get_rval routine for additional information
+       regarding the stride calculation and the t_value default assignment,
 */
 
 void put_rval_pcchk (REG *rptr, uint32 idx, t_value val, t_bool pc_chk)
 {
-size_t sz;
 t_value mask;
-uint32 *ptr;
+void    *ptr;
 t_value prev_val = 0;
 
 if ((!(sim_switches & SWMASK ('Z'))) && 
     (rptr->flags & REG_DEPOSIT) && sim_vm_reg_update)
     prev_val = get_rval (rptr, idx);
 
-#define PUT_RVAL(sz,rp,id,v,m) \
-    *(((sz *) rp->loc) + id) = \
-            (sz)((*(((sz *) rp->loc) + id) & \
-            ~((m) << (rp)->offset)) | ((v) << (rp)->offset))
+if (pc_chk && (rptr == sim_PC))                         /* if the PC is changing */
+    sim_brk_npc (0);                                    /*   then notify the breakpoint package */
 
-if (pc_chk && (rptr == sim_PC))
-    sim_brk_npc (0);
-sz = SZ_R (rptr);
-mask = width_mask[rptr->width];
-if ((rptr->depth > 1) && (rptr->flags & REG_CIRC)) {
-    idx = idx + rptr->qptr;
-    if (idx >= rptr->depth)
-        idx = idx - rptr->depth;
-    }
-if ((rptr->depth > 1) && (rptr->flags & REG_UNIT)) {
-    ptr = (uint32 *)(((UNIT *) rptr->loc) + idx);
-#if defined (USE_INT64)
-    if (sz <= sizeof (uint32))
-        *ptr = (*ptr &
-        ~(((uint32) mask) << rptr->offset)) |
-        (((uint32) val) << rptr->offset);
-    else *((t_uint64 *) ptr) = (*((t_uint64 *) ptr)
-        & ~(mask << rptr->offset)) | (val << rptr->offset);
-#else
-    *ptr = (*ptr &
-        ~(((uint32) mask) << rptr->offset)) |
-        (((uint32) val) << rptr->offset);
-#endif
-    }
-else if ((rptr->depth > 1) && (rptr->flags & REG_STRUCT)) {
-    ptr = (uint32 *)(((size_t)rptr->loc) + (idx * rptr->str_size));
-#if defined (USE_INT64)
-    if (sz <= sizeof (uint32))
-        *((uint32 *) ptr) = (*((uint32 *) ptr) &
-        ~(((uint32) mask) << rptr->offset)) |
-        (((uint32) val) << rptr->offset);
-    else *((t_uint64 *) ptr) = (*((t_uint64 *) ptr)
-        & ~(mask << rptr->offset)) | (val << rptr->offset);
-#else
-    *ptr = (*ptr &
-        ~(((uint32) mask) << rptr->offset)) |
-        (((uint32) val) << rptr->offset);
-#endif
-    }
-else if (((rptr->depth > 1) || (rptr->flags & REG_FIT)) &&
-    (sz == sizeof (uint8)))
-    PUT_RVAL (uint8, rptr, idx, (uint32) val, (uint32) mask);
-else if (((rptr->depth > 1) || (rptr->flags & REG_FIT)) &&
-    (sz == sizeof (uint16)))
-    PUT_RVAL (uint16, rptr, idx, (uint32) val, (uint32) mask);
-#if defined (USE_INT64)
-else if (sz <= sizeof (uint32))
-    PUT_RVAL (uint32, rptr, idx, (int32) val, (uint32) mask);
-else PUT_RVAL (t_uint64, rptr, idx, val, mask);
-#else
-else PUT_RVAL (uint32, rptr, idx, val, mask);
-#endif
+mask = ~(width_mask [rptr->width] << rptr->offset);     /* set up a mask to produce a hole in the element */
+val  = val << rptr->offset;                             /*   and position the new value to fit the hole */
+
+if ((rptr->depth > 1) && (rptr->flags & REG_CIRC))      /* if the register is a circular queue */
+    idx = (idx + rptr->qptr) % rptr->depth;             /*   then adjust the index relative to the queue (wrapped as needed) */
+
+ptr = ((char *) rptr->loc) + (idx * rptr->stride);      /* point at the starting byte of the item */
+
+if (rptr->size == sizeof (uint8))                       /* store the value */
+    *((uint8 *) ptr) =                                  /*   using a size */
+       (uint8) ((*((uint8 *) ptr) & mask) | val);        /*     appropriate to */
+                                                        /*       the size of */
+else
+    if (rptr->size == sizeof (uint16))                  /*         the underlying type */
+        *((uint16 *) ptr) =
+          (uint16) ((*((uint16 *) ptr) & mask) | val);
+
+    else 
+        if (rptr->size == sizeof (uint32))
+            *((uint32 *) ptr) =
+              (uint32) ((*((uint32 *) ptr) & mask) | val);
+
+        else                                            /* if the element size is non-standard */
+            *((t_value *) ptr) =                        /*   then access using the largest size permitted */
+              (*((t_value *) ptr) & mask) | val;
+
 if ((!(sim_switches & SWMASK ('Z'))) && 
     (rptr->flags & REG_DEPOSIT) && sim_vm_reg_update)
     sim_vm_reg_update (rptr, idx, prev_val, val);
@@ -10012,12 +10150,13 @@ put_rval_pcchk (rptr, idx, val, TRUE);
         addr    =       address to examine
         dptr    =       pointer to device
         uptr    =       pointer to unit
+        dfltinc =       default increment
    Outputs:
         return  =       if > 0, error status
                         if <= 0,-number of extra addr units retired
 */
 
-t_stat ex_addr (FILE *ofile, int32 flag, t_addr addr, DEVICE *dptr, UNIT *uptr)
+t_stat ex_addr (FILE *ofile, int32 flag, t_addr addr, DEVICE *dptr, UNIT *uptr, int32 dfltinc)
 {
 t_stat reason;
 int32 rdx;
@@ -10027,12 +10166,12 @@ if (sim_vm_fprint_addr)
 else fprint_val (ofile, addr, dptr->aradix, dptr->awidth, PV_LEFT);
 fprintf (ofile, ":\t");
 if (!(flag & EX_E))
-    return (1 - dptr->aincr);
+    return dfltinc;
 
 GET_RADIX (rdx, dptr->dradix);
 if ((reason = fprint_sym (ofile, addr, sim_eval, uptr, sim_switches)) > 0) {
     fprint_val (ofile, sim_eval[0], rdx, dptr->dwidth, PV_RZRO);
-    reason = 1 - dptr->aincr;
+    reason = dfltinc;
     }
 if (flag & EX_I)
     fprintf (ofile, "\t");
@@ -10075,7 +10214,8 @@ for (i = 0, j = addr; i < sim_emax; i++, j = j + dptr->aincr) {
         if (!(uptr->flags & UNIT_ATT))
             return SCPE_UNATT;
         if ((uptr->dynflags & UNIT_NO_FIO) ||
-            (uptr->fileref == NULL))
+            (uptr->fileref == NULL) ||
+            (sim_can_seek (uptr->fileref) == FALSE))
             return SCPE_NOFNC;
         if ((uptr->flags & UNIT_FIX) && (j >= uptr->capac)) {
             reason = SCPE_NXM;
@@ -10151,7 +10291,7 @@ if (uptr->flags & UNIT_RO)                              /* read only? */
     return sim_messagef (SCPE_RO, "%s is read only.\n"
                                   "%sse a writable device to change %s\n", 
                                   sim_uname (uptr), (uptr->flags & UNIT_ROABLE) ? "Attach Read/Write or u" : "U",
-                                  uptr->filename ? uptr->filename : "it");
+                                  uptr->filename ? sim_attach_name (uptr) : "it");
 mask = width_mask[dptr->dwidth];
 
 GET_RADIX (rdx, dptr->dradix);
@@ -10173,7 +10313,8 @@ for (i = 0, j = addr; i < count; i++, j = j + dptr->aincr) {
     else {
         if (!(uptr->flags & UNIT_ATT))
             return SCPE_UNATT;
-        if (uptr->dynflags & UNIT_NO_FIO)
+        if ((uptr->dynflags & UNIT_NO_FIO) || 
+            (sim_can_seek (uptr->fileref) == FALSE))
             return SCPE_NOFNC;
         if ((uptr->flags & UNIT_FIX) && (j >= uptr->capac))
             return SCPE_NXM;
@@ -10871,6 +11012,13 @@ if ((dptr = find_dev (cptr))) {                         /* exact match? */
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* base + unit#? */
     if (qdisable (dptr))                                /* device disabled? */
         continue;
+    for (u = 0; u < dptr->numunits; u++) {              /* Look for user defined unit names first */
+        if ((dptr->units[u].lname == NULL) ||
+            (strcmp (cptr, dptr->units[u].lname) != 0))
+            continue;
+        *uptr = &dptr->units[u];
+        return dptr;
+        }
     if (dptr->numunits &&                               /* any units? */
         (((nptr = dptr->name) &&
           (strncmp (cptr, nptr, strlen (nptr)) == 0)) ||
@@ -11664,7 +11812,6 @@ return val * negate;
 t_stat sprint_val (char *buffer, t_value val, uint32 radix,
     uint32 width, uint32 format)
 {
-#define MAX_WIDTH ((int) ((CHAR_BIT * sizeof (t_value) * 4 + 3)/3))
 t_value owtest, wtest;
 t_bool negative = FALSE;
 int32 d, digit, ndigits, commas = 0;
@@ -11675,8 +11822,7 @@ if (((format == PV_LEFTSIGN) || (format == PV_RCOMMASIGN)) &&
     val = (t_value)(-((t_svalue)val));
     negative = TRUE;
     }
-for (d = 0; d < MAX_WIDTH; d++)
-    dbuf[d] = (format == PV_RZRO)? '0': ' ';
+memset (dbuf, (format == PV_RZRO)? '0': ' ', MAX_WIDTH);
 dbuf[MAX_WIDTH] = 0;
 d = MAX_WIDTH;
 do {
@@ -12191,10 +12337,9 @@ if (sim_clock_queue != QUEUE_LIST_END)
 else
     sim_interval = noqueue_time = NOQUEUE_WAIT;
 if (uptr->next) {
-    sim_printf ("Cancel failed for %s\n", sim_uname(uptr));
-    if (sim_deb)
-        fclose(sim_deb);
-    abort ();
+    char buf[128];
+    snprintf (buf, sizeof (buf), "Cancel failed for %s\n", sim_uname(uptr));
+    SIM_SCP_ABORT (buf);
     }
 return SCPE_OK;
 }
@@ -12536,13 +12681,13 @@ while (bp) {
         if (bp == sim_brk_tab[sim_brk_ins])
             bpl = sim_brk_tab[sim_brk_ins] = bp->next;  /* remove from head of list */
         else
-            bpl->next = bp->next;                       /* remove from middle of list */
+            bpl->next = bp->next;                       /* remove from middle or end of list */
         free (bp);
         bp = bpl;
         }
     else {
         bpl = bp;
-        bp = bp->next;
+        bp = bpl->next;
         }
     }
 if (sim_brk_tab[sim_brk_ins] == NULL) {                 /* erased entry */
@@ -12844,13 +12989,14 @@ if (spc < SIM_BKPT_N_SPC) {
 const char *sim_brk_message(void)
 {
 static char msg[256];
-char addr[65];
+char addr[MAX_WIDTH + 1];
 char buf[32];
 
 msg[0] = '\0';
 if (sim_vm_sprint_addr)
     sim_vm_sprint_addr (addr, sim_dflt_dev, (t_value)sim_brk_match_addr);
-else sprint_val (addr, (t_value)sim_brk_match_addr, sim_dflt_dev->aradix, sim_dflt_dev->awidth, PV_LEFT);
+else 
+    sprint_val (addr, (t_value)sim_brk_match_addr, sim_dflt_dev->aradix, sim_dflt_dev->awidth, PV_LEFT);
 if (sim_brk_type_desc) {
     BRKTYPTAB *brk = sim_brk_type_desc;
 
@@ -13559,6 +13705,15 @@ if (cond > SCPE_MAX_ERR)
 return SCPE_OK;    
 }
 
+/* Abort and sanely close output files */
+/* This routine should ONLY be called from SCP modules */
+void _sim_scp_abort (const char *msg, const char *file, int linenum)
+{
+sim_printf ("%s - aborting from %s:%d\n", msg, file, linenum);
+sim_flush_buffered_files ();
+abort ();
+}
+
 /* Debug printout routines, from Dave Hittner */
 
 const char *debug_bstates = "01_^";
@@ -13707,7 +13862,6 @@ int32 saved_quiet = sim_quiet;
 int32 saved_sim_switches = sim_switches;
 int32 saved_deb_switches = sim_deb_switches;
 struct timespec saved_deb_basetime = sim_deb_basetime;
-char saved_debug_filename[CBUFSIZE];
 
 if (sim_deb == NULL)                                    /* no debug? */
     return SCPE_OK;
@@ -13719,9 +13873,11 @@ if (sim_deb == sim_log) {                               /* debug is log */
     return SCPE_OK;
     }
 
-if (!(saved_deb_switches & SWMASK ('B'))) {
-    strcpy (saved_debug_filename, sim_logfile_name (sim_deb, sim_deb_ref));
-
+if ((saved_deb_switches & SWMASK ('B')) != 0) {
+    char saved_debug_filename[CBUFSIZE];
+    
+    snprintf (saved_debug_filename, sizeof (saved_debug_filename), "%u %s", 
+                           (uint32)(sim_deb_buffer_size / (1024 * 1024)), sim_logfile_name (sim_deb, sim_deb_ref));
     sim_quiet = 1;
     sim_set_deboff (0, NULL);
     sim_switches = saved_deb_switches;
@@ -13767,11 +13923,11 @@ static const char *sim_debug_prefix (uint32 dbits, DEVICE* dptr, UNIT* uptr)
 const char* debug_type = _get_dbg_verb (dbits, dptr, uptr);
 char tim_t[32] = "";
 char tim_a[32] = "";
-char pc_s[64] = "";
+char pc_s[MAX_WIDTH + 33] = "";
 struct timespec time_now;
 
 if (sim_deb_switches & (SWMASK ('T') | SWMASK ('R') | SWMASK ('A'))) {
-    sim_rtcn_get_time(&time_now, 0);
+    sim_rtcn_debug_time(&time_now);
     if (sim_deb_switches & SWMASK ('R'))
         sim_timespec_diff (&time_now, &time_now, &sim_deb_basetime);
     if (sim_deb_switches & SWMASK ('T')) {
@@ -13800,7 +13956,7 @@ if (sim_deb_switches & SWMASK ('P')) {
     sprintf(pc_s, "-%s:", sim_PC->name);
     sprint_val (&pc_s[strlen(pc_s)], val, sim_PC->radix, sim_PC->width, sim_PC->flags & REG_FMT);
     }
-sprintf(debug_line_prefix, "DBG(%s%s%.0f%s)%s> %s %s: ", tim_t, tim_a, sim_gtime(), pc_s, AIO_MAIN_THREAD ? "" : "+", dptr->name, debug_type);
+snprintf(debug_line_prefix, sizeof (debug_line_prefix), "DBG(%s%s%.0f%s)%s> %s %s: ", tim_t, tim_a, sim_gtime(), pc_s, AIO_MAIN_THREAD ? "" : "+", dptr->name, debug_type);
 return debug_line_prefix;
 }
 
@@ -13994,7 +14150,7 @@ if (sim_do_ocptr[sim_do_depth]) {
         sim_cmd_echoed = TRUE;
         }
     else {
-        if (sim_deb) {                      /* Always put context in debug output */
+        if (sim_deb && !sim_cmd_echoed) {   /* Always put context in debug output */
             TMLN *saved_oline = sim_oline;
 
             sim_oline = NULL;               /* avoid potential debug to active socket */
@@ -15855,7 +16011,7 @@ return ((*gptr == '\0') && (*string));
 static t_svalue sim_eval_postfix (Stack *stack1, t_stat *stat)
 {
 Stack *stack2 = new_Stack();    /* local working stack2 which is holds the numbers operators */
-char temp_data[CBUFSIZE];       /* Holds the items popped from the stack2 */
+char temp_data[CBUFSIZE + 2];   /* Holds the items popped from the stack2 */
 Operator *temp_op;
 t_svalue temp_val;
 char temp_string[CBUFSIZE + 2];
@@ -16061,21 +16217,33 @@ if (devices == NULL)                        /* Test DEVICE not provided? */
 
 for (i = 0; (dptr = devices[i]) != NULL; i++) {
     REG *rptr;
+    int reg_entry = -1;
 
     for (rptr = dptr->registers; (rptr != NULL) && (rptr->name != NULL); rptr++) {
         uint32 bytes = 1;
         uint32 rsz = SZ_R(rptr);
-        uint32 memsize = ((rptr->flags & REG_FIT) || (rptr->depth > 1)) ? rptr->depth * rsz : 4;
+        uint32 memsize = (rptr->depth >= 1) ? rptr->depth * rsz : rsz;
         DEVICE *udptr = NULL;
         t_bool Bad;
+        REG *arptr;
+        int amb_entry = -1;
+
+        ++reg_entry;
+        for (arptr = dptr->registers; (arptr != NULL) && (arptr->name != NULL); arptr++) {
+            ++amb_entry;
+            if ((arptr != rptr) && (strcmp (rptr->name, arptr->name) == 0)) /* ambiguous name? */
+                break;
+            }
+        if ((arptr != NULL) && (arptr->name == NULL))
+            arptr = NULL;
 
         while ((bytes << 3) < rptr->offset + rptr->width)
             bytes <<= 1;
 
         if (rptr->depth > 1)
-            bytes = rptr->ele_size;
+            bytes = rptr->size;
 
-        if (rptr->flags & REG_UNIT) {
+        if (rptr->macro && (strstr (rptr->macro, "URDATA") != NULL)) {
             DEVICE **d;
 
             for (d = devices; *d != NULL; d++) {
@@ -16096,10 +16264,11 @@ for (i = 0; (dptr = devices[i]) != NULL; i++) {
             }
 
         if (sim_switches & SWMASK ('R'))            /* Debug output */
-            sim_printf ("%5s:%-9.9s %s(rdx=%u, wd=%u, off=%u, dep=%u, strsz=%u, objsz=%u, elesz=%u, rsz=%u, %s %s%s%s membytes=%u)\n", dptr->name, rptr->name, rptr->macro, 
-                        rptr->radix, rptr->width, rptr->offset, rptr->depth, (uint32)rptr->str_size, (uint32)rptr->obj_size, (uint32)rptr->ele_size, rsz, rptr->desc ? rptr->desc : "",
-                        (rptr->flags & REG_FIT) ? "REG_FIT" : "", (rptr->flags & REG_VMIO) ? " REG_VMIO" : "", (rptr->flags & REG_STRUCT) ? " REG_STRUCT" : "",
-                        memsize);
+            sim_printf ("%5s:%-9.9s %s%s%s(rdx=%u, wd=%u, off=%u, dep=%u, strsz=%u, objsz=%u, elesz=%u, rsz=%u, %s%s%s membytes=%u)\n", 
+                        dptr->name, rptr->name, rptr->desc ? rptr->desc : "", rptr->desc ? "\n\t" : "", rptr->macro ? rptr->macro : "", 
+                        rptr->radix, rptr->width, rptr->offset, rptr->depth, (uint32)rptr->stride, (uint32)rptr->obj_size, (uint32)rptr->size, rsz,
+                        (rptr->flags & REG_VMAD) ? " REG_VMAD" : "", (rptr->flags & REG_VMIO) ? " REG_VMIO" : "",
+                        (rptr->flags & REG_DEPOSIT) ? " REG_DEPOSIT" : "", memsize);
 
         MFlush (f);
         if (rptr->depth == 1) {
@@ -16118,43 +16287,63 @@ for (i = 0; (dptr = devices[i]) != NULL; i++) {
             Bad = TRUE;
             Mprintf (f, "a 0 bit wide register is meaningless\n");
             }
-        if ((rptr->obj_size != 0) && (rptr->ele_size != 0) && (rptr->depth != 0) && (rptr->macro != NULL)) {
-            if (rptr->flags & REG_UNIT) {
-                if (udptr == NULL) {
-                    Bad = TRUE;
-                    Mprintf (f, "\tthe indicated UNIT can't be found for this %u depth array\n", rptr->depth);
+        if (arptr != NULL) {
+            Bad = TRUE;
+            Mprintf (f, "\tThe %s DEVICE's REGister entry #%d has an identical name\n", dptr->name, amb_entry + 1);
+            Mprintf (f, "\ttherefore EXAMINE and SAVE operations will reference %u byte%s\n", bytes, (bytes != 1) ? "s" : "");
+            Mprintf (f, "\tand DEPOSIT and RESTORE operations will affect %u byte%s of memory\n", bytes, (bytes != 1) ? "s" : "");
+            Mprintf (f, "\tinconsistently.\n");
+            }
+        if (!Bad) {
+            if ((rptr->obj_size != 0) && (rptr->size != 0) && (rptr->depth != 0) && (rptr->macro != NULL)) {
+                if (strstr (rptr->macro, "URDATA") != NULL) {
+                    if (udptr == NULL) {
+                        Bad = TRUE;
+                        Mprintf (f, "\tthe indicated UNIT can't be found for this %u depth array\n", rptr->depth);
+                        }
+                    else {
+                        UNIT *uptr;
+
+                        for (uptr = udptr->units; (uint32)(uptr - udptr->units) < udptr->numunits; uptr++) {
+                            if (((char *)rptr->loc) < (char *)(uptr + 1))
+                                break;
+                            }
+                        if ((rptr->depth + (uptr - udptr->units)) > udptr->numunits) {
+                            Bad = TRUE;
+                            Mprintf (f, "\tthe %u depth of the UNIT array exceeds the number of units on the %s device which is %u\n", rptr->depth, dptr->name, udptr->numunits);
+                            }
+                        if (rptr->obj_size > sizeof (t_value)) {
+                            Bad = TRUE;
+                            Mprintf (f, "\t%u is larger than the size of the t_value type (%u)\n", (uint32)rptr->obj_size, (uint32)sizeof (t_value));
+                            }
+                        }
                     }
                 else {
-                    if (rptr->depth > udptr->numunits) {
-                        Bad = TRUE;
-                        Mprintf (f, "\tthe depth of the UNIT array exceeds the number of units on the %s device which is %u\n", dptr->name, udptr->numunits);
-                        }
-                    if (rptr->obj_size > sizeof (t_value)) {
-                        Bad = TRUE;
-                        Mprintf (f, "\t%u is larger than the size of the t_value type (%u)\n", (uint32)rptr->obj_size, (uint32)sizeof (t_value));
-                        }
+                    bytes *= rptr->depth;
+                    if (!Bad) 
+                        if ((rsz * rptr->depth == rptr->obj_size)                                                   ||
+                            ((rptr->macro && (strstr (rptr->macro, "STRDATA") != NULL)) && (rsz <= rptr->obj_size)) ||
+                            ((rptr->depth == 1) && 
+                             ((rptr->obj_size == sizeof (t_value)) || (rsz < rptr->obj_size)))          ||
+                            ((rptr->depth != 1) && (bytes == rptr->obj_size))                           ||
+                            ((rptr->depth != 1) && (rptr->offset == 0) && (rptr->width == 8) &&
+                             ((rptr->depth == rptr->obj_size) || (rptr->depth == rptr->obj_size - 1)))  ||
+                            ((rptr->depth != 1) && (rptr->offset == 0) && (rptr->obj_size == rptr->size)))
+                        continue;
+                    Bad = TRUE;
+                    Mprintf (f, "\ttherefore EXAMINE and SAVE operations will reference %u byte%s\n", bytes, (bytes != 1) ? "s" : "");
+                    Mprintf (f, "\tand DEPOSIT and RESTORE operations will affect %u byte%s of memory\n", bytes, (bytes != 1) ? "s" : "");
+                    Mprintf (f, "\twhile the variable lives in %u bytes of memory\n", (uint32)rptr->obj_size);
                     }
                 }
             else {
-                bytes *= rptr->depth;
-                if (!Bad) 
-                    if ((rsz * rptr->depth == rptr->obj_size)                                       ||
-                        ((rptr->flags & REG_STRUCT) && (rsz <= rptr->obj_size))                     ||
-                        ((rptr->depth == 1) && 
-                         ((rptr->obj_size == sizeof (t_value)) || (rsz < rptr->obj_size)))          ||
-                        ((rptr->depth != 1) && (bytes == rptr->obj_size))                           ||
-                        ((rptr->depth != 1) && (rptr->offset == 0) && (rptr->width == 8) &&
-                         ((rptr->depth == rptr->obj_size) || (rptr->depth == rptr->obj_size - 1)))  ||
-                        ((rptr->depth != 1) && (rptr->offset == 0) && (rptr->obj_size == rptr->ele_size)))
-                    continue;
                 Bad = TRUE;
-                Mprintf (f, "\ttherefore SAVE/RESTORE operations will affect %u byte%s of memory\n", bytes, (bytes != 1) ? "s" : "");
-                Mprintf (f, "\twhile the variable lives in %u bytes of memory\n", (uint32)rptr->obj_size);
+                Mprintf (f, "\tthe %s DEVICE %d REGister entry is not properly initialized\n", dptr->name, reg_entry);
                 }
             }
-        else
-            Mprintf (f, "\tthis register entry is not properly initialized\n");
         if (Bad) {
+            if (rptr->source_file != NULL)
+                fprintf (stdout, "In %s at line %d:\n", rptr->source_file, rptr->source_line);
             FMwrite (stdout, f);
             stat = SCPE_IERR;
             }
@@ -16164,31 +16353,123 @@ MClose (f);
 return stat;
 }
 
+static t_stat sim_device_unit_tests (const char *cptr)
+{
+int i;
+DEVICE *dptr;
+t_stat stat = SCPE_OK;
+
+for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
+    if (dptr->unit_test != NULL) {
+        sim_printf ("Running Unit Test for %s device:\n", dptr->name);
+        stat = dptr->unit_test (dptr, cptr);
+        }
+    }
+return stat;
+}
+
+
 uint8 treg8;
 uint16 treg16;
 uint32 treg32;
 t_value tregval;
+uint16 treg16array[5];
+uint16 treg16arrayx2[5][4];
+
+
+static UNIT validate_units[3];
 
 static struct validation_test {
-    REG reg[5];
+    REG reg[7];
     t_stat expected_result;
     } validations[] = {
-        { { { ORDATAD (REG8,   treg8,   8*sizeof(treg8),   "8 bit register") },
-            { ORDATAD (REG16,  treg16,  8*sizeof(treg16),  "16 bit register") },
-            { ORDATAD (REG32,  treg32,  8*sizeof(treg32),  "32 bit register") },
-            { ORDATAD (REGVAL, tregval, 8*sizeof(tregval), "value register") },
+        { { { SRDATAD (AMBIG,   validate_units,   pos,   10, 32, 0, 3, "a basic register array") },
+            { SRDATAD (AMBIG,   validate_units,   u3,    10, 32, 0, 3, "an ambiguously named register array") },
+            {NULL} },
+         SCPE_IERR},
+        { { { ORDATAD (OREG8,   treg8,   8*sizeof(treg8),   "8 bit register") },
+            { ORDATAD (OREG16,  treg16,  8*sizeof(treg16),  "16 bit register") },
+            { ORDATAD (OREG32,  treg32,  8*sizeof(treg32),  "32 bit register") },
+            { ORDATAD (OREGVAL, tregval, 8*sizeof(tregval), "value register") },
             {NULL} },
          SCPE_OK},
-        { { { ORDATAD (REG8,   treg8,   8*sizeof(treg8),   "8 bit register") },
-            { ORDATAD (REG16,  treg16,  8*sizeof(treg16),  "16 bit register") },
-            { ORDATAD (REG32,  treg32,  8*sizeof(treg32),  "32 bit register") },
-            { ORDATAD (REGVAL, tregval, 8*sizeof(tregval), "value register") },
+        { { { DRDATAD (DREG8,   treg8,   8*sizeof(treg8),   "8 bit register") },
+            { DRDATAD (DREG16,  treg16,  8*sizeof(treg16),  "16 bit register") },
+            { DRDATAD (DREG32,  treg32,  8*sizeof(treg32),  "32 bit register") },
+            { DRDATAD (DREGVAL, tregval, 8*sizeof(tregval), "value register") },
+            {NULL} },
+         SCPE_OK},
+        { { { HRDATAD (HREG8,   treg8,   8*sizeof(treg8),   "8 bit register") },
+            { HRDATAD (HREG16,  treg16,  8*sizeof(treg16),  "16 bit register") },
+            { HRDATAD (HREG32,  treg32,  8*sizeof(treg32),  "32 bit register") },
+            { HRDATAD (HREGVAL, tregval, 8*sizeof(tregval), "value register") },
+            {NULL} },
+         SCPE_OK},
+        { { { BINRDATAD (BINREG8,   treg8,   8*sizeof(treg8),   "8 bit register") },
+            { BINRDATAD (BINREG16,  treg16,  8*sizeof(treg16),  "16 bit register") },
+            { BINRDATAD (BINREG32,  treg32,  8*sizeof(treg32),  "32 bit register") },
+            { BINRDATAD (BINREGVAL, tregval, 8*sizeof(tregval), "value register") },
+            {NULL} },
+         SCPE_OK},
+        { { { FLDATAD (FLREG8,   treg8,   0,                    "Flag in 0'th bit of 8 bit register") },
+            { FLDATAD (FLREG87,  treg8,   (8*sizeof(treg8)-1),  "Flag in 7'th bit of 8 bit register") },
+            { FLDATAD (FLREG160, treg16,  0,                    "Flag in 0'th bit of 16 bit register") },
+            { FLDATAD (FLREG1615,treg16,  (8*sizeof(treg16)-1), "Flag in 15'th bit of 16 bit register") },
+            { FLDATAD (FLREG320, treg32,  0,                    "Flag in 0'th bit of 32 bit register") },
+            { FLDATAD (FLREG3231,treg32,  (8*sizeof(treg32)-1), "Flag in 31'st bit of 32 bit register") },
+            {NULL} },
+         SCPE_OK},
+        { { { GRDATAD (FLREG8,   treg8,   16, (8*sizeof(treg8))/2,  (8*sizeof(treg8))/4,  "2 bit field starting at offset 4 in an 8 bit register") },
+            { GRDATAD (FLREG16,  treg16,  16, (8*sizeof(treg16))/2, (8*sizeof(treg16))/4, "4 bit field starting at offset 8 in a 16 bit register") },
+            { GRDATAD (FLREG32,  treg32,  16, (8*sizeof(treg32))/2, (8*sizeof(treg32))/4, "8 bit field starting at offset 16 in a 32 bit register") },
+            {NULL} },
+         SCPE_OK},
+        { { { XRDATA (FLREG32,  &treg32,  16, 8, 0,  sizeof(treg32), 1, 1) },
+            {NULL} },
+         SCPE_OK},
+        { { { BRDATAD (FLREG16,  treg16array,  16, 16, 5,  "array of 5 uint16's") },
+            {NULL} },
+         SCPE_OK},
+        { { { CRDATAD (FLREG16,  treg16arrayx2,  16, 16, 20,  "array of 5x4 uint16's") },
+            {NULL} },
+         SCPE_OK},
+        { { { VBRDATAD (FLREG16,  treg16array,  16, 16, 5,  "5 Successive scalar values") },
+            {NULL} },
+         SCPE_OK},
+        { { { URDATAD (FLREG32,  validate_units[0].pos,  16, 32, 0,  3, PV_LEFT,  "Unit POS register array for 3 units") },
+            {NULL} },
+         SCPE_OK},
+        { { { URDATAD (FLREG32,  validate_units[2].pos,  16, 32, 0,  3, PV_LEFT,  "Unit POS register array for 3 units out of bounds") },
+            {NULL} },
+         SCPE_IERR},
+        { { { STRDATAD (STRPOS,  validate_units[0].pos,  16, 32, 0, 3,  sizeof(UNIT), PV_LEFT, "Structure") },
+            {NULL} },
+         SCPE_OK},
+        { { { SAVEDATA (ALLUNITS,  validate_units) },
+            {NULL} },
+         SCPE_OK},
+        { { { FLDATAD (FLREG80,  treg8,   0,                    "Flag in 0'th bit of 8 bit register") },
+            { FLDATAD (FLREG81,  treg8,   (8*sizeof(treg8)-1),  "Flag in 7'th bit of 8 bit register") },
+            { FLDATAD (FLREG82,  treg8,   8*sizeof(treg8),      "Flag outside of 8 bit register") },
+            {NULL} },
+         SCPE_IERR},
+        { { { FLDATAD (FLREG160, treg16,  0,                    "Flag in 0'th bit of 16 bit register") },
+            { FLDATAD (FLREG161, treg16,  (8*sizeof(treg16)-1), "Flag in 15'th bit of 16 bit register") },
+            { FLDATAD (FLREG162, treg16,  8*sizeof(treg16),     "Flag outside of 16 bit register") },
+            {NULL} },
+         SCPE_IERR},
+        { { { FLDATAD (FLREG320, treg32,  0,                    "Flag in 0'th bit of 32 bit register") },
+            { FLDATAD (FLREG321, treg32,  (8*sizeof(treg32)-1), "Flag in 31'st bit of 32 bit register") },
+            { FLDATAD (FLREG322, treg32,  8*sizeof(treg32),     "Flag outside of 32 bit register") },
+            {NULL} },
+         SCPE_IERR},
+        { { { SRDATAD (SPOS,    validate_units,   pos,   10, 32, 0, 3, "pos register array") },
+            { SRDATAD (US9,     validate_units,   us9,   10, 16, 0, 3, "short register array") },
+            { SRDATAD (U3,      validate_units,   u3,    10, 32, 0, 3, "32bit register array") },
             {NULL} },
          SCPE_OK},
         { { {NULL} } }
     };
-
-static UNIT validate_units[3];
 
 static DEVICE validate_test = {
     "TEST-REG", validate_units, NULL, NULL, 
@@ -16199,17 +16480,19 @@ static t_stat test_register_validation (void)
 struct validation_test *v;
 DEVICE *v_devs[] = {&validate_test, 
                    NULL};
+t_stat tstat, stat = SCPE_OK;
 
 if (sim_switches & SWMASK ('T'))
     sim_messagef (SCPE_OK, "test_register_validation - starting\n");
 for (v = validations; v->reg[0].name != NULL; v++) {
     validate_test.registers = v->reg;
-    if (SCPE_OK != sim_sanity_check_register_declarations (v_devs))
-        break;
+    tstat = sim_sanity_check_register_declarations (v_devs);
+    if (tstat != v->expected_result)
+        stat = tstat;
     }
 if (sim_switches & SWMASK ('T'))
     sim_messagef (SCPE_OK, "test_register_validation - done\n");
-return SCPE_OK;
+return stat;
 }
 
 typedef const char *(*parse_function)(const char *input, char *output, char end_char);
@@ -16538,6 +16821,8 @@ if (sim_switches & SWMASK ('D')) {
     sim_switches = saved_switches;
     }
 if ((strcmp (gbuf, "ALL") == 0) || (strcmp (gbuf, "SCP") == 0)) {
+    if (sim_fio_test (cptr) != SCPE_OK)
+        return sim_messagef (SCPE_IERR, "SCP fio test failed\n");
     if (test_register_validation () != SCPE_OK)
         return sim_messagef (SCPE_IERR, "SCP register validation test failed\n");
     if (test_scp_parsing () != SCPE_OK)
@@ -16546,7 +16831,7 @@ if ((strcmp (gbuf, "ALL") == 0) || (strcmp (gbuf, "SCP") == 0)) {
         return sim_messagef (SCPE_IERR, "SCP argument parsing test failed\n");
     if (test_scp_event_sequencing () != SCPE_OK)
         return sim_messagef (SCPE_IERR, "SCP event sequencing test failed\n");
-}
+    }
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
     t_stat tstat = SCPE_OK;
     t_bool was_disabled = ((dptr->flags & DEV_DIS) != 0);

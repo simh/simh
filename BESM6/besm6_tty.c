@@ -18,7 +18,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
  * SERGE VAKULENKO OR LEONID BROUKHIS BE LIABLE FOR ANY CLAIM, DAMAGES
  * OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
- * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE 
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
  * OR OTHER DEALINGS IN THE SOFTWARE.
 
  * Except as contained in this notice, the name of Leonid Broukhis or
@@ -75,6 +75,7 @@ int tty_typed [TTY_MAX+1], tty_instate [TTY_MAX+1];
 /* For all lines */
 time_t tty_last_time [LINES_MAX+1];
 int tty_idle_count [LINES_MAX+1];
+int tty_lnorder[LINES_MAX+1] = { -1 };
 
 /* The serial interrupt generator frequency, common for all VT lines */
 int tty_rate = 300;
@@ -94,6 +95,7 @@ uint32 CONSUL_IN[2];
 uint32 CONS_CAN_PRINT[2] = { 01000, 00400 };
 uint32 CONS_HAS_INPUT[2] = { 04000, 02000 };
 
+uint32 CONS_READY[2] = { 0200, 040 };
 /* Command line buffers for TELNET mode. */
 char vt_cbuf [CBUFSIZE] [LINES_MAX+1];
 char *vt_cptr [LINES_MAX+1];
@@ -151,7 +153,7 @@ REG tty_reg[] = {
  * For local connections, it is 0.
  */
 TMLN tty_line [LINES_MAX+1];
-TMXR tty_desc = { LINES_MAX+1, 0, 0, tty_line };        /* mux descriptor */
+TMXR tty_desc = { LINES_MAX+1, 0, 0, tty_line, tty_lnorder };        /* mux descriptor */
 
 #define TTY_UNICODE_CHARSET     0
 #define TTY_KOI7_JCUKEN_CHARSET (1<<UNIT_V_UF)
@@ -168,6 +170,14 @@ TMXR tty_desc = { LINES_MAX+1, 0, 0, tty_line };        /* mux descriptor */
 #define TTY_BSPACE_MASK         (1<<(UNIT_V_UF+4))
 #define TTY_CMDLINE_MASK        (1<<(UNIT_V_UF+5))
 
+static void reset_line(int num)
+{
+    /* Reset to a sensible default */
+    tty_unit[num].flags &= ~(TTY_CHARSET_MASK|TTY_BSPACE_MASK|TTY_CMDLINE_MASK);
+    tty_typed[num] = -1;
+    tty_instate[num] = 0;
+}
+
 t_stat tty_reset (DEVICE *dptr)
 {
     memset(tty_active, 0, sizeof(tty_active));
@@ -178,10 +188,9 @@ t_stat tty_reset (DEVICE *dptr)
     TTY_IN = TTY_OUT = 0;
     CONSUL_IN[0] = CONSUL_IN[1] = 0;
     reg = rus;
+    READY2 |= CONS_READY[0] | CONS_READY[1];
     vt_idle = 1;
     tty_line[0].conn = 1;                   /* faked, always busy */
-    /* In the READY2 register the ready flag for typewriters is inverted (0 means ready),
-     * and the device is always ready. */
     /* Forcing a ready interrupt. */
     PRP |= CONS_CAN_PRINT[0] | CONS_CAN_PRINT[1];
     // Schedule the very first TTY interrupt to match the next clock interrupt.
@@ -209,12 +218,13 @@ t_stat vt_clk (UNIT * this)
         TMLN *t = &tty_line [num];
         besm6_debug ("*** tty%d: a new connection from %s",
                      num, t->ipad);
+        reset_line (num);
         t->rcve = 1;
         tty_unit[num].flags &= ~TTY_STATE_MASK;
         tty_unit[num].flags |= TTY_VT340_STATE;
-        if (num <= TTY_MAX)
+        if (num <= TTY_MAX) {
             vt_mask |= 1 << (TTY_MAX - num);
-
+        }
         switch (tty_unit[num].flags & TTY_CHARSET_MASK) {
         case TTY_KOI7_JCUKEN_CHARSET:
             tmxr_linemsg (t, "Encoding is KOI-7 (jcuken)\r\n");
@@ -246,6 +256,9 @@ t_stat vt_clk (UNIT * this)
 
         /* Entering ^C (ETX) to get a prompt. */
         t->rxb [t->rxbpi++] = '\3';
+        if (num <= TTY_MAX) {
+            vt_mask |= 1 << (TTY_MAX - num);
+        }
     }
 
     /*
@@ -265,8 +278,8 @@ t_stat vt_clk (UNIT * this)
     /* If the TTY system is not idle, schedule the next interrupt
      * by instruction count using the target interrupt rate of 300 Hz;
      * otherwise we can wait for a roughly equivalent wallclock time period,
-     * e.g. until the next 250 Hz wallclock interrupt, but making sure 
-     * that the model time interval between GRP_SERIAL interrupts 
+     * e.g. until the next 250 Hz wallclock interrupt, but making sure
+     * that the model time interval between GRP_SERIAL interrupts
      * is never less than expected.
      */
     if (vt_is_idle()) {
@@ -473,12 +486,15 @@ MTAB tty_mod[] = {
       "RATE", &tty_setrate, &tty_showrate, NULL, "{300,600,1200,2400,4800,9600,19200}" },
     { MTAB_XTD | MTAB_VDV | MTAB_VALR, 1, "TURBO",
       "TURBO", &tty_setturbo, &tty_showturbo, NULL, "{ON, OFF}"},
-    { UNIT_ATT, UNIT_ATT, "connections",
+    { MTAB_XTD | MTAB_VDV, 0, "SUMMARY",
       NULL, NULL, &tmxr_show_summ, (void*) &tty_desc },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS",
       NULL, NULL, &tmxr_show_cstat, (void*) &tty_desc },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS",
       NULL, NULL, &tmxr_show_cstat, (void*) &tty_desc },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO | MTAB_VALR,   0,   "LINEORDER",
+      "LINEORDER",   &tmxr_set_lnorder, &tmxr_show_lnorder, (void *) &tty_desc,
+      "Line connection order, e.g. 26;20-24;1-10" },
     { MTAB_XTD | MTAB_VUN | MTAB_NC, 0, NULL,
       "LOG", &tmxr_set_log, &tmxr_show_log, (void*) &tty_desc },
     { MTAB_XTD | MTAB_VUN | MTAB_NC, 0, NULL,
@@ -1042,24 +1058,26 @@ int vt_getc (int num)
     TMLN *t = &tty_line [num];
     extern int32 sim_int_char;
     int c;
+#ifdef REMOTE_TIMEOUT
     time_t now;
-
+#endif
     if (! t->conn) {
         /* Пользователь отключился. */
         if (t->ipad) {
             besm6_debug ("*** tty%d: disconnecting %s",
-                         num, 
+                         num,
                          t->ipad);
             t->ipad = NULL;
         }
         tty_setmode (tty_unit+num, TTY_OFFLINE_STATE, 0, 0);
         tty_unit[num].flags &= ~TTY_STATE_MASK;
-        return -1;
+        return -2;
     }
     if (t->rcve) {
         /* A telnet line. */
         c = tmxr_getc_ln (t);
         if (! (c & TMXR_VALID)) {
+#ifdef REMOTE_TIMEOUT
             now = sim_get_time (0);
             if (now > tty_last_time[num] + 5*60) {
                 ++tty_idle_count[num];
@@ -1071,6 +1089,7 @@ int vt_getc (int num)
                 tmxr_linemsg (t, "\r\nSIMH: WAKE UP!\r\n");
                 tty_last_time[num] = now;
             }
+#endif
             return -1;
         }
         tty_idle_count[num] = 0;
@@ -1198,6 +1217,22 @@ int odd_parity(unsigned char c)
 }
 
 /*
+ * Converting Enter and Backspace to conventional values,
+ * unless the mode is RAW.
+ */
+int vt_fix(int num, int c) {
+    if ((tty_unit[num].flags & TTY_CHARSET_MASK) != TTY_RAW_CHARSET) {
+        switch (c) {
+        case '\r': case '\n':
+            return 3;     /* ETX is used as Enter */
+        case '\177':
+            return '\b';  /* ASCII DEL -> BS */
+        }
+    }
+    return c;
+}
+
+/*
  * Handling input from all connected terminals.
  */
 void vt_receive()
@@ -1211,6 +1246,15 @@ void vt_receive()
         uint32 mask = 1 << (TTY_MAX - num);
         switch (tty_instate[num]) {
         case 0:
+            if (tty_typed[num] <= -2) {
+                /* A "physically" disconnected line; upon reconnecting,
+                 * there will be no echo and no reaction to commands;
+                 * <enter>HYC<enter> needs to be typed
+                 * to re-initialize the line
+                 */
+                TTY_IN |= mask;		/* "long start" */
+                break;
+            }
             switch (tty_unit[num].flags & TTY_CHARSET_MASK) {
             case TTY_KOI7_JCUKEN_CHARSET:
                 tty_typed[num] = vt_kbd_input_koi7 (num);
@@ -1230,19 +1274,14 @@ void vt_receive()
                 break;
             }
             if (tty_typed[num] <= 0177) {
-                if ((tty_unit[num].flags & TTY_CHARSET_MASK) != TTY_RAW_CHARSET) {
-                    if (tty_typed[num] == '\r' || tty_typed[num] == '\n')
-                        tty_typed[num] = 3;     /* ETX is used as Enter */
-                    if (tty_typed[num] == '\177')
-                        tty_typed[num] = '\b';  /* ASCII DEL -> BS */
-                }
+                tty_typed[num] = vt_fix (num, tty_typed[num]);
                 tty_instate[num] = 1;
                 TTY_IN |= mask;         /* start bit */
                 GRP |= GRP_TTY_START;   /* not used ? */
                 /* auto-enabling the interrupt just in case
                  * (seems to be unneeded as the interrupt is never disabled)
                  */
-                MGRP |= GRP_SERIAL;       
+                MGRP |= GRP_SERIAL;
                 vt_receiving |= mask;
             }
             break;
@@ -1271,7 +1310,7 @@ void vt_receive()
 }
 
 /*
- * Checking if all terminals are idle. 
+ * Checking if all terminals are idle.
  * SIMH should not enter idle mode until they are.
  */
 int vt_is_idle ()
@@ -1285,21 +1324,31 @@ int tty_query ()
     return TTY_IN;
 }
 
+static char cons_is_printing[2];
+
 void consul_print (int dev_num, uint32 cmd)
 {
+    extern unsigned short gost_to_unicode(unsigned char);
+    extern void uni2utf8(unsigned short ch, char buf[5]);
+    int uni;
+    char buf[5];
     int line_num = dev_num + TTY_MAX + 1;
     if (tty_dev.dctrl)
         besm6_debug(">>> CONSUL%o: %03o", line_num, cmd & 0377);
-    cmd &= 0177;
+    
+    READY2 &= ~CONS_READY[dev_num]; /* temporarily not ready  */
+    
     switch (tty_unit[line_num].flags & TTY_STATE_MASK) {
     case TTY_VT340_STATE:
-        vt_send (line_num, cmd);
+        vt_send (line_num, cmd & 0177);
         break;
     case TTY_CONSUL_STATE:
-        besm6_debug(">>> CONSUL%o: Native charset not implemented", line_num);
+        uni = gost_to_unicode(cmd & 0177);
+        uni2utf8(uni, buf);
+        vt_puts(line_num, buf);
         break;
     }
-    PRP |= CONS_CAN_PRINT[dev_num];
+    cons_is_printing[dev_num] = 1;
     vt_idle = 0;
 }
 
@@ -1308,6 +1357,11 @@ void consul_receive ()
     int c, line_num, dev_num;
 
     for (dev_num = 0; dev_num < 2; ++dev_num){
+        if (cons_is_printing[dev_num]) {
+            READY2 |= CONS_READY[dev_num];
+            PRP |= CONS_CAN_PRINT[dev_num];
+            cons_is_printing[dev_num] = 0;
+        }
         line_num = dev_num + TTY_MAX + 1;
         if (! tty_line[line_num].conn)
             continue;
@@ -1327,11 +1381,8 @@ void consul_receive ()
             break;
         }
         if (c >= 0 && c <= 0177) {
+            c = vt_fix (line_num, c);
             CONSUL_IN[dev_num] = odd_parity(c) ? c | 0200 : c;
-            if ((tty_unit[line_num].flags & TTY_CHARSET_MASK) != TTY_RAW_CHARSET &&
-                (c == '\r' || c == '\n')) {
-                CONSUL_IN[dev_num] = 3;
-            }
             PRP |= CONS_HAS_INPUT[dev_num];
             vt_idle = 0;
         }

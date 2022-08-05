@@ -264,6 +264,7 @@ extern uint32 va_addr;                                  /* QDSS memory offset */
 #define DEV_UBUS        (1u << DEV_V_UBUS)
 #define DEV_QBUS        (1u << DEV_V_QBUS)
 #define DEV_Q18         (1u << DEV_V_Q18)
+#define DEV_NOAUTOCON   (0)
 
 #define UNIBUS          FALSE                           /* 22b only */
 
@@ -340,8 +341,10 @@ typedef struct {
 #define INT_V_QVSS      21                              /* QVSS */
 #define INT_V_DMCRX     22
 #define INT_V_DMCTX     23
-#define INT_V_TDRX      24                              /* TU58 */
-#define INT_V_TDTX      25
+#define INT_V_DUPRX     24                              /* DPV11 */
+#define INT_V_DUPTX     25
+#define INT_V_TDRX      26                              /* TU58 */
+#define INT_V_TDTX      27
 
 #define INT_CLK         (1u << INT_V_CLK)
 #define INT_RQ          (1u << INT_V_RQ)
@@ -368,6 +371,8 @@ typedef struct {
 #define INT_QVSS        (1u << INT_V_QVSS)
 #define INT_DMCRX       (1u << INT_V_DMCRX)
 #define INT_DMCTX       (1u << INT_V_DMCTX)
+#define INT_DUPRX       (1u << INT_V_DUPRX)
+#define INT_DUPTX       (1u << INT_V_DUPTX)
 #define INT_TDRX        (1u << INT_V_TDRX)
 #define INT_TDTX        (1u << INT_V_TDTX)
 
@@ -396,6 +401,8 @@ typedef struct {
 #define IPL_QVSS        (0x14 - IPL_HMIN)
 #define IPL_DMCRX       (0x14 - IPL_HMIN)
 #define IPL_DMCTX       (0x14 - IPL_HMIN)
+#define IPL_DUPRX       (0x14 - IPL_HMIN)
+#define IPL_DUPTX       (0x14 - IPL_HMIN)
 #define IPL_TDRX        (0x14 - IPL_HMIN)
 #define IPL_TDTX        (0x14 - IPL_HMIN)
 
