@@ -792,7 +792,11 @@ static const char* _eth_getname(int number, char* name, char *desc)
   if ((number < 0) || (count <= number))
       return NULL;
   if (list[number].eth_api != ETH_API_PCAP) {
+#if defined(_WIN32)
+    sim_printf ("Eth: Pcap capable device not found.  Install Npcap or WinPcap 4.1.3 to use pcap networking\n");
+#else
     sim_printf ("Eth: Pcap capable device not found.  You may need to run as root\n");
+#endif
     return NULL;
     }
 
