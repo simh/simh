@@ -2096,7 +2096,7 @@ SEL32 = ${SEL32D}/sel32_cpu.c ${SEL32D}/sel32_sys.c ${SEL32D}/sel32_chan.c \
 	${SEL32D}/sel32_scfi.c ${SEL32D}/sel32_fltpt.c ${SEL32D}/sel32_disk.c \
 	${SEL32D}/sel32_hsdp.c ${SEL32D}/sel32_mfp.c ${SEL32D}/sel32_scsi.c \
 	${SEL32D}/sel32_ec.c
-SEL32_OPT = -I $(SEL32D) -DUSE_INT32 -DSEL32  ${NETWORK_OPT}
+SEL32_OPT = -I ${SEL32D} -DUSE_INT32 -DSEL32  ${NETWORK_OPT}
 
 ###
 ### Experimental simulators
@@ -2582,13 +2582,13 @@ ifneq (,$(call find_test,${S3D},s3))
 	$@ $(call find_test,${S3D},s3) ${TEST_ARG}
 endif
 
-sel32: $(BIN)sel32$(EXE)
+sel32: ${BIN}sel32${EXE}
 
 ${BIN}sel32${EXE}: ${SEL32} ${SIM}
 	${MKDIRBIN}
-	${CC} ${SEL32} ${SIM} ${SEL32_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+	${CC} ${SEL32} ${SIM} ${SEL32_OPT} ${CC_OUTSPEC} ${LDFLAGS}
 ifneq (,$(call find_test,${SEL32D},sel32))
-	$@ $(call find_test,${SEL32D},sel32) $(TEST_ARG)
+	$@ $(call find_test,${SEL32D},sel32) ${TEST_ARG}
 endif
 
 altair : ${BIN}altair${EXE}
