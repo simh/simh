@@ -16316,8 +16316,19 @@ for (i = 0; (dptr = devices[i]) != NULL; i++) {
             else
                 Mprintf (f, "%s %s:%s used the %s macro to describe a %u bit wide field\n", sim_name, dptr->name, rptr->name, rptr->macro, rptr->width);
             }
-        else
-            Mprintf (f, "%s %s:%s used the %s macro to describe a %u bit%s wide and %u elements deep array\n", sim_name, dptr->name, rptr->name, rptr->macro, rptr->width, (rptr->width == 1) ? "" : "s", rptr->depth);
+        else {
+            if (rptr->depth > 1) {
+                Mprintf (f, "%s %s:%s used the %s macro to describe a %u bit%s wide and %u elements deep array\n", sim_name, dptr->name, rptr->name, rptr->macro, rptr->width, (rptr->width == 1) ? "" : "s", rptr->depth);
+                if (rptr->stride == 0) {
+                    Bad = TRUE;
+                    Mprintf (f, "%s %s:%s array stride is unspecified\n", sim_name, dptr->name, rptr->name);
+                    }
+                }
+            else {                              /* rptr->depth == 0 */
+                Bad = TRUE;
+                Mprintf (f, "%s %s:%s unexpected register depth of 0\n", sim_name, dptr->name, rptr->name);
+                }
+            }
         if (rsz > sizeof (t_value)) {
             Bad = TRUE;
             Mprintf (f, "%u bits at offset %u is wider than the maximum allowed width of %u bits\n", rptr->width, rptr->offset, (uint32)(8 * sizeof(t_value)));
