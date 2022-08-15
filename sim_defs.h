@@ -1083,11 +1083,11 @@ struct MEMFILE {
     _RegCheck(#nm,aloc,rdx,wd,0,dep,desc,flds,0,sizeof(*(aloc)),sizeof(*(aloc)),BRDATADF)
 /* Arrayed register whose data is kept in a standard C two dimensional array Register */
 #define CRDATA(nm,aloc,rdx,wd,dep) \
-    _RegCheck(#nm,aloc,rdx,wd,0,dep,NULL,NULL,0,sizeof(**(&aloc)),sizeof(**(&aloc)),CRDATA)
+    _RegCheck(#nm,&(aloc),rdx,wd,0,dep,NULL,NULL,0,sizeof(**(aloc)),sizeof(**(aloc)),CRDATA)
 #define CRDATAD(nm,aloc,rdx,wd,dep,desc) \
-    _RegCheck(#nm,aloc,rdx,wd,0,dep,desc,NULL,0,sizeof(**(&aloc)),sizeof(**(&aloc)),CRDATAD)
+    _RegCheck(#nm,&(aloc),rdx,wd,0,dep,desc,NULL,0,sizeof(**(aloc)),sizeof(**(aloc)),CRDATAD)
 #define CRDATADF(nm,aloc,rdx,wd,dep,desc,flds) \
-    _RegCheck(#nm,aloc,rdx,wd,0,dep,desc,flds,0,sizeof(**(&aloc)),sizeof(**(&aloc)),CRDATADF)
+    _RegCheck(#nm,&(aloc),rdx,wd,0,dep,desc,flds,0,sizeof(**(aloc)),sizeof(**(aloc)),CRDATADF)
 
 /* Range of memory whose data is successive scalar values accessed like an array Register */
 #define VBRDATA(nm,loc,rdx,wd,dep) \
