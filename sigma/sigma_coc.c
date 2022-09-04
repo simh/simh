@@ -1,6 +1,6 @@
 /* sigma_coc.c: Sigma character-oriented communications subsystem simulator
 
-   Copyright (c) 2007-2008, Robert M Supnik
+   Copyright (c) 2007-2022, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    coc          7611 communications multiplexor
 
    24-Aug-22    RMS     Transmit long space is 0x6, not 0xD (Ken Rector)
+                        Added LNORDER modifier
 */
 
 #include "sigma_io_defs.h"
@@ -84,8 +85,9 @@ uint32 muxc_cmd = MUXC_IDLE;                            /* channel state */
 uint32 mux_rint = INTV (INTG_E2, 0);
 uint32 mux_xint = INTV (INTG_E2, 1);
 
+static int32 mux_order[MUX_LINES] = { -1 };             /* line connection order */
 TMLN mux_ldsc[MUX_LINES] = { 0 };                       /* line descrs */
-TMXR mux_desc = { MUX_LINES_DFLT, 0, 0, mux_ldsc };     /* mux descrr */
+TMXR mux_desc = { MUX_LINES_DFLT, 0, 0, mux_ldsc, mux_order }; /* mux descr */
 
 extern uint32 chan_ctl_time;
 extern uint32 CC;
@@ -147,6 +149,8 @@ MTAB mux_mod[] = {
       &io_set_dva, &io_show_dva, NULL },
     { MTAB_XTD | MTAB_VDV, 0, "LINES", "LINES",
       &mux_vlines, &tmxr_show_lines, (void *) &mux_desc },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO,  0, "LINEORDER",   "LINEORDER",
+      &tmxr_set_lnorder, &tmxr_show_lnorder, (void *) &mux_desc },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "CSTATE", NULL,
       NULL, &io_show_cst, NULL },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO, RTC_COC, "POLL", "POLL",
