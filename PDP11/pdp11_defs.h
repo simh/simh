@@ -1,6 +1,6 @@
 /* pdp11_defs.h: PDP-11 simulator definitions
 
-   Copyright (c) 1993-2017, Robert M Supnik
+   Copyright (c) 1993-2022, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    The author gratefully acknowledges the help of Max Burnet, Megan Gentry,
    and John Wilson in resolving questions about the PDP-11
 
+   25-Jul-22    RMS     Removed OPT_RH11 (Mark Pizzolato)
    10-Feb-17    RMS     Fixed RJS11 register block length (Mark Hill)
    19-Jan-17    RMS     Moved CR11 to BR6, leaving CD11 at BR4 (Mark Pizzolato)
    10-Mar-16    RMS     Added UC15 support
@@ -173,7 +174,7 @@
 #define OPT_FPP         (1u << 3)                       /* FPP */
 #define OPT_CIS         (1u << 4)                       /* CIS */
 #define OPT_MMU         (1u << 5)                       /* MMU */
-#define OPT_RH11        (1u << 6)                       /* RH11 */
+#define OPT_RSRV        (1u << 6)                       /* unused */
 #define OPT_PAR         (1u << 7)                       /* parity */
 #define OPT_UBM         (1u << 8)                       /* UBM */
 #define OPT_BVT         (1u << 9)                       /* BEVENT */

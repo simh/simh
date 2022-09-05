@@ -1,6 +1,6 @@
 /* pdp11_rh.c: PDP-11 Massbus adapter simulator
 
-   Copyright (c) 2005-2013, Robert M Supnik
+   Copyright (c) 2005-2022, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rha, rhb             RH11/RH70 Massbus adapter
 
+   25-Jul-22    RMS     Removed OPT_RH11, changed adapter type test
    02-Sep-13    RMS     Added third Massbus adapter, debug printouts
    19-Mar-12    RMS     Fixed declaration of cpu_opt (Mark Pizzolato)
    02-Feb-08    RMS     Fixed DMA memory address limit test (John Dundas)
@@ -145,7 +146,7 @@
 
 /* Declarations */
 
-#define RH11            (cpu_opt & OPT_RH11)
+#define RH11            (UNIBUS && (cpu_model != MOD_1170))
 
 typedef struct {
     uint32 cs1;                                         /* ctrl/status 1 */
@@ -160,7 +161,7 @@ typedef struct {
 
 MBACTX massbus[MBA_NUM];
 
-extern uint32 cpu_opt;
+extern uint32 cpu_opt, cpu_model;
 extern int32 cpu_bme;
 extern uint16 *M;
 extern int32 int_req[IPL_HLVL];
@@ -169,7 +170,6 @@ extern UNIT cpu_unit;
 t_stat mba_reset (DEVICE *dptr);
 t_stat mba_rd (int32 *val, int32 pa, int32 access);
 t_stat mba_wr (int32 val, int32 pa, int32 access);
-t_stat mba_set_type (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat mba_show_type (FILE *st, UNIT *uptr, int32 val, void *desc);
 int32 mba0_inta (void);
 int32 mba1_inta (void);
@@ -179,7 +179,6 @@ void mba_clr_int (uint32 mb);
 void mba_upd_cs1 (uint32 set, uint32 clr, uint32 mb);
 void mba_set_cs2 (uint32 flg, uint32 mb);
 int32 mba_map_pa (int32 pa, int32 *ofs);
-
 
 extern uint32 Map_Addr (uint32 ba);
 
@@ -235,6 +234,8 @@ MTAB mba0_mod[] = {
       &set_addr, &show_addr, NULL },
     { MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
       &set_vec, &show_vec, NULL },
+    { MTAB_XTD|MTAB_VDV, 0, "TYPE", NULL,
+      NULL, &mba_show_type, NULL },
     { 0 }
     };
 
@@ -268,6 +269,8 @@ MTAB mba1_mod[] = {
       &set_addr, &show_addr, NULL },
     { MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
       &set_vec, &show_vec, NULL },
+    { MTAB_XTD|MTAB_VDV, 0, "TYPE", NULL,
+      NULL, &mba_show_type, NULL },
     { 0 }
     };
 
@@ -301,6 +304,8 @@ MTAB mba2_mod[] = {
       &set_addr, &show_addr, NULL },
     { MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
       &set_vec, &show_vec, NULL },
+    { MTAB_XTD|MTAB_VDV, 0, "TYPE", NULL,
+      NULL, &mba_show_type, NULL },
     { 0 }
     };
 
@@ -861,6 +866,18 @@ dibp = (DIB *) dptr->ctxt;
 if (dibp == NULL)
     return SCPE_IERR;
 fprintf (st, "Massbus adapter %d", dibp->ba);
+return SCPE_OK;
+}
+
+/* Show adapter type */
+
+t_stat mba_show_type (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+if (RH11)
+    fprintf (st, "RH11");
+else if (UNIBUS)
+    fprintf (st, "RH70");
+else fprintf (st, "RH70 emulator");
 return SCPE_OK;
 }
 

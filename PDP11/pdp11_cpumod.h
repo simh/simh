@@ -1,6 +1,6 @@
 /* pdp11_cpumod.h: PDP-11 CPU model definitions
 
-   Copyright (c) 2004-2021, Robert M Supnik
+   Copyright (c) 2004-2022, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -84,7 +84,7 @@
 #define MM0_1144        0160557
 #define MM3_1144        0000077
 
-#define SOP_1145        (BUS_U|OPT_EIS|OPT_FPP|OPT_MMU|OPT_RH11)
+#define SOP_1145        (BUS_U|OPT_EIS|OPT_FPP|OPT_MMU)
 #define OPT_1145        (OPT_FPP|OPT_MMU)
 #define PSW_1145        0174377
 #define PAR_1145        0007777
@@ -100,7 +100,7 @@
 #define MM0_1160        0160557
 
 #define SOP_1170        (BUS_U|OPT_EIS|OPT_FPP|OPT_MMU|OPT_UBM)
-#define OPT_1170        (OPT_FPP|OPT_RH11)
+#define OPT_1170        (OPT_FPP)
 #define PSW_1170        0174377
 #define PAR_1170        0177777
 #define PDR_1170        0077717
@@ -124,13 +124,13 @@
 #define SOP_1183        (BUS_Q|OPT_EIS|OPT_FPP|OPT_MMU)
 #define OPT_1183        (OPT_CIS)
 
-#define SOP_1184        (BUS_U|OPT_EIS|OPT_FPP|OPT_MMU|OPT_UBM|OPT_RH11)
+#define SOP_1184        (BUS_U|OPT_EIS|OPT_FPP|OPT_MMU|OPT_UBM)
 #define OPT_1184        (OPT_CIS)
 
 #define SOP_1193        (BUS_Q|OPT_EIS|OPT_FPP|OPT_MMU)
 #define OPT_1193        (OPT_CIS)
 
-#define SOP_1194        (BUS_U|OPT_EIS|OPT_FPP|OPT_MMU|OPT_UBM|OPT_RH11)
+#define SOP_1194        (BUS_U|OPT_EIS|OPT_FPP|OPT_MMU|OPT_UBM)
 #define OPT_1194        (OPT_CIS)
 
 #define MOD_MAX         20
