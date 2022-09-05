@@ -62,7 +62,7 @@
    sim_copyfile              copy a file
    sim_filepath_parts        expand and extract filename/path parts
    sim_dirscan               scan for a filename pattern
-   sim_get_filelist          get a list of files matching a pattern
+   sim_get_filelist          get a list of files matching a pattern recursively
    sim_free_filelist         free a filelist
    sim_print_filelist        print the elements of a filelist
 
@@ -93,9 +93,11 @@ t_bool sim_toffset_64;              /* Large File (>2GB) file I/O Support availa
 #endif
 
 #define FIO_DBG_PACK    1       /* Pack/Unpack Test Detail */
+#define FIO_DBG_SCAN    2       /* File/Directory Scan Detail */
 
 static DEBTAB fio_debug[] = {
   {"PACK",     FIO_DBG_PACK,      "Pack/Unpack Test Detail"},
+  {"SCAN",     FIO_DBG_SCAN,      "File/Directory Scan Detail"},
   {0}
 };
 
@@ -343,6 +345,16 @@ if ((0 != fstat (fileno (fp), &statb)) ||
 return TRUE;
 }
 
+
+
+#if defined(_WIN32)
+#include <direct.h>
+#include <io.h>
+#include <fcntl.h>
+#else
+#include <unistd.h>
+#endif
+
 static char *_sim_expand_homedir (const char *file, char *dest, size_t dest_size)
 {
 uint8 *without_quotes = NULL;
@@ -539,16 +551,42 @@ static struct relative_path_test {
         {NULL},
         };
 
+static struct get_filelist_test {
+    const char *name;
+    const char  *files[10];
+    const char *search;
+    int         expected_count;
+   } get_test[] = {
+        {"test-1",
+         {"aab/bbc/ccd/eef/file.txt", 
+          "aab/bbc/ccd/eef/file2.txt", 
+          "aac/bbd/cce/eef/file2.txt", 
+          NULL},
+         "*.txt", 3},
+        {"test-2",
+         {"xab/bbc/ccd/eef/file.txt", 
+          "xab/bbc/ccd/eef/file2.bbb", 
+          "xac/bbd/cce/eef/file2.txt", 
+          "xac/bbd/file3.txt", 
+          "xac/file4.txt", 
+          NULL},
+         "*.txt", 4},
+        {NULL},
+    };
+
+
 t_stat sim_fio_test (const char *cptr)
 {
 struct pack_test *pt;
 struct relative_path_test *rt;
+struct get_filelist_test *gt;
 t_stat r = SCPE_OK;
 char test_desc[512];
 uint8 result[512];
 
 sim_register_internal_device (&sim_fio_test_dev);
 sim_fio_test_dev.dctrl = (sim_switches & SWMASK ('D')) ? FIO_DBG_PACK : 0;
+sim_fio_test_dev.dctrl = (sim_switches & SWMASK ('S')) ? FIO_DBG_SCAN : 0;
 sim_set_deb_switches (SWMASK ('F'));
 sim_messagef (SCPE_OK, "sim_buf_pack_unpack - tests\n");
 for (pt = p_test; pt->src; ++pt) {
@@ -635,18 +673,55 @@ for (rt = r_test; rt->input; ++rt) {
         free (xdir);
         }
     }
+sim_messagef (SCPE_OK, "Testing get filelist:\n");
+for (gt = get_test; gt->name; ++gt) {
+    char xpath[PATH_MAX + 1];
+    int i;
+    char **filelist;
+
+    sim_messagef (SCPE_OK, "FileList test %s\n", gt->name);
+    for (i=0; gt->files[i]; ++i) {
+        char *c, *end;
+        char *filename = sim_filepath_parts (gt->files[i], "nx");
+        snprintf (xpath, sizeof (xpath), "testfiles/%s", gt->files[i]);
+        end = strrchr (xpath, '/');
+        *end = '\0';
+        c = xpath;
+        while ((c = strchr (c, '/'))) {
+            *c = '\0';
+            sim_mkdir (xpath);
+            *c++ = '/';
+            }
+        sim_mkdir (xpath);
+        *end = '/';
+        fclose (fopen (xpath, "w"));
+        free (filename);
+        }
+    snprintf (xpath, sizeof (xpath), "testfiles/%s", gt->search);
+    filelist = sim_get_filelist (xpath);
+    r = sim_messagef ((gt->expected_count != sim_count_filelist (filelist)) ? SCPE_IERR : SCPE_OK, 
+                      "sim_get_filelist (\"%s\") yielded %d entries:\n", xpath, sim_count_filelist (filelist));
+    sim_print_filelist (filelist);
+    sim_free_filelist (&filelist);
+    for (i=0; gt->files[i]; ++i) {
+        char *c;
+        char *filename = sim_filepath_parts (gt->files[i], "nx");
+        snprintf (xpath, sizeof (xpath), "testfiles/%s", gt->files[i]);
+        unlink (xpath);
+        c = strrchr (xpath, '/');
+        *c = '\0';
+        sim_rmdir (xpath);
+        while ((c = strrchr (xpath, '/'))) {
+            *c = '\0';
+            sim_rmdir (xpath);
+            }
+        sim_rmdir (xpath);
+        free (filename);
+        }
+    }
 return r;
 }
 
-
-
-#if defined(_WIN32)
-#include <direct.h>
-#include <io.h>
-#include <fcntl.h>
-#else
-#include <unistd.h>
-#endif
 
 int sim_stat (const char *fname, struct stat *stat_str)
 {
@@ -688,6 +763,38 @@ if (NULL == _sim_expand_homedir (path, pathbuf, sizeof (pathbuf)))
 return rmdir (pathbuf);
 }
 
+static void _sim_dirlist_entry (const char *directory, 
+                                 const char *filename,
+                                 t_offset FileSize,
+                                 const struct stat *filestat,
+                                 void *context)
+{
+char **dirlist = *(char ***)context;
+char FullPath[PATH_MAX + 1];
+int listcount = 0;
+
+if ((strcmp (filename, "..") == 0)       || /* Ignore previous dir */
+    (strcmp (filename, ".") == 0)        || /* Ignore current dir */
+    ((filestat->st_mode & S_IFDIR) == 0) || /* Ignore anything not a directory */
+    (stop_cpu))
+    return;
+if (strcmp (filename, ".") == 0)
+    filename = "";
+snprintf (FullPath, sizeof (FullPath), "%s%s%s", directory, filename, (*filename != '\0') ? "/" : "");
+if (dirlist != NULL) {
+    while (dirlist[listcount++] != NULL);
+    --listcount;
+    }
+dirlist = (char **)realloc (dirlist, (listcount + 2) * sizeof (*dirlist));
+dirlist[listcount] = strdup (FullPath);
+dirlist[listcount + 1] = NULL;
+*(char ***)context = dirlist;
+if (*filename != '\0') {
+    strlcat (FullPath, "*", sizeof (FullPath));                     /* append wildcard selector */
+    sim_dir_scan (FullPath, _sim_dirlist_entry, context);           /* recurse on this directory */
+    }
+}
+
 static void _sim_filelist_entry (const char *directory, 
                                  const char *filename,
                                  t_offset FileSize,
@@ -703,20 +810,83 @@ if (filelist != NULL) {
     while (filelist[listcount++] != NULL);
     --listcount;
     }
-filelist = (char **)realloc (filelist, (listcount + 2) * sizeof (*filelist));
+filelist = (char **)realloc (filelist, (listcount + 2) * sizeof (filelist));
 filelist[listcount] = strdup (FullPath);
 filelist[listcount + 1] = NULL;
 *(char ***)context = filelist;
 }
 
+/* Standardize the order of the list grouping by full path/filename */
+static int _filename_compare (const void *pa, const void *pb)
+{
+char *a = strdup (*(const char **)pa);
+char *fa = strrchr (a, '/');
+char *b = strdup (*(const char **)pb);
+char *fb = strrchr (b, '/');
+int result;
+
+*fa = '\0';
+*fb = '\0';
+
+result = strcmp (a, b);
+if (result == 0)
+    result = strcmp (fa + 1, fb + 1);
+free (a);
+free (b);
+return result;
+}
+
 char **sim_get_filelist (const char *filename)
 {
 t_stat r;
+char *dir = sim_filepath_parts (filename, "p");
+size_t dirsize = strlen (dir);
+char *file = sim_filepath_parts (filename, "nx");
+char **dirlist, **dirs;
 char **filelist = NULL;
 
-r = sim_dir_scan (filename, _sim_filelist_entry, &filelist);
-if (r == SCPE_OK)
+sim_debug (FIO_DBG_SCAN, &sim_fio_test_dev, "sim_get_filelist(filename=\"%s\")\n", filename);
+sim_debug (FIO_DBG_SCAN, &sim_fio_test_dev, " Looking for Directories in\"%s\"\n", dir);
+dir = (char *)realloc (dir, dirsize + 2);
+strlcat (dir, "*", dirsize + 2);
+dirlist = NULL;
+r = sim_dir_scan (dir, _sim_dirlist_entry, &dirlist);
+free (dir);
+sim_debug (FIO_DBG_SCAN, &sim_fio_test_dev, " %d directories found, r=%d\n", sim_count_filelist (dirlist), r);
+if (r == SCPE_OK) {
+    filelist = NULL;
+    if (dirlist != NULL) {
+        dirs = dirlist;
+        while (*dirs && !stop_cpu) {
+            size_t dfsize = 1 + strlen (file) + strlen (*dirs);
+            char *dfile = (char *)malloc (dfsize);
+            char **files;
+
+            snprintf (dfile, dfsize, "%s%s", *dirs++, file);
+            sim_debug (FIO_DBG_SCAN, &sim_fio_test_dev, "Checking for: %s\n", dfile);
+            r = sim_dir_scan (dfile, _sim_filelist_entry, &filelist);
+            free (dfile);
+            files = filelist;
+            if (sim_deb && files) {
+                sim_debug (FIO_DBG_SCAN, &sim_fio_test_dev, "Result: %s\n", *files);
+                while (*++files)
+                    sim_debug (FIO_DBG_SCAN, &sim_fio_test_dev, "Result: %s\n", *files);
+                }
+            }
+        }
+    else
+        sim_dir_scan (filename, _sim_filelist_entry, &filelist);
+    free (file);
+    sim_free_filelist (&dirlist);
+    qsort (filelist, sim_count_filelist (filelist), sizeof (*filelist), _filename_compare);
     return filelist;
+    }
+free (file);
+r = sim_dir_scan (filename, _sim_filelist_entry, &filelist);
+if (r == SCPE_OK) {
+    qsort (filelist, sim_count_filelist (filelist), sizeof (*filelist), _filename_compare);
+    return filelist;
+    }
 return NULL;
 }
 
@@ -739,6 +909,18 @@ if (filelist == NULL)
 while (*filelist != NULL)
     sim_printf ("%s\n", *filelist++);
 }
+
+int sim_count_filelist (char **filelist)
+{
+int count = 0;
+
+if (filelist == NULL)
+    return count;
+while (*filelist++ != NULL)
+    ++count;
+return count;
+}
+
 
 
 /* OS-dependent routines */
@@ -1642,7 +1824,7 @@ free (c);
 c = strrchr (WholeName, '/');
 if (c) {
     memmove (DirName, WholeName, 1+c-WholeName);
-    DirName[1+c-WholeName] = '\0';
+    DirName[2+c-WholeName] = '\0';  /* Terminate after the path separator */
     }
 else
     DirName[0] = '\0';
