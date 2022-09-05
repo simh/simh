@@ -1,6 +1,6 @@
 /* pdp11_dz.c: DZ11 terminal multiplexor simulator
 
-   Copyright (c) 2001-2020, Robert M Supnik
+   Copyright (c) 2001-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,7 +25,6 @@
 
    dz           DZ11 terminal multiplexor
 
-   14-Feb-20    RMS     Fixed race condition for multiple transmitters (Mark Pizzolato)
    29-Dec-08    RMS     Added MTAB_NC to SET LOG command (Walter Mueller)
    19-Nov-08    RMS     Revised for common TMXR show routines
    18-Jun-07    RMS     Added UNIT_IDLE flag
@@ -374,8 +373,7 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
             if (c >= 0)                                 /* store char */
                 tmxr_putc_ln (lp, c);
             tmxr_poll_tx (&dz_desc);                    /* poll output */
-            dz_csr[dz] &= ~CSR_TRDY;                    /* clear TRDY for now */
-            dz_update_xmti();                           /* update int */
+            dz_update_xmti ();                          /* update int */
             }
         break;
         }
@@ -476,18 +474,16 @@ void dz_update_xmti (void)
 int32 dz, linemask, i, j, line;
 
 for (dz = 0; dz < DZ_MUXES; dz++) {                     /* loop thru muxes */
-    if ((dz_csr[dz] & CSR_TRDY) == 0) {                 /* xmiting? */
-        linemask = dz_tcr[dz] & DZ_LMASK;               /* enabled lines */
-        dz_csr[dz] &= ~CSR_TRDY;                        /* assume not rdy */
-        j = CSR_GETTL (dz_csr[dz]);                     /* start at current */
-        for (i = 0; i < DZ_LINES; i++) {                /* loop thru lines */
-            j = (j + 1) & DZ_LNOMASK;                   /* next line */
-            line = (dz * DZ_LINES) + j;                 /* get line num */
-            if ((linemask & (1 << j)) && dz_ldsc[line].xmte) {
-                CSR_PUTTL(dz_csr[dz], j);               /* put ln in csr */
-                dz_csr[dz] |= CSR_TRDY;                 /* set xmt rdy */
-                break;
-                }
+    linemask = dz_tcr[dz] & DZ_LMASK;                   /* enabled lines */
+    dz_csr[dz] &= ~CSR_TRDY;                            /* assume not rdy */
+    j = CSR_GETTL (dz_csr[dz]);                         /* start at current */
+    for (i = 0; i < DZ_LINES; i++) {                    /* loop thru lines */
+        j = (j + 1) & DZ_LNOMASK;                       /* next line */
+        line = (dz * DZ_LINES) + j;                     /* get line num */
+        if ((linemask & (1 << j)) && dz_ldsc[line].xmte) {
+            CSR_PUTTL (dz_csr[dz], j);                  /* put ln in csr */
+            dz_csr[dz] |= CSR_TRDY;                     /* set xmt rdy */
+            break;
             }
         }
     if ((dz_csr[dz] & CSR_TIE) && (dz_csr[dz] & CSR_TRDY)) /* ready plus int? */
