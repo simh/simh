@@ -100,6 +100,7 @@ ifeq (old,$(shell gmake --version /dev/null 2>&1 | grep 'GNU Make' | awk '{ if (
   $(warning *** Warning *** GNU Make Version $(GMAKE_VERSION) is too old to)
   $(warning *** Warning *** fully process this makefile)
 endif
+SIM_MAJOR=$(shell grep SIM_MAJOR sim_rev.h | awk '{ print $$3 }')
 BUILD_SINGLE := ${MAKECMDGOALS} $(BLANK_SUFFIX)
 BUILD_MULTIPLE_VERB = is
 # building the pdp1, pdp11, tx-0, or any microvax simulator could use video support
@@ -161,6 +162,10 @@ ifneq ($(NONETWORK),)
 endif
 # ... or without video support
 ifneq ($(NOVIDEO),)
+  VIDEO_USEFUL =
+endif
+ifeq (3,${SIM_MAJOR})
+  # simh v3 DOES not have any video support
   VIDEO_USEFUL =
 endif
 ifneq ($(findstring Windows,${OS}),)
