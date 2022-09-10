@@ -248,7 +248,7 @@ CNFTAB cnf_tab[] = {
 static const char *opt_name[] = {
     "Unibus", "Qbus", "EIS", "NOEIS", "FIS", "NOFIS",
     "FPP", "NOFPP", "CIS", "NOCIS", "MMU", "NOMMU",
-    "RH11", "RH70", "PARITY", "NOPARITY", "Unibus map", "No map", 
+    "unused", "unused", "PARITY", "NOPARITY", "Unibus map", "No map", 
     "BEVENT enabled", "BEVENT disabled", NULL
     };
 
