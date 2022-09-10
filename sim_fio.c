@@ -62,7 +62,7 @@
    sim_copyfile              copy a file
    sim_filepath_parts        expand and extract filename/path parts
    sim_dirscan               scan for a filename pattern
-   sim_get_filelist          get a list of files matching a pattern recursively
+   sim_get_filelist          get a list of files matching a pattern
    sim_free_filelist         free a filelist
    sim_print_filelist        print the elements of a filelist
 
@@ -567,10 +567,8 @@ static struct get_filelist_test {
          {"xab/bbc/ccd/eef/file.txt", 
           "xab/bbc/ccd/eef/file2.bbb", 
           "xac/bbd/cce/eef/file2.txt", 
-          "xac/bbd/file3.txt", 
-          "xac/file4.txt", 
           NULL},
-         "*.txt", 4},
+         "*.txt", 2},
         {NULL},
     };
 
@@ -816,26 +814,6 @@ filelist[listcount + 1] = NULL;
 *(char ***)context = filelist;
 }
 
-/* Standardize the order of the list grouping by full path/filename */
-static int _filename_compare (const void *pa, const void *pb)
-{
-char *a = strdup (*(const char **)pa);
-char *fa = strrchr (a, '/');
-char *b = strdup (*(const char **)pb);
-char *fb = strrchr (b, '/');
-int result;
-
-*fa = '\0';
-*fb = '\0';
-
-result = strcmp (a, b);
-if (result == 0)
-    result = strcmp (fa + 1, fb + 1);
-free (a);
-free (b);
-return result;
-}
-
 char **sim_get_filelist (const char *filename)
 {
 t_stat r;
@@ -878,15 +856,12 @@ if (r == SCPE_OK) {
         sim_dir_scan (filename, _sim_filelist_entry, &filelist);
     free (file);
     sim_free_filelist (&dirlist);
-    qsort (filelist, sim_count_filelist (filelist), sizeof (*filelist), _filename_compare);
     return filelist;
     }
 free (file);
 r = sim_dir_scan (filename, _sim_filelist_entry, &filelist);
-if (r == SCPE_OK) {
-    qsort (filelist, sim_count_filelist (filelist), sizeof (*filelist), _filename_compare);
+if (r == SCPE_OK)
     return filelist;
-    }
 return NULL;
 }
 
