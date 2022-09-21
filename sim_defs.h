@@ -702,7 +702,8 @@ struct REG {
     BITFIELD            *fields;                        /* bit fields */
     uint32              qptr;                           /* circ q ptr */
     size_t              stride;                         /* structure/object size (for indexing) */
-    size_t              obj_size;                       /* sizeof(*loc) */
+    size_t              obj_size;                       /* sizeof(loc) */
+    size_t              pobj_size;                      /* sizeof(*loc) */
     size_t              size;                           /* sizeof(**loc) or sizeof(*loc) if depth == 1 */
     const char          *macro;                         /* Initializer Macro Name */
     const char          *source_file;                   /* source file used macro */
@@ -944,8 +945,9 @@ struct MEMFILE {
      FLDATA    Scalar with single bit display/entry
      GRDATA    Scalar with with specification of radix/width/offset parameters
 
-     BRDATA    Singly-subscripted array
-     CRDATA    Doubly-subscripted array
+     BRDATA    Singly-subscripted array of scalars
+     CRDATA    Doubly-subscripted array of scalars
+     VBRDATA   List of elements accessed like a Singly-subscripted array of scalars
 
      SRDATA    Singly-subscripted array of general structure fields
      URDATA    Singly-subscripted array of UNIT structure fields
@@ -1016,12 +1018,14 @@ struct MEMFILE {
 
     5. The SAVEDATA macro is useful to indicate global variables whose values
        must persist across a SAVE and RESTORE.  Such data is hidden from the
-       register user interface.
+       register user interface.  Data saved this way may generally not be 
+       usefully restored when a SAVE and RESTORE operations are done on host
+       systems with different endian attributes.
 */
 
 /* Internal use ONLY (see below) Generic Register declaration for all fields */
 #define _RegCheck(nm,loc,rdx,wd,off,dep,desc,flds,qptr,siz,elesiz,macro) \
-    nm, (loc), (rdx), (wd), (off), (dep), (desc), (flds), (qptr), (siz), sizeof(*(loc)), (elesiz), #macro, __FILE__, __LINE__
+    nm, (loc), (rdx), (wd), (off), (dep), (desc), (flds), (qptr), (siz), sizeof(loc), sizeof(*(loc)), (elesiz), #macro, __FILE__, __LINE__
 
 /* Generic Register declaration for all fields.  
    If the register structure is extended, this macro will be retained and a 
@@ -1031,6 +1035,10 @@ struct MEMFILE {
 /* v3 compatible macro */
 #define XRDATA(nm,loc,rdx,wd,off,dep,siz,str) \
     _RegCheck(#nm,loc,rdx,wd,off,dep,NULL,NULL,0,siz,sizeof((loc)),XRDATA)
+#define XRDATAD(nm,loc,rdx,wd,off,dep,siz,str,desc) \
+    _RegCheck(#nm,loc,rdx,wd,off,dep,desc,NULL,0,siz,sizeof((loc)),XRDATAD)
+#define XRDATADF(nm,loc,rdx,wd,off,dep,siz,str,desc,flds) \
+    _RegCheck(#nm,loc,rdx,wd,off,dep,desc,flds,0,siz,sizeof((loc)),XRDATADF)
 
 /* Right Justified Octal Register Data */
 #define ORDATA(nm,loc,wd) \

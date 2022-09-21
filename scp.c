@@ -16303,9 +16303,9 @@ for (i = 0; (dptr = devices[i]) != NULL; i++) {
             }
 
         if (sim_switches & SWMASK ('R'))            /* Debug output */
-            sim_printf ("%5s:%-9.9s %s%s%s(rdx=%u, wd=%u, off=%u, dep=%u, strsz=%u, objsz=%u, elesz=%u, rsz=%u, %s%s%s membytes=%u)\n", 
+            sim_printf ("%5s:%-9.9s %s%s%s(rdx=%u, wd=%u, off=%u, dep=%u, strsz=%u, objsz=%u, oobjsz=%u, elesz=%u, rsz=%u, %s%s%s membytes=%u)\n", 
                         dptr->name, rptr->name, rptr->desc ? rptr->desc : "", rptr->desc ? "\n\t" : "", rptr->macro ? rptr->macro : "", 
-                        rptr->radix, rptr->width, rptr->offset, rptr->depth, (uint32)rptr->stride, (uint32)rptr->obj_size, (uint32)rptr->size, rsz,
+                        rptr->radix, rptr->width, rptr->offset, rptr->depth, (uint32)rptr->stride, (uint32)rptr->obj_size, (uint32)rptr->pobj_size, (uint32)rptr->size, rsz,
                         (rptr->flags & REG_VMAD) ? " REG_VMAD" : "", (rptr->flags & REG_VMIO) ? " REG_VMIO" : "",
                         (rptr->flags & REG_DEPOSIT) ? " REG_DEPOSIT" : "", memsize);
 
@@ -16318,10 +16318,19 @@ for (i = 0; (dptr = devices[i]) != NULL; i++) {
             }
         else {
             if (rptr->depth > 1) {
-                Mprintf (f, "%s %s:%s used the %s macro to describe a %u bit%s wide and %u elements deep array\n", sim_name, dptr->name, rptr->name, rptr->macro, rptr->width, (rptr->width == 1) ? "" : "s", rptr->depth);
+                Mprintf (f, "%s %s:%s used the %s macro to describe a %u bit%s wide and %u element deep array\n", sim_name, dptr->name, rptr->name, rptr->macro, rptr->width, (rptr->width == 1) ? "" : "s", rptr->depth);
                 if (rptr->stride == 0) {
                     Bad = TRUE;
                     Mprintf (f, "%s %s:%s array stride is unspecified\n", sim_name, dptr->name, rptr->name);
+                    }
+                if (((((size_t)rptr->loc + rptr->stride)) % rsz) != 0) {
+                    Bad = TRUE;
+                    Mprintf (f, "%s %s:%s array seems to not have naturally aligned elements with a stride of %u and depth of %u\n", sim_name, dptr->name, rptr->name, (uint32)rptr->stride, (uint32)rptr->depth);
+                    }
+                if ((memcmp (rptr->macro, "BRDATA", 6) == 0) && 
+                    ((rptr->depth * rptr->stride) > rptr->obj_size)) {
+                    Bad = TRUE;
+                    Mprintf (f, "%s %s:%s stride of %u and depth of %u is unreasonable and access will reach beyond the array upper bound\n", sim_name, dptr->name, rptr->name, (uint32)rptr->stride, (uint32)rptr->depth);
                     }
                 }
             else {                              /* rptr->depth == 0 */
@@ -16370,20 +16379,20 @@ for (i = 0; (dptr = devices[i]) != NULL; i++) {
                     }
                 else {
                     bytes *= rptr->depth;
-                    if (!Bad) 
-                        if ((rsz * rptr->depth == rptr->obj_size)                                                   ||
-                            ((rptr->macro && (strstr (rptr->macro, "STRDATA") != NULL)) && (rsz <= rptr->obj_size)) ||
+                    if (!Bad)
+                        if ((rsz * rptr->depth == rptr->pobj_size)                                                   ||
+                            ((rptr->macro && (strstr (rptr->macro, "STRDATA") != NULL)) && (rsz <= rptr->pobj_size)) ||
                             ((rptr->depth == 1) && 
-                             ((rptr->obj_size == sizeof (t_value)) || (rsz < rptr->obj_size)))          ||
-                            ((rptr->depth != 1) && (bytes == rptr->obj_size))                           ||
+                             ((rptr->pobj_size == sizeof (t_value)) || (rsz < rptr->pobj_size)))         ||
+                            ((rptr->depth != 1) && (bytes == rptr->pobj_size))                           ||
                             ((rptr->depth != 1) && (rptr->offset == 0) && (rptr->width == 8) &&
-                             ((rptr->depth == rptr->obj_size) || (rptr->depth == rptr->obj_size - 1)))  ||
-                            ((rptr->depth != 1) && (rptr->offset == 0) && (rptr->obj_size == rptr->size)))
+                             ((rptr->depth == rptr->obj_size) || (rptr->depth == rptr->pobj_size - 1)))  ||
+                            ((rptr->depth != 1) && (rptr->offset == 0) && (rptr->pobj_size == rptr->size)))
                         continue;
                     Bad = TRUE;
                     Mprintf (f, "\ttherefore EXAMINE and SAVE operations will reference %u byte%s\n", bytes, (bytes != 1) ? "s" : "");
                     Mprintf (f, "\tand DEPOSIT and RESTORE operations will affect %u byte%s of memory\n", bytes, (bytes != 1) ? "s" : "");
-                    Mprintf (f, "\twhile the variable lives in %u bytes of memory\n", (uint32)rptr->obj_size);
+                    Mprintf (f, "\twhile the variable lives in %u bytes of memory\n", (uint32)rptr->pobj_size);
                     }
                 }
             else {
@@ -16433,6 +16442,9 @@ static struct validation_test {
     REG reg[7];
     t_stat expected_result;
     } validations[] = {
+        { { { BRDATAD (STRUCT,  validate_units,   16, 8*sizeof(treg16), sizeof(validate_units)/sizeof(treg16), "an invalid array of scalars") },
+            {NULL} },
+         SCPE_IERR},
         { { { SRDATAD (AMBIG,   validate_units,   pos,   10, 32, 0, 3, "a basic register array") },
             { SRDATAD (AMBIG,   validate_units,   u3,    10, 32, 0, 3, "an ambiguously named register array") },
             {NULL} },
