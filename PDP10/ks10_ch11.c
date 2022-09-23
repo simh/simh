@@ -134,7 +134,7 @@ MTAB ch11_mod[] = {
   { 0 },
 };
 
-DIB ch11_dib = { 0764140, 017, 0270, 6, 3, &ch11_read, &ch11_write, NULL, 0, 0 };
+DIB ch11_dib = { 0764140, 017, 0270, 5, 3, &ch11_read, &ch11_write, NULL, 0, 0 };
 
 DEBTAB ch11_debug[] = {
     { "DETAIL",    DEBUG_DETAIL,"I/O operations"},
