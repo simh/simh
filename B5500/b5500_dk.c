@@ -130,7 +130,7 @@ MTAB                dsk_mod[] = {
 };
 
 REG                 dsk_reg[] = {
-    {BRDATA(BUFF, dsk_buffer, 16, 8, sizeof(dsk_buffer)), REG_HRO},
+    {CRDATA(BUFF, dsk_buffer, 16, 8, sizeof(dsk_buffer)), REG_HRO},
     {0}
 };
 

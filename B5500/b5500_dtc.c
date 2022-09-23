@@ -195,7 +195,7 @@ MTAB                dtc_mod[] = {
 REG                 dtc_reg[] = {
     {ORDATAD(BUFSIZE, dtc_bufsize, 8, "Buffer size"), REG_HRO},
     {ORDATAD(NLINES, dtc_desc.lines, 8, "Buffer size"), REG_HRO},
-    {BRDATA(BUF, dtc_buf, 16, 8, sizeof(dtc_buf)), REG_HRO},
+    {CRDATA(BUF, dtc_buf, 16, 8, sizeof(dtc_buf)), REG_HRO},
     {BRDATA(LSTAT, dtc_lstatus, 16, 8, sizeof(dtc_lstatus)), REG_HRO},
     {BRDATA(BUFPTR, dtc_bufptr, 16, 16, sizeof(dtc_bufptr)/sizeof(uint16)), REG_HRO},
     {BRDATA(BUFSIZ, dtc_bsize, 16, 16, sizeof(dtc_bsize)/sizeof(uint16)), REG_HRO},

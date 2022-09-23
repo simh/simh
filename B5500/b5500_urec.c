@@ -151,7 +151,7 @@ MTAB                cdr_mod[] = {
 };
 
 REG                 cdr_reg[] = {
-    {BRDATA(BUFF, cdr_buffer, 16, 16, sizeof(cdr_buffer)/sizeof(uint16)), REG_HRO},
+    {CRDATA(BUFF, cdr_buffer, 16, 16, sizeof(cdr_buffer)/sizeof(uint16)), REG_HRO},
     {0}
 };  
 
@@ -178,7 +178,7 @@ MTAB                cdp_mod[] = {
 };
 
 REG                 cdp_reg[] = {
-    {BRDATA(BUFF, cdp_buffer, 16, 16, sizeof(cdp_buffer)/sizeof(uint16)), REG_HRO},
+    {CRDATA(BUFF, cdp_buffer, 16, 16, sizeof(cdp_buffer)/sizeof(uint16)), REG_HRO},
     {0}
 };  
 
@@ -209,7 +209,7 @@ MTAB                lpr_mod[] = {
 };
 
 REG                 lpr_reg[] = {
-    {BRDATA(BUFF, lpr_buffer, 16, 8, sizeof(lpr_buffer)), REG_HRO},
+    {CRDATA(BUFF, lpr_buffer, 16, 8, sizeof(lpr_buffer)), REG_HRO},
     {0}
 };  
 
