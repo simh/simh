@@ -792,7 +792,11 @@ static const char* _eth_getname(int number, char* name, char *desc)
   if ((number < 0) || (count <= number))
       return NULL;
   if (list[number].eth_api != ETH_API_PCAP) {
+#if defined(_WIN32)
+    sim_printf ("Eth: Pcap capable device not found.  Install Npcap or WinPcap 4.1.3 to use pcap networking\n");
+#else
     sim_printf ("Eth: Pcap capable device not found.  You may need to run as root\n");
+#endif
     return NULL;
     }
 
@@ -2692,26 +2696,45 @@ return SCPE_OK;
 
 const char *eth_version (void)
 {
-#if defined(HAVE_PCAP_NETWORK)
 static char version[300];
 
-if (!version[0]) {
-  strlcpy(version, pcap_lib_version(), sizeof(version));
-  if (memcmp(pcap_lib_version(), "Npcap", 5) == 0) {
-    char maj_min[CBUFSIZE];
-    char *c = version;
-
-    while (*c && !isdigit (*c))
-      ++c;
-    get_glyph (c, maj_min, ',');
-    if (strcmp ("0.9990", maj_min) > 0)
-      snprintf(version, sizeof(version), "Unsupported - %s", pcap_lib_version());
-    }
-  }
-return version;
-#else
-return NULL;
+if (version[0] != '\0') 
+  return version;
+#if defined(HAVE_SLIRP_NETWORK)
+if (version[0] != '\0')
+  strlcat (version, ", ", sizeof (version));
+strlcat (version, "NAT", sizeof (version));
 #endif
+#if defined(HAVE_TAP_NETWORK)
+if (version[0] != '\0')
+  strlcat (version, ", ", sizeof (version));
+strlcat (version, "TAP", sizeof (version));
+#endif
+#if defined(HAVE_VDE_NETWORK)
+if (version[0] != '\0')
+  strlcat (version, ", ", sizeof (version));
+strlcat (version, "VDE", sizeof (version));
+#endif
+if (version[0] != '\0')
+  strlcat (version, ", ", sizeof (version));
+strlcat (version, "UDP", sizeof (version));
+#if defined(HAVE_PCAP_NETWORK)
+if (version[0] != '\0')
+  strlcat (version, ", ", sizeof (version));
+strlcat (version, "PCAP: ", sizeof (version));
+if (strstr (pcap_lib_version(), "Npcap") != NULL) {
+  char maj_min[CBUFSIZE];
+  const char *c = pcap_lib_version();
+
+  while (*c && !isdigit (*c))
+    ++c;
+  get_glyph (c, maj_min, ',');
+  if (strcmp ("0.9990", maj_min) > 0)
+    strlcat (version, "Unsupported - ", sizeof(version));
+  }
+strlcat (version, pcap_lib_version(), sizeof (version));
+#endif
+return version;
 }
 
 t_stat eth_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)

@@ -121,7 +121,7 @@ UNIT                mt_unit[] = {
 };
 
 REG                 mt_reg[] = {
-    {BRDATA(BUFF, mt_buffer, 16, 8, sizeof(mt_buffer)), REG_HRO},
+    {CRDATA(BUFF, mt_buffer, 16, 8, sizeof(mt_buffer)), REG_HRO},
     {0}
 };
 

@@ -216,6 +216,34 @@ popd
 set _TRIED_CLONE=1
 goto _check_build
 :_notice1_announce
+if "%_TRIED_CURL%" neq "" goto _notice3_announce
+call :FindCurl _CURL_CURL
+if "%_CURL_CURL%" equ "" goto _notice3_announce
+call :FindTar _TAR_TAR
+if "%_TAR_TAR%" equ "" goto _notice3_announce
+echo *****************************************************
+echo *****************************************************
+echo **                                                 **
+echo ** The required build support is not yet available.**
+echo **                                                 **
+echo ** Using curl and tar to acquire and expand a      **
+echo ** local copy of the windows-build repository      **
+echo ** in archive form from:                           **
+echo **                                                 **
+echo **    https://github.com/simh/windows-build        **
+echo **                                                 **
+echo ** This may take a minute or so.  Please wait...   **
+echo **                                                 **
+echo *****************************************************
+echo *****************************************************
+pushd ..\..
+%_CURL_CURL% --location https://github.com/simh/windows-build/archive/windows-build.tar.gz --output windows-build.tar.gz
+%_TAR_TAR% -xzf windows-build.tar.gz
+del windows-build.tar.gz
+popd
+set _TRIED_CURL=1
+goto _check_build
+:_notice3_announce
 echo *****************************************************
 echo *****************************************************
 echo **  The required build support is not available.   **
@@ -260,6 +288,34 @@ popd
 set _TRIED_PULL=1
 goto _check_build
 :_notice2_announce
+if "%_TRIED_CURL%" neq "" goto _notice4_announce
+call :FindCurl _CURL_CURL
+if "%_CURL_CURL%" equ "" goto _notice4_announce
+call :FindTar _TAR_TAR
+if "%_TAR_TAR%" equ "" goto _notice4_announce
+echo *****************************************************
+echo *****************************************************
+echo **                                                 **
+echo ** The required build support is out of date.      **
+echo **                                                 **
+echo ** Using curl and tar to acquire and expand a      **
+echo ** local copy of the windows-build repository      **
+echo ** in archive form from:                           **
+echo **                                                 **
+echo **    https://github.com/simh/windows-build        **
+echo **                                                 **
+echo ** This may take a minute or so.  Please wait...   **
+echo **                                                 **
+echo *****************************************************
+echo *****************************************************
+pushd ..\..
+%_CURL_CURL% --location https://github.com/simh/windows-build/archive/windows-build.tar.gz --output windows-build.tar.gz
+%_TAR_TAR% -xzf windows-build.tar.gz
+del windows-build.tar.gz
+popd
+set _TRIED_CURL=1
+goto _check_build
+:_notice4_announce
 echo *****************************************************
 echo *****************************************************
 echo **  The required build support is out of date.     **
@@ -391,6 +447,22 @@ set _VC_CL_=
 set _GIT_BASE_=
 set _GIT_TMP_=
 set _GIT_TMP=
+exit /B 0
+
+:FindTar
+set _TAR_TMP=%1
+call :WhichInPath tar.exe _TAR_TMP_
+set %_TAR_TMP%=%_TAR_TMP_%
+set _TAR_TMP_=
+set _TAR_TMP=
+exit /B 0
+
+:FindCurl
+set _CURL_TMP=%1
+call :WhichInPath curl.exe _CURL_TMP_
+set %_CURL_TMP%=%_CURL_TMP_%
+set _CURL_TMP_=
+set _CURL_TMP=
 exit /B 0
 
 :FindVCVersion

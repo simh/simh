@@ -125,6 +125,7 @@ static t_stat dup_set_W5 (UNIT* uptr, int32 val, CONST char* cptr, void* desc);
 static t_stat dup_show_W5 (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
 static t_stat dup_set_W6 (UNIT* uptr, int32 val, CONST char* cptr, void* desc);
 static t_stat dup_show_W6 (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
+static uint16 dup_crc_ccitt (uint8 const *bytes, uint32 len);
 static t_stat dup_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 static t_stat dup_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 static const char *dup_description (DEVICE *dptr);
@@ -414,7 +415,7 @@ static BITFIELD dpv_parcsr_bits[] = {
 #define PARCSR_V_DPV_ADSYNC   0
 #define PARCSR_S_DPV_ADSYNC   8
 #define PARCSR_M_DPV_ADSYNC   (((1<<PARCSR_S_DPV_ADSYNC)-1)<<PARCSR_V_DPV_ADSYNC)
-    BITF(DPV_ERRDET,8),                         /* CRC Type */
+    BITF(DPV_ERRDET,3),                         /* CRC Type */
 #define PARCSR_V_DPV_ERRDET   8
 #define PARCSR_S_DPV_ERRDET   3
 #define PARCSR_M_DPV_ERRDET   (((1<<PARCSR_S_DPV_ERRDET)-1)<<PARCSR_V_DPV_ERRDET)
@@ -935,7 +936,7 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
             if (dup_txcsr[dup] & TXCSR_M_DPV_SEND) {
                 dup_txcsr[dup] |= TXCSR_M_DPV_TXACT;
                 sim_activate (dup_units+dup, dup_wait[dup]);
-                /* Go ahead, Abort not supported */
+                /* Go ahead not supported */
             }
         }
         break;
@@ -1205,9 +1206,12 @@ return SCPE_OK;
 t_bool dup_put_msg_bytes (int32 dup, uint8 *bytes, size_t len, t_bool start, t_bool end)
 {
 t_bool breturn = FALSE;
+int32 charmode;
 
 if ((dup < 0) || (dup >= dup_desc.lines) || (DUPDPTR->flags & DEV_DIS))
     return FALSE;
+
+charmode = ((UNIBUS) ? (dup_parcsr[dup] & PARCSR_M_DECMODE) : (dup_parcsr[dup] & PARCSR_M_DPV_PROTSEL));
 
 if (!tmxr_tpbusyln(&dup_ldsc[dup])) {  /* Not Busy sending? */
     if (start) {
@@ -1220,9 +1224,11 @@ if (!tmxr_tpbusyln(&dup_ldsc[dup])) {  /* Not Busy sending? */
         dup_xmtpacket[dup] = (uint8 *)realloc (dup_xmtpacket[dup], dup_xmtpksize[dup]);
         }
     /* Strip sync bytes at the beginning of a message */
-    while (len && (dup_xmtpkoffset[dup] == 0) && (bytes[0] == DDCMP_SYN)) {
-        --len;
-        ++bytes;
+    if (dup_kmc[dup] || charmode) {
+        while (len && (dup_xmtpkoffset[dup] == 0) && (bytes[0] == DDCMP_SYN)) {
+            --len;
+            ++bytes;
+            }
         }
     /* Insert remaining bytes into transmit buffer */
     if (len) {
@@ -1237,13 +1243,24 @@ if (!tmxr_tpbusyln(&dup_ldsc[dup])) {  /* Not Busy sending? */
         dup_set_txint (dup);
     /* On End of Message, insert CRC and flag delivery start */
     if (end) {
-        uint16 crc16 = ddcmp_crc16 (0, dup_xmtpacket[dup], dup_xmtpkoffset[dup]);
+        uint16 crc16;
 
-        dup_xmtpacket[dup][dup_xmtpkoffset[dup]++] = crc16 & 0xFF;
-        dup_xmtpacket[dup][dup_xmtpkoffset[dup]++] = crc16 >> 8;
-        if ((dup_xmtpkoffset[dup] > 8) || (dup_xmtpacket[dup][0] == DDCMP_ENQ)) {
+        if (charmode) {
+            crc16 = ddcmp_crc16 (0, dup_xmtpacket[dup], dup_xmtpkoffset[dup]);
+            dup_xmtpacket[dup][dup_xmtpkoffset[dup]++] = crc16 & 0xFF;
+            dup_xmtpacket[dup][dup_xmtpkoffset[dup]++] = crc16 >> 8;
+            if ((dup_xmtpkoffset[dup] > 8) || (dup_xmtpacket[dup][0] == DDCMP_ENQ)) {
+                dup_xmtpkbytes[dup] = dup_xmtpkoffset[dup];
+                ddcmp_tmxr_put_packet_ln (&dup_ldsc[dup], dup_xmtpacket[dup], dup_xmtpkbytes[dup], dup_corruption[dup]);
+                }
+            } 
+        else {
+            crc16 = dup_crc_ccitt (dup_xmtpacket[dup], dup_xmtpkoffset[dup]);
+            /* this crc is transmitted in big-endian order */
+            dup_xmtpacket[dup][dup_xmtpkoffset[dup]++] = crc16 >> 8;
+            dup_xmtpacket[dup][dup_xmtpkoffset[dup]++] = crc16 & 0xFF;
             dup_xmtpkbytes[dup] = dup_xmtpkoffset[dup];
-            ddcmp_tmxr_put_packet_ln (&dup_ldsc[dup], dup_xmtpacket[dup], dup_xmtpkbytes[dup], dup_corruption[dup]);
+            tmxr_put_packet_ln (&dup_ldsc[dup], dup_xmtpacket[dup], dup_xmtpkbytes[dup]);
             }
         }
     breturn = TRUE;
@@ -1279,7 +1296,7 @@ return SCPE_OK;
 
 static t_stat dup_rcv_byte (int32 dup)
 {
-int32 crcoffset;
+int32 crcoffset, charmode;
 
 sim_debug (DBG_TRC, DUPDPTR, "dup_rcv_byte(dup=%d) - %s, byte %d of %d\n", dup, 
            (dup_rxcsr[dup] & RXCSR_M_RCVEN) ? "enabled" : "disabled",
@@ -1292,33 +1309,72 @@ if (dup_rcv_packet_data_callback[dup]) {
     dup_rcv_packet_data_callback[dup](dup, dup_rcvpkbytes[dup]);
     return SCPE_OK;
     }
+charmode = ((UNIBUS) ? (dup_parcsr[dup] & PARCSR_M_DECMODE) : (dup_parcsr[dup] & PARCSR_M_DPV_PROTSEL));
 /* if we added trailing SYNs, don't include them in the CRC calc */
 crcoffset = (dup_kmc[dup] ? 0 : TRAILING_SYNS);
 dup_rxcsr[dup] |= RXCSR_M_RXACT;
 if (UNIBUS)
-    dup_rxdbuf[dup] &= ~RXDBUF_M_RCRCER;
+    dup_rxdbuf[dup] &= ~(RXDBUF_M_RCRCER|RXDBUF_M_RENDMSG|RXDBUF_M_RSTRMSG);
 else
-    dup_rxdbuf[dup] &= ~RXDBUF_M_DPV_RCRCER;
+    dup_rxdbuf[dup] &= ~(RXDBUF_M_DPV_RCRCER|RXDBUF_M_DPV_RENDMSG|RXDBUF_M_DPV_RSTRMSG);
 dup_rxdbuf[dup] &= ~RXDBUF_M_RXDBUF;
 dup_rxdbuf[dup] |= dup_rcvpacket[dup][dup_rcvpkinoff[dup]++];
 dup_rxcsr[dup] |= RXCSR_M_RXDONE;
-if (UNIBUS) {
-    if ( ((dup_rcvpkinoff[dup] == 8) || 
-          (dup_rcvpkinoff[dup] >= dup_rcvpkbytes[dup]-crcoffset)) &&
-         (0 == ddcmp_crc16 (0, dup_rcvpacket[dup], dup_rcvpkinoff[dup])))
-        dup_rxdbuf[dup] |= RXDBUF_M_RCRCER;
-    else
-        dup_rxdbuf[dup] &= ~RXDBUF_M_RCRCER;
-} else {
-    if ( ((dup_rcvpkinoff[dup] == 6) || 
-          (dup_rcvpkinoff[dup] >= dup_rcvpkbytes[dup]-crcoffset-2)) &&
-         (0 == ddcmp_crc16 (0, dup_rcvpacket[dup], dup_rcvpkinoff[dup]+2)))
-        dup_rxdbuf[dup] |= RXDBUF_M_DPV_RCRCER;
-    else
-        dup_rxdbuf[dup] &= ~RXDBUF_M_DPV_RCRCER;
-}
+if (UNIBUS) { /* DUP */
+    if (charmode) { /* DDCMP */
+        if ( ((dup_rcvpkinoff[dup] == 8) || 
+              (dup_rcvpkinoff[dup] >= dup_rcvpkbytes[dup]-crcoffset)) &&
+             (0 == ddcmp_crc16 (0, dup_rcvpacket[dup], dup_rcvpkinoff[dup])))
+            dup_rxdbuf[dup] |= RXDBUF_M_RCRCER;
+        else
+            dup_rxdbuf[dup] &= ~RXDBUF_M_RCRCER;
+        if (dup_rcvpkinoff[dup] >= dup_rcvpkbytes[dup])
+            dup_rcvpkinoff[dup] = dup_rcvpkbytes[dup] = 0;
+        }
+    else { /* HDLC */
+        /* set End Of Message on fake Flag that was added earlier */
+        if (dup_rcvpkinoff[dup] == dup_rcvpkbytes[dup]) {
+            dup_rxdbuf[dup] |= RXDBUF_M_RENDMSG;
+            /* check CRC only with EOM indication */
+            if (0 != dup_crc_ccitt (dup_rcvpacket[dup], dup_rcvpkinoff[dup]-1))
+                dup_rxdbuf[dup] |= RXDBUF_M_RCRCER;
+            }
+        /* set Start Of Message on first byte (primary mode only) */
+        if (dup_rcvpkinoff[dup] == 1)
+            dup_rxdbuf[dup] |= RXDBUF_M_RSTRMSG;
+        if (dup_rcvpkinoff[dup] >= dup_rcvpkbytes[dup])
+            dup_rcvpkinoff[dup] = dup_rcvpkbytes[dup] = 0;
+        }
+    }
+else { /* DPV */
+    if (charmode) { /* DDCMP */
+        if ( ((dup_rcvpkinoff[dup] == 6) || 
+              (dup_rcvpkinoff[dup] >= dup_rcvpkbytes[dup]-crcoffset-2)) &&
+             (0 == ddcmp_crc16 (0, dup_rcvpacket[dup], dup_rcvpkinoff[dup]+2)))
+            dup_rxdbuf[dup] |= RXDBUF_M_DPV_RCRCER;
+        else
+            dup_rxdbuf[dup] &= ~RXDBUF_M_DPV_RCRCER;
+        if (dup_rcvpkinoff[dup] >= dup_rcvpkbytes[dup])
+            dup_rcvpkinoff[dup] = dup_rcvpkbytes[dup] = 0;
+        }
+    else { /* HDLC */
+        /* set End Of Message on last actual message byte, excluding the CRC */
+        if (dup_rcvpkinoff[dup] == dup_rcvpkbytes[dup] - 2) {
+            dup_rxdbuf[dup] |= RXDBUF_M_DPV_RENDMSG;
+            dup_rxcsr[dup] |= RXCSR_M_DPV_RSTARY;
+            /* check CRC only with EOM indication */
+            if (0 != dup_crc_ccitt (dup_rcvpacket[dup], dup_rcvpkinoff[dup] + 2))
+              dup_rxdbuf[dup] |= RXDBUF_M_DPV_RCRCER;
+            }
+        /* set Start Of Message on first byte (primary mode only) */
+        if (dup_rcvpkinoff[dup] == 1)
+                dup_rxdbuf[dup] |= RXDBUF_M_DPV_RSTRMSG;
+        /* DPV doesn't return the CRC bytes */
+        if (dup_rcvpkinoff[dup] >= dup_rcvpkbytes[dup] - 2 )
+            dup_rcvpkinoff[dup] = dup_rcvpkbytes[dup] = 0;
+        }
+    }
 if (dup_rcvpkinoff[dup] >= dup_rcvpkbytes[dup]) {
-    dup_rcvpkinoff[dup] = dup_rcvpkbytes[dup] = 0;
     dup_rxcsr[dup] &= ~RXCSR_M_RXACT;
     }
 if (dup_rxcsr[dup] & RXCSR_M_RXIE)
@@ -1332,19 +1388,32 @@ return SCPE_OK;
 static t_stat dup_svc (UNIT *uptr)
 {
 DEVICE *dptr = DUPDPTR;
-int32 dup = (int32)(uptr-dptr->units);
+int32 dup = (int32)(uptr-dptr->units), charmode, putlen = 1;
 TMLN *lp = &dup_desc.ldsc[dup];
 t_bool txdone;
 
 sim_debug(DBG_TRC, DUPDPTR, "dup_svc(dup=%d)\n", dup);
-if (UNIBUS)
+if (UNIBUS) {
     txdone = !(dup_txcsr[dup] & TXCSR_M_TXDONE);
-else
+    charmode = (dup_parcsr[dup] & PARCSR_M_DECMODE);
+    if ((dup_txdbuf[dup] & TXDBUF_M_TEOM) ||
+        (!charmode && ((dup_txdbuf[dup] & TXDBUF_M_TSOM))))
+        putlen = 0;
+    }
+else {
     txdone = !(dup_txcsr[dup] & TXCSR_M_DPV_TBEMPTY);
+    charmode = (dup_parcsr[dup] & PARCSR_M_DPV_PROTSEL);
+    if (!charmode && (dup_txdbuf[dup] & TXDBUF_M_TSOM))
+        putlen = 0;
+    }
 if (txdone && (!tmxr_tpbusyln (lp))) {
     uint8 data = dup_txdbuf[dup] & TXDBUF_M_TXDBUF;
 
-    dup_put_msg_bytes (dup, &data, (dup_txdbuf[dup] & TXDBUF_M_TEOM) && (dptr == &dup_dev) ? 0 : 1, dup_txdbuf[dup] & TXDBUF_M_TSOM, (dup_txdbuf[dup] & TXDBUF_M_TEOM));
+    if (!charmode && (dup_txdbuf[dup] & TXDBUF_M_TABRT))
+        /* HDLC mode abort, just reset the current TX frame back to the start */
+        dup_put_msg_bytes (dup, &data, 0, TRUE, FALSE);
+    else
+        dup_put_msg_bytes (dup, &data, putlen, dup_txdbuf[dup] & TXDBUF_M_TSOM, (dup_txdbuf[dup] & TXDBUF_M_TEOM));
     if (tmxr_tpbusyln (lp)) { /* Packet ready to send? */
         sim_debug(DBG_TRC, DUPDPTR, "dup_svc(dup=%d) - Packet Done %d bytes\n", dup, dup_xmtpkoffset[dup]);
         }
@@ -1425,19 +1494,29 @@ for (dup=active=attached=0; dup < dup_desc.lines; dup++) {
             r = tmxr_get_packet_ln (lp, &buf, &size_t_size);
             size = (uint16)size_t_size;
         }
-        /* in DEC mode add some SYN bytes to the end to deal with host drivers that 
-           implement the DDCMP CRC performance optimisation (DDCMP V4.0 section 5.1.2) */
-        if ((r == SCPE_OK) && (buf)) {
+        /* In HDLC mode, we need a minimum frame size of 1 byte + CRC
+           In DEC mode add some SYN bytes to the end to deal with host drivers that
+           implement the DDCMP CRC performance optimisation (DDCMP V4.0 section 5.1.2).
+           In HDLC mode on DUP only, add a flag because RENDMSG happens after the last actual frame character */
+        if ((r == SCPE_OK) && (buf) && ((charmode) || size > 3)) {
             if (dup_rcvpksize[dup] < size + TRAILING_SYNS) {
                 dup_rcvpksize[dup] = size + TRAILING_SYNS;
                 dup_rcvpacket[dup] = (uint8 *)realloc (dup_rcvpacket[dup], dup_rcvpksize[dup]);
                 }
             memcpy (dup_rcvpacket[dup], buf, size);
             dup_rcvpkbytes[dup] = size;
-            if (!dup_kmc[dup] && charmode) {
-                memcpy(&(dup_rcvpacket[dup][size]), tsyns, TRAILING_SYNS);
-                dup_rcvpkbytes[dup] += TRAILING_SYNS ;
-            }
+            if (!dup_kmc[dup]) {
+                if (charmode) {
+                    memcpy(&(dup_rcvpacket[dup][size]), tsyns, TRAILING_SYNS);
+                    dup_rcvpkbytes[dup] += TRAILING_SYNS ;
+                    }
+                else {
+                    if (UNIBUS) {
+                        dup_rcvpacket[dup][size] = 0x7E;
+                        dup_rcvpkbytes[dup] += 1 ;
+                        }
+                    }
+                }
             dup_rcvpkinoff[dup] = 0;
             dup_rxcsr[dup] |= RXCSR_M_RXACT;
             dup_rcv_byte (dup);
@@ -1829,6 +1908,59 @@ dptr->numunits = newln + 1;
 return dup_reset (dptr);                            /* setup lines and auto config */
 }
 
+/*
+ * Finding a definitive definition of the correct HDLC CRC is not easy. This
+ * one is the same calculation as in a couple of good quality public examples
+ * that both agree with each other, so hopefully it's the correct one.
+ */
+uint16 dup_crc_ccitt (uint8 const *bytes, uint32 len)
+{
+static uint16 const crc_ccitt_lookup[256] = {
+    0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50A5, 0x60C6, 0x70E7,
+    0x8108, 0x9129, 0xA14A, 0xB16B, 0xC18C, 0xD1AD, 0xE1CE, 0xF1EF,
+    0x1231, 0x0210, 0x3273, 0x2252, 0x52B5, 0x4294, 0x72F7, 0x62D6,
+    0x9339, 0x8318, 0xB37B, 0xA35A, 0xD3BD, 0xC39C, 0xF3FF, 0xE3DE,
+    0x2462, 0x3443, 0x0420, 0x1401, 0x64E6, 0x74C7, 0x44A4, 0x5485,
+    0xA56A, 0xB54B, 0x8528, 0x9509, 0xE5EE, 0xF5CF, 0xC5AC, 0xD58D,
+    0x3653, 0x2672, 0x1611, 0x0630, 0x76D7, 0x66F6, 0x5695, 0x46B4,
+    0xB75B, 0xA77A, 0x9719, 0x8738, 0xF7DF, 0xE7FE, 0xD79D, 0xC7BC,
+    0x48C4, 0x58E5, 0x6886, 0x78A7, 0x0840, 0x1861, 0x2802, 0x3823,
+    0xC9CC, 0xD9ED, 0xE98E, 0xF9AF, 0x8948, 0x9969, 0xA90A, 0xB92B,
+    0x5AF5, 0x4AD4, 0x7AB7, 0x6A96, 0x1A71, 0x0A50, 0x3A33, 0x2A12,
+    0xDBFD, 0xCBDC, 0xFBBF, 0xEB9E, 0x9B79, 0x8B58, 0xBB3B, 0xAB1A,
+    0x6CA6, 0x7C87, 0x4CE4, 0x5CC5, 0x2C22, 0x3C03, 0x0C60, 0x1C41,
+    0xEDAE, 0xFD8F, 0xCDEC, 0xDDCD, 0xAD2A, 0xBD0B, 0x8D68, 0x9D49,
+    0x7E97, 0x6EB6, 0x5ED5, 0x4EF4, 0x3E13, 0x2E32, 0x1E51, 0x0E70,
+    0xFF9F, 0xEFBE, 0xDFDD, 0xCFFC, 0xBF1B, 0xAF3A, 0x9F59, 0x8F78,
+    0x9188, 0x81A9, 0xB1CA, 0xA1EB, 0xD10C, 0xC12D, 0xF14E, 0xE16F,
+    0x1080, 0x00A1, 0x30C2, 0x20E3, 0x5004, 0x4025, 0x7046, 0x6067,
+    0x83B9, 0x9398, 0xA3FB, 0xB3DA, 0xC33D, 0xD31C, 0xE37F, 0xF35E,
+    0x02B1, 0x1290, 0x22F3, 0x32D2, 0x4235, 0x5214, 0x6277, 0x7256,
+    0xB5EA, 0xA5CB, 0x95A8, 0x8589, 0xF56E, 0xE54F, 0xD52C, 0xC50D,
+    0x34E2, 0x24C3, 0x14A0, 0x0481, 0x7466, 0x6447, 0x5424, 0x4405,
+    0xA7DB, 0xB7FA, 0x8799, 0x97B8, 0xE75F, 0xF77E, 0xC71D, 0xD73C,
+    0x26D3, 0x36F2, 0x0691, 0x16B0, 0x6657, 0x7676, 0x4615, 0x5634,
+    0xD94C, 0xC96D, 0xF90E, 0xE92F, 0x99C8, 0x89E9, 0xB98A, 0xA9AB,
+    0x5844, 0x4865, 0x7806, 0x6827, 0x18C0, 0x08E1, 0x3882, 0x28A3,
+    0xCB7D, 0xDB5C, 0xEB3F, 0xFB1E, 0x8BF9, 0x9BD8, 0xABBB, 0xBB9A,
+    0x4A75, 0x5A54, 0x6A37, 0x7A16, 0x0AF1, 0x1AD0, 0x2AB3, 0x3A92,
+    0xFD2E, 0xED0F, 0xDD6C, 0xCD4D, 0xBDAA, 0xAD8B, 0x9DE8, 0x8DC9,
+    0x7C26, 0x6C07, 0x5C64, 0x4C45, 0x3CA2, 0x2C83, 0x1CE0, 0x0CC1,
+    0xEF1F, 0xFF3E, 0xCF5D, 0xDF7C, 0xAF9B, 0xBFBA, 0x8FD9, 0x9FF8,
+    0x6E17, 0x7E36, 0x4E55, 0x5E74, 0x2E93, 0x3EB2, 0x0ED1, 0x1EF0
+    };
+uint32 i = 0;
+uint16 crc = 0xffff;
+
+while (i++ < len)
+    crc = ((crc << 8) ^ crc_ccitt_lookup[(crc >> 8) ^ *bytes++]);
+
+/*    sim_debug (DBG_TRC, DUPDPTR, "dup_crc_ccitt (len=%d, crc=0x%04x)\n", 
+      (int)len, crc); */
+
+return crc;
+}
+
 static t_stat dup_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 const char helpString[] =
@@ -1839,8 +1971,8 @@ const char helpString[] =
     " serial synchronous line. The original hardware is capable of handling\n"
     " a wide variety of protocols, including byte oriented protocols, such\n"
     " as DDCMP and BISYNC and bit-oriented protocols such as SDLC, HDLC\n"
-    " and ADCCP.  The emulated device currently only supports connections\n"
-    " using the DDCMP protocol.\n\n"
+    " and ADCCP.  The emulated device supports connections\n"
+    " using the DDCMP or HDLC protocols.\n"
     " The %D11 is ideally suited for interfacing the %1s system\n"
     " to medium-speed synchronous lines for remote batch, remote data\n"
     " collection, remote concentration and network applications. Multiple\n"
@@ -1851,7 +1983,7 @@ const char helpString[] =
     " data rates.  The maximum emulated rate is dependent on the host CPU's\n"
     " available cycles.\n"
     "1 Hardware Description\n"
-    " The %1s %D11 consists of a microprocessor module and a synchronous line\n"
+    " The %1s %D11 consists of a synchronous line\n"
     " unit module.\n"
     "2 $Registers\n"
     "\n"
@@ -1922,7 +2054,7 @@ const char helpString[] =
     "\n"
     " The default connection uses TCP transport between the local system and\n"
     " the peer.  Alternatively, UDP can be used by specifying UDP on the\n"
-    " ATTACH command.\n"
+    " ATTACH command. \n"
     "\n"
     " Communication may alternately use the DDCMP synchronous framer device.\n"
     " The DDCMP synchronous device is a USB device that can send and\n"
@@ -1972,12 +2104,12 @@ const char helpString[] =
     "1 Implementation\n"
     " A real %D11 transports host generated protocol implemented data via a\n"
     " synchronous connection, the emulated device makes a TCP (or UDP)\n"
-    " connection to another emulated device which either speaks DDCMP over the\n"
-    " TCP connection directly, or interfaces to a simulated computer where the\n"
+    " connection to another emulated device which either speaks DDCMP/HDLC over the\n"
+    " TCP/UDP connection directly, or interfaces to a simulated computer where the\n"
     " operating system speaks the DDCMP protocol on the wire.\n"
     "\n"
     " The %D11 can be used for point-to-point DDCMP connections carrying\n"
-    " DECnet and other types of networking, e.g. from ULTRIX or DSM.\n"
+    " DECnet, X.25 and other types of networking, e.g. from ULTRIX or DSM.\n"
     "1 Debugging\n"
     " The simulator has a number of debug options, these are:\n"
     "\n"

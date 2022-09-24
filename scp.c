@@ -1459,9 +1459,39 @@ static const char simh_help1[] =
 #endif
       "+SET CLOCK nocatchup         disable catchup clock ticks\n"
       "+SET CLOCK catchup           enable catchup clock ticks\n"
-      "+SET CLOCK calib=n%%          specify idle calibration skip %%\n"
-      "+SET CLOCK calib=ALWAYS      specify calibration independent of idle\n"
+      "+SET CLOCK calib{=n%%}        specify idle calibration skip %%\n"
+      "+SET CLOCK calib{=ALWAYS}    specify calibration independent of idle %%\n"
+      "+SET CLOCK nocalib{=n{M/K}}  disable calibration\n"
+      "+SET CLOCK base=YYYY/MM/DD-HH:MM:SS.MSEC\n"
+      "++++++++                     set the base pseudo time\n"
+      "++++++++                     when calibration is disabled\n"
       "+SET CLOCK stop=n            stop execution after n %C\n\n"
+      "4CALIBRATE\n"
+      " The SET CLOCK CALIBRATE command enables clock tick calibration to\n"
+      " dynamically align wall clock time, and optionally allows calibration\n"
+      " to be skipped when idle percentage exceeds a specified value.\n"
+      " Clock calibration to align clock ticks with wall clock time is\n"
+      " initially enabled and calibration always happens.\n"
+      "4NOCALIBRATE\n"
+      " The SET CLOCK NOCALIBRATE command causes simulated clocks to appear\n"
+      " to the simulated system as if it was running at a hard set rate\n"
+      " without any relationship to wall clock time.  This mode may be useful\n"
+      " when running diagnostics or test scripts which may expect certain\n"
+      " behavior or compare simulation results to previouosly observed values.\n"
+      " When running in NOCALIBRATE mode, clock ticks are presented to the\n"
+      " simulated system after the appropriate number of %C that happened\n"
+      " when running on real hardware.  In addition, these ticks will be issued\n"
+      " precisely at the same rate from one execution run to the next.\n"
+      "4BASE\n"
+      " When running with calibration disabled, wall clock time within the\n"
+      " simulator is not meaningfully related to the real wall clock time.\n"
+      " Simulator devices may query what they believe to be the wall clock\n"
+      " time what they get is the pseudo wall clock time that has transpired\n"
+      " in the simulators current execution session.\n"
+      " The SET CLOCK BASE=YYYY/MM/DD-HH:MM:SS.MSEC command exists to specify\n"
+      " the base time that the devices access when running relative to the\n"
+      " beginning of simulator instruction execution.\n"
+      "4STOP\n"
       " The SET CLOCK STOP command allows execution to have a bound when\n"
       " execution starts with a BOOT, NEXT or CONTINUE command.\n"
 #define HLP_SET_ASYNCH "*Commands SET Asynch"
@@ -2380,11 +2410,11 @@ static const char simh_help2[] =
       " file.  Otherwise, the next command in the command file is processed.\n\n"
       "5String Comparison Expressions\n"
       " String Values can be compared with:\n"
-      "++{-i}{-w} {NOT} \"<string1>\"|EnVarName1 <compare-op> \"<string2>|EnvVarName2\"\n\n"
-      " The -i switch, if present, causes comparisons to be case insensitive.\n"
-      " The -w switch, if present, causes comparisons to allow arbitrary runs of\n"
-      " whitespace to be equivalent to a single space.\n"
-      " The -i and -w switches may be combined.\n"
+      "+{-I}{-W} {NOT} \"<string1>\"|EnVarName1 <compare-op> \"<string2>|EnvVarName2\"\n\n"
+      " The -I switch, if present, causes comparisons to be case insensitive.\n"
+      " The -W switch, if present, causes comparisons to allow arbitrary runs\n"
+      " of whitespace to be equivalent to a single space.\n"
+      " The -I and -W switches may be combined.\n"
       " <string1> and <string2> are quoted string values which may have\n"
       " environment variables substituted as desired.\n"
       " Either quoted string may alternatively be an environment variable name.\n"
@@ -2401,10 +2431,10 @@ static const char simh_help2[] =
       "++GTR - greater than\n"
       "++>=  - greater than or equal\n"
       "++GEQ - greater than or equal\n\n"
-      " Comparisons are generic.  This means that if both string1 and string2 are\n"
-      " comprised of all numeric digits, then the strings are converted to numbers\n"
-      " and a numeric comparison is performed. For example: \"+1\" EQU \"1\" will be\n"
-      " true.\n"
+      " Comparisons are generic.  This means that if both string1 and string2\n"
+      " are comprised of all numeric digits, then the strings are converted to\n"
+      " numbers and a numeric comparison is performed.\n"
+      " For example: \"+1\" EQU \"1\" will be true.\n"
       "5File Existence Expressions\n"
       " File existence can be determined with:\n\n"
       "++{NOT} EXIST \"<filespec>\"\n\n"
@@ -2417,9 +2447,13 @@ static const char simh_help2[] =
       " have the same contents.  If the -W switch is present, allows\n"
       " arbitrary runs of whitespace to be considered a single space\n"
       " during file content comparison.\n\n"
-      " When a file comparison determines that files are different, the environment\n"
-      " variable _FILE_COMPARE_DIFF_OFFSET is set to the file offset where the first\n"
-      " difference in the files was observed\n\n"
+      " When a file comparison determines that files are different, the\n"
+      " environment variable _FILE_COMPARE_DIFF_OFFSET is set to the file\n"
+      " offset where the first difference in the files was observed.\n\n"
+      " If the environment variable _FILE_COMPARE_START_OFFSET is defined, it\n"
+      " specifies the offset into the both files where the comparison should\n"
+      " start, thus skipping the initial bytes of the file before beginning\n"
+      " the comparison.\n\n"
       "5Debugging Expression Evaluation\n"
       " Debug output can be produced which will walk through the details\n"
       " involved during expression evaluation.  This output can, for example,\n"
@@ -4969,6 +5003,7 @@ if (sim_switches & SWMASK ('F')) {      /* File Compare? */
     FILE *f1, *f2;
     int c1, c2;
     size_t diff_offset = 0;
+    t_offset start_offset = 0;
     char *filename1, *filename2;
 
     filename1 = (char *)malloc (strlen (s1));
@@ -4978,6 +5013,8 @@ if (sim_switches & SWMASK ('F')) {      /* File Compare? */
     strcpy (filename2, s2 + 1);
     filename2[strlen (filename2) - 1] = '\0';
 
+    if (getenv ("_FILE_COMPARE_START_OFFSET") != NULL)
+        start_offset = (t_offset)strtoul (getenv ("_FILE_COMPARE_START_OFFSET"), NULL, 0);
     setenv ("_FILE_COMPARE_DIFF_OFFSET", "", 1);    /* Remove previous environment variable */
     f1 = sim_fopen (filename1, "rb");
     f2 = sim_fopen (filename2, "rb");
@@ -4985,11 +5022,13 @@ if (sim_switches & SWMASK ('F')) {      /* File Compare? */
     free (filename2);
     if ((f1 == NULL) && (f2 == NULL))   /* Both can't open? */
         return 0;                       /* Call that equal */
-    if (f1 == NULL) {
+    if ((f1 == NULL) ||
+        (sim_fseeko (f1, start_offset, SEEK_SET) != 0)) {
         fclose (f2);
         return -1;
         }
-    if (f2 == NULL) {
+    if ((f2 == NULL) ||
+        (sim_fseeko (f2, start_offset, SEEK_SET) != 0)) {
         fclose (f1);
         return 1;
         }
@@ -5034,7 +5073,7 @@ if (sim_switches & SWMASK ('F')) {      /* File Compare? */
     if (c1 != c2) {
         char offset_buf[32];
 
-        snprintf (offset_buf, sizeof (offset_buf), "%u", (uint32)diff_offset);
+        snprintf (offset_buf, sizeof (offset_buf), "%u", (uint32)(diff_offset + start_offset));
         setenv ("_FILE_COMPARE_DIFF_OFFSET", offset_buf, 1);
         }
     return c1 - c2;
@@ -16264,9 +16303,9 @@ for (i = 0; (dptr = devices[i]) != NULL; i++) {
             }
 
         if (sim_switches & SWMASK ('R'))            /* Debug output */
-            sim_printf ("%5s:%-9.9s %s%s%s(rdx=%u, wd=%u, off=%u, dep=%u, strsz=%u, objsz=%u, elesz=%u, rsz=%u, %s%s%s membytes=%u)\n", 
+            sim_printf ("%5s:%-9.9s %s%s%s(rdx=%u, wd=%u, off=%u, dep=%u, strsz=%u, objsz=%u, oobjsz=%u, elesz=%u, rsz=%u, %s%s%s membytes=%u)\n", 
                         dptr->name, rptr->name, rptr->desc ? rptr->desc : "", rptr->desc ? "\n\t" : "", rptr->macro ? rptr->macro : "", 
-                        rptr->radix, rptr->width, rptr->offset, rptr->depth, (uint32)rptr->stride, (uint32)rptr->obj_size, (uint32)rptr->size, rsz,
+                        rptr->radix, rptr->width, rptr->offset, rptr->depth, (uint32)rptr->stride, (uint32)rptr->obj_size, (uint32)rptr->pobj_size, (uint32)rptr->size, rsz,
                         (rptr->flags & REG_VMAD) ? " REG_VMAD" : "", (rptr->flags & REG_VMIO) ? " REG_VMIO" : "",
                         (rptr->flags & REG_DEPOSIT) ? " REG_DEPOSIT" : "", memsize);
 
@@ -16277,8 +16316,28 @@ for (i = 0; (dptr = devices[i]) != NULL; i++) {
             else
                 Mprintf (f, "%s %s:%s used the %s macro to describe a %u bit wide field\n", sim_name, dptr->name, rptr->name, rptr->macro, rptr->width);
             }
-        else
-            Mprintf (f, "%s %s:%s used the %s macro to describe a %u bit%s wide and %u elements deep array\n", sim_name, dptr->name, rptr->name, rptr->macro, rptr->width, (rptr->width == 1) ? "" : "s", rptr->depth);
+        else {
+            if (rptr->depth > 1) {
+                Mprintf (f, "%s %s:%s used the %s macro to describe a %u bit%s wide and %u element deep array\n", sim_name, dptr->name, rptr->name, rptr->macro, rptr->width, (rptr->width == 1) ? "" : "s", rptr->depth);
+                if (rptr->stride == 0) {
+                    Bad = TRUE;
+                    Mprintf (f, "%s %s:%s array stride is unspecified\n", sim_name, dptr->name, rptr->name);
+                    }
+                if (((((size_t)rptr->loc + rptr->stride)) % rsz) != 0) {
+                    Bad = TRUE;
+                    Mprintf (f, "%s %s:%s array seems to not have naturally aligned elements with a stride of %u and depth of %u\n", sim_name, dptr->name, rptr->name, (uint32)rptr->stride, (uint32)rptr->depth);
+                    }
+                if ((memcmp (rptr->macro, "BRDATA", 6) == 0) && 
+                    ((rptr->depth * rptr->stride) > rptr->obj_size)) {
+                    Bad = TRUE;
+                    Mprintf (f, "%s %s:%s stride of %u and depth of %u is unreasonable and access will reach beyond the array upper bound\n", sim_name, dptr->name, rptr->name, (uint32)rptr->stride, (uint32)rptr->depth);
+                    }
+                }
+            else {                              /* rptr->depth == 0 */
+                Bad = TRUE;
+                Mprintf (f, "%s %s:%s unexpected register depth of 0\n", sim_name, dptr->name, rptr->name);
+                }
+            }
         if (rsz > sizeof (t_value)) {
             Bad = TRUE;
             Mprintf (f, "%u bits at offset %u is wider than the maximum allowed width of %u bits\n", rptr->width, rptr->offset, (uint32)(8 * sizeof(t_value)));
@@ -16320,20 +16379,20 @@ for (i = 0; (dptr = devices[i]) != NULL; i++) {
                     }
                 else {
                     bytes *= rptr->depth;
-                    if (!Bad) 
-                        if ((rsz * rptr->depth == rptr->obj_size)                                                   ||
-                            ((rptr->macro && (strstr (rptr->macro, "STRDATA") != NULL)) && (rsz <= rptr->obj_size)) ||
+                    if (!Bad)
+                        if ((rsz * rptr->depth == rptr->pobj_size)                                                   ||
+                            ((rptr->macro && (strstr (rptr->macro, "STRDATA") != NULL)) && (rsz <= rptr->pobj_size)) ||
                             ((rptr->depth == 1) && 
-                             ((rptr->obj_size == sizeof (t_value)) || (rsz < rptr->obj_size)))          ||
-                            ((rptr->depth != 1) && (bytes == rptr->obj_size))                           ||
+                             ((rptr->pobj_size == sizeof (t_value)) || (rsz < rptr->pobj_size)))         ||
+                            ((rptr->depth != 1) && (bytes == rptr->pobj_size))                           ||
                             ((rptr->depth != 1) && (rptr->offset == 0) && (rptr->width == 8) &&
-                             ((rptr->depth == rptr->obj_size) || (rptr->depth == rptr->obj_size - 1)))  ||
-                            ((rptr->depth != 1) && (rptr->offset == 0) && (rptr->obj_size == rptr->size)))
+                             ((rptr->depth == rptr->obj_size) || (rptr->depth == rptr->pobj_size - 1)))  ||
+                            ((rptr->depth != 1) && (rptr->offset == 0) && (rptr->pobj_size == rptr->size)))
                         continue;
                     Bad = TRUE;
                     Mprintf (f, "\ttherefore EXAMINE and SAVE operations will reference %u byte%s\n", bytes, (bytes != 1) ? "s" : "");
                     Mprintf (f, "\tand DEPOSIT and RESTORE operations will affect %u byte%s of memory\n", bytes, (bytes != 1) ? "s" : "");
-                    Mprintf (f, "\twhile the variable lives in %u bytes of memory\n", (uint32)rptr->obj_size);
+                    Mprintf (f, "\twhile the variable lives in %u bytes of memory\n", (uint32)rptr->pobj_size);
                     }
                 }
             else {
@@ -16383,6 +16442,9 @@ static struct validation_test {
     REG reg[7];
     t_stat expected_result;
     } validations[] = {
+        { { { BRDATAD (STRUCT,  validate_units,   16, 8*sizeof(treg16), sizeof(validate_units)/sizeof(treg16), "an invalid array of scalars") },
+            {NULL} },
+         SCPE_IERR},
         { { { SRDATAD (AMBIG,   validate_units,   pos,   10, 32, 0, 3, "a basic register array") },
             { SRDATAD (AMBIG,   validate_units,   u3,    10, 32, 0, 3, "an ambiguously named register array") },
             {NULL} },

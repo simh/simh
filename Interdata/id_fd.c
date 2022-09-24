@@ -165,7 +165,7 @@ REG fd_reg[] = {
     { HRDATA (STA, fd_sta, 8) },
     { HRDATA (BUF, fd_db, 8) },
     { HRDATA (LRN, fd_lrn, 16) },
-    { BRDATA (ESTA, fd_es, 16, 8, ES_SIZE * FD_NUMDR) },
+    { CRDATA (ESTA, fd_es, 16, 8, ES_SIZE * FD_NUMDR) },
     { BRDATA (DBUF, fdxb, 16, 8, FD_NUMBY) },
     { HRDATA (DBPTR, fd_bptr, 8) },
     { FLDATA (WDV, fd_wdv, 0) },

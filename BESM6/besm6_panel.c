@@ -30,14 +30,6 @@
  */
 
 #include "besm6_defs.h"
-#if defined (HAVE_LIBSDL)
-#if !defined (FONTFILE)
-#include "besm6_panel_font.h"
-#endif /* !defined (FONTFILE) */
-#if !defined (FONTFILE)
-#undef HAVE_LIBSDL
-#endif /* !defined (FONTFILE) */
-#endif /* defined (HAVE_LIBSDL) */
 
 #ifdef HAVE_LIBSDL
 #include <stdlib.h>
@@ -450,8 +442,6 @@ t_stat besm6_show_panel (FILE *st, UNIT *up, int32 v, CONST void *dp)
     return SCPE_OK;
 }
 
-#if SDL_MAJOR_VERSION == 2
-
 static SDL_Window *sdlWindow;
 static SDL_Renderer *sdlRenderer;
 static SDL_Texture *sdlTexture;
@@ -461,8 +451,38 @@ static SDL_Texture *sdlTexture;
  */
 t_stat besm6_init_panel (UNIT *u, int32 val, CONST char *cptr, void *desc)
 {
+    const char *fontfile = NULL;
+    char fontfilepath[PATH_MAX + 1];
+    struct stat stat_buf;
+
     if (screen)
         return SCPE_ALATT;
+#if defined (FONTFILE)
+    fontfile = QUOTE(FONTFILE);
+#endif
+    if ((fontfile == NULL) || (sim_stat (fontfile, &stat_buf))) {
+        const char *dirs[] = {"/usr/share/fonts", "/Library/Fonts", "/usr/lib/jvm", "/System/Library/Frameworks/JavaVM.framework/Versions", "/System/Library/Fonts/Supplemental", "C:/Windows/Fonts", NULL};
+        const char *fonts[] = {"DejaVuSans.ttf", "LucidaSansRegular.ttf", "FreeSans.ttf", "AppleGothic.ttf", "tahoma.ttf", NULL};
+        const char **d, **f;
+
+        for (d = dirs; (fontfile == NULL) && (*d != NULL); d++) {
+            char **filelist;
+
+            if (sim_stat (*d, &stat_buf))
+                continue;
+            for (f = fonts; *f != NULL; f++) {
+                snprintf (fontfilepath, sizeof (fontfilepath), "%s/%s", *d, *f);
+                filelist = sim_get_filelist (fontfilepath);
+                if (filelist) {
+                    fontfile = strdup (*filelist);
+                    sim_free_filelist (&filelist);
+                    break;
+                }
+            }
+        }
+    }
+    if (fontfile == NULL)
+        return sim_messagef (SCPE_OPENERR, "No font file available\n");
     /* Initialize SDL subsystems - in this case, only video. */
     if (SDL_Init (SDL_INIT_VIDEO) < 0) {
         return sim_messagef (SCPE_OPENERR, "SDL: unable to init: %s\n",
@@ -495,11 +515,11 @@ t_stat besm6_init_panel (UNIT *u, int32 val, CONST char *cptr, void *desc)
     foreground = cyan;
 
     /* Open the font file with the requested point size */
-    font_big = TTF_OpenFont (QUOTE(FONTFILE), 16);
-    font_small = TTF_OpenFont (QUOTE(FONTFILE), 9);
+    font_big = TTF_OpenFont (fontfile, 16);
+    font_small = TTF_OpenFont (fontfile, 9);
     if (! font_big || ! font_small) {
         t_stat ret = sim_messagef(SCPE_OPENERR, "SDL: couldn't load font %s: %s\n",
-                                  QUOTE(FONTFILE), SDL_GetError());
+                                  fontfile, SDL_GetError());
         besm6_close_panel(u, val, cptr, desc);
         return ret;
     }
@@ -578,104 +598,6 @@ void besm6_draw_panel (int force)
     if (SDL_PollEvent (&event) && event.type == SDL_QUIT)
         besm6_close_panel(&cpu_unit, 0, NULL, NULL);
 }
-
-#else
-
-/*
- * Initializing of the graphical window and the fonts.
- */
-t_stat besm6_init_panel (UNIT *u, int32 val, CONST char *cptr, void *desc)
-{
-    if (screen)
-        return SCPE_ALATT;
-    /* Initialize SDL subsystems - in this case, only video. */
-    if (SDL_Init (SDL_INIT_VIDEO) < 0) {
-        return sim_messagef (SCPE_OPENERR, "SDL: unable to init: %s\n",
-                             SDL_GetError ());
-    }
-    screen = SDL_SetVideoMode (WIDTH, HEIGHT, DEPTH, SDL_SWSURFACE);
-    if (! screen) {
-        return sim_messagef (SCPE_OPENERR, "SDL: unable to set %dx%dx%d mode: %s\n",
-                             WIDTH, HEIGHT, DEPTH, SDL_GetError ());
-    }
-
-    /* Initialize the TTF library */
-    if (TTF_Init() < 0) {
-        t_stat ret = sim_messagef(SCPE_OPENERR, "SDL: couldn't initialize TTF: %s\n",
-                                  SDL_GetError());
-        SDL_Quit();
-        return ret;
-    }
-
-    /* Open the font file with the requested point size */
-    font_big = TTF_OpenFont (QUOTE(FONTFILE), 16);
-    font_small = TTF_OpenFont (QUOTE(FONTFILE), 9);
-    if (! font_big || ! font_small) {
-        t_stat ret = sim_messagef(SCPE_OPENERR, "SDL: couldn't load font %s: %s\n",
-                                  QUOTE(FONTFILE), SDL_GetError());
-        besm6_close_panel(u, val, cptr, desc);
-        return ret;
-    }
-
-    /* Font colors */
-    background = black;
-    foreground = cyan;
-
-    /* Drawing the static part of the BESM-6 panel */
-    draw_modifiers_static (0, 24, 10);
-    draw_modifiers_static (1, 400, 10);
-    draw_prp_static (24, 170);
-    draw_counters_static (472, 170);
-    draw_grp_static (24, 230);
-    draw_brz_static (24, 280);
-
-    /* Make sure all lights are updated */
-    memset(M_lamps, ~0, sizeof(M_lamps));
-    memset(BRZ_lamps, ~0, sizeof(BRZ_lamps));
-    memset(GRP_lamps, ~0, sizeof(GRP_lamps));
-    memset(PRP_lamps, ~0, sizeof(PRP_lamps));
-    besm6_draw_panel(1);
-
-    /* Tell SDL to update the whole screen */
-    SDL_UpdateRect (screen, 0, 0, WIDTH, HEIGHT);
-    return SCPE_OK;
-}
-
-/*
- * Refreshing the window
- */
-void besm6_draw_panel (int force)
-{
-    SDL_Event event;
-    if (! screen)
-        return;
-
-    if (force) {
-        /* When the CPU is stopped */
-        act = 1;
-        besm6_draw_panel(0);
-        act = 1;
-        besm6_draw_panel(0);
-        return;
-    }
-
-    /* Do the blinkenlights */
-    draw_modifiers_periodic (0, 24, 10);
-    draw_modifiers_periodic (1, 400, 10);
-    draw_counters_periodic (472, 170);
-    draw_prp_periodic (24, 170);
-    draw_grp_periodic (24, 230);
-    draw_brz_periodic (24, 280);
-
-    /* Tell SDL to update the whole screen */
-    SDL_UpdateRect (screen, 0, 0, WIDTH, HEIGHT);
-
-    /* Close the panel window */
-    if (SDL_PollEvent (&event) && event.type == SDL_QUIT)
-        besm6_close_panel(&cpu_unit, 0, NULL, NULL);
-}
-
-#endif /* SDL_MAJOR_VERSION */
 
 #else /* HAVE_LIBSDL */
 t_stat besm6_init_panel (UNIT *u, int32 val, CONST char *cptr, void *desc)

@@ -649,12 +649,8 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
     endif
     ifneq (,$(call find_include,SDL2/SDL))
       ifneq (,$(call find_lib,SDL2))
-        ifneq (,$(findstring Haiku,$(OSTYPE)))
-          ifneq (,$(shell which sdl2-config))
-            SDLX_CONFIG = sdl2-config
-          endif
-        else
-          SDLX_CONFIG = $(realpath $(dir $(call find_include,SDL2/SDL))../../bin/sdl2-config)
+        ifneq (,$(shell which sdl2-config))
+          SDLX_CONFIG = sdl2-config
         endif
         ifneq (,$(SDLX_CONFIG))
           VIDEO_CCDEFS += -DHAVE_LIBSDL -DUSE_SIM_VIDEO `$(SDLX_CONFIG) --cflags`
@@ -715,6 +711,49 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
         endif
       endif
       $(info *** Info ***)
+    else
+      ifneq (,$(BESM6_BUILD))
+        ifneq (,$(and $(findstring sdl2,${VIDEO_LDFLAGS}),$(call find_include,SDL2/SDL_ttf),$(call find_lib,SDL2_ttf)))
+          $(info using libSDL2_ttf: $(call find_lib,SDL2_ttf) $(call find_include,SDL2/SDL_ttf))
+          $(info ***)
+          VIDEO_TTF_OPT = $(filter-out -DSDL_MAIN_AVAILABLE,$(VIDEO_CCDEFS)) ${VIDEO_LDFLAGS} -lSDL2_ttf
+          VIDEO_FEATURES += with TrueType font support
+          # Retain support for explicitly supplying a preferred fontfile
+          ifneq (,$(FONTFILE))
+            VIDEO_TTF_OPT +=  -DFONTFILE=${FONTFILE}
+          endif
+        else
+          $(info *** No SDL ttf support available.  BESM-6 video panel disabled.)
+          $(info ***)
+          ifeq (Darwin,$(OSTYPE))
+            ifeq (/opt/local/bin/port,$(shell which port))
+              $(info *** Info *** Install the MacPorts libSDL2-ttf development package to provide this)
+              $(info *** Info *** functionality for your OS X system:)
+              $(info *** Info ***       # port install libsdl2-ttf-dev)
+            endif
+            ifeq (/usr/local/bin/brew,$(shell which brew))
+              ifeq (/opt/local/bin/port,$(shell which port))
+                $(info *** Info ***)
+                $(info *** Info *** OR)
+                $(info *** Info ***)
+              endif
+              $(info *** Info *** Install the HomeBrew sdl2_ttf package to provide this)
+              $(info *** Info *** functionality for your OS X system:)
+              $(info *** Info ***       $$ brew install sdl2_ttf)
+            endif
+          else
+            ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,apt-get)))
+              $(info *** Info *** Install the development components of libSDL2-ttf)
+              $(info *** Info *** packaged for your Linux operating system distribution:)
+              $(info *** Info ***        $$ sudo apt-get install libsdl2-ttf-dev)
+            else
+              $(info *** Info *** Install the development components of libSDL2-ttf packaged by your)
+              $(info *** Info *** operating system distribution and rebuild your simulator to)
+              $(info *** Info *** enable this extra functionality.)
+            endif
+          endif
+        endif
+      endif
     endif
   endif
   ifneq (,$(NETWORK_USEFUL))
@@ -1896,92 +1935,7 @@ BESM6 = ${BESM6D}/besm6_cpu.c ${BESM6D}/besm6_sys.c ${BESM6D}/besm6_mmu.c \
         ${BESM6D}/besm6_tty.c ${BESM6D}/besm6_panel.c ${BESM6D}/besm6_printer.c \
         ${BESM6D}/besm6_pl.c ${BESM6D}/besm6_mg.c \
         ${BESM6D}/besm6_punch.c ${BESM6D}/besm6_punchcard.c ${BESM6D}/besm6_vu.c
-
-ifneq (,$(BESM6_BUILD))
-    BESM6_OPT = -I ${BESM6D} -DUSE_INT64 $(BESM6_PANEL_OPT)
-    ifneq (,$(and ${SDLX_CONFIG},${VIDEO_LDFLAGS}, $(or $(and $(call find_include,SDL2/SDL_ttf),$(call find_lib,SDL2_ttf)), $(and $(call find_include,SDL/SDL_ttf),$(call find_lib,SDL_ttf)))))
-        FONTPATH += /usr/share/fonts /Library/Fonts /usr/lib/jvm /System/Library/Frameworks/JavaVM.framework/Versions C:/Windows/Fonts
-        FONTPATH := $(dir $(foreach dir,$(strip $(FONTPATH)),$(wildcard $(dir)/.)))
-        FONTNAME += DejaVuSans.ttf LucidaSansRegular.ttf FreeSans.ttf AppleGothic.ttf tahoma.ttf
-#cmake-insert:set(BESM6_FONT)
-#cmake-insert:foreach (fdir IN ITEMS
-#cmake-insert:            "/usr/share/fonts" "/Library/Fonts" "/usr/lib/jvm"
-#cmake-insert:            "/System/Library/Frameworks/JavaVM.framework/Versions"
-#cmake-insert:            "$ENV{WINDIR}/Fonts")
-#cmake-insert:    foreach (font IN ITEMS
-#cmake-insert:                "DejaVuSans.ttf" "LucidaSansRegular.ttf" "FreeSans.ttf" "AppleGothic.ttf" "tahoma.ttf")
-#cmake-insert:        if (EXISTS ${fdir})
-#cmake-insert:            file(GLOB_RECURSE found_font ${fdir}/${font})
-#cmake-insert:            if (found_font)
-#cmake-insert:                get_filename_component(fontfile ${found_font} ABSOLUTE)
-#cmake-insert:                list(APPEND BESM6_FONT ${fontfile})
-#cmake-insert:            endif ()
-#cmake-insert:        endif ()
-#cmake-insert:    endforeach()
-#cmake-insert:endforeach()
-#cmake-insert:
-#cmake-insert:if (NOT BESM6_FONT)
-#cmake-insert:    message("No font file available, BESM-6 video panel disabled")
-#cmake-insert:    set(BESM6_PANEL_OPT)
-#cmake-insert:endif ()
-#cmake-insert:
-#cmake-insert:if (BESM6_FONT AND WITH_VIDEO)
-#cmake-insert:    list(GET BESM6_FONT 0 BESM6_FONT)
-#cmake-insert:endif ()
-        $(info font paths are: $(FONTPATH))
-        $(info font names are: $(FONTNAME))
-        find_fontfile = $(strip $(firstword $(foreach dir,$(strip $(FONTPATH)),$(wildcard $(dir)/$(1))$(wildcard $(dir)/*/$(1))$(wildcard $(dir)/*/*/$(1))$(wildcard $(dir)/*/*/*/$(1)))))
-        find_font = $(abspath $(strip $(firstword $(foreach font,$(strip $(FONTNAME)),$(call find_fontfile,$(font))))))
-        ifneq (,$(call find_font))
-            FONTFILE=$(call find_font)
-        else
-            $(info ***)
-            $(info *** No font file available, BESM-6 video panel disabled.)
-            $(info ***)
-            $(info *** To enable the panel display please specify one of:)
-            $(info ***          a font path with FONTPATH=path)
-            $(info ***          a font name with FONTNAME=fontname.ttf)
-            $(info ***          a font file with FONTFILE=path/fontname.ttf)
-            $(info ***)
-        endif
-    endif
-    ifeq (,$(and ${VIDEO_LDFLAGS}, ${FONTFILE}, $(BESM6_BUILD)))
-        $(info *** No SDL ttf support available.  BESM-6 video panel disabled.)
-        $(info ***)
-        ifeq (Darwin,$(OSTYPE))
-          ifeq (/opt/local/bin/port,$(shell which port))
-            $(info *** Info *** Install the MacPorts libSDL2-ttf development package to provide this)
-            $(info *** Info *** functionality for your OS X system:)
-            $(info *** Info ***       # port install libsdl2-ttf-dev)
-          endif
-          ifeq (/usr/local/bin/brew,$(shell which brew))
-            ifeq (/opt/local/bin/port,$(shell which port))
-              $(info *** Info ***)
-              $(info *** Info *** OR)
-              $(info *** Info ***)
-            endif
-            $(info *** Info *** Install the HomeBrew sdl2_ttf package to provide this)
-            $(info *** Info *** functionality for your OS X system:)
-            $(info *** Info ***       $$ brew install sdl2_ttf)
-          endif
-        else
-          ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,apt-get)))
-            $(info *** Info *** Install the development components of libSDL2-ttf)
-            $(info *** Info *** packaged for your Linux operating system distribution:)
-            $(info *** Info ***        $$ sudo apt-get install libsdl2-ttf-dev)
-          else
-            $(info *** Info *** Install the development components of libSDL2-ttf packaged by your)
-            $(info *** Info *** operating system distribution and rebuild your simulator to)
-            $(info *** Info *** enable this extra functionality.)
-          endif
-        endif
-        BESM6_OPT = -I ${BESM6D} -DUSE_INT64 
-    else ifneq (,$(and $(findstring sdl2,${VIDEO_LDFLAGS}),$(call find_include,SDL2/SDL_ttf),$(call find_lib,SDL2_ttf)))
-        $(info using libSDL2_ttf: $(call find_lib,SDL2_ttf) $(call find_include,SDL2/SDL_ttf))
-        $(info ***)
-        BESM6_PANEL_OPT = -DFONTFILE=${FONTFILE} ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL2_ttf
-    endif
-endif
+BESM6_OPT = -I ${BESM6D} -DUSE_INT64 $(VIDEO_TTF_OPT)
 
 PDP6D = ${SIMHD}/PDP10
 ifneq (,${DISPLAY_OPT})
@@ -2096,7 +2050,7 @@ SEL32 = ${SEL32D}/sel32_cpu.c ${SEL32D}/sel32_sys.c ${SEL32D}/sel32_chan.c \
 	${SEL32D}/sel32_scfi.c ${SEL32D}/sel32_fltpt.c ${SEL32D}/sel32_disk.c \
 	${SEL32D}/sel32_hsdp.c ${SEL32D}/sel32_mfp.c ${SEL32D}/sel32_scsi.c \
 	${SEL32D}/sel32_ec.c
-SEL32_OPT = -I $(SEL32D) -DUSE_INT32 -DSEL32  ${NETWORK_OPT}
+SEL32_OPT = -I ${SEL32D} -DUSE_INT32 -DSEL32  ${NETWORK_OPT}
 
 ###
 ### Experimental simulators
@@ -2582,13 +2536,13 @@ ifneq (,$(call find_test,${S3D},s3))
 	$@ $(call find_test,${S3D},s3) ${TEST_ARG}
 endif
 
-sel32: $(BIN)sel32$(EXE)
+sel32: ${BIN}sel32${EXE}
 
 ${BIN}sel32${EXE}: ${SEL32} ${SIM}
 	${MKDIRBIN}
-	${CC} ${SEL32} ${SIM} ${SEL32_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+	${CC} ${SEL32} ${SIM} ${SEL32_OPT} ${CC_OUTSPEC} ${LDFLAGS}
 ifneq (,$(call find_test,${SEL32D},sel32))
-	$@ $(call find_test,${SEL32D},sel32) $(TEST_ARG)
+	$@ $(call find_test,${SEL32D},sel32) ${TEST_ARG}
 endif
 
 altair : ${BIN}altair${EXE}

@@ -162,12 +162,12 @@
    These additional register definition macros are used to define:
 
      FBDATA -- a one-bit flag in an arrayed register
-     SRDATA -- an array of bytes large enough to hold a structure
+     SVDATA -- a register only used for SAVE/RESTORE
      YRDATA -- a binary register
 
    The FBDATA macro defines a flag that is replicated in the same bit position
    in each element of an array; the array element size is assumed to be the
-   minimum necessary to hold the bit at the given offset.  The SRDATA macro is
+   minimum necessary to hold the bit at the given offset.  The SVDATA macro is
    used solely to SAVE data stored in a structure so that it may be RESTOREd
    later.  The YRDATA macro extends the functionality of the ORDATA, DRDATA, and
    HRDATA macros to registers with binary (base 2) representation.
@@ -199,24 +199,24 @@
 #undef REGMAP
 
 #if (SIM_MAJOR >= 4)
-  #define REGMAP(nm,loc,rdx,wd,off,dep,fl) \
-    REGDATA (nm, loc, rdx, wd, off, dep, NULL, NULL, fl, 0, 0)
+  #define REGMAP(nm,loc,rdx,wd,off,dep,fl,siz) \
+    REGDATA (nm, loc, rdx, wd, off, dep, NULL, NULL, fl, 0, siz)
 
 #elif defined (__STDC__) || defined (_WIN32)
-  #define REGMAP(nm,loc,rdx,wd,off,dep,fl) \
+  #define REGMAP(nm,loc,rdx,wd,off,dep,fl,siz) \
     #nm, &(loc), (rdx), (wd), (off), (dep), (fl), 0
 
 #else
-  #define REGMAP(nm,loc,rdx,wd,off,dep,fl) \
+  #define REGMAP(nm,loc,rdx,wd,off,dep,fl,siz) \
     "nm", &(loc), (rdx), (wd), (off), (dep), (fl), 0
 
 #endif
 
-/*              Macro                    name   loc    radix  width  offset    depth     flags */
-/*      -------------------------        ----  ------  -----  -----  ------  ----------  ----- */
-#define FBDATA(nm,loc,ofs,dep,fl) REGMAP (nm,  (loc),    2,     1,   (ofs),    (dep),    (fl)  )
-#define SRDATA(nm,loc,fl)         REGMAP (nm,  (loc),    8,     8,     0,    sizeof loc, (fl)  )
-#define YRDATA(nm,loc,wid,fl)     REGMAP (nm,  (loc),    2,   (wid),   0,        1,      (fl)  )
+/*              Macro                      name   loc    radix  width  offset    depth     flags     size       */
+/*      -------------------------          ----  ------  -----  -----  ------  ----------  ----- -------------- */
+#define FBDATA(nm,loc,ofs,dep,fl) REGMAP   (nm,  (loc),    2,     1,   (ofs),    (dep),    (fl), sizeof  *(loc))
+#define SVDATA(nm,loc)            SAVEDATA (nm,  (loc))
+#define YRDATA(nm,loc,wid,fl)     BINRDATA (nm,  (loc),         (wid)),                    (fl)
 
 
 /* Debugging and console output.

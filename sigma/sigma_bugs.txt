@@ -124,7 +124,9 @@
 118. MT: revised error handling failed to set tape mark status on space file forward/reverse.
 119. IO: UEND flag in the wrong bit position in status word.
 120. DP: SEEK(I), RECAL(I) must be coded as fast operations.
-
+121. COC: Transmit long space is 0x6, and stop transmit is 0xE.
+122. COC: Received break generates a data-in channel transaction with a flag bit set
+     in the line number.
 
 Diagnostic Notes
 ----------------

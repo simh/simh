@@ -1,6 +1,6 @@
 /* sigma_coc.c: Sigma character-oriented communications subsystem simulator
 
-   Copyright (c) 2007-2008, Robert M Supnik
+   Copyright (c) 2007-2022, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,9 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    coc          7611 communications multiplexor
+
+   24-Aug-22    RMS     Transmit long space is 0x6, not 0xD (Ken Rector)
+                        Added LNORDER modifier
 */
 
 #include "sigma_io_defs.h"
@@ -82,8 +85,9 @@ uint32 muxc_cmd = MUXC_IDLE;                            /* channel state */
 uint32 mux_rint = INTV (INTG_E2, 0);
 uint32 mux_xint = INTV (INTG_E2, 1);
 
+static int32 mux_order[MUX_LINES] = { -1 };             /* line connection order */
 TMLN mux_ldsc[MUX_LINES] = { 0 };                       /* line descrs */
-TMXR mux_desc = { MUX_LINES_DFLT, 0, 0, mux_ldsc };     /* mux descrr */
+TMXR mux_desc = { MUX_LINES_DFLT, 0, 0, mux_ldsc, mux_order }; /* mux descr */
 
 extern uint32 chan_ctl_time;
 extern uint32 CC;
@@ -145,6 +149,8 @@ MTAB mux_mod[] = {
       &io_set_dva, &io_show_dva, NULL },
     { MTAB_XTD | MTAB_VDV, 0, "LINES", "LINES",
       &mux_vlines, &tmxr_show_lines, (void *) &mux_desc },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO,  0, "LINEORDER",   "LINEORDER",
+      &tmxr_set_lnorder, &tmxr_show_lnorder, (void *) &mux_desc },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "CSTATE", NULL,
       NULL, &io_show_cst, NULL },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO, RTC_COC, "POLL", "POLL",
@@ -305,7 +311,28 @@ switch (op) {                                           /* case on op */
 return 0;
 }
 
-/* MUX: DIO dispatch routine */
+/* MUX: DIO dispatch routine
+
+   Although only 9 of 16 function codes are documented, schematics
+   indicate that there are don't cares in decoding.
+
+   0000         sense receiver status
+   0001         turn receiver on
+   0010         turn receiver off
+   0011         turn receiver DSR off
+   0100         sense transmitter status
+   0101         transmit character
+   0110         transmit long space (based on software)
+   0111         turn transmitter DSR off
+   1000         unused (equivalent to 0000)
+   1001         unused
+   1010         unused
+   1011         unused
+   1100         unused (equivalent to 0100)
+   1101         transmit long space (in documentation; not correct)
+   1110         turn transmitter off
+   1111         unused
+*/
 
 uint32 mux_dio (uint32 op, uint32 rn, uint32 ad)
 {
@@ -321,27 +348,30 @@ if (op == OP_RD) {                                      /* read direct */
     return 0;
     }
 ln = MUXDAT_GETLIN (R[rn]);                             /* get line num */
-if (fnc & 0x4) {                                        /* transmit */
+if ((fnc & 0x4) != 0) {                                 /* transmit */
     if ((coc != 0) ||                                   /* nx COC or */
         (ln >= MUX_NUMLIN)) {                           /* nx line? */
         CC |= CC4;
         return 0;
         }
-    if ((fnc & 0x7) == 0x5) {                           /* send char? */
-        if (fnc & 0x8)                                  /* space? */
-            mux_xbuf[ln] = 0;
-        else mux_xbuf[ln] = MUXDAT_GETCHR (R[rn]);      /* no, get char */
+    switch (fnc) {                                      /* case on fnc */
+    case 0x5: case 0x6:                                 /* xmit, xmit long space */
+        if (fnc == 0x5)                                 /* send char? */
+            mux_xbuf[ln] = MUXDAT_GETCHR (R[rn]);       /* get char */
+        else mux_xbuf[ln] = 0;                          /* just space */
         sim_activate (&muxl_unit[ln], muxl_unit[ln].wait);
         mux_sta[ln] = (mux_sta[ln] | MUXL_XIA) & ~MUXL_XIR;
         mux_scan_next (1);                              /* unlock scanner */
-        }
-    else if (fnc == 0x06) {                             /* stop transmit */
+        break;
+    case 0xE:                                           /* stop transmit */
         mux_sta[ln] &= ~MUXL_XIA|MUXL_XIR;              /* disable int */
         mux_scan_next (1);                              /* unlock scanner */
-        }
-    else if (fnc == 0x07) {                             /* disconnect */
+        break;
+    case 0x7:                                           /* disconnect */
         tmxr_reset_ln (&mux_ldsc[ln]);                  /* reset line */
         mux_reset_ln (ln);                              /* reset state */
+    default:                                            /* fall through */
+        break;
         }
     CC = (sim_is_active (&muxl_unit[ln])? 0: CC4) |
         (mux_ldsc[ln].conn? CC3: 0);
@@ -350,18 +380,21 @@ else {                                                  /* receive */
     if ((coc != 0) ||                                   /* nx COC or */
         (ln >= MUX_NUMLIN))                             /* nx line */
         return 0;
-    if (fnc == 0x01) {                                  /* set rcv enable */
+    switch (fnc) {                                      /* case on fnc */
+    case 0x1:                                           /* set rcv enable */
         if (mux_ldsc[ln].conn)                          /* connected? */
             mux_ldsc[ln].rcve = 1;                      /* just enable */
         else mux_sta[ln] |= MUXL_REP;                   /* enable pending */
-        }
-    else if (fnc == 0x02) {                             /* clr rcv enable */
+        break;
+    case 0x2:                                           /* clr rcv enable */
         mux_ldsc[ln].rcve = 0;
         mux_sta[ln] &= ~MUXL_REP;
-        }
-    else if (fnc == 0x03) {                             /* disconnect */
+        break;
+    case 0x3:                                           /* disconnect */
         tmxr_reset_ln (&mux_ldsc[ln]);                  /* reset line */
         mux_reset_ln (ln);                              /* reset state */
+    default:                                            /* fall through */
+        break;
         }
     if (mux_sta[ln] & MUXL_RBP)                         /* break pending? */
         CC = CC3|CC4;
@@ -418,16 +451,19 @@ tmxr_poll_rx (&mux_desc);                               /* poll for input */
 for (ln = 0; ln < MUX_NUMLIN; ln++) {                   /* loop thru lines */
     if (mux_ldsc[ln].conn) {                            /* connected? */
         if ((c = tmxr_getc_ln (&mux_ldsc[ln]))) {       /* get char */
-            if (c & SCPE_BREAK)                         /* break? */
+            if (c & SCPE_BREAK) {                       /* break? */
                 mux_sta[ln] |= MUXL_RBP;                /* set rcv brk */
+                c = 0;                                  /* space */
+                ln |= 0x80;                             /* break flag */
+                }
             else {                                      /* normal char */
                 mux_sta[ln] &= ~MUXL_RBP;               /* clr rcv brk */
                 c = sim_tt_inpcvt (c, TT_GET_MODE (muxl_unit[ln].flags));
                 mux_rbuf[ln] = c;                       /* save char */
-                if ((muxc_cmd == MUXC_RCV) &&           /* chan active? */
-                    (r = muxi_put_char (c, ln)))        /* char to chan */
-                    return r;
                 }                                       /* end else char */
+            if ((muxc_cmd == MUXC_RCV) &&               /* chan active? */
+                (r = muxi_put_char (c, ln)))            /* char to chan */
+                return r;
             }                                           /* end if char */
         }                                               /* end if conn */
     else mux_sta[ln] &= ~MUXL_RBP;                      /* disconnected */

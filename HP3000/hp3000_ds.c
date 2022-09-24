@@ -441,7 +441,7 @@ static REG ds_reg [] = {
     { ORDATA (STATUS, status_word,      16),                  REG_FIT | PV_RZRO },
     { DRDATA (RETRY,  retry_counter,     4),                  REG_FIT | PV_LEFT },
 
-    { SRDATA (DIAG,   overrides,                              REG_HRO)          },
+    { SVDATA (DIAG,   overrides)                                                },
 
       DIB_REGS (ds_dib),
 

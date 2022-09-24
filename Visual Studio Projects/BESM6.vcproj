@@ -26,7 +26,7 @@
 			<Tool
 				Name="VCPreBuildEventTool"
 				Description="Check for required build dependencies, git commit id and required Font File"
-				CommandLine="Pre-Build-Event.cmd &quot;$(TargetDir)$(TargetName).exe&quot; LIBPCRE LIBSDL FINDFONT tahoma.ttf besm6_panel_font.h"
+				CommandLine="Pre-Build-Event.cmd &quot;$(TargetDir)$(TargetName).exe&quot; LIBPCRE LIBSDL"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
@@ -107,7 +107,7 @@
 			<Tool
 				Name="VCPreBuildEventTool"
 				Description="Check for required build dependencies, git commit id and required Font File"
-				CommandLine="Pre-Build-Event.cmd &quot;$(TargetDir)$(TargetName).exe&quot; LIBPCRE LIBSDL FINDFONT tahoma.ttf besm6_panel_font.h"
+				CommandLine="Pre-Build-Event.cmd &quot;$(TargetDir)$(TargetName).exe&quot; LIBPCRE LIBSDL"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
