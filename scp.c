@@ -16383,7 +16383,7 @@ for (i = 0; (dptr = devices[i]) != NULL; i++) {
                             Bad = TRUE;
                             Mprintf (f, "\tthe %u depth of the UNIT array exceeds the number of units on the %s device which is %u\n", rptr->depth, dptr->name, udptr->numunits);
                             }
-                        if (rptr->obj_size > sizeof (t_value)) {
+                        if (rptr->size > sizeof (t_value)) {
                             Bad = TRUE;
                             Mprintf (f, "\t%u is larger than the size of the t_value type (%u)\n", (uint32)rptr->obj_size, (uint32)sizeof (t_value));
                             }
