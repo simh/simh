@@ -10447,9 +10447,9 @@ return read_line_p (NULL, cptr, size, stream);
                         NULL if EOF
 */
 
-char *read_line_p (const char *prompt, char *cptr, int32 size, FILE *stream)
-{
-char *tptr;
+#if defined (HAVE_LIBEDIT)
+#include <editline/readline.h>
+#endif
 #if defined(_WIN32)
 #define dlopen(X,Y)    LoadLibraryA((X))
 #define dlsym(X,Y)     GetProcAddress((HINSTANCE)(X),(Y))
@@ -10462,10 +10462,12 @@ char *tptr;
 #endif
 #define EDIT_DEFAULT_LIB "edit."
 #define SIM_HAVE_DLOPEN DLL
-#else
+#else /* !defined(_WIN32) */
 #define EDIT_DEFAULT_LIB "libedit."
-#endif /* _WIN32 */
-#if defined(SIM_HAVE_DLOPEN)
+#endif /* defined(_WIN32) */
+
+char *read_line_p (const char *prompt, char *cptr, int32 size, FILE *stream)
+{
 static int initialized = 0;
 typedef char *(*readline_func)(const char *);
 static readline_func p_readline = NULL;
@@ -10473,24 +10475,41 @@ typedef void (*add_history_func)(const char *);
 static add_history_func p_add_history = NULL;
 typedef void (*free_line_func)(void *);
 static free_line_func p_free_line = NULL;
+char *tptr;
 
 if (prompt && (!initialized)) {
-    void *handle;
     initialized = 1;
+
+#if defined(HAVE_LIBEDIT)
+    p_readline = (readline_func)&readline;
+    p_add_history = (add_history_func)&add_history;
+#if !defined(RL_READLINE_VERSION)
+    p_free_line = (free_line_func)&rl_free;
+#else
+    p_free_line = (free_line_func)&free;
+#endif
+#else /* !defined(HAVE_LIBEDIT) */
+#if defined(SIM_HAVE_DLOPEN)
+    if (!p_readline) {   /* libedit not available at compile time, try OS shared object? */
+        void *handle;
 
 #define S__STR_QUOTE(tok) #tok
 #define S__STR(tok) S__STR_QUOTE(tok)
-    handle = dlopen(EDIT_DEFAULT_LIB S__STR(SIM_HAVE_DLOPEN), RTLD_NOW|RTLD_GLOBAL);
-    if (!handle)
-        handle = dlopen(EDIT_DEFAULT_LIB S__STR(SIM_HAVE_DLOPEN) ".2", RTLD_NOW|RTLD_GLOBAL);
-    if (handle) {
-        p_readline = (readline_func)((size_t)dlsym(handle, "readline"));
-        p_add_history = (add_history_func)((size_t)dlsym(handle, "add_history"));
-        p_free_line = (free_line_func)((size_t)dlsym(handle, "rl_free"));
-        if (p_free_line == NULL)
-            p_free_line = (free_line_func)&free;
+        handle = dlopen(EDIT_DEFAULT_LIB S__STR(SIM_HAVE_DLOPEN), RTLD_NOW|RTLD_GLOBAL);
+        if (!handle)
+            handle = dlopen(EDIT_DEFAULT_LIB S__STR(SIM_HAVE_DLOPEN) ".2", RTLD_NOW|RTLD_GLOBAL);
+        if (handle) {
+            p_readline = (readline_func)((size_t)dlsym(handle, "readline"));
+            p_add_history = (add_history_func)((size_t)dlsym(handle, "add_history"));
+            p_free_line = (free_line_func)((size_t)dlsym(handle, "rl_free"));
+            if (p_free_line == NULL)
+                p_free_line = (free_line_func)&free;
+            }
         }
+#endif /* defined(SIM_HAVE_DLOPEN) */
+#endif /* defined(HAVE_LIBEDIT) */
     }
+
 if (prompt) {                                           /* interactive? */
     if (p_readline) {
         char *tmpc = p_readline (prompt);               /* get cmd line */
@@ -10507,14 +10526,8 @@ if (prompt) {                                           /* interactive? */
         cptr = fgets (cptr, size, stream);              /* get cmd line */
         }
     }
-else cptr = fgets (cptr, size, stream);                 /* get cmd line */
-#else
-if (prompt) {                                           /* interactive? */
-    printf ("%s", prompt);                              /* display prompt */
-    fflush (stdout);
-    }
-cptr = fgets (cptr, size, stream);                      /* get cmd line */
-#endif
+else
+    cptr = fgets (cptr, size, stream);                  /* get cmd line */
 
 if (cptr == NULL) {
     clearerr (stream);                                  /* clear error */
@@ -10538,10 +10551,8 @@ if ((*cptr == ';') || (*cptr == '#')) {                 /* ignore comment */
     *cptr = 0;
     }
 
-#if defined (SIM_HAVE_DLOPEN)
 if (prompt && p_add_history && *cptr)                   /* Save non blank lines in history */
     p_add_history (cptr);
-#endif
 
 return cptr;
 }

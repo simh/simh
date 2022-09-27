@@ -566,6 +566,17 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
       endif
     endif
   endif
+  # Find libedit BSD licensed library for readline support.
+  ifneq (,$(and $(call find_lib,edit), $(call find_lib,termcap)))
+    ifneq (,$(call find_include,editline/readline))
+      OS_CCDEFS += -DHAVE_LIBEDIT
+      OS_LDFLAGS += -ledit -ltermcap
+      $(info using libedit: $(call find_lib,edit) $(call find_include,editline/readline))
+      ifeq ($(LD_SEARCH_NEEDED),$(call need_search,edit))
+        OS_LDFLAGS += -L$(dir $(call find_lib,edit)) -L$(dir $(call find_lib,termcap)) 
+      endif
+    endif
+  endif
   # Find available ncurses library.
   ifneq (,$(call find_include,ncurses))
     ifneq (,$(call find_lib,ncurses))

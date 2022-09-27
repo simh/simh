@@ -267,11 +267,74 @@
 				RelativePath="..\sim_video.c"
 				>
 			</File>
+			<Filter
+				Name="WinEditLine"
+				>
+				<File
+					RelativePath="..\..\windows-build\WinEditLine\src\editline.c"
+					>
+					<FileConfiguration
+						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							AdditionalIncludeDirectories="$(InputDir)"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							AdditionalIncludeDirectories="$(InputDir)"
+						/>
+					</FileConfiguration>
+				</File>
+				<File
+					RelativePath="..\..\windows-build\WinEditLine\src\fn_complete.c"
+					>
+					<FileConfiguration
+						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							AdditionalIncludeDirectories="$(InputDir)"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							AdditionalIncludeDirectories="$(InputDir)"
+						/>
+					</FileConfiguration>
+				</File>
+				<File
+					RelativePath="..\..\windows-build\WinEditLine\src\history.c"
+					>
+					<FileConfiguration
+						Name="Debug|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							AdditionalIncludeDirectories="$(InputDir)"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+							AdditionalIncludeDirectories="$(InputDir)"
+						/>
+					</FileConfiguration>
+				</File>
+			</Filter>
 		</Filter>
 		<Filter
 			Name="Header Files"
-			Filter="h;hpp;hxx;hm;inl;inc"
-			>
+			Filter="h;hpp;hxx;hm;inl;inc"			>
 			<File
 				RelativePath="..\I650\i650_defs.h"
 				>
