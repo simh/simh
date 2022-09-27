@@ -664,7 +664,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
           SDLX_CONFIG = sdl2-config
         endif
         ifneq (,$(SDLX_CONFIG))
-          VIDEO_CCDEFS += -DHAVE_LIBSDL -DUSE_SIM_VIDEO `$(SDLX_CONFIG) --cflags`
+          VIDEO_CCDEFS += -DHAVE_LIBSDL `$(SDLX_CONFIG) --cflags`
           VIDEO_LDFLAGS += `$(SDLX_CONFIG) --libs`
           VIDEO_FEATURES = - video capabilities provided by libSDL2 (Simple Directmedia Layer)
           DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/sim_ws.c
@@ -672,11 +672,8 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
           DISPLAY340 = ${DISPLAYD}/type340.c
           DISPLAYNG = ${DISPLAYD}/ng.c
           DISPLAYIII = ${DISPLAYD}/iii.c
-          DISPLAY_OPT += -DUSE_DISPLAY $(VIDEO_CCDEFS) $(VIDEO_LDFLAGS)
+          DISPLAY_OPT += -DUSE_DISPLAY $(VIDEO_CCDEFS) $(VIDEO_LDFLAGS) -DUSE_SIM_VIDEO
           $(info using libSDL2: $(call find_include,SDL2/SDL))
-          ifeq (Darwin,$(OSTYPE))
-            VIDEO_CCDEFS += -DSDL_MAIN_AVAILABLE
-          endif
         endif
       endif
     endif
@@ -727,7 +724,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
         ifneq (,$(and $(findstring sdl2,${VIDEO_LDFLAGS}),$(call find_include,SDL2/SDL_ttf),$(call find_lib,SDL2_ttf)))
           $(info using libSDL2_ttf: $(call find_lib,SDL2_ttf) $(call find_include,SDL2/SDL_ttf))
           $(info ***)
-          VIDEO_TTF_OPT = $(filter-out -DSDL_MAIN_AVAILABLE,$(VIDEO_CCDEFS)) ${VIDEO_LDFLAGS} -lSDL2_ttf
+          VIDEO_TTF_OPT = $(VIDEO_CCDEFS) -DHAVE_LIBSDL_TTF ${VIDEO_LDFLAGS} -lSDL2_ttf
           VIDEO_FEATURES += with TrueType font support
           # Retain support for explicitly supplying a preferred fontfile
           ifneq (,$(FONTFILE))
