@@ -16465,7 +16465,7 @@ static struct validation_test {
     REG reg[7];
     t_stat expected_result;
     } validations[] = {
-        { { { BRDATAD (STRUCT,  validate_units,   16, 8*sizeof(treg16), sizeof(validate_units)/sizeof(treg16), "an invalid array of scalars") },
+        { { { BRDATAD (STRUCT,  validate_units,   16, 8*sizeof(treg16), sizeof(validate_units)/2, "an invalid array of scalars") },
             {NULL} },
          SCPE_IERR},
         { { { SRDATAD (AMBIG,   validate_units,   pos,   10, 32, 0, 3, "a basic register array") },
