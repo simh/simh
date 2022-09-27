@@ -29,7 +29,7 @@ rem
 rem Everything implicitly requires BUILD to also be set to have 
 rem any meaning, it always gets set.
 set _X_BUILD=BUILD
-set _X_REQUIRED_WINDOWS_BUILD=20220714
+set _X_REQUIRED_WINDOWS_BUILD=20220926
 call :FindVCVersion _VC_VER
 
 set _PDB=%~dpn1.pdb
@@ -46,12 +46,7 @@ if /I "%1" == "ROM"      set _arg=ROM
 if /I "%1" == "BUILD"    set _arg=BUILD
 if /I "%1" == "LIBSDL"   set _arg=LIBSDL
 if /I "%1" == "LIBPCRE"  set _arg=LIBPCRE
-if /I "%1" == "FINDFONT" set _arg=FINDFONT
 if "%_arg%" == ""        echo *** warning *** unknown parameter %1
-if /I "%1" == "FINDFONT" set _X_FontName=%2
-if /I "%1" == "FINDFONT" set _X_FontIncludeName=%3
-if /I "%_arg%" == "FINDFONT" shift
-if /I "%_arg%" == "FINDFONT" shift
 if not "%_arg%" == ""    set _X_%_arg%=%_arg%
 shift
 goto _next_arg
@@ -155,22 +150,6 @@ for /F "usebackq tokens=2*" %%i in (`findstr /C:"_VC_VER=%_VC_VER% " "%_X_VC_VER
 echo Enabling Library support for %_X_VC_VER%
 call "%_X_VC_VER_DIR%\Install-Library-Support.cmd"
 :_done_libsdl
-if "%_X_FINDFONT%" == "" goto _done_findfont
-if "%_X_FontName%" == "" goto _done_findfont
-echo. >%_X_FontIncludeName%.temp
-set FONTFILE=%windir%\Fonts\%_X_FontName%
-if not exist "%FONTFILE%" echo Can't find font %_X_FontName%
-if not exist "%FONTFILE%" goto _done_findfont
-set FONTFILE=%FONTFILE:\=/%
-echo #define FONTFILE %FONTFILE% >>%_X_FontIncludeName%.temp
-if not exist %_X_FontIncludeName% goto _found_font
-fc %_X_FontIncludeName%.temp %_X_FontIncludeName% >NUL
-if NOT ERRORLEVEL 1 goto _done_findfont
-:_found_font
-echo Found: %FONTFILE%
-move /Y %_X_FontIncludeName%.temp %_X_FontIncludeName% >NUL
-:_done_findfont
-if exist %_X_FontIncludeName%.temp del %_X_FontIncludeName%.temp
 call :FindVCVersion _VC_VER
 if not exist "..\..\windows-build\libpng-1.6.18\projects\Release Library" goto _setup_library
 if not exist "..\..\windows-build\libpng-1.6.18\projects\Release Library\VisualC.version" set _LIB_VC_VER=9
