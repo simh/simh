@@ -52,7 +52,7 @@ All Simulator updates on Open SIMH will be present in this repository, and any c
 
 ### Mark Pizzolato's changes not present in the Open SIMH repo:
 
-#### Changes to SCP (the simulator framework or command execution environment)
+#### Visible changes to SCP (the simulator framework or command execution environment)
 
 - Add descriptive messages for cases when NOPARAM status is returned.
 - Avoid excessive DO command context lines when commands produce multiple lines of output.
@@ -66,6 +66,10 @@ All Simulator updates on Open SIMH will be present in this repository, and any c
 - Add extended register sanity checks including duplicate name detection.  Fixed simulator devices with duplicate register names.
 - Simulators with video devices that may be enabled, no longer disable the screen saver until the video display is presented.  Optionally enabling or disabling the OS screen saver by an environment variable.
 - More readable output of SHOW <dev>|<unit> with variable sized DEVICE and UNIT names.
+- Automatic Crllic Font detection in BESM6 simulator at runtime rather than build time.  More relevant for distribution binaries.
+- Build-in tab file name completion previously done by GPL readline now done by BSD licensed library available on all platforms (expecially Windows).
+- Robust register sanity checking for all register definition macros.
+- When building on windows, the windows-build dependency libraries are automatically downloaded even if git is not available.
 
 #### Changes to the PDP-11 and VAX simulators
 

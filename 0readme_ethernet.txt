@@ -222,9 +222,9 @@ Windows notes:
     developed or supported. These packages for windows simulate the libpcap 
     package that is freely available for un*x systems.  
 
- 2. You must *install* the npcap or WinPCAP runtime package.
+ 2. You must *install* the Npcap or WinPCAP runtime package.
 
- 3. The first time the npcap/WinPCAP driver is used, it will be dynamically 
+ 3. The first time the Npcap/WinPCAP driver is used, it will be dynamically 
     loaded, and the user must be an Administrator on the machine to do so. 
     If you need to run as an unprivileged user, you must set the "npf" driver 
     to autostart. 
@@ -259,6 +259,8 @@ Building on Windows:
 
     https://github.com/simh/windows-build/archive/windows-build.zip
 
+ This archive of dependent components for Windows simulators will 
+ automatically be downloaded, if needed, when building with Visual Studio.
 
  There are Windows batch files provided to initiate compiles using the MinGW
  compiler tool chain.  These batch files are located in the same directory 
@@ -290,7 +292,7 @@ for details.
 ----- WARNING ----- WARNING ----- WARNING ----- WARNING ----- WARNING -----
 
  1. For all platforms, you must run SIMH(scp) with sufficient privilege to
-    allow the Ethernet card can be set into promiscuous mode and to write
+    allow the Ethernet card to be set into promiscuous mode and to write
     packets through the driver. 
       a) For Windows systems this means having administrator privileges to 
          start the "npf" driver.  The current WinPcap installer offers an 
@@ -365,9 +367,9 @@ Building on Linux, {Free|Net|Open}BSD, OS/X, Solaris, other *nix:
     binaries will run on any system whether or not libpcap is installed.  If 
     you want to force direct libpcap linking during a build you do so by 
     typing 'make USE_NETWORK=1'.  You must build with gcc to do this.  There 
-    is no observable benefit to statically linking against libpcap.  Support
-    for statically linking libpcap ia deprecated on all platforms except
-    Linux and OS X where it has already been removed.
+    is no observable benefit to directly linking against libpcap.  Support
+    for directly linking libpcap is deprecated on all platforms except
+    Linux and macOS where it has already been removed.
     
  4. Some platforms (HP-UX in particular) may not have vendor supplied libpcap 
     components available and installed with the operating system.  The packages
