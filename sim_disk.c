@@ -52,6 +52,8 @@ Public routines:
    sim_disk_show_capac       show disk capacity
    sim_disk_set_autosize     MTAB set autosize
    sim_disk_show_autosize    MTAB display autosize
+   sim_disk_set_autozap      MTAB set autozap
+   sim_disk_show_autozap     MTAB display autozap
    sim_disk_set_async        enable asynchronous operation
    sim_disk_clr_async        disable asynchronous operation
    sim_disk_data_trace       debug support
@@ -592,7 +594,7 @@ return r;
 
 static t_bool sim_disk_no_autosize = FALSE;
 
-t_stat sim_disk_set_noautosize (int32 flag, CONST char *cptr)
+t_stat sim_disk_set_all_noautosize (int32 flag, CONST char *cptr)
 {
 DEVICE *dptr;
 uint32 dev, unit, count = 0;
@@ -652,6 +654,8 @@ if (cptr != NULL)
     return sim_messagef (SCPE_ARG, "%s: Unexpected autosize argument: %s\n", sim_uname (uptr), cptr);
 if (sim_disk_no_autosize)
     return sim_messagef (SCPE_ARG, "%s: Disk autosizing is globally disabled\n", sim_uname (uptr));
+if ((uptr->flags & UNIT_ATT) != 0)
+    return sim_messagef (SCPE_ALATT, "%s: Disk already attached, autosizing not changed\n", sim_uname (uptr));
 if (val ^ ((uptr->flags & DKUF_NOAUTOSIZE) != 0))
     return SCPE_OK;
 if (val)
@@ -672,6 +676,71 @@ else
 return SCPE_OK;
 }
 
+t_stat sim_disk_set_all_autozap (int32 flag, CONST char *cptr)
+{
+DEVICE *dptr;
+uint32 dev, unit, count = 0;
+int32 saved_sim_show_message = sim_show_message;
+
+sim_show_message = FALSE;
+for (dev = 0; (dptr = sim_devices[dev]) != NULL; dev++) {
+    t_bool device_disabled = ((dptr->flags & DEV_DIS) != 0);
+
+    if ((DEV_TYPE (dptr) != DEV_DISK) &&
+        (DEV_TYPE (dptr) != DEV_SCSI))                          /* If not a sim_disk device? */
+        continue;                                               /*   skip this device */
+
+    if (device_disabled)
+        dptr->flags &= ~DEV_DIS;                                /* Temporarily enable device */
+    ++count;
+    for (unit = 0; unit < dptr->numunits; unit++) {
+        char cmd[CBUFSIZE];
+        t_bool unit_disabled = ((dptr->units[unit].flags & UNIT_DIS) != 0);
+
+        if (unit_disabled &&                                    /* disabled and */
+            ((dptr->units[unit].flags & UNIT_DISABLE) == 0))    /* can't be enabled? */
+             continue;                                          /*  Not a drive unit, so skip. */
+
+        if (unit_disabled)
+            dptr->units[unit].flags &= ~UNIT_DIS;               /* Temporarily enable unit */
+        sprintf (cmd, "%s %sAUTOZAP", sim_uname (&dptr->units[unit]), (flag != 0) ? "" : "NO");
+        set_cmd (0, cmd);
+        if (unit_disabled)
+            dptr->units[unit].flags |= ~UNIT_DIS;               /* leave unit disabled again */
+        }
+    if (device_disabled)
+        dptr->flags |= DEV_DIS;                                 /* leave device the way we found it */
+    }
+sim_show_message = saved_sim_show_message;
+if (count == 0)
+    return sim_messagef (SCPE_ARG, "No disk devices in the %s simulator support autozap\n", sim_name);
+return SCPE_OK;
+}
+
+/* Set disk autozap */
+
+t_stat sim_disk_set_autozap (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+if (uptr == NULL)
+    return SCPE_IERR;
+if (cptr != NULL)
+    return sim_messagef (SCPE_ARG, "%s: Unexpected autozap argument: %s\n", sim_uname (uptr), cptr);
+if (val ^ ((uptr->flags & DKUF_AUTOZAP) == 0))
+    return SCPE_OK;
+if (val)
+    uptr->flags |= DKUF_AUTOZAP;
+else
+    uptr->flags &= ~DKUF_AUTOZAP;
+return SCPE_OK;
+}
+
+/* Show disk autozap */
+
+t_stat sim_disk_show_autozap (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+fprintf (st, "%sautozap", ((uptr->flags & DKUF_AUTOZAP) != 0) ? "" : "no" );
+return SCPE_OK;
+}
 
 
 /* Test for write protect */
@@ -3943,6 +4012,7 @@ struct disk_context *ctx;
 int (*close_function)(FILE *f);
 FILE *fileref;
 t_bool auto_format;
+char *autozap_filename = NULL;
 
 if (uptr == NULL)
     return SCPE_IERR;
@@ -4001,6 +4071,8 @@ sim_disk_clr_async (uptr);
 
 uptr->flags &= ~(UNIT_ATT | UNIT_RO);
 uptr->dynflags &= ~(UNIT_NO_FIO | UNIT_DISK_CHK);
+if ((uptr->flags & DKUF_AUTOZAP) != 0)
+    autozap_filename = strdup (uptr->filename);
 free (uptr->filename);
 uptr->filename = NULL;
 uptr->fileref = NULL;
@@ -4014,8 +4086,18 @@ uptr->io_flush = NULL;
 if (auto_format)
     sim_disk_set_fmt (uptr, 0, "AUTO", NULL);           /* restore file format */
 
-if (close_function (fileref) == EOF)
+if (close_function (fileref) == EOF) {
+    free (autozap_filename);
     return SCPE_IOERR;
+    }
+if (autozap_filename) {
+    t_bool saved_sim_show_message = sim_show_message;
+
+    sim_show_message = FALSE;
+    sim_disk_info_cmd (1, autozap_filename);
+    free (autozap_filename);
+    sim_show_message = saved_sim_show_message;
+    }
 return SCPE_OK;
 }
 
@@ -7114,18 +7196,24 @@ uint32 i, j, k, l;
 
 sim_show_message = FALSE;
 sim_disk_no_autosize = TRUE;
-sim_disk_set_noautosize (FALSE, NULL);
+sim_disk_set_all_noautosize (FALSE, NULL);
 sim_show_message = saved_sim_show_message;
 for (i = 0; NULL != (dptr = sim_devices[i]); i++) {
     DRVTYP *drive;
-    MTAB autos[] = {
+    static MTAB autos[] = {
         { MTAB_XTD|MTAB_VUN,        1,  NULL, "AUTOSIZE", 
             &sim_disk_set_autosize,  NULL, NULL, "Enable disk autosize on attach" },
         { MTAB_XTD|MTAB_VUN,        0,  NULL, "NOAUTOSIZE", 
             &sim_disk_set_autosize,  NULL, NULL, "Disable disk autosize on attach"  },
         { MTAB_XTD|MTAB_VUN,        0,  "AUTOSIZE", NULL, 
             NULL, &sim_disk_show_autosize, NULL, "Display disk autosize on attach setting" }};
-
+    static MTAB autoz[] = {
+        { MTAB_XTD|MTAB_VUN,        1,  NULL, "AUTOZAP", 
+            &sim_disk_set_autozap,  NULL, NULL, "Enable disk metadaat removal on detach" },
+        { MTAB_XTD|MTAB_VUN,        0,  NULL, "NOAUTOZAP", 
+            &sim_disk_set_autozap,  NULL, NULL, "Disable disk metadata removal on detach"  },
+        { MTAB_XTD|MTAB_VUN,        0,  "AUTOZAP", NULL, 
+            NULL, &sim_disk_show_autozap, NULL, "Display disk autozap on detach setting" }};
     MTAB *mtab = dptr->modifiers;
     MTAB *nmtab = NULL;
     t_stat (*validator)(UNIT *up, int32 v, CONST char *cp, void *dp) = NULL;
@@ -7140,6 +7228,7 @@ for (i = 0; NULL != (dptr = sim_devices[i]); i++) {
         (dptr->type_ctx == NULL))
         continue;
     drive = (DRVTYP *)dptr->type_ctx;
+    /* First prepare/fill-in the drive type list */
     for (drives = aliases = 0; drive[drives].name != NULL; drives++) {
         if (drive[drives].MediaId == 0)
             drive[drives].MediaId = sim_disk_drive_type_to_mediaid (drive[drives].name, drive[drives].driver_name);
@@ -7157,9 +7246,9 @@ for (i = 0; NULL != (dptr = sim_devices[i]); i++) {
              ((strcasecmp (mtab[j].mstring, "AUTOSIZE") == 0)   ||
               (strcasecmp (mtab[j].mstring, "NOAUTOSIZE") == 0)))) {
              if ((mtab[j].mask & (MTAB_XTD|MTAB_VUN)) == 0)
-                 ++dumb_autosizers;
+                 ++dumb_autosizers;             /* Autosize set in unit flags */
              else
-                 ++smart_autosizers;
+                 ++smart_autosizers;            /* Autosize set by modifier */
             }
         for (k = 0; drive[k].name != NULL; k++) {
             if ((mtab[j].mstring == NULL) || 
@@ -7175,11 +7264,13 @@ for (i = 0; NULL != (dptr = sim_devices[i]); i++) {
             continue;
         ++setters;
         }
-    nmtab = (MTAB *)calloc (2 + ((smart_autosizers == 0) * (sizeof (autos)/sizeof (autos[0]))) + drives + aliases + (modifiers - (setters + dumb_autosizers)), sizeof (MTAB));
+    nmtab = (MTAB *)calloc (2 + ((smart_autosizers == 0) * (sizeof (autos)/sizeof (autos[0]))) + (1 + (sizeof (autos)/sizeof (autos[0]))) * (drives + aliases + (modifiers - (setters + dumb_autosizers))), sizeof (MTAB));
     l = 0;
     if (smart_autosizers == 0) {
         for (k = 0; k < (sizeof (autos)/sizeof (autos[0])); k++)
             nmtab[l++] = autos[k];
+        for (k = 0; k < (sizeof (autoz)/sizeof (autoz[0])); k++)
+            nmtab[l++] = autoz[k];
         }
     for (j = 0; mtab[j].mask != 0; j++) {
         if ((((mtab[j].pstring != NULL) && 
@@ -7402,7 +7493,7 @@ if (info->flag) {        /* zap type */
             container_size -= sizeof (*f);
             initial_container_size = container_size;
             stop_cpu = FALSE;
-            sim_messagef (SCPE_OK, "Trimming trailing zero containing blocks back to lbn: %u          \n", (uint32)(highwater / sector_size));
+            sim_messagef (SCPE_OK, "Trimming trailing zero containing blocks back to lbn: %u         \n", (uint32)(highwater / sector_size));
             while ((container_size > highwater) &&
                    (!stop_cpu)) {
                 if ((sim_fseeko (container, container_size - sector_size, SEEK_SET) != 0) ||
@@ -7410,7 +7501,7 @@ if (info->flag) {        /* zap type */
                     (0 != memcmp (sector_data, zero_sector, sector_size)))
                     break;
                 if ((0 == (container_size % 1024*1024)))
-                    sim_messagef (SCPE_OK, "Trimming trailing zero containing blocks at lbn: %u          \r", (uint32)(container_size / sector_size));
+                    sim_messagef (SCPE_OK, "Trimming trailing zero containing blocks at lbn: %u         \r", (uint32)(container_size / sector_size));
                 container_size -= sector_size;
                 }
             free (sector_data);
@@ -7425,11 +7516,11 @@ if (info->flag) {        /* zap type */
                 (void)sim_set_fsize (container, (t_addr)container_size);
                 fclose (container);
                 sim_set_file_times (FullPath, statb.st_atime, statb.st_mtime);
-                info->stat = sim_messagef (SCPE_OK, "Disk Type Removed from container '%s'\n", FullPath);
+                info->stat = sim_messagef (SCPE_OK, "Disk Type Removed from container: '%s'\n", sim_relative_path (FullPath));
                 }
             else {
                 fclose (container);
-                info->stat = sim_messagef (SCPE_ARG, "Canceled Disk Type Removal from container '%s'\n", FullPath);
+                info->stat = sim_messagef (SCPE_ARG, "Canceled Disk Type Removal from container: '%s'\n", sim_relative_path (FullPath));
                 }
             stop_cpu = FALSE;
             return;
@@ -7484,7 +7575,7 @@ if (info->flag == 0) {
                         "   ElementEncodingSize: %s\n"
                         "   AccessFormat:        %s\n"
                         "   CreationTime:        %s",
-                        uptr->filename,
+                        sim_relative_path (uptr->filename),
                         f->CreatingSimulator, f->DriveType, NtoHl(f->SectorSize), NtoHl (f->SectorCount), 
                         _disk_tranfer_encoding (NtoHl (f->ElementEncodingSize)), fmts[f->AccessFormat].name, f->CreationTime);
             if (f->DeviceName[0] != '\0')
@@ -7498,7 +7589,7 @@ if (info->flag == 0) {
             sim_printf ("Container Size: %s bytes\n", sim_fmt_numeric ((double)ctx->container_size));
             }
         else {
-            sim_printf ("Container Info for '%s' unavailable\n", uptr->filename);
+            sim_printf ("Container Info for '%s' unavailable\n", sim_relative_path (uptr->filename));
             sim_printf ("Container Size: %s bytes\n", sim_fmt_numeric ((double)container_size));
             info->stat = SCPE_ARG|SCPE_NOMESSAGE;
             }

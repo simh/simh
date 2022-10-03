@@ -1594,7 +1594,27 @@ static const char simh_help1[] =
       "++++++++                     available\n"
 #define HLP_NOAUTOSIZE  "*Commands SET NoAutosize"
       "3NoAutosize\n"
-      "+SET NOAUTOSIZE              disables disk autosizing for all disks\n";
+      "+SET NOAUTOSIZE              disables disk autosizing for all disks\n"
+      "++++++++                     in the simulator which support multiple\n"
+      "++++++++                     drive types or sizes\n"
+      "+SET <unit> NOAUTOSIZE       disables disk autosizing for a specific\n"
+      "++++++++                     unit in the simulator that supports\n"
+      "++++++++                     different drive types or sizes\n"
+      "+SET AUTOSIZE                enables disk autosizing for all disks\n"
+      "++++++++                     in the simulator which support multiple\n"
+      "++++++++                     drive types or sizes\n"
+      "+SET <unit> AUTOSIZE         enables disk autosizing for a specific\n"
+      "++++++++                     unit in the simulator that supports\n"
+      "++++++++                     different drive types or sizes\n"
+#define HLP_AUTOZAP     "*Commands SET Autozap"
+      "3Autozap\n"
+      "+SET AUTOZAP                 enables automatic metadata removal on\n"
+      "++++++++                     detach for all disks with metadata\n"
+      "++++++++                     capabilities in the simulator\n"
+      "+SET <unit> AUTOZAP          enables automatic metadata removal on\n"
+      "++++++++                     detach for a specific unit in the simulator\n"
+      "+SET <unit> NOAUTOZAP        disables automatic metadata removal on\n"
+      "++++++++                     detach for a specific unit in the simulator\n";
 static const char simh_help2[] =
       /***************** 80 character line width template *************************/
 #define HLP_SHOW        "*Commands SHOW"
@@ -2650,7 +2670,10 @@ static CTAB set_glob_tab[] = {
     { "PROMPT",     &set_prompt,                0, HLP_SET_PROMPT },
     { "RUNLIMIT",   &set_runlimit,              1, HLP_RUNLIMIT },
     { "NORUNLIMIT", &set_runlimit,              0, HLP_RUNLIMIT },
-    { "NOAUTOSIZE", &sim_disk_set_noautosize,   1, HLP_NOAUTOSIZE },
+    { "NOAUTOSIZE", &sim_disk_set_all_noautosize, 1, HLP_NOAUTOSIZE },
+    { "AUTOSIZE",   &sim_disk_set_all_noautosize, 0, HLP_NOAUTOSIZE },
+    { "AUTOZAP",    &sim_disk_set_all_autozap,  1, HLP_AUTOZAP },
+    { "NOAUTOZAP",  &sim_disk_set_all_autozap,  0, HLP_AUTOZAP },
     { NULL,         NULL,                       0 }
     };
 

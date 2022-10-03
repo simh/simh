@@ -48,7 +48,7 @@
 
 ## WHAT'S NEW since the Open SIMH fork
 
-All Simulator updates on Open SIMH will be present in this repository, and any changes to the master branch code in this repository authored by anyone except Mark Pizzolato will be posted as pull requestss on the Open simh repo.
+All Simulator updates on Open SIMH will be present in this repository, and any changes to the master branch code in this repository authored by anyone except Mark Pizzolato may be posted as pull requestss on the Open simh repo.
 
 ### Mark Pizzolato's changes not present in the Open SIMH repo:
 
@@ -66,10 +66,11 @@ All Simulator updates on Open SIMH will be present in this repository, and any c
 - Add extended register sanity checks including duplicate name detection.  Fixed simulator devices with duplicate register names.
 - Simulators with video devices that may be enabled, no longer disable the screen saver until the video display is presented.  Optionally enabling or disabling the OS screen saver by an environment variable.
 - More readable output of SHOW <dev>|<unit> with variable sized DEVICE and UNIT names.
-- Automatic Crllic Font detection in BESM6 simulator at runtime rather than build time.  More relevant for distribution binaries.
-- Build-in tab file name completion previously done by GPL readline now done by BSD licensed library available on all platforms (expecially Windows).
+- Automatic Cryllic Font detection in BESM6 simulator at runtime rather than build time.  More relevant for distribution binaries.
+- Build-in command history and tab file name completion previously done by GPL readline now done by BSD licensed library available on all platforms (expecially Windows).
 - Robust register sanity checking for all register definition macros.
 - When building on windows, the windows-build dependency libraries are automatically downloaded even if git is not available.
+- Add a global SET AUTOZAP command or per drive SET <unit> AUTOZAP which removes metadata from disk containers at detach time if the container has metadata.
 
 #### Changes to the PDP-11 and VAX simulators
 
@@ -583,15 +584,15 @@ functionality.
 
 ###### OS X - Dependencies
 
-The MacPorts package manager is available to provide these external packages.  Once MacPorts is installed, these commands will install the required dependent packages:
+The MacPorts package manager is available to provide these external packages.  Once MacPorts is installed, this commands will install the required dependent packages:
 
-    # port install vde2 libsdl2 libsdl2_ttf libpng zlib pcre
+    # port install vde2 libsdl2 libsdl2_ttf libpng zlib pcre libedit
 
 OR
 
 The HomeBrew package manager can be used to provide these packages:
 
-    $ brew install vde sdl2 sdl2_ttf libpng zlib pcre
+    $ brew install vde sdl2 sdl2_ttf libpng zlib pcre libedit
 
 ###### Linux - Dependencies
 
@@ -599,7 +600,7 @@ Different Linux distributions have different package management systems:
 
 Ubuntu:
 
-    # apt-get install libpcap-dev libpcre3-dev vde2 libsdl2-dev libsdl2_ttf-dev
+    # apt-get install libpcap-dev libpcre3-dev vde2 libsdl2-dev libsdl2_ttf-dev libedit-dev
 
 #### Windows
 
