@@ -2558,8 +2558,24 @@ static const char simh_help2[] =
       "++sim> curl --help\n\n"
 #define HLP_DISKINFO    "*Commands Disk_Container_Information"
       "2Disk Container Information\n"
-      " Information about a Disk Container can be displayed with the DISKINFO command:\n\n"
-      "++DISKINFO container-spec    show information about a disk container\n\n";
+      " Information about a Disk Container can be displayed with the DISKINFO\n"
+      " command:\n\n"
+      "++DISKINFO container-spec       show information about a disk container\n\n"
+      " Disk Containers that have metadata that describes details about the\n"
+      " the container's type and attributes will display that detailed\n"
+      " information for the container.  Disk Containers that don't have metadata\n"
+      " merely have their size reported.\n\n"
+      " In either case, if a known file system type is recognized on the container\n"
+      " the details about that file system are indicated.\n\n"
+#define HLP_ZAPTYPE     "*Commands Removing_Disk_Metadata"
+      "2Removing Disk Metadata\n"
+      " Metadata on disk containers can be removed by using the ZAPTYPE command:\n\n"
+      "++ZAPTYPE container-spec       remove disk metadata if present\n\n"
+      " Disk Containers that have metadata will have that metadata removed and\n"
+      " the container's last write time reflected in the file timestamp and the\n"
+      " container's size will shrink back to the further of the file's size when\n"
+      " the metadat was added or the furthest write point in the container.\n"
+      " Disk Containers that don't have metadata will not be modified\n\n";
 
 
 static CTAB cmd_table[] = {
@@ -2635,7 +2651,7 @@ static CTAB cmd_table[] = {
     { "NORUNLIMIT", &runlimit_cmd,  0,          HLP_RUNLIMIT,   NULL, NULL },
     { "TESTLIB",    &test_lib_cmd,  0,          HLP_TESTLIB,    NULL, NULL },
     { "DISKINFO",   &sim_disk_info_cmd,  0,     HLP_DISKINFO,   NULL, NULL },
-    { "ZAPTYPE",    &sim_disk_info_cmd,  1,     NULL,           NULL, NULL },
+    { "ZAPTYPE",    &sim_disk_info_cmd,  1,     HLP_ZAPTYPE,    NULL, NULL },
     { NULL,         NULL,           0,          NULL,           NULL, NULL }
     };
 
@@ -6785,7 +6801,6 @@ if (flag) {
         fprintf (st, "\n        Virtual Hard Disk (VHD) support");
     if (sim_disk_raw_support())
         fprintf (st, "\n        RAW disk and CD/DVD ROM support");
-    fprintf (st, "\n        Autosizing of disks is %s", sim_disk_autosize_disabled() ? "disabled" : "enabled");
 #if defined (SIM_ASYNCH_IO)
     fprintf (st, "\n        Asynchronous I/O support (%s)", AIO_QUEUE_MODE);
 #endif

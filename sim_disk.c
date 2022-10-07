@@ -592,17 +592,12 @@ AIO_CALL(DOP_IAVL, 0, NULL, NULL, 0, callback);
 return r;
 }
 
-static t_bool sim_disk_no_autosize = FALSE;
-
 t_stat sim_disk_set_all_noautosize (int32 flag, CONST char *cptr)
 {
 DEVICE *dptr;
 uint32 dev, unit, count = 0;
 int32 saved_sim_show_message = sim_show_message;
 
-if (flag == sim_disk_no_autosize)
-    return sim_messagef (SCPE_ARG, "Autosizing is already %sabled!\n", 
-                                    sim_disk_no_autosize ? "dis" : "en");
 sim_show_message = FALSE;
 for (dev = 0; (dptr = sim_devices[dev]) != NULL; dev++) {
     t_bool device_disabled = ((dptr->flags & DEV_DIS) != 0);
@@ -635,13 +630,7 @@ for (dev = 0; (dptr = sim_devices[dev]) != NULL; dev++) {
 sim_show_message = saved_sim_show_message;
 if (count == 0)
     return sim_messagef (SCPE_ARG, "No disk devices support autosizing\n");
-sim_disk_no_autosize = flag;
 return SCPE_OK;
-}
-
-t_bool sim_disk_autosize_disabled (void)
-{
-return (sim_disk_no_autosize != 0);
 }
 
 /* Set disk autosize */
@@ -652,8 +641,6 @@ if (uptr == NULL)
     return SCPE_IERR;
 if (cptr != NULL)
     return sim_messagef (SCPE_ARG, "%s: Unexpected autosize argument: %s\n", sim_uname (uptr), cptr);
-if (sim_disk_no_autosize)
-    return sim_messagef (SCPE_ARG, "%s: Disk autosizing is globally disabled\n", sim_uname (uptr));
 if ((uptr->flags & UNIT_ATT) != 0)
     return sim_messagef (SCPE_ALATT, "%s: Disk already attached, autosizing not changed\n", sim_uname (uptr));
 if (val ^ ((uptr->flags & DKUF_NOAUTOSIZE) != 0))
@@ -669,10 +656,7 @@ return SCPE_OK;
 
 t_stat sim_disk_show_autosize (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
-if (sim_disk_no_autosize)
-    fprintf (st, "global noautosize");
-else
-    fprintf (st, "%sautosize", ((uptr->flags & DKUF_NOAUTOSIZE) != 0) ? "no" : "");
+fprintf (st, "%sautosize", ((uptr->flags & DKUF_NOAUTOSIZE) != 0) ? "no" : "");
 return SCPE_OK;
 }
 
@@ -1495,7 +1479,6 @@ ODSChecksum (void *Buffer, uint16 WordCount)
 
 static t_offset get_ods2_filesystem_size (UNIT *uptr, uint32 physsectsz, t_bool *readonly)
 {
-DEVICE *dptr;
 t_addr saved_capac;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 t_offset temp_capac = (sim_toffset_64 ? (t_addr)0xFFFFFFFFu : (t_addr)0x7FFFFFFFu);  /* Make sure we can access the largest sector */
@@ -1508,8 +1491,6 @@ uint32 ScbLbn = 0;
 t_offset ret_val = (t_offset)-1;
 t_seccnt sects_read;
 
-if ((dptr = find_dev_from_unit (uptr)) == NULL)
-    return ret_val;
 saved_capac = uptr->capac;
 uptr->capac = (t_addr)temp_capac;
 if ((_DEC_rdsect (uptr, 512 / ctx->sector_size, (uint8 *)&Home, &sects_read, sizeof (Home) / ctx->sector_size, physsectsz)) ||
@@ -1581,7 +1562,6 @@ return ret_val;
 
 static t_offset get_ods1_filesystem_size (UNIT *uptr, uint32 physsectsz, t_bool *readonly)
 {
-DEVICE *dptr;
 t_addr saved_capac;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 t_addr temp_capac = (sim_toffset_64 ? (t_addr)0xFFFFFFFFu : (t_addr)0x7FFFFFFFu);  /* Make sure we can access the largest sector */
@@ -1595,8 +1575,6 @@ uint32 ScbLbn;
 t_offset ret_val = (t_offset)-1;
 t_seccnt sects_read;
 
-if ((dptr = find_dev_from_unit (uptr)) == NULL)
-    return ret_val;
 saved_capac = uptr->capac;
 uptr->capac = temp_capac;
 if ((_DEC_rdsect (uptr, 512 / ctx->sector_size, (uint8 *)&Home, &sects_read, sizeof (Home) / ctx->sector_size, physsectsz)) ||
@@ -1654,7 +1632,6 @@ typedef struct ultrix_disklabel {
 
 static t_offset get_ultrix_filesystem_size (UNIT *uptr, uint32 physsectsz, t_bool *readonly)
 {
-DEVICE *dptr;
 t_addr saved_capac;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 t_addr temp_capac = (sim_toffset_64 ? (t_addr)0xFFFFFFFFu : (t_addr)0x7FFFFFFFu);  /* Make sure we can access the largest sector */
@@ -1665,8 +1642,6 @@ int i;
 uint32 max_lbn = 0, max_lbn_partnum = 0;
 t_seccnt sects_read;
 
-if ((dptr = find_dev_from_unit (uptr)) == NULL)
-    return ret_val;
 saved_capac = uptr->capac;
 uptr->capac = temp_capac;
 if ((_DEC_rdsect (uptr, 31 * (512 / ctx->sector_size), sector_buf, &sects_read, 512 / ctx->sector_size, physsectsz)) ||
@@ -1743,7 +1718,6 @@ typedef struct ISO_9660_Primary_Volume_Descriptor {
 
 static t_offset get_iso9660_filesystem_size (UNIT *uptr, uint32 physsectsz, t_bool *readonly)
 {
-DEVICE *dptr;
 t_addr saved_capac;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 t_addr temp_capac = (sim_toffset_64 ? (t_addr)0xFFFFFFFFu : (t_addr)0x7FFFFFFFu);  /* Make sure we can access the largest sector */
@@ -1757,8 +1731,6 @@ t_offset cur_pos = 32768;           /* Beyond the boot area of an ISO 9660 image
 t_seccnt sectsread;
 int read_count = 0;
 
-if ((dptr = find_dev_from_unit (uptr)) == NULL)
-    return ret_val;
 saved_capac = uptr->capac;
 uptr->capac = temp_capac;
 
@@ -1879,7 +1851,6 @@ typedef struct BSD_211_disklabel {
 
 static t_offset get_BSD_211_filesystem_size (UNIT *uptr, uint32 physsectsz, t_bool *readonly)
 {
-DEVICE *dptr;
 t_addr saved_capac;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 t_addr temp_capac = (sim_toffset_64 ? (t_addr)0xFFFFFFFFu : (t_addr)0x7FFFFFFFu);  /* Make sure we can access the largest sector */
@@ -1893,8 +1864,6 @@ uint16 sum = 0;
 uint16 *pdata;
 #define WORDSWAP(l) (((l >> 16) & 0xFFFF) | ((l & 0xFFFF) << 16))
 
-if ((dptr = find_dev_from_unit (uptr)) == NULL)
-    return ret_val;
 saved_capac = uptr->capac;
 uptr->capac = temp_capac;
 if ((_DEC_rdsect (uptr, 1, sector_buf, &sects_read, 512 / ctx->sector_size, physsectsz)) ||
@@ -2027,7 +1996,6 @@ typedef struct NetBSD_disklabel {
 
 static t_offset get_NetBSD_filesystem_size (UNIT *uptr, uint32 physsectsz, t_bool *readonly)
 {
-DEVICE *dptr;
 t_addr saved_capac;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 t_addr temp_capac = (sim_toffset_64 ? (t_addr)0xFFFFFFFFu : (t_addr)0x7FFFFFFFu);  /* Make sure we can access the largest sector */
@@ -2040,8 +2008,6 @@ t_seccnt sects_read;
 uint16 sum = 0;
 uint16 *pdata;
 
-if ((dptr = find_dev_from_unit (uptr)) == NULL)
-    return ret_val;
 saved_capac = uptr->capac;
 uptr->capac = temp_capac;
 if ((_DEC_rdsect (uptr, 0, (uint8 *)sector_buf, &sects_read, 512 / ctx->sector_size, physsectsz)) ||
@@ -2492,16 +2458,12 @@ return SCPE_IOERR;
 
 static t_offset get_rsts_filesystem_size (UNIT *uptr, uint32 physsectsz, t_bool *readonly)
 {
-DEVICE *dptr;
 t_addr saved_capac;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 t_addr temp_capac = (sim_toffset_64 ? (t_addr)0xFFFFFFFFu : (t_addr)0x7FFFFFFFu);  /* Make sure we can access the largest sector */
 uint8 buf[512];
 t_offset ret_val = (t_offset)-1;
 rstsContext context;
-
-if ((dptr = find_dev_from_unit (uptr)) == NULL)
-    return ret_val;
 
 saved_capac = uptr->capac;
 uptr->capac = temp_capac;
@@ -2656,7 +2618,6 @@ return RT11_NOPART;
 
 static t_offset get_rt11_filesystem_size (UNIT *uptr, uint32 physsectsz, t_bool *readonly)
 {
-DEVICE *dptr;
 t_addr saved_capac;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 t_addr temp_capac = (sim_toffset_64 ? (t_addr)0xFFFFFFFFu : (t_addr)0x7FFFFFFFu);  /* Make sure we can access the largest sector */
@@ -2672,8 +2633,6 @@ uint16 dir_seg;
 uint16 version = 0;
 t_offset ret_val = (t_offset)-1;
 
-if ((dptr = find_dev_from_unit (uptr)) == NULL)
-     return ret_val;
 saved_capac = uptr->capac;
 uptr->capac = temp_capac;
 
@@ -3157,8 +3116,7 @@ if (!(uptr->flags & UNIT_ATTABLE))                      /* not attachable? */
     return SCPE_NOATT;
 if ((dptr = find_dev_from_unit (uptr)) == NULL)
     return SCPE_NOATT;
-if ((sim_disk_autosize_disabled ()) ||                  /* global autosize disabled OR */
-    ((uptr->flags & DKUF_NOAUTOSIZE) != 0)) {           /* unit autosize disabled? */
+if ((uptr->flags & DKUF_NOAUTOSIZE) != 0) {             /* unit autosize disabled? */
     dontchangecapac = TRUE;
     drivetypes = NULL;
     }
@@ -7195,7 +7153,6 @@ DEVICE *dptr;
 uint32 i, j, k, l;
 
 sim_show_message = FALSE;
-sim_disk_no_autosize = TRUE;
 sim_disk_set_all_noautosize (FALSE, NULL);
 sim_show_message = saved_sim_show_message;
 for (i = 0; NULL != (dptr = sim_devices[i]); i++) {
@@ -7445,7 +7402,7 @@ t_offset container_size;
 
 sprintf (FullPath, "%s%s", directory, filename);
 
-if (info->flag) {        /* zap type */
+if (info->flag) {        /* zap disk type */
     struct stat statb;
 
     if (sim_disk_check_attached_container (FullPath)) {
@@ -7531,7 +7488,8 @@ if (info->flag) {        /* zap type */
     stop_cpu = FALSE;
     return;
     }
-if (info->flag == 0) {
+if (info->flag == 0) {  /* DISKINFO */
+    DEVICE device, *dptr = &device;
     UNIT unit, *uptr = &unit;
     struct disk_context disk_ctx;
     struct disk_context *ctx = &disk_ctx;
@@ -7539,14 +7497,17 @@ if (info->flag == 0) {
     int (*close_function)(FILE *f);
     FILE *container;
     t_offset container_size;
+    int32 saved_switches = sim_switches;
 
     memset (&unit, 0, sizeof (unit));
     memset (&disk_ctx, 0, sizeof (disk_ctx));
     sim_switches |= SWMASK ('E') | SWMASK ('R');   /* Must exist, Read Only */
     uptr->flags |= UNIT_ATTABLE;
     uptr->disk_ctx = &disk_ctx;
+    disk_ctx.capac_factor = 1;
+    disk_ctx.dptr = uptr->dptr = dptr;
     sim_disk_set_fmt (uptr, 0, "VHD", NULL);
-    container = sim_vhd_disk_open (FullPath, "r");
+    container = sim_vhd_disk_open (FullPath, "rb");
     if (container == NULL) {
         sim_disk_set_fmt (uptr, 0, "SIMH", NULL);
         container = sim_fopen (FullPath, "rb");
@@ -7587,15 +7548,23 @@ if (info->flag == 0) {
             if (highwater_sector > 0)
                 sim_printf ("   HighwaterSector:     %u\n", (uint32)highwater_sector);
             sim_printf ("Container Size: %s bytes\n", sim_fmt_numeric ((double)ctx->container_size));
+            ctx->sector_size = NtoHl(f->SectorSize);
+            ctx->xfer_encode_size = NtoHl (f->ElementEncodingSize);
             }
         else {
             sim_printf ("Container Info for '%s' unavailable\n", sim_relative_path (uptr->filename));
             sim_printf ("Container Size: %s bytes\n", sim_fmt_numeric ((double)container_size));
             info->stat = SCPE_ARG|SCPE_NOMESSAGE;
+            ctx->sector_size = 512;
+            ctx->xfer_encode_size = 1;
             }
-        free (f);
+        sim_set_uname (uptr, "FILE");
+        get_filesystem_size (uptr, NULL);
         free (uptr->filename);
         close_function (container);
+        free (f);
+        free (uptr->uname);
+        sim_switches = saved_switches;
         return;
         }
     else {
