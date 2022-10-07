@@ -9,7 +9,7 @@
 #   FreeBSD
 #   HP-UX
 #   AIX
-#   Windows (MinGW & cygwin)
+#   Windows (MinGW & cygwin) - deprecated (maybe works, maybe not)
 #   Linux x86 targeting Android (using agcc script)
 #   Haiku x86 (with gcc4)
 #
@@ -103,6 +103,7 @@ endif
 SIM_MAJOR=$(shell grep SIM_MAJOR sim_rev.h | awk '{ print $$3 }')
 BUILD_SINGLE := ${MAKECMDGOALS} $(BLANK_SUFFIX)
 BUILD_MULTIPLE_VERB = is
+MAKECMDGOALS_DESCRIPTION = the $(MAKECMDGOALS) simulator
 # building the pdp1, pdp11, tx-0, or any microvax simulator could use video support
 ifneq (3,${SIM_MAJOR})
   ifneq (,$(or $(findstring XXpdp1XX,$(addsuffix XX,$(addprefix XX,${MAKECMDGOALS}))),$(findstring pdp11,${MAKECMDGOALS}),$(findstring tx-0,${MAKECMDGOALS}),$(findstring microvax1,${MAKECMDGOALS}),$(findstring microvax2,${MAKECMDGOALS}),$(findstring microvax3900,${MAKECMDGOALS}),$(findstring microvax2000,${MAKECMDGOALS}),$(findstring vaxstation3100,${MAKECMDGOALS}),$(findstring XXvaxXX,$(addsuffix XX,$(addprefix XX,${MAKECMDGOALS})))))
@@ -142,10 +143,7 @@ ifneq (,$(findstring pdp11,${MAKECMDGOALS})$(findstring pdp10,${MAKECMDGOALS})$(
     BUILD_MULTIPLE_VERB = are
     VIDEO_USEFUL = true
     BESM6_BUILD = true
-  endif
-  ifneq (,$(word 2,${MAKECMDGOALS}))
-    BUILD_MULTIPLE = s
-    BUILD_MULTIPLE_VERB = are
+    MAKECMDGOALS_DESCRIPTION = everything
   endif
 else
   ifeq (${MAKECMDGOALS},)
@@ -156,7 +154,13 @@ else
     BUILD_MULTIPLE_VERB = are
     BUILD_SINGLE := all $(BUILD_SINGLE)
     BESM6_BUILD = true
+    MAKECMDGOALS_DESCRIPTION = everything
   endif
+endif
+ifneq (,$(and $(word 1,${MAKECMDGOALS}),$(word 2,${MAKECMDGOALS})))
+  BUILD_MULTIPLE = s
+  BUILD_MULTIPLE_VERB = are
+  MAKECMDGOALS_DESCRIPTION = the $(MAKECMDGOALS) simulators
 endif
 # someone may want to explicitly build simulators without network support
 ifneq ($(NONETWORK),)
@@ -167,6 +171,11 @@ ifneq ($(NOVIDEO),)
   VIDEO_USEFUL =
 endif
 ifneq ($(findstring Windows,${OS}),)
+  $(info *** Warning *** Compiling simh simulators with MinGW or cygwin is deprecated and)
+  $(info *** Warning *** may not complete successfully or produce working simulators.  If)
+  $(info *** Warning *** building simulators completes, they may not be fully functional.)
+  $(info *** Warning *** It is recommended to use one of the free Microsoft Visual Studio)
+  $(info *** Warning *** compilers which provide fully functional simulator capabilities.)
   ifeq ($(findstring .exe,${SHELL}),.exe)
     # MinGW
     WIN32 := 1
@@ -183,6 +192,38 @@ endif
 find_exe = $(abspath $(strip $(firstword $(foreach dir,$(strip $(subst :, ,${PATH})),$(wildcard $(dir)/$(1))))))
 find_lib = $(firstword $(abspath $(strip $(firstword $(foreach dir,$(strip ${LIBPATH}),$(foreach ext,$(strip ${LIBEXT}),$(wildcard $(dir)/lib$(1).$(ext))))))))
 find_include = $(abspath $(strip $(firstword $(foreach dir,$(strip ${INCPATH}),$(wildcard $(dir)/$(1).h)))))
+ifeq (/usr/local/bin/brew,$(shell which brew))
+  PKG_MGR = HOMEBREW
+else
+  ifeq (/opt/local/bin/port,$(shell which port))
+    PKG_MGR = MACPORTS
+  endif
+endif
+ifneq (,$(and $(findstring Linux,$(shell uname)),$(call find_exe,apt-get)))
+  PKG_MGR = APT
+endif
+ifneq (,$(and $(findstring Linux,$(shell uname)),$(call find_exe,yum)))
+  PKG_MGR = YUM
+endif
+ifneq (,$(call find_exe,pkgin))
+  PKG_MGR = PKGSRC
+endif
+# Dependent packages
+DPKG_COMPILER  = 1
+DPKG_PCAP      = 2
+DPKG_VDE       = 3
+DPKG_PCRE      = 4
+DPKG_EDITLINE  = 5
+DPKG_SDL       = 6
+DPKG_PNG       = 7
+DPKG_ZLIB      = 8
+DPKG_SDL_TTF   = 9
+# Platform Pkg Names  COMPILER PCAP          VDE            PCRE         EDITLINE      SDL         PNG          ZLIB       SDL_TTF
+PKGS_SRC_HOMEBREW   = -        -             vde            pcre         libedit       sdl2        libpng       zlib       sdl2_ttf
+PKGS_SRC_MACPORTS   = -        -             vde2           pcre         libedit       libsdl2     libpng       zlib       libsdl2_ttf
+PKGS_SRC_APT        = gcc      libpcap-dev   libvdeplug-dev libpcre3-dev libedit-dev   libsdl2-dev libpng-dev   -          libsdl2-ttf-dev
+PKGS_SRC_YUM        = gcc      libpcap-devel -              pcre-devel   libedit-devel SDL2-devel  libpng-devel zlib-devel SDL2_ttf-devel
+PKGS_SRC_PKGSRC     = -        -             -              pcre         editline      SDL2        png          zlib       SDL2_ttf
 ifneq (3,${SIM_MAJOR})
   ifneq (0,$(TESTS))
     find_test = RegisterSanityCheck $(abspath $(wildcard $(1)/tests/$(2)_test.ini)) </dev/null
@@ -201,6 +242,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
       $(info *** Warning *** Using local cc since gcc isn't available locally.)
       $(info *** Warning *** You may need to install gcc to build working simulators.)
       GCC = cc
+      NEEDED_PKGS += DPKG_COMPILER
     else
       GCC = gcc
     endif
@@ -220,7 +262,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
   ifeq (Darwin,$(OSTYPE))
     ifeq (,$(shell which port)$(shell which brew))
       $(info *** Info *** simh dependent packages on macOS must be provided by either the)
-      $(info *** Info *** MacPorts package system or by the HomeBrew package system.)
+      $(info *** Info *** HomeBrew package system or by the MacPorts package system.)
       $(info *** Info *** Neither of these seem to be installed on the local system.)
       $(info *** Info ***)
       ifeq (,$(INCLUDES)$(LIBRARIES))
@@ -564,18 +606,26 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
       ifeq ($(LD_SEARCH_NEEDED),$(call need_search,pcre))
         OS_LDFLAGS += -L$(dir $(call find_lib,pcre))
       endif
+    else
+      NEEDED_PKGS += DPKG_PCRE
     endif
+  else
+    NEEDED_PKGS += DPKG_PCRE
   endif
   # Find libedit BSD licensed library for readline support.
-  ifneq (,$(and $(call find_lib,edit), $(call find_lib,termcap)))
+  ifneq (,$(call find_lib,edit))
     ifneq (,$(call find_include,editline/readline))
       OS_CCDEFS += -DHAVE_LIBEDIT
-      OS_LDFLAGS += -ledit -ltermcap
+      OS_LDFLAGS += -ledit
       $(info using libedit: $(call find_lib,edit) $(call find_include,editline/readline))
       ifeq ($(LD_SEARCH_NEEDED),$(call need_search,edit))
-        OS_LDFLAGS += -L$(dir $(call find_lib,edit)) -L$(dir $(call find_lib,termcap)) 
+        OS_LDFLAGS += -L$(dir $(call find_lib,edit))
       endif
+    else
+      NEEDED_PKGS += DPKG_EDITLINE
     endif
+  else
+    NEEDED_PKGS += DPKG_EDITLINE
   endif
   # Find available ncurses library.
   ifneq (,$(call find_include,ncurses))
@@ -631,9 +681,33 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
           OS_CCDEFS += -DHAVE_ZLIB
           OS_LDFLAGS += -lz
           $(info using zlib: $(call find_lib,z) $(call find_include,zlib))
+        else
+          NEEDED_PKGS += DPKG_ZLIB
         endif
+      else
+        NEEDED_PKGS += DPKG_ZLIB
+      endif
+    else
+      # some systems may name the png library libpng16
+      ifneq (,$(call find_lib,png16))
+        OS_CCDEFS += -DHAVE_LIBPNG
+        OS_LDFLAGS += -lpng16
+        $(info using libpng: $(call find_lib,png16) $(call find_include,png))
+        ifneq (,$(call find_include,zlib))
+          ifneq (,$(call find_lib,z))
+            OS_CCDEFS += -DHAVE_ZLIB
+            OS_LDFLAGS += -lz
+            $(info using zlib: $(call find_lib,z) $(call find_include,zlib))
+          else
+            NEEDED_PKGS += DPKG_ZLIB
+          endif
+        endif
+      else
+        NEEDED_PKGS += DPKG_PNG
       endif
     endif
+  else
+    NEEDED_PKGS += DPKG_PNG
   endif
   ifneq (,$(call find_include,glob))
     OS_CCDEFS += -DHAVE_GLOB
@@ -675,92 +749,24 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
           DISPLAY_OPT += -DUSE_DISPLAY $(VIDEO_CCDEFS) $(VIDEO_LDFLAGS) -DUSE_SIM_VIDEO
           $(info using libSDL2: $(call find_include,SDL2/SDL))
         endif
+      else
+        NEEDED_PKGS += DPKG_SDL
       endif
+    else
+      NEEDED_PKGS += DPKG_SDL
     endif
-    ifeq (cygwin,$(OSTYPE))
-      LIBEXT = $(LIBEXTSAVE)
-    endif
-    ifeq (,$(findstring HAVE_LIBSDL,$(VIDEO_CCDEFS)))
-      $(info *** Info ***)
-      $(info *** Info *** The simulator$(BUILD_MULTIPLE) you are building could provide more functionality)
-      $(info *** Info *** if video support was available on your system.)
-      $(info *** Info *** To gain this functionality:)
-      ifeq (Darwin,$(OSTYPE))
-        ifeq (/opt/local/bin/port,$(shell which port))
-          $(info *** Info *** Install the MacPorts libSDL2 package to provide this)
-          $(info *** Info *** functionality for your OS X system:)
-          $(info *** Info ***       # port install libsdl2 libpng zlib pcre)
-        endif
-        ifeq (/usr/local/bin/brew,$(shell which brew))
-          ifeq (/opt/local/bin/port,$(shell which port))
-            $(info *** Info ***)
-            $(info *** Info *** OR)
-            $(info *** Info ***)
-          endif
-          $(info *** Info *** Install the HomeBrew libSDL2 package to provide this)
-          $(info *** Info *** functionality for your OS X system:)
-          $(info *** Info ***       $$ brew install sdl2 libpng zlib pcre)
-        else
-          ifeq (,$(shell which port))
-            $(info *** Info *** Install MacPorts or HomeBrew and rerun this make for)
-            $(info *** Info *** specific advice)
-          endif
+    ifneq (,$(BESM6_BUILD))
+      ifneq (,$(and $(findstring sdl2,${VIDEO_LDFLAGS}),$(call find_include,SDL2/SDL_ttf),$(call find_lib,SDL2_ttf)))
+        $(info using libSDL2_ttf: $(call find_lib,SDL2_ttf) $(call find_include,SDL2/SDL_ttf))
+        $(info ***)
+        VIDEO_TTF_OPT = $(VIDEO_CCDEFS) -DHAVE_LIBSDL_TTF ${VIDEO_LDFLAGS} -lSDL2_ttf
+        VIDEO_FEATURES += with TrueType font support
+        # Retain support for explicitly supplying a preferred fontfile
+        ifneq (,$(FONTFILE))
+          VIDEO_TTF_OPT +=  -DFONTFILE=${FONTFILE}
         endif
       else
-        ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,apt-get)))
-          $(info *** Info *** Install the development components of libSDL2 packaged for)
-          $(info *** Info *** your operating system distribution for your Linux)
-          $(info *** Info *** system:)
-          $(info *** Info ***        $$ sudo apt-get install libsdl2-dev libpng-dev)
-        else
-          $(info *** Info *** Install the development components of libSDL2 packaged by your)
-          $(info *** Info *** operating system distribution and rebuild your simulator to)
-          $(info *** Info *** enable this extra functionality.)
-        endif
-      endif
-      $(info *** Info ***)
-    else
-      ifneq (,$(BESM6_BUILD))
-        ifneq (,$(and $(findstring sdl2,${VIDEO_LDFLAGS}),$(call find_include,SDL2/SDL_ttf),$(call find_lib,SDL2_ttf)))
-          $(info using libSDL2_ttf: $(call find_lib,SDL2_ttf) $(call find_include,SDL2/SDL_ttf))
-          $(info ***)
-          VIDEO_TTF_OPT = $(VIDEO_CCDEFS) -DHAVE_LIBSDL_TTF ${VIDEO_LDFLAGS} -lSDL2_ttf
-          VIDEO_FEATURES += with TrueType font support
-          # Retain support for explicitly supplying a preferred fontfile
-          ifneq (,$(FONTFILE))
-            VIDEO_TTF_OPT +=  -DFONTFILE=${FONTFILE}
-          endif
-        else
-          $(info *** No SDL ttf support available.  BESM-6 video panel disabled.)
-          $(info ***)
-          ifeq (Darwin,$(OSTYPE))
-            ifeq (/opt/local/bin/port,$(shell which port))
-              $(info *** Info *** Install the MacPorts libSDL2-ttf development package to provide this)
-              $(info *** Info *** functionality for your OS X system:)
-              $(info *** Info ***       # port install libsdl2-ttf-dev)
-            endif
-            ifeq (/usr/local/bin/brew,$(shell which brew))
-              ifeq (/opt/local/bin/port,$(shell which port))
-                $(info *** Info ***)
-                $(info *** Info *** OR)
-                $(info *** Info ***)
-              endif
-              $(info *** Info *** Install the HomeBrew sdl2_ttf package to provide this)
-              $(info *** Info *** functionality for your OS X system:)
-              $(info *** Info ***       $$ brew install sdl2_ttf)
-            endif
-          else
-            ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,apt-get)))
-              $(info *** Info *** Install the development components of libSDL2-ttf)
-              $(info *** Info *** packaged for your Linux operating system distribution:)
-              $(info *** Info ***        $$ sudo apt-get install libsdl2-ttf-dev)
-            else
-              $(info *** Info *** Install the development components of libSDL2-ttf packaged by your)
-              $(info *** Info *** operating system distribution and rebuild your simulator to)
-              $(info *** Info *** enable this extra functionality.)
-            endif
-          endif
-        endif
+        NEEDED_PKGS += DPKG_SDL_TTF
       endif
     endif
   endif
@@ -781,7 +787,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
           NETWORK_CCDEFS += -DUSE_NETWORK
           ifeq (,$(findstring Linux,$(OSTYPE))$(findstring Darwin,$(OSTYPE)))
             $(info *** Warning ***)
-            $(info *** Warning *** Statically linking against libpcap is provides no measurable)
+            $(info *** Warning *** Directly linking against libpcap is provides no measurable)
             $(info *** Warning *** benefits over dynamically linking libpcap.)
             $(info *** Warning ***)
             $(info *** Warning *** Support for linking this way is currently deprecated and may be removed)
@@ -789,10 +795,10 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
             $(info *** Warning ***)
           else
             $(info *** Error ***)
-            $(info *** Error *** Statically linking against libpcap is provides no measurable)
+            $(info *** Error *** Directly linking against libpcap is provides no measurable)
             $(info *** Error *** benefits over dynamically linking libpcap.)
             $(info *** Error ***)
-            $(info *** Error *** Support for linking statically has been removed on the $(OSTYPE))
+            $(info *** Error *** Support for linking directly has been removed on the $(OSTYPE))
             $(info *** Error *** platform.)
             $(info *** Error ***)
             $(error Retry your build without specifying USE_NETWORK=1)
@@ -916,60 +922,13 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
           endif
           $(info using libvdeplug: $(call find_lib,vdeplug) $(call find_include,libvdeplug))
         endif
-      endif
-    endif
-    ifeq (,$(findstring HAVE_VDE_NETWORK,$(NETWORK_CCDEFS)))
-      # Support is available on Linux for libvdeplug.  Advise on its usage
-      ifneq (,$(findstring Linux,$(OSTYPE))$(findstring Darwin,$(OSTYPE)))
-        ifneq (,$(findstring USE_NETWORK,$(NETWORK_CCDEFS))$(findstring USE_SHARED,$(NETWORK_CCDEFS)))
-          $(info *** Info ***)
-          $(info *** Info *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) $(BUILD_MULTIPLE_VERB) being built with)
-          $(info *** Info *** minimal libpcap networking support)
-          $(info *** Info ***)
+      else
+        ifeq (,$(findstring PKG_PCAP, $(NEEDED_PKGS)))
+          NEEDED_PKGS += DPKG_PCAP
         endif
-        $(info *** Info ***)
-        $(info *** Info *** Simulators on your $(OSNAME) platform can also be built with)
-        $(info *** Info *** extended LAN Ethernet networking support by using VDE Ethernet.)
-        $(info *** Info ***)
-        $(info *** Info *** To build simulator(s) with extended networking support you)
-        ifeq (Darwin,$(OSTYPE))
-          ifeq (/opt/local/bin/port,$(shell which port))
-            $(info *** Info *** should install the MacPorts vde2 package to provide this)
-            $(info *** Info *** functionality for your OS X system:)
-            $(info *** Info ***       # port install vde2)
-          endif
-          ifeq (/usr/local/bin/brew,$(shell which brew))
-            ifeq (/opt/local/bin/port,$(shell which port))
-              $(info *** Info ***)
-              $(info *** Info *** OR)
-              $(info *** Info ***)
-            endif
-            $(info *** Info *** should install the HomeBrew vde package to provide this)
-            $(info *** Info *** functionality for your OS X system:)
-            $(info *** Info ***       $$ brew install vde)
-          else
-            ifeq (,$(shell which port))
-              $(info *** Info *** should install MacPorts or HomeBrew and rerun this make for)
-              $(info *** Info *** specific advice)
-            endif
-          endif
-        else
-          ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,apt-get)))
-            $(info *** Info *** should install the vde2 package to provide this)
-            $(info *** Info *** functionality for your $(OSNAME) system:)
-            ifneq (,$(shell apt list 2>/dev/null| grep libvdeplug-dev))
-              $(info *** Info ***        $$ sudo apt-get install libvdeplug-dev)
-            else
-              $(info *** Info ***        $$ sudo apt-get install vde2)
-            endif
-          else
-            $(info *** Info *** should read 0readme_ethernet.txt and follow the instructions)
-            $(info *** Info *** regarding the needed libvdeplug components for your $(OSNAME))
-            $(info *** Info *** platform)
-          endif
-        endif
-        $(info *** Info ***)
       endif
+    else
+      NEEDED_PKGS += DPKG_VDE
     endif
     ifneq (,$(call find_include,linux/if_tun))
       # Provide support for Tap networking on Linux
@@ -990,17 +949,6 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
     ifeq (slirp,$(shell if ${TEST} -e slirp_glue/sim_slirp.c; then echo slirp; fi))
       NETWORK_CCDEFS += -Islirp -Islirp_glue -Islirp_glue/qemu -DHAVE_SLIRP_NETWORK -DUSE_SIMH_SLIRP_DEBUG slirp/*.c slirp_glue/*.c
       NETWORK_LAN_FEATURES += NAT(SLiRP)
-    endif
-    ifeq (,$(findstring USE_NETWORK,$(NETWORK_CCDEFS))$(findstring USE_SHARED,$(NETWORK_CCDEFS))$(findstring HAVE_VDE_NETWORK,$(NETWORK_CCDEFS)))
-      NETWORK_CCDEFS += -DUSE_NETWORK
-      NETWORK_FEATURES = - WITHOUT Local LAN networking support
-      $(info *** Warning ***)
-      $(info *** Warning *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) $(BUILD_MULTIPLE_VERB) being built WITHOUT LAN networking support)
-      $(info *** Warning ***)
-      $(info *** Warning *** To build simulator(s) with networking support you should read)
-      $(info *** Warning *** 0readme_ethernet.txt and follow the instructions regarding the)
-      $(info *** Warning *** needed libpcap components for your $(OSTYPE) platform)
-      $(info *** Warning ***)
     endif
     NETWORK_OPT = $(NETWORK_CCDEFS)
   endif
@@ -1191,7 +1139,7 @@ else
     ifeq (,$(WINDOWS_BUILD))
       WINDOWS_BUILD = 00000000
     endif
-    ifneq (,$(or $(shell if 20190124 GTR $(WINDOWS_BUILD) echo old-windows-build),$(and $(shell if 20171112 GTR $(WINDOWS_BUILD) echo old-windows-build),$(findstring pthreadGC2,$(PTHREADS_LDFLAGS)))))
+    ifneq (,$(or $(shell if 20191001 GTR $(WINDOWS_BUILD) echo old-windows-build),$(and $(shell if 20171112 GTR $(WINDOWS_BUILD) echo old-windows-build),$(findstring pthreadGC2,$(PTHREADS_LDFLAGS)))))
       $(info .)
       $(info windows-build components at: $(abspath ..\windows-build))
       $(info .)
@@ -1234,6 +1182,68 @@ else
     CFLAGS_I = -DHAVE_NTDDDISK_H
   endif
 endif # Win32 (via MinGW)
+USEFUL_PACKAGES = $(filter-out -,$(foreach word,$(NEEDED_PKGS),$(word $($(word)),$(PKGS_SRC_$(strip $(PKG_MGR))))))
+USEFUL_PLURAL =  $(if $(word 2,$(USEFUL_PACKAGES)),s,)
+USEFUL_MULTIPLE_HIST = $(if $(word 2,$(USEFUL_PACKAGES)),were,was)
+USEFUL_MULTIPLE = $(if $(word 2,$(USEFUL_PACKAGES)),these,this)
+ifneq (,$(USEFUL_PACKAGES))
+  $(info )
+  $(info *** Info ***)
+  $(info *** Info *** The simulator$(BUILD_MULTIPLE) you are building could provide more functionality)
+  $(info *** Info *** if the: $(USEFUL_PACKAGES))
+  $(info *** Info *** package$(USEFUL_PLURAL) $(USEFUL_MULTIPLE_HIST) available on your system.)
+  $(info )
+  $(info *** You have the option of building $(MAKECMDGOALS_DESCRIPTION) without the functionality)
+  $(info *** $(USEFUL_MULTIPLE) package$(USEFUL_PLURAL) provide$(if $(USEFUL_PLURAL),,s), or stopping now to install $(USEFUL_MULTIPLE) package$(USEFUL_PLURAL).)
+  $(info )
+  $(info Do you want to install $(USEFUL_MULTIPLE) package$(USEFUL_PLURAL) before building $(MAKECMDGOALS_DESCRIPTION)?)
+endif
+ifneq (,$(and $(findstring HOMEBREW,$(PKG_MGR)),$(USEFUL_PACKAGES)))
+  ifeq (,$(shell bash -c 'read -p "[Enter Y or N, Default is Y] " answer; echo $$answer' | grep -i n))
+    BREW_RESULT = $(shell brew install $(USEFUL_PACKAGES) 1>&2)
+    $(info $(BREW_RESULT))
+    $(info *** rerunning this make to perform your desired build...)
+    MAKE_RESULT = $(shell $(MAKE) $(MAKECMDGOALS) 1>&2)
+    $(error Done: $(MAKE_RESULT))
+  endif
+else
+  ifneq (,$(and $(findstring MACPORTS,$(PKG_MGR)),$(USEFUL_PACKAGES)))
+    ifeq (,$(shell $(SHELL) -c 'read -p "[Enter Y or N, Default is Y] " answer; echo $$answer' | grep -i n))
+      $(info Enter:    $$ sudo port install $(USEFUL_PACKAGES))
+      $(info when that completes)
+      $(info re-enter: $$ $(MAKE) $(MAKECMDGOALS))
+      $(error )
+    endif
+  endif
+endif
+ifneq (,$(and $(findstring APT,$(PKG_MGR)),$(USEFUL_PACKAGES)))
+  ifeq (,$(shell $(SHELL) -c 'read -p "[Enter Y or N, Default is Y] " answer; echo $$answer' | grep -i n))
+    $(info Enter:    $$ sudo apt-get install $(USEFUL_PACKAGES))
+    $(info when that completes)
+    $(info re-enter: $$ $(MAKE) $(MAKECMDGOALS))
+    $(error )
+  endif
+endif
+ifneq (,$(and $(findstring YUM,$(PKG_MGR)),$(USEFUL_PACKAGES)))
+  ifeq (,$(shell $(SHELL) -c 'read -p "[Enter Y or N, Default is Y] " answer; echo $$answer' | grep -i n))
+    $(info Enter:    $$ sudo yum install $(USEFUL_PACKAGES))
+    $(info when that completes)
+    $(info re-enter: $$ $(MAKE) $(MAKECMDGOALS))
+    $(error )
+  endif
+endif
+ifneq (,$(and $(findstring PKGSRC,$(PKG_MGR)),$(USEFUL_PACKAGES)))
+  ifeq (,$(shell $(SHELL) -c 'read -p "[Enter Y or N, Default is Y] " answer; echo $$answer' | grep -i n))
+    $(info Enter:    $$ su)
+    hash := \#
+    $(info Enter:    Password: <type-root-password>)
+    $(info Enter:    $(hash) pkgin install $(USEFUL_PACKAGES))
+    $(info when that completes)
+    $(info Enter:    $(hash) exit)
+    $(info re-enter: $$ $(MAKE) $(MAKECMDGOALS))
+    $(error )
+  endif
+endif
 ifneq (,$(GIT_COMMIT_ID))
   CFLAGS_GIT = -DSIM_GIT_COMMIT_ID=$(GIT_COMMIT_ID)
 endif
