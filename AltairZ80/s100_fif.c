@@ -1,4 +1,4 @@
-/*  $Id: s100_fif.c 1995 2008-07-15 03:59:13Z hharte $
+/*
 
     IMSAI FIF Disk Controller by Ernie Price
 
