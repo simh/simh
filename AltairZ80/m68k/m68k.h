@@ -1,28 +1,58 @@
-#ifndef M68K__HEADER
-#define M68K__HEADER
-
 /* ======================================================================== */
 /* ========================= LICENSING & COPYRIGHT ======================== */
 /* ======================================================================== */
 /*
  *                                  MUSASHI
- *                                Version 3.3
+ *                                Version 3.32
  *
  * A portable Motorola M680x0 processor emulation engine.
- * Copyright 1998-2001 Karl Stenerud.  All rights reserved.
+ * Copyright Karl Stenerud.  All rights reserved.
  *
- * This code may be freely used for non-commercial purposes as long as this
- * copyright notice remains unaltered in the source code and any binary files
- * containing this code in compiled form.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- * All other lisencing terms must be negotiated with the author
- * (Karl Stenerud).
- *
- * The latest version of this code can be obtained at:
- * http://kstenerud.cjb.net
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
  */
 
+#ifndef M68K__HEADER
+#define M68K__HEADER
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#ifndef ARRAY_LENGTH
+#define ARRAY_LENGTH(x)         (sizeof(x) / sizeof(x[0]))
+#endif
+
+#ifndef FALSE
+#define FALSE 0
+#define TRUE 1
+#endif
+
+/* ======================================================================== */
+/* ============================= CONFIGURATION ============================ */
+/* ======================================================================== */
+
+/* Import the configuration for this build */
+#ifdef MUSASHI_CNF
+#include MUSASHI_CNF
+#else
+#include "m68kconf.h"
+#endif
 
 /* ======================================================================== */
 /* ============================ GENERAL DEFINES =========================== */
@@ -63,58 +93,62 @@
 /* CPU types for use in m68k_set_cpu_type() */
 enum
 {
-    M68K_CPU_TYPE_INVALID,
-    M68K_CPU_TYPE_68000,
-    M68K_CPU_TYPE_68010,
-    M68K_CPU_TYPE_68EC020,
-    M68K_CPU_TYPE_68020,
-    M68K_CPU_TYPE_68030,    /* Supported by disassembler ONLY */
-    M68K_CPU_TYPE_68040     /* Supported by disassembler ONLY */
+	M68K_CPU_TYPE_INVALID,
+	M68K_CPU_TYPE_68000,
+	M68K_CPU_TYPE_68010,
+	M68K_CPU_TYPE_68EC020,
+	M68K_CPU_TYPE_68020,
+	M68K_CPU_TYPE_68EC030,
+	M68K_CPU_TYPE_68030,
+	M68K_CPU_TYPE_68EC040,
+	M68K_CPU_TYPE_68LC040,
+	M68K_CPU_TYPE_68040,
+	M68K_CPU_TYPE_SCC68070
 };
 
 /* Registers used by m68k_get_reg() and m68k_set_reg() */
 typedef enum
 {
-    /* Real registers */
-    M68K_REG_D0,        /* Data registers */
-    M68K_REG_D1,
-    M68K_REG_D2,
-    M68K_REG_D3,
-    M68K_REG_D4,
-    M68K_REG_D5,
-    M68K_REG_D6,
-    M68K_REG_D7,
-    M68K_REG_A0,        /* Address registers */
-    M68K_REG_A1,
-    M68K_REG_A2,
-    M68K_REG_A3,
-    M68K_REG_A4,
-    M68K_REG_A5,
-    M68K_REG_A6,
-    M68K_REG_A7,
-    M68K_REG_PC,        /* Program Counter */
-    M68K_REG_SR,        /* Status Register */
-    M68K_REG_SP,        /* The current Stack Pointer (located in A7) */
-    M68K_REG_USP,       /* User Stack Pointer */
-    M68K_REG_ISP,       /* Interrupt Stack Pointer */
-    M68K_REG_MSP,       /* Master Stack Pointer */
-    M68K_REG_SFC,       /* Source Function Code */
-    M68K_REG_DFC,       /* Destination Function Code */
-    M68K_REG_VBR,       /* Vector Base Register */
-    M68K_REG_CACR,      /* Cache Control Register */
-    M68K_REG_CAAR,      /* Cache Address Register */
+	/* Real registers */
+	M68K_REG_D0,		/* Data registers */
+	M68K_REG_D1,
+	M68K_REG_D2,
+	M68K_REG_D3,
+	M68K_REG_D4,
+	M68K_REG_D5,
+	M68K_REG_D6,
+	M68K_REG_D7,
+	M68K_REG_A0,		/* Address registers */
+	M68K_REG_A1,
+	M68K_REG_A2,
+	M68K_REG_A3,
+	M68K_REG_A4,
+	M68K_REG_A5,
+	M68K_REG_A6,
+	M68K_REG_A7,
+	M68K_REG_PC,		/* Program Counter */
+	M68K_REG_SR,		/* Status Register */
+	M68K_REG_SP,		/* The current Stack Pointer (located in A7) */
+	M68K_REG_USP,		/* User Stack Pointer */
+	M68K_REG_ISP,		/* Interrupt Stack Pointer */
+	M68K_REG_MSP,		/* Master Stack Pointer */
+	M68K_REG_SFC,		/* Source Function Code */
+	M68K_REG_DFC,		/* Destination Function Code */
+	M68K_REG_VBR,		/* Vector Base Register */
+	M68K_REG_CACR,		/* Cache Control Register */
+	M68K_REG_CAAR,		/* Cache Address Register */
 
-    /* Assumed registers */
-    /* These are cheat registers which emulate the 1-longword prefetch
-     * present in the 68000 and 68010.
-     */
-    M68K_REG_PREF_ADDR, /* Last prefetch address */
-    M68K_REG_PREF_DATA, /* Last prefetch data */
+	/* Assumed registers */
+	/* These are cheat registers which emulate the 1-longword prefetch
+	 * present in the 68000 and 68010.
+	 */
+	M68K_REG_PREF_ADDR,	/* Last prefetch address */
+	M68K_REG_PREF_DATA,	/* Last prefetch data */
 
-    /* Convenience registers */
-    M68K_REG_PPC,       /* Previous value in the program counter */
-    M68K_REG_IR,        /* Instruction register */
-    M68K_REG_CPU_TYPE   /* Type of CPU being run */
+	/* Convenience registers */
+	M68K_REG_PPC,		/* Previous value in the program counter */
+	M68K_REG_IR,		/* Instruction register */
+	M68K_REG_CPU_TYPE	/* Type of CPU being run */
 } m68k_register_t;
 
 /* ======================================================================== */
@@ -164,6 +198,15 @@ unsigned int m68k_read_disassembler_32 (unsigned int address);
 void m68k_write_memory_8(unsigned int address, unsigned int value);
 void m68k_write_memory_16(unsigned int address, unsigned int value);
 void m68k_write_memory_32(unsigned int address, unsigned int value);
+
+/* Special call to simulate undocumented 68k behavior when move.l with a
+ * predecrement destination mode is executed.
+ * To simulate real 68k behavior, first write the high word to
+ * [address+2], and then write the low word to [address].
+ *
+ * Enable this functionality with M68K_SIMULATE_PD_WRITES in m68kconf.h.
+ */
+void m68k_write_memory_32_pd(unsigned int address, unsigned int value);
 
 
 
@@ -217,6 +260,20 @@ void m68k_set_reset_instr_callback(void  (*callback)(void));
  */
 void m68k_set_pc_changed_callback(void  (*callback)(unsigned int new_pc));
 
+/* Set the callback for the TAS instruction.
+ * You must enable M68K_TAS_HAS_CALLBACK in m68kconf.h.
+ * The CPU calls this callback every time it encounters a TAS instruction.
+ * Default behavior: return 1, allow writeback.
+ */
+void m68k_set_tas_instr_callback(int  (*callback)(void));
+
+/* Set the callback for illegal instructions.
+ * You must enable M68K_ILLG_HAS_CALLBACK in m68kconf.h.
+ * The CPU calls this callback every time it encounters an illegal instruction
+ * which must return 1 if it handles the instruction normally or 0 if it's really an illegal instruction.
+ * Default behavior: return 0, exception will occur.
+ */
+void m68k_set_illg_instr_callback(int  (*callback)(int));
 
 /* Set the callback for CPU function code changes.
  * You must enable M68K_EMULATE_FC in m68kconf.h.
@@ -234,7 +291,7 @@ void m68k_set_fc_callback(void  (*callback)(unsigned int new_fc));
  * instruction cycle.
  * Default behavior: do nothing.
  */
-void m68k_set_instr_hook_callback(void  (*callback)(void));
+void m68k_set_instr_hook_callback(void  (*callback)(unsigned int pc));
 
 
 
@@ -247,6 +304,11 @@ void m68k_set_instr_hook_callback(void  (*callback)(void));
  * M68K_CPU_TYPE_EC020, and M68K_CPU_TYPE_68020.
  */
 void m68k_set_cpu_type(unsigned int cpu_type);
+
+/* Do whatever initialisations the core requires.  Should be called
+ * at least once at init time.
+ */
+void m68k_init(void);
 
 /* Pulse the RESET pin on the CPU.
  * You *MUST* reset the CPU at least once to initialize the emulation
@@ -275,9 +337,19 @@ void m68k_end_timeslice(void);          /* End timeslice now */
  */
 void m68k_set_irq(unsigned int int_level);
 
+/* Set the virtual irq lines, where the highest level
+ * active line is automatically selected.  If you use this function,
+ * do not use m68k_set_irq.
+ */
+void m68k_set_virq(unsigned int level, unsigned int active);
+unsigned int m68k_get_virq(unsigned int level);
 
 /* Halt the CPU as if you pulsed the HALT pin. */
 void m68k_pulse_halt(void);
+
+
+/* Trigger a bus error exception */
+void m68k_pulse_bus_error(void);
 
 
 /* Context switching to allow multiple CPUs */
@@ -291,18 +363,8 @@ unsigned int m68k_get_context(void* dst);
 /* set the current cpu context */
 void m68k_set_context(void* dst);
 
-/* Save the current cpu context to disk.
- * You must provide a function pointer of the form:
- * void save_value(char* identifier, unsigned int value)
- */
-void m68k_save_context( void (*save_value)(const char* identifier, unsigned int value));
-
-/* Load a cpu context from disk.
- * You must provide a function pointer of the form:
- * unsigned int load_value(char* identifier)
- */
-void m68k_load_context(unsigned int (*load_value)(const char* identifier));
-
+/* Register the CPU state information */
+void m68k_state_register(const char *type, int index);
 
 
 /* Peek at the internals of a CPU context.  This can either be a context
@@ -322,18 +384,28 @@ unsigned int m68k_is_valid_instruction(unsigned int instruction, unsigned int cp
  */
 unsigned int m68k_disassemble(char* str_buff, unsigned int pc, unsigned int cpu_type);
 
+/* Same as above but accepts raw opcode data directly rather than fetching
+ * via the read/write interfaces.
+ */
+unsigned int m68k_disassemble_raw(char* str_buff, unsigned int pc, const unsigned char* opdata, const unsigned char* argdata, unsigned int cpu_type);
+
 
 /* ======================================================================== */
-/* ============================= CONFIGURATION ============================ */
+/* ============================== MAME STUFF ============================== */
 /* ======================================================================== */
 
-/* Import the configuration for this build */
-#include "m68kconf.h"
-
+#if M68K_COMPILE_FOR_MAME == OPT_ON
+#include "m68kmame.h"
+#endif /* M68K_COMPILE_FOR_MAME */
 
 
 /* ======================================================================== */
 /* ============================== END OF FILE ============================= */
 /* ======================================================================== */
+
+#ifdef __cplusplus
+}
+#endif
+
 
 #endif /* M68K__HEADER */

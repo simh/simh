@@ -3,20 +3,28 @@
 /* ======================================================================== */
 /*
  *                                  MUSASHI
- *                                Version 3.3
+ *                                Version 3.32
  *
  * A portable Motorola M680x0 processor emulation engine.
- * Copyright 1998-2001 Karl Stenerud.  All rights reserved.
+ * Copyright Karl Stenerud.  All rights reserved.
  *
- * This code may be freely used for non-commercial purposes as long as this
- * copyright notice remains unaltered in the source code and any binary files
- * containing this code in compiled form.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- * All other lisencing terms must be negotiated with the author
- * (Karl Stenerud).
- *
- * The latest version of this code can be obtained at:
- * http://kstenerud.cjb.net
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
  */
 
 
@@ -47,68 +55,102 @@
 #define M68K_COMPILE_FOR_MAME      OPT_OFF
 #endif /* M68K_COMPILE_FOR_MAME */
 
-#if M68K_COMPILE_FOR_MAME == OPT_ON
-#include "m68kmame.h"
-#else
 
+#if M68K_COMPILE_FOR_MAME == OPT_OFF
 
 
 /* ======================================================================== */
 /* ============================= CONFIGURATION ============================ */
 /* ======================================================================== */
 
-/* Turn on if you want to use the following M68K variants */
-#define M68K_EMULATE_010            OPT_OFF
-#define M68K_EMULATE_EC020          OPT_OFF
-#define M68K_EMULATE_020            OPT_OFF
+/* Turn ON if you want to use the following M68K variants */
+#define M68K_EMULATE_010            OPT_ON
+#define M68K_EMULATE_EC020          OPT_ON
+#define M68K_EMULATE_020            OPT_ON
+#define M68K_EMULATE_030            OPT_ON
+#define M68K_EMULATE_040            OPT_ON
 
 
-/* If on, the CPU will call m68k_read_immediate_xx() for immediate addressing
+/* If ON, the CPU will call m68k_read_immediate_xx() for immediate addressing
  * and m68k_read_pcrelative_xx() for PC-relative addressing.
  * If off, all read requests from the CPU will be redirected to m68k_read_xx()
  */
 #define M68K_SEPARATE_READS         OPT_OFF
 
+/* If ON, the CPU will call m68k_write_32_pd() when it executes move.l with a
+ * predecrement destination EA mode instead of m68k_write_32().
+ * To simulate real 68k behavior, m68k_write_32_pd() must first write the high
+ * word to [address+2], and then write the low word to [address].
+ */
+#define M68K_SIMULATE_PD_WRITES     OPT_OFF
 
-/* If on, CPU will call the interrupt acknowledge callback when it services an
+/* If ON, CPU will call the interrupt acknowledge callback when it services an
  * interrupt.
  * If off, all interrupts will be autovectored and all interrupt requests will
  * auto-clear when the interrupt is serviced.
  */
-#define M68K_EMULATE_INT_ACK        OPT_SPECIFY_HANDLER
-#define M68K_INT_ACK_CALLBACK(A)    m68k_cpu_irq_ack(A)
+#define M68K_EMULATE_INT_ACK        OPT_OFF
+#define M68K_INT_ACK_CALLBACK(A)    your_int_ack_handler_function(A)
 
 
-/* If on, CPU will call the breakpoint acknowledge callback when it encounters
+/* If ON, CPU will call the breakpoint acknowledge callback when it encounters
  * a breakpoint instruction and it is running a 68010+.
  */
 #define M68K_EMULATE_BKPT_ACK       OPT_OFF
 #define M68K_BKPT_ACK_CALLBACK()    your_bkpt_ack_handler_function()
 
 
-/* If on, the CPU will monitor the trace flags and take trace exceptions
+/* If ON, the CPU will monitor the trace flags and take trace exceptions
  */
 #define M68K_EMULATE_TRACE          OPT_OFF
 
 
-/* If on, CPU will call the output reset callback when it encounters a reset
+/* If ON, CPU will call the output reset callback when it encounters a reset
  * instruction.
  */
-#define M68K_EMULATE_RESET          OPT_SPECIFY_HANDLER
-#define M68K_RESET_CALLBACK()       m68k_cpu_pulse_reset()
+#define M68K_EMULATE_RESET          OPT_OFF
+#define M68K_RESET_CALLBACK()       your_reset_handler_function()
+
+/* If ON, CPU will call the callback when it encounters a cmpi.l #v, dn
+ * instruction.
+ */
+#define M68K_CMPILD_HAS_CALLBACK     OPT_OFF
+#define M68K_CMPILD_CALLBACK(v,r)    your_cmpild_handler_function(v,r)
 
 
-/* If on, CPU will call the set fc callback on every memory access to
+/* If ON, CPU will call the callback when it encounters a rte
+ * instruction.
+ */
+#define M68K_RTE_HAS_CALLBACK       OPT_OFF
+#define M68K_RTE_CALLBACK()         your_rte_handler_function()
+
+/* If ON, CPU will call the callback when it encounters a tas
+ * instruction.
+ */
+#define M68K_TAS_HAS_CALLBACK       OPT_OFF
+#define M68K_TAS_CALLBACK()         your_tas_handler_function()
+
+/* If ON, CPU will call the callback when it encounters an illegal instruction
+ * passing the opcode as argument. If the callback returns 1, then it's considered
+ * as a normal instruction, and the illegal exception in canceled. If it returns 0,
+ * the exception occurs normally.
+ * The callback looks like int callback(int opcode)
+ * You should put OPT_SPECIFY_HANDLER here if you cant to use it, otherwise it will
+ * use a dummy default handler and you'll have to call m68k_set_illg_instr_callback explicitely
+ */
+#define M68K_ILLG_HAS_CALLBACK	    OPT_OFF
+#define M68K_ILLG_CALLBACK(opcode)  op_illg(opcode)
+
+/* If ON, CPU will call the set fc callback on every memory access to
  * differentiate between user/supervisor, program/data access like a real
  * 68000 would.  This should be enabled and the callback should be set if you
  * want to properly emulate the m68010 or higher. (moves uses function codes
  * to read/write data from different address spaces)
  */
-#define M68K_EMULATE_FC             OPT_SPECIFY_HANDLER
-#define M68K_SET_FC_CALLBACK(A)     m68k_cpu_set_fc(A)
+#define M68K_EMULATE_FC             OPT_OFF
+#define M68K_SET_FC_CALLBACK(A)     your_set_fc_handler_function(A)
 
-
-/* If on, CPU will call the pc changed callback when it changes the PC by a
+/* If ON, CPU will call the pc changed callback when it changes the PC by a
  * large value.  This allows host programs to be nicer when it comes to
  * fetching immediate data and instructions on a banked memory system.
  */
@@ -116,25 +158,25 @@
 #define M68K_SET_PC_CALLBACK(A)     your_pc_changed_handler_function(A)
 
 
-/* If on, CPU will call the instruction hook callback before every
+/* If ON, CPU will call the instruction hook callback before every
  * instruction.
  */
 #define M68K_INSTRUCTION_HOOK       OPT_OFF
-#define M68K_INSTRUCTION_CALLBACK() your_instruction_hook_function()
+#define M68K_INSTRUCTION_CALLBACK(pc) your_instruction_hook_function(pc)
 
 
-/* If on, the CPU will emulate the 4-byte prefetch queue of a real 68000 */
-#define M68K_EMULATE_PREFETCH       OPT_ON
+/* If ON, the CPU will emulate the 4-byte prefetch queue of a real 68000 */
+#define M68K_EMULATE_PREFETCH       OPT_OFF
 
 
-/* If on, the CPU will generate address error exceptions if it tries to
+/* If ON, the CPU will generate address error exceptions if it tries to
  * access a word or longword at an odd address.
- * NOTE: Do not enable this!  It is not working!
+ * NOTE: This is only emulated properly for 68000 mode.
  */
 #define M68K_EMULATE_ADDRESS_ERROR  OPT_OFF
 
 
-/* Turn on to enable logging of illegal instruction calls.
+/* Turn ON to enable logging of illegal instruction calls.
  * M68K_LOG_FILEHANDLE must be #defined to a stdio file stream.
  * Turn on M68K_LOG_1010_1111 to log all 1010 and 1111 calls.
  */
@@ -142,6 +184,9 @@
 #define M68K_LOG_1010_1111          OPT_OFF
 #define M68K_LOG_FILEHANDLE         some_file_handle
 
+/* Emulate PMMU : if you enable this, there will be a test to see if the current chip has some enabled pmmu added to every memory access,
+ * so enable this only if it's useful */
+#define M68K_EMULATE_PMMU   OPT_ON
 
 /* ----------------------------- COMPATIBILITY ---------------------------- */
 
@@ -150,41 +195,13 @@
  */
 
 
-/* If on, the emulation core will use 64-bit integers to speed up some
+/* If ON, the enulation core will use 64-bit integers to speed up some
  * operations.
 */
 #define M68K_USE_64_BIT  OPT_ON
 
 
-/* Set to your compiler's static inline keyword to enable it, or
- * set it to blank to disable it.
- * If you define INLINE in the makefile, it will override this value.
- * NOTE: not enabling inline functions will SEVERELY slow down emulation.
- */
-#ifndef INLINE
-#define INLINE static __inline
-#endif /* INLINE */
-
-
-/* If your environment requires special prefixes for system callback functions
- * such as the argument to qsort(), then set them here or in the makefile.
- */
-#ifndef DECL_SPEC
-#define DECL_SPEC
-#endif
-
 #endif /* M68K_COMPILE_FOR_MAME */
-
-#include "m68ksim.h"
-
-#define m68k_read_memory_8(A) m68k_cpu_read_byte(A)
-#define m68k_read_memory_16(A) m68k_cpu_read_word(A)
-#define m68k_read_memory_32(A) m68k_cpu_read_long(A)
-
-#define m68k_write_memory_8(A, V) m68k_cpu_write_byte(A, V)
-#define m68k_write_memory_16(A, V) m68k_cpu_write_word(A, V)
-#define m68k_write_memory_32(A, V) m68k_cpu_write_long(A, V)
-
 
 /* ======================================================================== */
 /* ============================== END OF FILE ============================= */

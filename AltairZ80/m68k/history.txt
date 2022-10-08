@@ -1,0 +1,115 @@
+The history of Musashi for anyone who might be interested:
+---------------------------------------------------------
+
+Musashi was born out of sheer boredom.
+I needed something to code, and so having had fun with a few of the emulators
+around, I decided to try my hand at CPU emulation.
+I had owned an Amiga for many years and had done some assembly coding on it so
+I figured it would be the ideal chip to cut my teeth on.
+Had I known then how much work was involved in emulating a chip like this, I
+may not have even started ;-)
+
+
+15-Jul-2013: Musashi license changed to MIT.
+
+10-Jun-2002: Musashi 3.4 released
+             - Added various undocumented m68k features thanks to Bart
+               Trzynadlowski's experiments.
+               See http://dynarec.com/~bart/files/68knotes.txt for details.
+             - Fixed a bug that caused privilege violation and illegal
+               instruction exceptions to stack the wrong PC value.
+             - Added emulation of address errors (Note: this only works
+               in 68000 mode.  All other CPUs require a LOT of overhead
+               to emulate this.  I'm not sure if I'll implement them or not.
+
+27-Jan-2001: Musashi 3.3 released
+             - Fixed problem when displaying negative numbers in disassembler
+             - Fixed cpu type selector - was allowing 020 instructions to be
+               disassembled when in 000 mode.
+             - Fixed opcode jumptable generator (ambiguous operators in the
+               test for f-line ops)
+             - Fixed signed/unsigned problem in divl and mull opcodes (not
+               sure if this was causing an error but best to be sure)
+             - Cleaned up the naming scheme for the opcode handlers
+
+14-Aug-2000: Musashi 3.2 released
+             - Fixed RTE bug that killed the program counter when in m68020
+               mode.
+             - Minor fixes in negx and nbcd.
+             - renamed d68k.c to m68kdasm.c and merged d68k.h into m68k.h.
+               d68k_read_xxx() instructions have been renamed to
+               m68k_read_xxx_disassembler().
+             - Rewrote exception processing and fixed 68020 stack frame
+               problems.
+             - FINALLY fixed the mull and divl instructions.
+             - Added 64-bit safe code fixes.
+             - Added 64-bit optimizations (these will only  be ANSI compliant
+               under c9x, and so to use them you must turn on M68K_USE_64_BIT
+               in m68kconf.h).
+
+28-May-2000: Musashi 3.1 released
+             - Fixed bug in m68k_get_reg() that retrieved the wrong value for
+               the status register.
+             - Fixed register bug in movec.
+             - Fixed cpu type comparison problem that caused indexed
+               addressing modes to be incorrectly interpreted when in m68ec020
+               mode.
+             - Added code to speed up busy waiting on some branch instructions.
+             - Fixed some bfxxx opcode bugs.
+
+05-Apr-2000: Musashi 3.0 released
+             - Major code overhaul.
+             - Rewrote code generator program and changed the format of
+               m68k_in.c.
+             - Added support for m68ec020.
+             - Removed timing from the opcode handlers.
+             - Added correct timing for m68000, m68010, and m68020.
+               Note: 68020 timing is the cache timing from the manual.
+             - Removed the m68k_peek_xxx() and m68k_poke_xxx() instructions and
+               replaced them with m68k_get_reg() and m68k_set_reg().
+             - Added support for function codes.
+             - Revamped m68kconf.h to be easier to configure and more powerful.
+             - Added option to separate immediate and normal reads.
+             - Added support for (undocumented) m68000 instruction prefetch.
+             - Rewrote indexed addressing mode handling.
+             - Rewrote interrupt handling.
+             - Fixed a masking bug for m68k_get_reg() when requesting the PC.
+             - Moved the instruction table sorting routine to m68kmake.c so
+               that it is invoked at compile time rather than at runtime.
+             - Rewrote the exception handling routines to support different
+               stack frames (needed for m68020 emulation).
+             - Rewrote faster status register and condition code flag handling
+               functions / macros.
+             - Fixed function code handling to fetch from program space when
+               using pc-relative addressing.
+             - Fixed initial program counter and stack pointer fetching on
+               reset (loads from program space now).
+             - A lot of code cleanup.
+             - LOTS of bugfixes (especially in the m68020 code).
+
+13-May-1999: Musashi 2.2 released
+             - Added support for m68020.
+             - Lots of bugfixes.
+
+25-Mar-1999: Musashi 2.1 released
+             - Added support for m68010.
+             - Many bugfixes.
+
+17-Mar-1999: Musashi 2.0 released
+             - Major code overhaul.
+             - Replaced monolithic codebase with a code generator program.
+             - Added correct m68000 timing.
+             - Moved timing into the opcode handlers.
+
+06-Jan-1999: Musashi 1.0 released
+
+20-Dec-1998: Beta release of Musashi v0.5 that could run Rastan Saga under MAME
+             (barely).
+
+04-Dec-1998: Final prototype v0.4
+
+20-Nov-1998: First prototype v0.1
+
+11-Jun-1998: Early disassembler
+
+12-May-1998: First outline
