@@ -210,9 +210,9 @@ static int32 markTimeSP             = 0;        /* stack pointer for timer stack
 
                                                 /* default time in milliseconds to sleep for SIMHSleepCmd       */
 #if defined (__MWERKS__) && defined (macintosh)
-static uint32 SIMHSleep             = 0;        /* no sleep on Macintosh OS9                                    */
+       uint32 SIMHSleep             = 0;        /* no sleep on Macintosh OS9                                    */
 #else
-static uint32 SIMHSleep             = 1;        /* default value is one millisecond                             */
+       uint32 SIMHSleep             = 1;        /* default value is one millisecond                             */
 #endif
 static uint32 sleepAllowedCounter   = 0;        /* only sleep on no character available when == 0               */
 static uint32 sleepAllowedStart     = SLEEP_ALLOWED_START_DEFAULT;  /* default start for above counter          */
