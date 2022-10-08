@@ -41,7 +41,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories="../AltairZ80/;./;../;../slirp;../slirp_glue;../slirp_glue/qemu;../slirp_glue/qemu/win32/include;../../windows-build/include;;../../windows-build/include/SDL2"
-				PreprocessorDefinitions="NO_INLINE;SIM_BUILD_TOOL=simh-Visual-Studio-Project;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID;HAVE_PCRE_H;PCRE_STATIC;HAVE_LIBEDIT"
+				PreprocessorDefinitions="inline=__inline;SIM_BUILD_TOOL=simh-Visual-Studio-Project;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID;HAVE_PCRE_H;PCRE_STATIC;HAVE_LIBEDIT"
 				KeepComments="false"
 				BasicRuntimeChecks="0"
 				RuntimeLibrary="1"
@@ -125,7 +125,7 @@
 				OmitFramePointers="true"
 				WholeProgramOptimization="true"
 				AdditionalIncludeDirectories="../AltairZ80/;./;../;../slirp;../slirp_glue;../slirp_glue/qemu;../slirp_glue/qemu/win32/include;../../windows-build/include;;../../windows-build/include/SDL2"
-				PreprocessorDefinitions="NO_INLINE;SIM_BUILD_TOOL=simh-Visual-Studio-Project;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID;HAVE_PCRE_H;PCRE_STATIC;HAVE_LIBEDIT"
+				PreprocessorDefinitions="inline=__inline;SIM_BUILD_TOOL=simh-Visual-Studio-Project;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID;HAVE_PCRE_H;PCRE_STATIC;HAVE_LIBEDIT"
 				StringPooling="true"
 				RuntimeLibrary="0"
 				EnableFunctionLevelLinking="true"
@@ -252,31 +252,31 @@
 				>
 			</File>
 			<File
-				RelativePath="..\AltairZ80\m68kasm.c"
+				RelativePath="..\AltairZ80\m68k\m68kasm.c"
 				>
 			</File>
 			<File
-				RelativePath="..\AltairZ80\m68kcpu.c"
+				RelativePath="..\AltairZ80\m68k\m68kcpu.c"
 				>
 			</File>
 			<File
-				RelativePath="..\AltairZ80\m68kdasm.c"
+				RelativePath="..\AltairZ80\m68k\m68kdasm.c"
 				>
 			</File>
 			<File
-				RelativePath="..\AltairZ80\m68kopac.c"
+				RelativePath="..\AltairZ80\m68k\m68kopac.c"
 				>
 			</File>
 			<File
-				RelativePath="..\AltairZ80\m68kopdm.c"
+				RelativePath="..\AltairZ80\m68k\m68kopdm.c"
 				>
 			</File>
 			<File
-				RelativePath="..\AltairZ80\m68kopnz.c"
+				RelativePath="..\AltairZ80\m68k\m68kopnz.c"
 				>
 			</File>
 			<File
-				RelativePath="..\AltairZ80\m68kops.c"
+				RelativePath="..\AltairZ80\m68k\m68kops.c"
 				>
 			</File>
 			<File

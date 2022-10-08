@@ -77,7 +77,7 @@
 
  */
 
-#include "m68k.h"
+#include "m68k/m68k.h"
 
 /* Read/write macros */
 #define READ_BYTE(BASE, ADDR) (BASE)[ADDR]

@@ -29,7 +29,7 @@
     03/27/14 -- MWD Add MITS Hard Disk device (mhdsk_dev)
 */
 
-#include "m68k.h"
+#include "m68k/m68k.h"
 #include <ctype.h>
 
 #define SIM_EMAX 6
