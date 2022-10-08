@@ -69,9 +69,6 @@ extern "C" {
 typedef signed   char  sint8;  		/* ASG: changed from char to signed char */
 typedef signed   short sint16;
 typedef signed   int   sint32; 		/* AWJ: changed from long to int */
-typedef unsigned char  uint8;
-typedef unsigned short uint16;
-typedef unsigned int   uint32; 			/* AWJ: changed from long to int */
 
 /* signed and unsigned int must be at least 32 bits wide */
 typedef signed   int sint;
@@ -154,7 +151,7 @@ typedef uint32 uint64;
 #define EXCEPTION_RESET                    0
 #define EXCEPTION_BUS_ERROR                2 /* This one is not emulated! */
 #define EXCEPTION_ADDRESS_ERROR            3 /* This one is partially emulated (doesn't stack a proper frame yet) */
-#define EXCEPTION_ILLEGAL_INSTRUCTION      4
+#define EXCEPTION_ILLEGAL_INSTRUCTION_M68K 4
 #define EXCEPTION_ZERO_DIVIDE              5
 #define EXCEPTION_CHK                      6
 #define EXCEPTION_TRAPV                    7
@@ -2010,11 +2007,11 @@ static inline void m68ki_exception_illegal(void)
 	}
 	#endif /* M68K_EMULATE_ADDRESS_ERROR */
 
-	m68ki_stack_frame_0000(REG_PPC, sr, EXCEPTION_ILLEGAL_INSTRUCTION);
-	m68ki_jump_vector(EXCEPTION_ILLEGAL_INSTRUCTION);
+	m68ki_stack_frame_0000(REG_PPC, sr, EXCEPTION_ILLEGAL_INSTRUCTION_M68K);
+	m68ki_jump_vector(EXCEPTION_ILLEGAL_INSTRUCTION_M68K);
 
 	/* Use up some clock cycles and undo the instruction's cycles */
-	USE_CYCLES(CYC_EXCEPTION[EXCEPTION_ILLEGAL_INSTRUCTION] - CYC_INSTRUCTION[REG_IR]);
+	USE_CYCLES(CYC_EXCEPTION[EXCEPTION_ILLEGAL_INSTRUCTION_M68K] - CYC_INSTRUCTION[REG_IR]);
 }
 
 /* Exception for format errror in RTE */

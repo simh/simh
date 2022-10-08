@@ -4,6 +4,7 @@
 #ifdef LSB_FIRST
 #define LITTLEENDIAN
 #else
+#undef BIGENDIAN
 #define BIGENDIAN
 #endif
 
@@ -23,9 +24,6 @@
 *----------------------------------------------------------------------------*/
 
 typedef sint8 flag;
-typedef sint8 int8;
-typedef sint16 int16;
-typedef sint32 int32;
 typedef sint64 int64;
 
 /*----------------------------------------------------------------------------

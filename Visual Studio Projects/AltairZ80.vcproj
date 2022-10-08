@@ -280,6 +280,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\AltairZ80\m68k\softfloat\softfloat.c"
+				>
+			</File>
+			<File
 				RelativePath="..\AltairZ80\m68ksim.c"
 				>
 			</File>

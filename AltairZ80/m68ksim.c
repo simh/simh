@@ -244,6 +244,8 @@ void m68k_clear_memory(void ) {
 void m68k_cpu_reset(void) {
     WRITE_LONG(m68k_ram, 0, 0x00006000);    // SP
     WRITE_LONG(m68k_ram, 4, 0x00000200);    // PC
+    m68k_init();
+    m68k_set_cpu_type(M68K_CPU_TYPE_68000);
     m68k_pulse_reset(); // also calls MC6850_reset()
     m68k_CPUToView();
 }

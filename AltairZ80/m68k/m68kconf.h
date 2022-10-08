@@ -89,8 +89,8 @@
  * If off, all interrupts will be autovectored and all interrupt requests will
  * auto-clear when the interrupt is serviced.
  */
-#define M68K_EMULATE_INT_ACK        OPT_OFF
-#define M68K_INT_ACK_CALLBACK(A)    your_int_ack_handler_function(A)
+#define M68K_EMULATE_INT_ACK        OPT_SPECIFY_HANDLER
+#define M68K_INT_ACK_CALLBACK(A)    m68k_cpu_irq_ack(A)
 
 
 /* If ON, CPU will call the breakpoint acknowledge callback when it encounters
@@ -108,8 +108,8 @@
 /* If ON, CPU will call the output reset callback when it encounters a reset
  * instruction.
  */
-#define M68K_EMULATE_RESET          OPT_OFF
-#define M68K_RESET_CALLBACK()       your_reset_handler_function()
+#define M68K_EMULATE_RESET          OPT_SPECIFY_HANDLER
+#define M68K_RESET_CALLBACK()       m68k_cpu_pulse_reset()
 
 /* If ON, CPU will call the callback when it encounters a cmpi.l #v, dn
  * instruction.
@@ -147,8 +147,8 @@
  * want to properly emulate the m68010 or higher. (moves uses function codes
  * to read/write data from different address spaces)
  */
-#define M68K_EMULATE_FC             OPT_OFF
-#define M68K_SET_FC_CALLBACK(A)     your_set_fc_handler_function(A)
+#define M68K_EMULATE_FC             OPT_SPECIFY_HANDLER
+#define M68K_SET_FC_CALLBACK(A)     m68k_cpu_set_fc(A)
 
 /* If ON, CPU will call the pc changed callback when it changes the PC by a
  * large value.  This allows host programs to be nicer when it comes to
@@ -202,6 +202,17 @@
 
 
 #endif /* M68K_COMPILE_FOR_MAME */
+
+#include "m68ksim.h"
+
+#define m68k_read_memory_8(A) m68k_cpu_read_byte(A)
+#define m68k_read_memory_16(A) m68k_cpu_read_word(A)
+#define m68k_read_memory_32(A) m68k_cpu_read_long(A)
+
+#define m68k_write_memory_8(A, V) m68k_cpu_write_byte(A, V)
+#define m68k_write_memory_16(A, V) m68k_cpu_write_word(A, V)
+#define m68k_write_memory_32(A, V) m68k_cpu_write_long(A, V)
+
 
 /* ======================================================================== */
 /* ============================== END OF FILE ============================= */
