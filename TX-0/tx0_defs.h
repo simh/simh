@@ -1,9 +1,7 @@
 /*************************************************************************
  *                                                                       *
- * $Id: tx0_defs.h 2059 2009-02-23 05:59:14Z hharte $                    *
- *                                                                       *
- * Copyright (c) 2009 Howard M. Harte.                                   *
- * Based on pdp1_defs.h, Copyright (c) 1993-2006, Robert M. Supnik       *
+ * Copyright (c) 2009-2022 Howard M. Harte.                              *
+ * https://github.com/hharte                                             *
  *                                                                       *
  * Permission is hereby granted, free of charge, to any person obtaining *
  * a copy of this software and associated documentation files (the       *
@@ -18,27 +16,25 @@
  *                                                                       *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,       *
  * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF    *
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND                 *
- * NONINFRINGEMENT. IN NO EVENT SHALL HOWARD M. HARTE BE LIABLE FOR ANY  *
- * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,  *
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE     *
- * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                *
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-            *
+ * INFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE   *
+ * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN       *
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN     *
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE      *
+ * SOFTWARE.                                                             *
  *                                                                       *
- * Except as contained in this notice, the name of Howard M. Harte shall *
+ * Except as contained in this notice, the names of The Authors shall    *
  * not be used in advertising or otherwise to promote the sale, use or   *
  * other dealings in this Software without prior written authorization   *
- * of Howard M. Harte.                                                   *
+ * from the Authors.                                                     *
  *                                                                       *
  * Module Description:                                                   *
- *     cpu TX-0 Central Processor                                        *
- *                                                                       *
- * Environment:                                                          *
- *     User mode only                                                    *
+ *     cpu TX-0 Central Processor Definitions.                           *
  *                                                                       *
  *************************************************************************/
 
-#ifndef PDP1_DEFS_H_
-#define PDP1_DEFS_H_   0
+#ifndef TX0_DEFS_H_
+#define TX0_DEFS_H_   0
 
 #include "sim_defs.h"
 
@@ -94,4 +90,4 @@
 #define UNIT_MODE_TEST  (1 << UNIT_V_MODE)
 
 
-#endif
+#endif	/* TX0_DEFS_H_ */
