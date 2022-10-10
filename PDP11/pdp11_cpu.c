@@ -347,6 +347,7 @@ int32 relocW (int32 addr);
 void relocR_test (int32 va, int32 apridx);
 void relocW_test (int32 va, int32 apridx);
 int32 clean_MMR1 (int32 mmr1);
+int32 relocC (int32 va, int32 sw);
 t_bool PLF_test (int32 va, int32 apr);
 void reloc_abort (int32 err, int32 apridx);
 int32 ReadE (int32 addr);
@@ -948,7 +949,7 @@ while (reason == 0)  {
     inst_psw = get_PSW ();
     saved_sim_interval = sim_interval;
     if (BPT_SUMM_PC) {                                  /* possible breakpoint */
-        t_addr pa = relocR (PC | isenable);             /* relocate PC */
+        t_addr pa = relocC (PC, 0);                     /* relocate PC */
         if (sim_brk_test (PC, BPT_PCVIR) ||             /* Normal PC breakpoint? */
             sim_brk_test (pa, BPT_PCPHY))               /* Physical Address breakpoint? */
             ABORT (ABRT_BKPT);                          /* stop simulation */
