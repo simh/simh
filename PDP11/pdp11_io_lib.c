@@ -898,6 +898,8 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
         {00104} },                                      /* DAZ */
     { { "TV" },          1,  0,  0, 0, 
         {04100} },                                      /* TV - raster display */
+    { { "MB" },          1,  1,  0, 0, 
+        {04000}, {0374} },                              /* MB11 */
     { { NULL },         -1 }                            /* end table */
 };
 

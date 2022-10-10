@@ -742,6 +742,7 @@ typedef struct pdp_dib DIB;
 #define INT_INTERNAL1   (INT_PIR1)
 
 #define IPL_UCB         7                               /* int pri levels */
+#define IPL_MB          7
 #define IPL_CLK         6
 #define IPL_PCLK        6
 #define IPL_DTA         6
