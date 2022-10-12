@@ -1431,8 +1431,9 @@ PDP11 = ${PDP11D}/pdp11_fp.c ${PDP11D}/pdp11_cpu.c ${PDP11D}/pdp11_dz.c \
 	${PDP11D}/pdp11_ke.c ${PDP11D}/pdp11_dc.c ${PDP11D}/pdp11_dmc.c \
 	${PDP11D}/pdp11_kmc.c ${PDP11D}/pdp11_dup.c ${PDP11D}/pdp11_rs.c \
 	${PDP11D}/pdp11_vt.c ${PDP11D}/pdp11_td.c ${PDP11D}/pdp11_io_lib.c \
-	${PDP11D}/pdp11_rom.c ${PDP11D}/pdp11_ch.c ${DISPLAYL} ${DISPLAYVT} \
-	${PDP11D}/pdp11_ng.c ${PDP11D}/pdp11_daz.c ${DISPLAYNG}
+	${PDP11D}/pdp11_rom.c ${PDP11D}/pdp11_ch.c \
+	${PDP11D}/pdp11_ng.c ${PDP11D}/pdp11_daz.c ${PDP11D}/pdp11_ten11.c \
+	${DISPLAYL} ${DISPLAYVT} ${DISPLAYNG}
 PDP11_OPT = -DVM_PDP11 -I ${PDP11D} ${NETWORK_OPT} ${DISPLAY_OPT}
 
 

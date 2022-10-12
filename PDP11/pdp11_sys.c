@@ -124,6 +124,8 @@ extern DEVICE ch_dev;
 extern DEVICE ng_dev;
 extern DEVICE daz_dev;
 #endif
+extern DEVICE ten11_dev;
+
 extern REG cpu_reg[];
 extern int32 saved_PC;
 
@@ -209,6 +211,7 @@ DEVICE *sim_devices[] = {
     &ng_dev,
     &daz_dev,
 #endif
+    &ten11_dev,
 #else
     &clk_dev,
     &tti_dev,
