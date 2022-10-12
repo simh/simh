@@ -646,6 +646,7 @@ MTAB cpu_mod[] = {
     { UNIT_MSIZE, 98304, NULL, "96K", &cpu_set_size, NULL, NULL, "Set memory size to 96Kb"},
     { UNIT_MSIZE, 131072, NULL, "128K", &cpu_set_size, NULL, NULL, "Set memory size to 128Kb"},
     { UNIT_MSIZE, 196608, NULL, "192K", &cpu_set_size, NULL, NULL, "Set memory size to 192Kb"},
+    { UNIT_MSIZE, 221184, NULL, "216K", &cpu_set_size, NULL, NULL, "Set memory size to 216Kb"},
     { UNIT_MSIZE, 262144, NULL, "256K", &cpu_set_size, NULL, NULL, "Set memory size to 256Kb"},
     { UNIT_MSIZE, 393216, NULL, "384K", &cpu_set_size, NULL, NULL, "Set memory size to 384Kb"},
     { UNIT_MSIZE, 524288, NULL, "512K", &cpu_set_size, NULL, NULL, "Set memory size to 512Kb"},
