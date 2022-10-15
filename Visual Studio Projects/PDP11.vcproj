@@ -228,6 +228,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\PDP11\pdp11_dh.c"
+				>
+			</File>
+			<File
 				RelativePath="..\PDP11\pdp11_dl.c"
 				>
 			</File>
@@ -689,7 +693,8 @@
 		</Filter>
 		<Filter
 			Name="Header Files"
-			Filter="h;hpp;hxx;hm;inl;inc"			>
+			Filter="h;hpp;hxx;hm;inl;inc"
+			>
 			<File
 				RelativePath="..\display\display.h"
 				>
