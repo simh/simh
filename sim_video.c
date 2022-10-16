@@ -709,6 +709,7 @@ vptr->vid_height = height;
 vptr->vid_mouse_captured = FALSE;
 vptr->vid_cursor_visible = (vptr->vid_flags & SIM_VID_INPUTCAPTURED);
 vptr->vid_blending = FALSE;
+vptr->vid_ready = FALSE;
 
 if (!vid_active) {
     vid_key_events.head = 0;
