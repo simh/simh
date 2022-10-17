@@ -15,5 +15,4 @@ notifications:
   - provider: Email
     to:
       - Mark@infocomm.com
-      - lars@nocrew.org
     on_build_success: false
