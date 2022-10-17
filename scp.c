@@ -6950,6 +6950,9 @@ if (flag) {
         char tarversion[PATH_MAX+1] = "";
         char curlversion[PATH_MAX+1] = "";
         FILE *f;
+#if defined(SIM_BUILD_OS_VERSION)
+        char buildosversion[2*PATH_MAX+1] = S_xstr(SIM_BUILD_OS_VERSION);
+#endif
         
         if ((f = popen ("uname -a", "r"))) {
             memset (osversion, 0, sizeof (osversion));
@@ -6960,7 +6963,11 @@ if (flag) {
                 } while (osversion[0] == '\0');
             pclose (f);
             }
-        fprintf (st, "\n        OS: %s", osversion);
+#if defined(SIM_BUILD_OS_VERSION)
+        if (strcmp(osversion, buildosversion) != 0)
+            fprintf (st, "\n        Building OS: %s", buildosversion);
+#endif
+        fprintf (st, "\n        Running OS: %s", osversion);
         if ((f = popen ("uname", "r"))) {
             memset (os_type, 0, sizeof (os_type));
             do {
