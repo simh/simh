@@ -1,34 +1,67 @@
 #ifndef ROM_rom_rev2_demon_bin_H
 #define ROM_rom_rev2_demon_bin_H 0
 /*
-   3B2/rom_rev2_demon_bin.h         produced at Mon Aug 23 13:30:22 2021
-   from 3B2/rom_rev2_demon.bin which was last modified at Mon Jul 26 08:03:30 2021
+   3B2/rom_rev2_demon_bin.h         produced at Wed Oct 19 10:15:15 2022
+   from 3B2/rom_rev2_demon.bin which was last modified at Sun Sep 25 10:27:44 2022
    file size: 65536 (0x10000) - checksum: 0xFFB345BB
    This file is a generated file and should NOT be edited or changed by hand.
 */
 #undef BOOT_CODE_SIZE
 #define BOOT_CODE_SIZE 0x10000
+#undef BOOT_CODE_CHECKSUM
+#define BOOT_CODE_CHECKSUM 0xFFB345BB
 #undef BOOT_CODE_FILENAME
 #define BOOT_CODE_FILENAME "rom_rev2_demon.bin"
+#undef BOOT_CODE_FILEPATH
+#define BOOT_CODE_FILEPATH "3B2/rom_rev2_demon.bin"
 #undef BOOT_CODE_ARRAY
+#if defined(DONT_USE_INTERNAL_ROM)
+#define BOOT_CODE_ARRAY NULL
+#else
 #define BOOT_CODE_ARRAY rom_rev2_demon_bin
+#endif
 #if !defined(BOOT_CODE_SIZE_1)
 #define BOOT_CODE_SIZE_1 0x10000
+#define BOOT_CODE_CHECKSUM_1 0xFFB345BB
 #define BOOT_CODE_FILENAME_1 "rom_rev2_demon.bin"
+#define BOOT_CODE_FILEPATH_1 "3B2/rom_rev2_demon.bin"
+#if defined(DONT_USE_INTERNAL_ROM)
+#define BOOT_CODE_ARRAY_1 NULL
+#else
 #define BOOT_CODE_ARRAY_1 rom_rev2_demon_bin
+#endif
 #elif !defined(BOOT_CODE_SIZE_2)
 #define BOOT_CODE_SIZE_2 0x10000
+#define BOOT_CODE_CHECKSUM_2 0xFFB345BB
 #define BOOT_CODE_FILENAME_2 "rom_rev2_demon.bin"
+#define BOOT_CODE_FILEPATH_2 "3B2/rom_rev2_demon.bin"
+#if defined(DONT_USE_INTERNAL_ROM)
+#define BOOT_CODE_ARRAY_2 NULL
+#else
 #define BOOT_CODE_ARRAY_2 rom_rev2_demon_bin
+#endif
 #elif !defined(BOOT_CODE_SIZE_3)
 #define BOOT_CODE_SIZE_3 0x10000
+#define BOOT_CODE_CHECKSUM_3 0xFFB345BB
 #define BOOT_CODE_FILENAME_3 "rom_rev2_demon.bin"
+#define BOOT_CODE_FILEPATH_3 "3B2/rom_rev2_demon.bin"
+#if defined(DONT_USE_INTERNAL_ROM)
+#define BOOT_CODE_ARRAY_3 NULL
+#else
 #define BOOT_CODE_ARRAY_3 rom_rev2_demon_bin
+#endif
 #elif !defined(BOOT_CODE_SIZE_4)
 #define BOOT_CODE_SIZE_4 0x10000
+#define BOOT_CODE_CHECKSUM_4 0xFFB345BB
 #define BOOT_CODE_FILENAME_4 "rom_rev2_demon.bin"
+#define BOOT_CODE_FILEPATH_4 "3B2/rom_rev2_demon.bin"
+#if defined(DONT_USE_INTERNAL_ROM)
+#define BOOT_CODE_ARRAY_4 NULL
+#else
 #define BOOT_CODE_ARRAY_4 rom_rev2_demon_bin
 #endif
+#endif
+#if !defined(DONT_USE_INTERNAL_ROM)
 unsigned char rom_rev2_demon_bin[] = {
 0x00,0x00,0x05,0x50,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
 0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
@@ -4126,4 +4159,5 @@ unsigned char rom_rev2_demon_bin[] = {
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0x0D,0x0D,0x0D,0x0D,0x03,0x02,0x01,0x90,0x03,0x02,0x01,0x02,0x03,0x02,0x01,0x55,};
+#endif
 #endif /* ROM_rom_rev2_demon_bin_H */

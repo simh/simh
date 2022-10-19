@@ -1,34 +1,67 @@
 #ifndef ROM_vax_ka411_bin_H
 #define ROM_vax_ka411_bin_H 0
 /*
-   VAX/vax_ka411_bin.h         produced at Mon Aug 23 13:30:20 2021
-   from VAX/ka411.bin which was last modified at Mon Jul 26 08:03:31 2021
+   VAX/vax_ka411_bin.h         produced at Wed Oct 19 10:15:15 2022
+   from VAX/ka411.bin which was last modified at Sun Sep 25 10:27:45 2022
    file size: 262144 (0x40000) - checksum: 0xFECB7EE3
    This file is a generated file and should NOT be edited or changed by hand.
 */
 #undef BOOT_CODE_SIZE
 #define BOOT_CODE_SIZE 0x40000
+#undef BOOT_CODE_CHECKSUM
+#define BOOT_CODE_CHECKSUM 0xFECB7EE3
 #undef BOOT_CODE_FILENAME
 #define BOOT_CODE_FILENAME "ka411.bin"
+#undef BOOT_CODE_FILEPATH
+#define BOOT_CODE_FILEPATH "VAX/ka411.bin"
 #undef BOOT_CODE_ARRAY
+#if defined(DONT_USE_INTERNAL_ROM)
+#define BOOT_CODE_ARRAY NULL
+#else
 #define BOOT_CODE_ARRAY vax_ka411_bin
+#endif
 #if !defined(BOOT_CODE_SIZE_1)
 #define BOOT_CODE_SIZE_1 0x40000
+#define BOOT_CODE_CHECKSUM_1 0xFECB7EE3
 #define BOOT_CODE_FILENAME_1 "ka411.bin"
+#define BOOT_CODE_FILEPATH_1 "VAX/ka411.bin"
+#if defined(DONT_USE_INTERNAL_ROM)
+#define BOOT_CODE_ARRAY_1 NULL
+#else
 #define BOOT_CODE_ARRAY_1 vax_ka411_bin
+#endif
 #elif !defined(BOOT_CODE_SIZE_2)
 #define BOOT_CODE_SIZE_2 0x40000
+#define BOOT_CODE_CHECKSUM_2 0xFECB7EE3
 #define BOOT_CODE_FILENAME_2 "ka411.bin"
+#define BOOT_CODE_FILEPATH_2 "VAX/ka411.bin"
+#if defined(DONT_USE_INTERNAL_ROM)
+#define BOOT_CODE_ARRAY_2 NULL
+#else
 #define BOOT_CODE_ARRAY_2 vax_ka411_bin
+#endif
 #elif !defined(BOOT_CODE_SIZE_3)
 #define BOOT_CODE_SIZE_3 0x40000
+#define BOOT_CODE_CHECKSUM_3 0xFECB7EE3
 #define BOOT_CODE_FILENAME_3 "ka411.bin"
+#define BOOT_CODE_FILEPATH_3 "VAX/ka411.bin"
+#if defined(DONT_USE_INTERNAL_ROM)
+#define BOOT_CODE_ARRAY_3 NULL
+#else
 #define BOOT_CODE_ARRAY_3 vax_ka411_bin
+#endif
 #elif !defined(BOOT_CODE_SIZE_4)
 #define BOOT_CODE_SIZE_4 0x40000
+#define BOOT_CODE_CHECKSUM_4 0xFECB7EE3
 #define BOOT_CODE_FILENAME_4 "ka411.bin"
+#define BOOT_CODE_FILEPATH_4 "VAX/ka411.bin"
+#if defined(DONT_USE_INTERNAL_ROM)
+#define BOOT_CODE_ARRAY_4 NULL
+#else
 #define BOOT_CODE_ARRAY_4 vax_ka411_bin
 #endif
+#endif
+#if !defined(DONT_USE_INTERNAL_ROM)
 unsigned char vax_ka411_bin[] = {
 0x31,0xC8,0x00,0x00,0x02,0x02,0x01,0x08,0xC7,0xC7,0xC7,0xC7,0x00,0x01,0x02,0x03,
 0x55,0x55,0x55,0x55,0xAA,0xAA,0xAA,0xAA,0x33,0x33,0x33,0x33,0x40,0x40,0x40,0x40,
@@ -16414,4 +16447,5 @@ unsigned char vax_ka411_bin[] = {
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x7D,0xE4,0x67,0x80,};
+#endif
 #endif /* ROM_vax_ka411_bin_H */
