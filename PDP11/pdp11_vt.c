@@ -739,7 +739,7 @@ vt_boot(int32 unit, DEVICE *dptr)
 
     /* Instead, since that won't be too useful.... */
     /* Load and start Lunar Lander which has the potential to be fun! */
-    sim_set_memory_load_file (BOOT_CODE_ARRAY, BOOT_CODE_SIZE);
+    sim_set_memory_load_file_ex (BOOT_CODE_ARRAY, BOOT_CODE_SIZE, BOOT_CODE_FILEPATH, BOOT_CODE_CHECKSUM);
     r = load_cmd (0, BOOT_CODE_FILENAME);
     sim_set_memory_load_file (NULL, 0);
     /* Lunar Lander presumes a VT device vector base of 320 */

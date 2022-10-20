@@ -48,9 +48,7 @@
 #include "swtp_defs.h"
 
 
-#if !defined(DONT_USE_INTERNAL_ROM)
 #include "swtp_swtbugv10_bin.h"
-#endif /* DONT_USE_INTERNAL_ROM */
 
 #define UNIT_V_MSIZE    (UNIT_V_UF)     /* ROM Size */
 #define UNIT_MSIZE      (0x7 << UNIT_V_MSIZE)

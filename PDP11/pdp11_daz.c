@@ -252,7 +252,7 @@ daz_boot(int32 unit, DEVICE *dptr)
     set_cmd (0, "NG TYPE=DAZZLE");
     set_cmd (0, "PCLK ENABLED");
     set_cmd (0, "KE ENABLED");
-    sim_set_memory_load_file (BOOT_CODE_ARRAY, BOOT_CODE_SIZE);
+    sim_set_memory_load_file_ex (BOOT_CODE_ARRAY, BOOT_CODE_SIZE, BOOT_CODE_FILEPATH, BOOT_CODE_CHECKSUM);
     r = load_cmd (0, BOOT_CODE_FILENAME);
     sim_set_memory_load_file (NULL, 0);
     cpu_set_boot (03252);

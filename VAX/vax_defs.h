@@ -1028,7 +1028,7 @@ extern int32 cpu_instruction_set;
 #define BOOT_CODE_SIZE 0
 #endif
 
-extern t_stat cpu_load_bootcode (const char *filename, const unsigned char *builtin_code, size_t size, t_bool rom, t_addr offset);
+extern t_stat cpu_load_bootcode (const char *filename, const unsigned char *builtin_code, size_t size, t_bool rom, t_addr offset, const char *filepath, unsigned int checksum);
 extern t_stat cpu_print_model (FILE *st);
 extern t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern t_stat cpu_set_model (UNIT *uptr, int32 val, CONST char *cptr, void *desc);

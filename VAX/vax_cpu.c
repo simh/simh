@@ -3920,15 +3920,14 @@ else {
 return SCPE_OK;
 }
 
-t_stat cpu_load_bootcode (const char *filename, const unsigned char *builtin_code, size_t size, t_bool rom, t_addr offset)
+t_stat cpu_load_bootcode (const char *filename, const unsigned char *builtin_code, size_t size, t_bool rom, t_addr offset, const char *filepath, unsigned int checksum)
 {
 char args[CBUFSIZE];
 t_stat r;
 int32 saved_sim_switches = sim_switches;
 
 sim_messagef (SCPE_OK, "Loading boot code from %s%s\n", builtin_code ? "internal " : "", filename);
-if (builtin_code)
-    sim_set_memory_load_file (builtin_code, size);
+sim_set_memory_load_file_ex (builtin_code, size, filepath, checksum);
 if (rom)
     sprintf (args, "-R %s", filename);
 else

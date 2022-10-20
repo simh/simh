@@ -31,11 +31,7 @@
 
 #include "vax_defs.h"
 
-#ifdef DONT_USE_INTERNAL_ROM
-#define BOOT_CODE_FILENAME "vmb.exe"
-#else /* !DONT_USE_INTERNAL_ROM */
 #include "vax_vmb_exe.h" /* Defines BOOT_CODE_FILENAME and BOOT_CODE_ARRAY, etc */
-#endif /* DONT_USE_INTERNAL_ROM */
 
 /* KA820 specific IPRs */
 
@@ -691,7 +687,7 @@ t_stat cpu_boot (int32 unitno, DEVICE *dptr)
 {
 t_stat r;
 
-r = cpu_load_bootcode (BOOT_CODE_FILENAME, BOOT_CODE_ARRAY, BOOT_CODE_SIZE, FALSE, 0x200);
+r = cpu_load_bootcode (BOOT_CODE_FILENAME, BOOT_CODE_ARRAY, BOOT_CODE_SIZE, FALSE, 0x200, BOOT_CODE_FILEPATH, BOOT_CODE_CHECKSUM);
 if (r != SCPE_OK)
     return r;
 SP = PC = 512;

@@ -32,15 +32,6 @@
 #include "vax_defs.h"
 #include "sim_ether.h"
 
-#ifdef DONT_USE_INTERNAL_ROM
-#if defined (VAX_46)
-#define BOOT_CODE_FILENAME "ka46a.bin"
-#elif defined (VAX_47)
-#define BOOT_CODE_FILENAME "ka47a.bin"
-#elif defined (VAX_48)
-#define BOOT_CODE_FILENAME "ka48a.bin"
-#endif
-#else /* !DONT_USE_INTERNAL_ROM */
 #if defined (VAX_46)
 #include "vax_ka46a_bin.h" /* Defines BOOT_CODE_FILENAME and BOOT_CODE_ARRAY, etc */
 #elif defined (VAX_47)
@@ -48,7 +39,6 @@
 #elif defined (VAX_48)
 #include "vax_ka48a_bin.h" /* Defines BOOT_CODE_FILENAME and BOOT_CODE_ARRAY, etc */
 #endif
-#endif /* DONT_USE_INTERNAL_ROM */
 
 
 t_stat vax460_boot (int32 flag, CONST char *ptr);
@@ -983,7 +973,7 @@ conpsl = PSL_IS | PSL_IPL1F | CON_PWRUP;
 if (rom == NULL)
     return SCPE_IERR;
 if (*rom == 0) {                                        /* no boot? */
-    r = cpu_load_bootcode (BOOT_CODE_FILENAME, BOOT_CODE_ARRAY, BOOT_CODE_SIZE, TRUE, 0);
+    r = cpu_load_bootcode (BOOT_CODE_FILENAME, BOOT_CODE_ARRAY, BOOT_CODE_SIZE, TRUE, 0, BOOT_CODE_FILEPATH, BOOT_CODE_CHECKSUM);
     if (r != SCPE_OK)
         return r;
     }

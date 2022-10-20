@@ -33,12 +33,7 @@
 #include "sim_tmxr.h"
 #include "sim_ether.h"
 
-#ifdef DONT_USE_INTERNAL_ROM
-#define BOOT_CODE_FILENAME "is1000.bin"
-#else /* !DONT_USE_INTERNAL_ROM */
 #include "vax_is1000_bin.h" /* Defines BOOT_CODE_FILENAME and BOOT_CODE_ARRAY, etc */
-#endif /* DONT_USE_INTERNAL_ROM */
-
 
 t_stat is1000_boot (int32 flag, CONST char *ptr);
 
@@ -922,7 +917,7 @@ conpsl = PSL_IS | PSL_IPL1F | CON_PWRUP;
 if (rom == NULL)
     return SCPE_IERR;
 if (*rom == 0) {                                        /* no boot? */
-    r = cpu_load_bootcode (BOOT_CODE_FILENAME, BOOT_CODE_ARRAY, BOOT_CODE_SIZE, TRUE, 0);
+    r = cpu_load_bootcode (BOOT_CODE_FILENAME, BOOT_CODE_ARRAY, BOOT_CODE_SIZE, TRUE, 0, BOOT_CODE_FILEPATH, BOOT_CODE_CHECKSUM);
     if (r != SCPE_OK)
         return r;
     }
