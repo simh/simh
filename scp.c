@@ -8243,12 +8243,21 @@ for (mtab = dptr->modifiers; (mtab != NULL) && (mtab->mstring != NULL); ++mtab) 
 
 static const unsigned char *mem_data = NULL;
 static size_t mem_data_size = 0;
+static const char *mem_filepath;
+static unsigned int mem_checksum;
+
+t_stat sim_set_memory_load_file_ex (const unsigned char *builtin_code, size_t size, const char *filepath, unsigned int checksum)
+{
+mem_data = builtin_code;
+mem_data_size = size;
+mem_filepath = filepath;
+mem_checksum = checksum;
+return SCPE_OK;
+}
 
 t_stat sim_set_memory_load_file (const unsigned char *data, size_t size)
 {
-mem_data = data;
-mem_data_size = size;
-return SCPE_OK;
+return sim_set_memory_load_file_ex (data, size, NULL, 0);
 }
 
 int Fgetc (FILE *f)
@@ -8268,22 +8277,68 @@ t_stat load_cmd (int32 flag, CONST char *cptr)
 {
 char gbuf[CBUFSIZE];
 FILE *loadfile = NULL;
-t_stat reason;
+t_stat reason = SCPE_OK;
 
 GET_SWITCHES (cptr);                                    /* get switches */
 if (*cptr == 0)                                         /* must be more */
     return SCPE_2FARG;
 cptr = get_glyph_nc (cptr, gbuf, 0);                    /* get file name */
-if (!mem_data) {
+if (mem_data == NULL) {
+    if (mem_filepath != NULL)
+        reason = sim_fetch_binary_file (gbuf, mem_filepath, mem_data_size, mem_checksum);
+    if (reason != SCPE_OK)
+        return reason;
     loadfile = sim_fopen (gbuf, flag? "wb": "rb");      /* open for wr/rd */
     if (loadfile == NULL)
-        return SCPE_OPENERR;
+        return sim_messagef (SCPE_OPENERR, "Error opening '%s' - %s\n", gbuf, strerror (errno));
     }
 GET_SWITCHES (cptr);                                    /* get switches */
 reason = sim_load (loadfile, (CONST char *)cptr, gbuf, flag);/* load or dump */
 if (loadfile)
     fclose (loadfile);
 return reason;
+}
+
+#define SIM_REPO_PATH "https://github.com/simh/simh/raw/master/"
+
+t_stat sim_fetch_binary_file (const char *filename, const char *filepath, size_t size, unsigned int checksum)
+{
+struct stat filestat;
+t_stat r = SCPE_OK;
+FILE *f;
+t_bool fetched = FALSE;
+int byte;
+unsigned int thissum = 0;
+size_t bytes = 0;
+
+if (sim_stat (filename, &filestat)) {
+    char cmd[CBUFSIZE];
+
+    if ((errno == EACCES) || (errno == EPERM))
+        return SCPE_OPENERR;
+    sim_messagef (SCPE_OK, "Fetching %s from %s%s\n", filename, SIM_REPO_PATH, filepath);
+    snprintf (cmd, sizeof (cmd), "-LJOs %s%s", SIM_REPO_PATH, filepath);
+    r = curl_cmd (0, cmd);
+    if (r != SCPE_OK)
+        return sim_messagef (SCPE_OPENERR, "Can't acquire '%s' remotely\n", filename);
+    fetched = TRUE;
+    }
+f = sim_fopen (filename, "rb");
+if (f == NULL)
+    return sim_messagef (SCPE_OPENERR, "Can't open '%s' - %s\n", filename, strerror (errno));
+while (EOF != (byte = fgetc (f))) {
+    ++bytes;
+    thissum += (unsigned char)byte;
+    }
+fclose (f);
+thissum = ~thissum;
+if (((bytes != size) || (thissum != checksum)) && fetched)
+    unlink (filename);
+if (bytes != size)
+    return sim_messagef (SCPE_OPENERR, "'%s' Expected file size found %d instead of %d\n", filename, (int)bytes, (int)size);
+if (thissum != checksum)
+    return sim_messagef (SCPE_OPENERR, "'%s' Expected file size found 0x%X instead of 0x%X\n", filename, thissum, checksum);
+return SCPE_OK;
 }
 
 /* Attach command

@@ -195,6 +195,7 @@ int Fprintf (FILE *f, const char *fmt, ...) GCC_FMT_ATTR(2, 3);
 #define fputs(_s,_f) Fprintf(_f,"%s",_s)
 #define fputc(_c,_f) Fprintf(_f,"%c",_c)
 t_stat sim_set_memory_load_file (const unsigned char *data, size_t size);
+t_stat sim_set_memory_load_file_ex (const unsigned char *data, size_t size, const char *filepath, unsigned int checksum);
 int Fgetc (FILE *f);
 t_stat fprint_val (FILE *stream, t_value val, uint32 rdx, uint32 wid, uint32 fmt);
 t_stat sprint_val (char *buf, t_value val, uint32 rdx, uint32 wid, uint32 fmt);
@@ -241,6 +242,7 @@ t_stat sim_exp_showall (FILE *st, const EXPECT *exp);
 t_stat sim_exp_check (EXPECT *exp, uint8 data);
 CONST char *match_ext (CONST char *fnam, const char *ext);
 int sim_cmp_string (const char *s1, const char *s2);
+t_stat sim_fetch_binary_file (const char *filename, const char *filepath, size_t size, unsigned int checksum);
 t_stat show_version (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr);
 t_stat set_dev_debug (DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr);
 t_stat show_dev_debug (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr);
