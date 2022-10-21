@@ -463,13 +463,15 @@ t_stat besm6_init_panel (UNIT *u, int32 val, CONST char *cptr, void *desc)
     if ((fontfile == NULL) ||
         (sim_stat (fontfile, &stat_buf))) {
         const char *dirs[] = {"/usr/share/fonts", "/Library/Fonts", "/usr/lib/jvm", "/System/Library/Frameworks/JavaVM.framework/Versions", "/System/Library/Fonts/Supplemental", "C:/Windows/Fonts", NULL};
-        char *fonts[] = {NULL, "DejaVuSans.ttf", "LucidaSansRegular.ttf", "FreeSans.ttf", "AppleGothic.ttf", "tahoma.ttf", "LiberationSans-Regular.ttf", NULL};
+        const char *fonts[] = {NULL, "DejaVuSans.ttf", "LucidaSansRegular.ttf", "FreeSans.ttf", "AppleGothic.ttf", "tahoma.ttf", "LiberationSans-Regular.ttf", NULL};
         const char **d, **f;
 
-        if (fontfile != NULL)
+        if (fontfile != NULL) {
             fonts[0] = fontfile;
+            fonts[1] = NULL;
+            }
         else {
-            for (f = fonts; *(f + 1) = NULL; ++f)
+            for (f = fonts; *(f + 1) != NULL; ++f)
                 *f = *(f + 1);
             }
         fontfile = NULL;
