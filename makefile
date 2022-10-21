@@ -192,10 +192,10 @@ endif
 find_exe = $(abspath $(strip $(firstword $(foreach dir,$(strip $(subst :, ,${PATH})),$(wildcard $(dir)/$(1))))))
 find_lib = $(firstword $(abspath $(strip $(firstword $(foreach dir,$(strip ${LIBPATH}),$(foreach ext,$(strip ${LIBEXT}),$(wildcard $(dir)/lib$(1).$(ext))))))))
 find_include = $(abspath $(strip $(firstword $(foreach dir,$(strip ${INCPATH}),$(wildcard $(dir)/$(1).h)))))
-ifeq (/usr/local/bin/brew,$(shell which brew))
+ifeq (/usr/local/bin/brew,$(shell which brew 2>/dev/null))
   PKG_MGR = HOMEBREW
 else
-  ifeq (/opt/local/bin/port,$(shell which port))
+  ifeq (/opt/local/bin/port,$(shell which port 2>/dev/null))
     PKG_MGR = MACPORTS
   endif
 endif
@@ -205,8 +205,14 @@ endif
 ifneq (,$(and $(findstring Linux,$(shell uname)),$(call find_exe,yum)))
   PKG_MGR = YUM
 endif
-ifneq (,$(call find_exe,pkgin))
+ifneq (,$(and $(findstring NetBSD,$(shell uname)),$(call find_exe,pkgin)))
   PKG_MGR = PKGSRC
+endif
+ifneq (,$(and $(findstring FreeBSD,$(shell uname)),$(call find_exe,pkg)))
+  PKG_MGR = PKGBSD
+endif
+ifneq (,$(and $(findstring OpenBSD,$(shell uname)),$(call find_exe,pkg_add)))
+  PKG_MGR = PKGADD
 endif
 # Dependent packages
 DPKG_COMPILER  = 1
@@ -224,6 +230,8 @@ PKGS_SRC_MACPORTS   = -        -             vde2           pcre         libedit
 PKGS_SRC_APT        = gcc      libpcap-dev   libvdeplug-dev libpcre3-dev libedit-dev   libsdl2-dev libpng-dev   -          libsdl2-ttf-dev
 PKGS_SRC_YUM        = gcc      libpcap-devel -              pcre-devel   libedit-devel SDL2-devel  libpng-devel zlib-devel SDL2_ttf-devel
 PKGS_SRC_PKGSRC     = -        -             -              pcre         editline      SDL2        png          zlib       SDL2_ttf
+PKGS_SRC_PKGBSD     = -        -             -              pcre         libedit       sdl2        png          -          sdl2_ttf
+PKGS_SRC_PKGADD     = -        -             -              pcre         -             sdl2        png          -          sdl2-ttf
 ifneq (3,${SIM_MAJOR})
   ifneq (0,$(TESTS))
     find_test = RegisterSanityCheck $(abspath $(wildcard $(1)/tests/$(2)_test.ini)) </dev/null
@@ -239,8 +247,10 @@ endif
 ifeq (${WIN32},)  #*nix Environments (&& cygwin)
   ifeq (${GCC},)
     ifeq (,$(shell which gcc 2>/dev/null))
-      $(info *** Warning *** Using local cc since gcc isn't available locally.)
-      $(info *** Warning *** You may need to install gcc to build working simulators.)
+      ifneq (clang,$(findstring clang,$(and $(shell which cc 2>/dev/null),$(shell cc -v /dev/null 2>&1 | grep 'clang'))))
+        $(info *** Warning *** Using local cc since gcc isn't available locally.)
+        $(info *** Warning *** You may need to install gcc to build working simulators.)
+      endif
       GCC = cc
       NEEDED_PKGS += DPKG_COMPILER
     else
@@ -260,7 +270,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
     OSNAME = windows-build
   endif
   ifeq (Darwin,$(OSTYPE))
-    ifeq (,$(shell which port)$(shell which brew))
+    ifeq (,$(shell which port 2>/dev/null)$(shell which brew 2>/dev/null))
       $(info *** Info *** simh dependent packages on macOS must be provided by either the)
       $(info *** Info *** HomeBrew package system or by the MacPorts package system.)
       $(info *** Info *** Neither of these seem to be installed on the local system.)
@@ -1190,12 +1200,14 @@ USEFUL_MULTIPLE = $(if $(word 2,$(USEFUL_PACKAGES)),these,this)
 ifneq (,$(USEFUL_PACKAGES))
   $(info )
   $(info *** Info ***)
-  $(info *** Info *** The simulator$(BUILD_MULTIPLE) you are building could provide more functionality)
-  $(info *** Info *** if the: $(USEFUL_PACKAGES))
+  $(info *** Info *** The simulator$(BUILD_MULTIPLE) you are building could provide more)
+  $(info *** Info *** functionality if the:)
+  $(info *** Info ***     $(USEFUL_PACKAGES))
   $(info *** Info *** package$(USEFUL_PLURAL) $(USEFUL_MULTIPLE_HIST) available on your system.)
   $(info )
-  $(info *** You have the option of building $(MAKECMDGOALS_DESCRIPTION) without the functionality)
-  $(info *** $(USEFUL_MULTIPLE) package$(USEFUL_PLURAL) provide$(if $(USEFUL_PLURAL),,s), or stopping now to install $(USEFUL_MULTIPLE) package$(USEFUL_PLURAL).)
+  $(info *** You have the option of building $(MAKECMDGOALS_DESCRIPTION) without the)
+  $(info *** functionality $(USEFUL_MULTIPLE) package$(USEFUL_PLURAL) provide$(if $(USEFUL_PLURAL),,s), or stopping now to install)
+  $(info *** $(USEFUL_MULTIPLE) package$(USEFUL_PLURAL).)
   $(info )
   $(info Do you want to install $(USEFUL_MULTIPLE) package$(USEFUL_PLURAL) before building $(MAKECMDGOALS_DESCRIPTION)?)
 endif
@@ -1239,6 +1251,31 @@ ifneq (,$(and $(findstring PKGSRC,$(PKG_MGR)),$(USEFUL_PACKAGES)))
     hash := \#
     $(info Enter:    Password: <type-root-password>)
     $(info Enter:    $(hash) pkgin install $(USEFUL_PACKAGES))
+    $(info when that completes)
+    $(info Enter:    $(hash) exit)
+    $(info re-enter: $$ $(MAKE) $(MAKECMDGOALS))
+    $(error )
+  endif
+endif
+ifneq (,$(and $(findstring PKGBSD,$(PKG_MGR)),$(USEFUL_PACKAGES)))
+  ifeq (,$(shell $(SHELL) -c 'read -p "[Enter Y or N, Default is Y] " answer; echo $$answer' | grep -i n))
+    $(info Enter:    $$ su)
+    hash := \#
+    $(info Enter:    Password: <type-root-password>)
+    $(info Enter:    $(hash) pkg install $(USEFUL_PACKAGES))
+    $(info when that completes)
+    $(info Enter:    $(hash) exit)
+    $(info re-enter: $$ $(MAKE) $(MAKECMDGOALS))
+    $(error )
+  endif
+endif
+ifneq (,$(and $(findstring PKGADD,$(PKG_MGR)),$(USEFUL_PACKAGES)))
+  $(info [Enter Y or N, Default is Y])
+  ifeq (,$(shell $(SHELL) -c 'read answer; echo $$answer' | grep -i n))
+    $(info Enter:    $$ su)
+    hash := \#
+    $(info Enter:    Password: <type-root-password>)
+    $(info Enter:    $(hash) pkg_add $(USEFUL_PACKAGES))
     $(info when that completes)
     $(info Enter:    $(hash) exit)
     $(info re-enter: $$ $(MAKE) $(MAKECMDGOALS))
