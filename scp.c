@@ -1047,7 +1047,7 @@ static const char simh_help1[] =
       " There are two forms of execution stop criteria:\n"
       "+1. A temporary breakpoint (which exists only until it is encountered).\n"
       "+2. A string which will stop execution when the simulator has output\n"
-      "++the indicated string.\n"
+      "++the indicated string.\n\n"
 #define HLP_GO          "*Commands Running_A_Simulated_Program GO"
       "3GO {start_pc_addr} {UNTIL stop_pc_addr|\"output-string\"}\n"
       " The GO command does not reset devices, deposits its argument (if given)\n"
@@ -1057,11 +1057,11 @@ static const char simh_help1[] =
       " There are two forms of execution stop criteria:\n"
       "+1. A temporary breakpoint (which exists only until it is encountered).\n"
       "+2. A string which will stop execution when the simulator has output\n"
-      "++the indicated string.\n"
+      "++the indicated string.\n\n"
 #define HLP_CONTINUE    "*Commands Running_A_Simulated_Program CONTINUE"
       "3CONTINUE\n"
       " The CONT command (abbreviated CO) does not reset devices and resumes\n"
-      " execution at the current PC.\n"
+      " execution at the current PC.\n\n"
 #define HLP_STEP        "*Commands Running_A_Simulated_Program STEP"
       "3STEP\n"
       " The STEP command (abbreviated S) resumes execution at the current PC for\n"
@@ -1075,12 +1075,12 @@ static const char simh_help1[] =
       " The NEXT command (abbreviated N) resumes execution at the current PC for\n"
       " one instruction, attempting to execute through a subroutine calls.\n"
       " If the next instruction to be executed is not a subroutine call,\n"
-      " one instruction is executed.\n"
+      " one instruction is executed.\n\n"
 #define HLP_BOOT        "*Commands Running_A_Simulated_Program BOOT"
-      "3BOOT\n"
+      "3BOOT {dev|unit}\n"
       " The BOOT command (abbreviated BO) resets all devices and bootstraps the\n"
       " device and unit given by its argument.  If no unit is supplied, unit 0 is\n"
-      " bootstrapped.  The specified unit must be attached.\n"
+      " bootstrapped.  The specified unit, generally, must be attached.\n\n"
        /***************** 80 character line width template *************************/
       "2Stopping The Simulator\n"
       " Programs run until the simulator detects an error or stop condition, or\n"
@@ -3987,7 +3987,7 @@ if (*cptr) {
                     }
                 else {
                     if (((cmdp->action == &exdep_cmd) || (0 == strcmp(cmdp->name, "BOOT"))) &&
-                        sim_dflt_dev->help) {
+                        (cmdp->help == NULL) && (sim_dflt_dev->help != NULL)) {
                             sim_dflt_dev->help (stdout, sim_dflt_dev, sim_dflt_dev->units, 0, cmdp->name);
                             if (sim_log && (!sim_oline))
                                 sim_dflt_dev->help (sim_log, sim_dflt_dev, sim_dflt_dev->units, 0, cmdp->name);
