@@ -6731,7 +6731,7 @@ FILE *f;
 memset (toolversion, 0, sizeof(toolversion));
 toolpath = sim_get_tool_path (tool);
 if (toolpath[0]) {
-    snprintf (versioncmd, sizeof (versioncmd), "%s --version", tool);
+    snprintf (versioncmd, sizeof (versioncmd), "%s --version 2>&1", tool);
     if ((f = popen (versioncmd, "r"))) {
         do {
             if (NULL == fgets (toolversion, sizeof(toolversion)-1, f))
