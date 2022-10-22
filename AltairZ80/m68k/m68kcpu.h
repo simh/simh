@@ -1912,6 +1912,7 @@ extern jmp_buf m68ki_bus_error_jmp_buf;
 static inline void m68ki_exception_bus_error(void)
 {
 	int i;
+	uint sr;
 
 	/* If we were processing a bus error, address error, or reset,
 	 * while writing the stack frame, this is a catastrophic failure.
@@ -1932,7 +1933,7 @@ static inline void m68ki_exception_bus_error(void)
 		REG_DA[i] = REG_DA_SAVE[i];
 	}
 
-	uint sr = m68ki_init_exception();
+	sr = m68ki_init_exception();
 
 	/* Note: This is implemented for 68010 only! */
 	m68ki_stack_frame_1000(REG_PPC, sr, EXCEPTION_BUS_ERROR);
