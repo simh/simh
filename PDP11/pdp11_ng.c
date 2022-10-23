@@ -1,7 +1,7 @@
 #ifdef USE_DISPLAY
 /* pdp11_ng.c: NG, Knight vector display
 
-   Copyright (c) 2018, Lars Brinkhoff
+   Copyright (c) 2018, 2022, Lars Brinkhoff
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -230,11 +230,9 @@ ng_boot(int32 unit, DEVICE *dptr)
 t_stat
 ng_set_type(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-  //if ((uptr->flags & DEV_DIS) == 0)
-  //return SCPE_ALATT;
-  if (MATCH_CMD (cptr, "DAZZLE"))
+  if (MATCH_CMD (cptr, "DAZZLE") == 0)
     ng_type = TYPE_DAZZLE;
-  else if (MATCH_CMD (cptr, "LOGO"))
+  else if (MATCH_CMD (cptr, "LOGO") == 0)
     ng_type = TYPE_LOGO;
   else
     return SCPE_ARG;
