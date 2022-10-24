@@ -309,6 +309,8 @@ static t_stat wd179x_reset(DEVICE *dptr)
         }
     }
 
+    wd179x_info->cmdtype = 0;
+
     return SCPE_OK;
 }
 

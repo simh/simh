@@ -1911,6 +1911,7 @@ extern jmp_buf m68ki_bus_error_jmp_buf;
 /* Exception for bus error */
 static inline void m68ki_exception_bus_error(void)
 {
+	uint sr;
 	int i;
 	uint sr;
 

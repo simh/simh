@@ -43,6 +43,10 @@
 #define OPT_ON              1
 #define OPT_SPECIFY_HANDLER 2
 
+#if defined(_MSC_VER)
+/* Disable MSVC warning 4146: Unary minus. */
+#pragma warning (disable: 4146)
+#endif
 
 /* ======================================================================== */
 /* ============================== MAME STUFF ============================== */

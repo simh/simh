@@ -282,10 +282,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\AltairZ80\m68k\softfloat\softfloat.c"
-				>
-			</File>
-			<File
 				RelativePath="..\AltairZ80\m68ksim.c"
 				>
 			</File>
@@ -338,11 +334,11 @@
 				>
 			</File>
 			<File
-				RelativePath="..\AltairZ80\s100_if3.c"
+				RelativePath="..\AltairZ80\s100_icom.c"
 				>
 			</File>
 			<File
-				RelativePath="..\AltairZ80\s100_icom.c"
+				RelativePath="..\AltairZ80\s100_if3.c"
 				>
 			</File>
 			<File
@@ -430,6 +426,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\AltairZ80\m68k\softfloat\softfloat.c"
+				>
+			</File>
+			<File
 				RelativePath="..\AltairZ80\vfdhd.c"
 				>
 			</File>
@@ -511,6 +511,58 @@
 				>
 			</File>
 			<File
+				RelativePath="..\AltairZ80\i8272.h"
+				>
+			</File>
+			<File
+				RelativePath="..\AltairZ80\i86.h"
+				>
+			</File>
+			<File
+				RelativePath="..\AltairZ80\insns.h"
+				>
+			</File>
+			<File
+				RelativePath="..\AltairZ80\m68k\m68k.h"
+				>
+			</File>
+			<File
+				RelativePath="..\AltairZ80\m68k\m68kconf.h"
+				>
+			</File>
+			<File
+				RelativePath="..\AltairZ80\m68k\m68kcpu.h"
+				>
+			</File>
+			<File
+				RelativePath="..\AltairZ80\m68k\m68kmmu.h"
+				>
+			</File>
+			<File
+				RelativePath="..\AltairZ80\m68k\m68kops.h"
+				>
+			</File>
+			<File
+				RelativePath="..\AltairZ80\m68ksim.h"
+				>
+			</File>
+			<File
+				RelativePath="..\AltairZ80\m68k\softfloat\mamesf.h"
+				>
+			</File>
+			<File
+				RelativePath="..\AltairZ80\mfdc.h"
+				>
+			</File>
+			<File
+				RelativePath="..\AltairZ80\m68k\softfloat\milieu.h"
+				>
+			</File>
+			<File
+				RelativePath="..\AltairZ80\nasm.h"
+				>
+			</File>
+			<File
 				RelativePath="..\scp.h"
 				>
 			</File>
@@ -564,6 +616,18 @@
 			</File>
 			<File
 				RelativePath="..\sim_video.h"
+				>
+			</File>
+			<File
+				RelativePath="..\AltairZ80\m68k\softfloat\softfloat.h"
+				>
+			</File>
+			<File
+				RelativePath="..\AltairZ80\vfdhd.h"
+				>
+			</File>
+			<File
+				RelativePath="..\AltairZ80\wd179x.h"
 				>
 			</File>
 		</Filter>
