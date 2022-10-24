@@ -3637,11 +3637,21 @@ return (WAIT_OBJECT_0 == WaitForSingleObject (std_input, ms_timeout));
 static uint8 out_buf[ESC_HOLD_MAX]; /* Buffered characters pending output */
 static int32 out_ptr = 0;
 
-static t_stat sim_out_hold_svc (UNIT *uptr)
+static void sim_console_write(uint8 *outbuf, int32 outsz)
 {
 DWORD unused;
+DWORD mode;
+BOOL result;
 
-WriteConsoleA(std_output, out_buf, out_ptr, &unused, NULL);
+if (GetConsoleMode(std_output, &mode))
+    WriteConsoleA(std_output, outbuf, outsz, &unused, NULL);
+else
+    result = WriteFile(std_output, outbuf, outsz, &unused, NULL);
+}
+
+static t_stat sim_out_hold_svc (UNIT *uptr)
+{
+sim_console_write(out_buf, out_ptr);
 out_ptr = 0;
 return SCPE_OK;
 }
@@ -3650,16 +3660,16 @@ return SCPE_OK;
 
 static t_stat sim_os_putchar (int32 c)
 {
-DWORD unused;
 uint32 now;
 static uint32 last_bell_time;
+uint8  ch = (c & 0xff);
 
-if (c != 0177) {
-    switch (c) {
+if (ch != 0177) {
+    switch (ch) {
         case BELL_CHAR:
             now = sim_os_msec ();
             if ((now - last_bell_time) > BELL_INTERVAL_MS) {
-                WriteConsoleA(std_output, &c, 1, &unused, NULL);
+                sim_console_write(&ch, 1);
                 last_bell_time = now;
                 }
             break;
@@ -3668,26 +3678,26 @@ if (c != 0177) {
         case CSI_CHAR:
         case ESC_CHAR:
             if (out_ptr) {
-                WriteConsoleA(std_output, out_buf, out_ptr, &unused, NULL);
+                sim_console_write(out_buf, out_ptr);
                 out_ptr = 0;
                 sim_cancel (&out_hold_unit);
                 }
-            out_buf[out_ptr++] = (uint8)c;
+            out_buf[out_ptr++] = ch;
             sim_activate_after (&out_hold_unit, ESC_HOLD_USEC_DELAY);
             out_hold_unit.action = &sim_out_hold_svc;
             break;
         default:
             if (out_ptr) {
                 if (out_ptr >= ESC_HOLD_MAX) {              /* Stop buffering if full */
-                    WriteConsoleA(std_output, out_buf, out_ptr, &unused, NULL);
+                    sim_console_write(out_buf, out_ptr);
                     out_ptr = 0;
-                    WriteConsoleA(std_output, &c, 1, &unused, NULL);
+                    sim_console_write(&ch, 1);
                     }
                 else
-                    out_buf[out_ptr++] = (uint8)c;
+                    out_buf[out_ptr++] = ch;
                 }
             else
-                WriteConsoleA(std_output, &c, 1, &unused, NULL);
+                sim_console_write(&ch, 1);
         }
     }
 return SCPE_OK;
