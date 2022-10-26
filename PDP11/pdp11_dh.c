@@ -81,8 +81,8 @@ DIB dh_dib = {
 };
 
 UNIT dh_unit[] = {
-  { UDATA (&dh_input_svc, UNIT_ATTABLE, 0) },
-  { UDATA (&dh_output_svc, UNIT_DIS, 0) }
+  { UDATA (&dh_input_svc, UNIT_ATTABLE | UNIT_IDLE, 0) },
+  { UDATA (&dh_output_svc, UNIT_DIS | UNIT_IDLE, 0) }
 };
 
 REG dh_reg[] = {

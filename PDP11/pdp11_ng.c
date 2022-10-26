@@ -58,7 +58,7 @@ DIB ng_dib = {
 };
 
 UNIT ng_unit = {
-  UDATA (&ng_svc, 0, 0), NG_DELAY
+  UDATA (&ng_svc, UNIT_IDLE, 0), NG_DELAY
 };
 
 REG ng_reg[] = {
@@ -131,8 +131,14 @@ t_stat
 ng_wr(int32 data, int32 PA, int32 access)
 {
   switch (PA & 002) {
-  case 000:  ng_set_csr(data); return SCPE_OK;
-  case 002:  ng_set_reloc(data); return SCPE_OK;
+  case 000:
+    ng_set_csr(data);
+    if (data & 010000)
+      sim_activate (&ng_unit, 1);
+    return SCPE_OK;
+  case 002:
+    ng_set_reloc(data);
+    return SCPE_OK;
   }
   return SCPE_NXM;
 }
@@ -183,7 +189,6 @@ ng_reset(DEVICE *dptr)
 
   CLR_INT (NG);
   ng_unit.wait = 100;
-  sim_activate (dptr->units, 1);
 
   set_cmd (0, "DZ DISABLED"); /* Conflict with NG. */
   set_cmd (0, "HK DISABLED"); /* Conflict with RF. */

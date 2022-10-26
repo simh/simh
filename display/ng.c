@@ -308,6 +308,7 @@ ng_cycle(int us, int slowdown)
   static uint32 usec = 0;
   static uint32 msec = 0;
   uint32 new_msec;
+  int running = 0;
   int saved;
 
   new_msec = (usec += us) / 1000;
@@ -323,7 +324,7 @@ ng_cycle(int us, int slowdown)
     if ((status[0] & 1) == 0)
       goto age_ret;
   } else if (ng_type != TYPE_DAZZLE)
-    return 1;
+    return 0;
 
   if (sync_period)
     goto age_ret;
@@ -333,6 +334,7 @@ ng_cycle(int us, int slowdown)
     if (ng_type == TYPE_DAZZLE && (status[console] & TKRUN) == 0)
       continue;
 
+    running = 1;
     time_out = fetch(dpc[console], &inst);
     DEBUGF("[%d] PC %06o, INSTR %06o\n", console, dpc[console], inst);
     dpc[console] += 2;
@@ -355,5 +357,5 @@ ng_cycle(int us, int slowdown)
 
  age_ret:
   display_age(us, slowdown);
-  return 1;
+  return running || !display_is_blank();
 }
