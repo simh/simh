@@ -79,6 +79,7 @@ ng_get_csr(void)
     DEBUGF("Get CSR: %06o\n", status[0]);
     return status[0];
   }
+  return 0;
 }
 
 int32
