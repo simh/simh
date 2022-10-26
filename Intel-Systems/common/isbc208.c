@@ -512,7 +512,7 @@ extern void clr_irq(int32 int_num);
 extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint16, uint16, uint8);
 extern uint8 unreg_dev(uint16);
 extern void multibus_put_mbyte(uint16 addr, uint8 val);
-extern int32 multibus_get_mbyte(uint16 addr);
+extern uint8 multibus_get_mbyte(uint16 addr);
  
 /* external globals */
 
