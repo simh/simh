@@ -309,6 +309,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
         endif
       endif
     else
+      OS_CCDEFS += -Werror
       ifeq (,$(findstring ++,${GCC}))
         CC_STD = -std=gnu99
       else
@@ -316,6 +317,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
       endif
     endif
   else
+    OS_CCDEFS += -Werror
     ifeq (Apple,$(shell ${GCC} -v /dev/null 2>&1 | grep 'Apple' | awk '{ print $$1 }'))
       COMPILER_NAME = $(shell ${GCC} -v /dev/null 2>&1 | grep 'Apple' | awk '{ print $$1 " " $$2 " " $$3 " " $$4 }')
       CLANG_VERSION = $(word 4,$(COMPILER_NAME))
