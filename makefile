@@ -2274,7 +2274,7 @@ endif
 
 pdp11 : ${BIN}pdp11${EXE}
 
-${BIN}pdp11${EXE} : ${PDP11} ${SIM}
+${BIN}pdp11${EXE} : ${PDP11} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${PDP11} ${SIM} ${PDP11_OPT} ${CC_OUTSPEC} ${LDFLAGS}
 ifneq (,$(call find_test,${PDP11D},pdp11))
