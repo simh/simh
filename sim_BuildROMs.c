@@ -90,6 +90,7 @@ struct ROM_File_Descriptor {
 #define snprintf _snprintf
 #else
 #include <utime.h>
+#include <unistd.h>
 #endif
 
 int sim_read_ROM_include(const char *include_filename, 
