@@ -6954,7 +6954,7 @@ if (flag) {
         char buildosversion[2*PATH_MAX+1] = S_xstr(SIM_BUILD_OS_VERSION);
 #endif
         
-        if ((f = popen ("uname -a", "r"))) {
+        if ((f = popen ("uname -a | sed 's/,//g'", "r"))) {
             memset (osversion, 0, sizeof (osversion));
             do {
                 if (NULL == fgets (osversion, sizeof (osversion)-1, f))
