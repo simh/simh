@@ -201,7 +201,7 @@ uint8  cmp_order[0100] = {
 
 uint8               M[MAXMEMSIZE] = { 0 };      /* memory */
 uint32              EMEMSIZE;                   /* Physical memory size */
-uint8               AC[6*256];                  /* store registers */
+uint8               AC[6*512];                  /* store registers */
 uint16              flags;                      /* Flags */
 uint16              spc;                        /* Reg start point */
 uint16              spcb;                       /* Reg start point b */
