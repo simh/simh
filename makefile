@@ -845,7 +845,8 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
           $(info using macOS dynamic libpcap: $(call find_include,pcap))
         endif
       endif
-    else
+    else # pcap desired but pcap.h not found
+      NEEDED_PKGS += DPKG_PCAP
       # On non-Linux platforms, we'll still try to provide deprecated support for libpcap in /usr/local
       INCPATHSAVE := ${INCPATH}
       ifeq (,$(findstring Linux,$(OSTYPE)))
