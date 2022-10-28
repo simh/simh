@@ -1913,7 +1913,6 @@ static inline void m68ki_exception_bus_error(void)
 {
 	uint sr;
 	int i;
-	uint sr;
 
 	/* If we were processing a bus error, address error, or reset,
 	 * while writing the stack frame, this is a catastrophic failure.
