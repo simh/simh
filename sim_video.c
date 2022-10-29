@@ -2095,6 +2095,7 @@ while (vid_active) {
                                 event.user.code = 0;    /* Mark as done */
                                 continue;
                                 }
+                            vptr = vid_get_event_window (&event, event.user.windowID);
                             break;
                             }
                         }
