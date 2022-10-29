@@ -44,6 +44,13 @@
 # If debugging is desired, then GNU make can be invoked with
 # DEBUG=1 on the command line.
 #
+# When building compiler optimized binaries with the gcc or clang 
+# compilers, invoking GNU make with LTO=1 on the command line will 
+# cause the build to use Link Time Optimization to maximally optimize 
+# the results.  Link Time Optimization can report errors which aren't 
+# otherwise detected and will also take significantly longer to 
+# complete.
+#
 # The default build will run per simulator tests if they are 
 # available.  If building without running tests is desired, 
 # then GNU make should be invoked with TESTS=0 on the command 
@@ -224,15 +231,15 @@ DPKG_SDL       = 6
 DPKG_PNG       = 7
 DPKG_ZLIB      = 8
 DPKG_SDL_TTF   = 9
-# Platform Pkg Names  COMPILER PCAP          VDE            PCRE         EDITLINE      SDL         PNG          ZLIB       SDL_TTF
-PKGS_SRC_HOMEBREW   = -        -             vde            pcre         libedit       sdl2        libpng       zlib       sdl2_ttf
-PKGS_SRC_MACPORTS   = -        -             vde2           pcre         libedit       libsdl2     libpng       zlib       libsdl2_ttf
-PKGS_SRC_APT        = gcc      libpcap-dev   libvdeplug-dev libpcre3-dev libedit-dev   libsdl2-dev libpng-dev   -          libsdl2-ttf-dev
-PKGS_SRC_YUM        = gcc      libpcap-devel -              pcre-devel   libedit-devel SDL2-devel  libpng-devel zlib-devel SDL2_ttf-devel
-PKGS_SRC_PKGSRC     = -        -             -              pcre         editline      SDL2        png          zlib       SDL2_ttf
-PKGS_SRC_PKGBSD     = -        -             -              pcre         libedit       sdl2        png          -          sdl2_ttf
-PKGS_SRC_PKGADD     = -        -             -              pcre         -             sdl2        png          -          sdl2-ttf
 ifneq (3,${SIM_MAJOR})
+  # Platform Pkg Names  COMPILER PCAP          VDE            PCRE         EDITLINE      SDL         PNG          ZLIB       SDL_TTF
+  PKGS_SRC_HOMEBREW   = -        -             vde            pcre         libedit       sdl2        libpng       zlib       sdl2_ttf
+  PKGS_SRC_MACPORTS   = -        -             vde2           pcre         libedit       libsdl2     libpng       zlib       libsdl2_ttf
+  PKGS_SRC_APT        = gcc      libpcap-dev   libvdeplug-dev libpcre3-dev libedit-dev   libsdl2-dev libpng-dev   -          libsdl2-ttf-dev
+  PKGS_SRC_YUM        = gcc      libpcap-devel -              pcre-devel   libedit-devel SDL2-devel  libpng-devel zlib-devel SDL2_ttf-devel
+  PKGS_SRC_PKGSRC     = -        -             -              pcre         editline      SDL2        png          zlib       SDL2_ttf
+  PKGS_SRC_PKGBSD     = -        -             -              pcre         libedit       sdl2        png          -          sdl2_ttf
+  PKGS_SRC_PKGADD     = -        -             -              pcre         -             sdl2        png          -          sdl2-ttf
   ifneq (0,$(TESTS))
     find_test = RegisterSanityCheck $(abspath $(wildcard $(1)/tests/$(2)_test.ini)) </dev/null
     ifneq (,${TEST_ARG})
@@ -243,6 +250,16 @@ ifneq (3,${SIM_MAJOR})
   else
     TESTING_FEATURES = - Per simulator tests will be skipped
   endif
+else
+  # simh v3 has minimal external dependencies
+  # Platform Pkg Names  COMPILER PCAP          VDE            PCRE         EDITLINE      SDL         PNG          ZLIB       SDL_TTF
+  PKGS_SRC_HOMEBREW   = -        -             vde            -            libedit       -           -            -          -
+  PKGS_SRC_MACPORTS   = -        -             vde2           -            libedit       -           -            -          -
+  PKGS_SRC_APT        = -        libpcap-dev   libvdeplug-dev -            libedit-dev   -           -            -          -
+  PKGS_SRC_YUM        = -        libpcap-devel -              -            libedit-devel -           -            -          -
+  PKGS_SRC_PKGSRC     = -        -             -              -            editline      -           -            -          -
+  PKGS_SRC_PKGBSD     = -        -             -              -            libedit       -           -            -          -
+  PKGS_SRC_PKGADD     = -        -             -              -            -             -           -            -          -
 endif
 ifeq (${WIN32},)  #*nix Environments (&& cygwin)
   ifeq (${GCC},)
@@ -538,7 +555,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
                 endif
                 OS_CCDEFS += -D_HPUX_SOURCE -D_LARGEFILE64_SOURCE
                 OS_LDFLAGS += -Wl,+b:
-                NO_LTO = 1
+                LTO =
               else
                 LIBEXT = a
               endif
@@ -562,14 +579,6 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
     endif
     export CPATH = $(subst $() $(),:,$(INCPATH))
     export LIBRARY_PATH = $(subst $() $(),:,$(LIBPATH))
-    # Some gcc versions don't support LTO, so only use LTO when the compiler is known to support it
-    ifeq (,$(NO_LTO))
-      ifneq (,$(GCC_VERSION))
-        ifeq (,$(shell ${GCC} -v /dev/null 2>&1 | grep '\-\-enable-lto'))
-          LTO_EXCLUDE_VERSIONS += $(GCC_VERSION)
-        endif
-      endif
-    endif
   endif
   $(info lib paths are: ${LIBPATH})
   $(info include paths are: ${INCPATH})
@@ -631,6 +640,9 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
       OS_CCDEFS += -DHAVE_LIBEDIT
       OS_LDFLAGS += -ledit
       $(info using libedit: $(call find_lib,edit) $(call find_include,editline/readline))
+      ifneq (,$(call find_lib,termcap))
+        OS_LDFLAGS += -ltermcap
+      endif
       ifeq ($(LD_SEARCH_NEEDED),$(call need_search,edit))
         OS_LDFLAGS += -L$(dir $(call find_lib,edit))
       endif
@@ -1298,18 +1310,13 @@ ifneq ($(DEBUG),)
   CFLAGS_G = -g -ggdb -g3
   CFLAGS_O = -O0
   BUILD_FEATURES = - debugging support
+  LTO =
 else
   ifneq (,$(findstring clang,$(COMPILER_NAME))$(findstring LLVM,$(COMPILER_NAME)))
     CFLAGS_O = -O2 -fno-strict-overflow
-    GCC_OPTIMIZERS_CMD = ${GCC} --help
-    NO_LTO = 1
+    GCC_OPTIMIZERS_CMD = ${GCC} --help 2>&1
   else
-    NO_LTO = 1
-    ifeq (Darwin,$(OSTYPE))
-      CFLAGS_O += -O4 -flto -fwhole-program
-    else
-      CFLAGS_O := -O2
-    endif
+    CFLAGS_O := -O2
   endif
   LDFLAGS_O = 
   GCC_MAJOR_VERSION = $(firstword $(subst  ., ,$(GCC_VERSION)))
@@ -1324,9 +1331,6 @@ else
   endif
   ifneq (,$(GCC_COMMON_CMD))
     GCC_OPTIMIZERS += $(shell $(GCC_COMMON_CMD))
-  endif
-  ifneq (,$(findstring $(GCC_VERSION),$(LTO_EXCLUDE_VERSIONS)))
-    NO_LTO = 1
   endif
   ifneq (,$(findstring -finline-functions,$(GCC_OPTIMIZERS)))
     CFLAGS_O += -finline-functions
@@ -1346,13 +1350,19 @@ else
   ifneq (,$(findstring -fstrict-overflow,$(GCC_OPTIMIZERS)))
     CFLAGS_O += -fno-strict-overflow
   endif
-  ifeq (,$(NO_LTO))
+  ifneq (,$(findstring $(GCC_VERSION),$(LTO_EXCLUDE_VERSIONS)))
+    LTO =
+  endif
+  ifneq (,$(LTO))
     ifneq (,$(findstring -flto,$(GCC_OPTIMIZERS)))
-      CFLAGS_O += -flto -fwhole-program
-      LDFLAGS_O += -flto -fwhole-program
+      CFLAGS_O += -flto
+      ifneq (,$(and $(findstring gcc,$(COMPILER_NAME)),$(findstring -fwhole-program,$(GCC_OPTIMIZERS))))
+        CFLAGS_O += -fwhole-program
+      endif
+      LTO_FEATURE = , with Link Time Optimization,
     endif
   endif
-  BUILD_FEATURES = - compiler optimizations and no debugging support
+  BUILD_FEATURES = - compiler optimizations$(LTO_FEATURE) and no debugging support
 endif
 ifneq (3,$(GCC_MAJOR_VERSION))
   ifeq (,$(GCC_WARNINGS_CMD))
@@ -1601,7 +1611,7 @@ VAX730 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
 	${PDP11D}/pdp11_hk.c ${PDP11D}/pdp11_vh.c ${PDP11D}/pdp11_dmc.c \
 	${PDP11D}/pdp11_td.c ${PDP11D}/pdp11_tc.c ${PDP11D}/pdp11_rk.c \
 	${PDP11D}/pdp11_io_lib.c ${PDP11D}/pdp11_ch.c ${PDP11D}/pdp11_dup.c
-VAX730_OPT = -DVM_VAX -DVAX_730 -DUSE_INT64 -DUSE_ADDR64 -I VAX -I ${PDP11D} ${NETWORK_OPT}
+VAX730_OPT = -DVM_VAX -DVAX_730 -DUSE_INT64 -DUSE_ADDR64 -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
 
 
 VAX750 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
@@ -1617,7 +1627,7 @@ VAX750 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
 	${PDP11D}/pdp11_vh.c ${PDP11D}/pdp11_dmc.c ${PDP11D}/pdp11_dup.c \
 	${PDP11D}/pdp11_td.c ${PDP11D}/pdp11_tc.c ${PDP11D}/pdp11_rk.c \
 	${PDP11D}/pdp11_io_lib.c ${PDP11D}/pdp11_ch.c
-VAX750_OPT = -DVM_VAX -DVAX_750 -DUSE_INT64 -DUSE_ADDR64 -I VAX -I ${PDP11D} ${NETWORK_OPT}
+VAX750_OPT = -DVM_VAX -DVAX_750 -DUSE_INT64 -DUSE_ADDR64 -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
 
 
 VAX780 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
@@ -1633,7 +1643,7 @@ VAX780 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
 	${PDP11D}/pdp11_vh.c ${PDP11D}/pdp11_dmc.c ${PDP11D}/pdp11_dup.c \
 	${PDP11D}/pdp11_td.c ${PDP11D}/pdp11_tc.c ${PDP11D}/pdp11_rk.c \
 	${PDP11D}/pdp11_io_lib.c ${PDP11D}/pdp11_ch.c
-VAX780_OPT = -DVM_VAX -DVAX_780 -DUSE_INT64 -DUSE_ADDR64 -I VAX -I ${PDP11D} ${NETWORK_OPT}
+VAX780_OPT = -DVM_VAX -DVAX_780 -DUSE_INT64 -DUSE_ADDR64 -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
 
 
 VAX8200 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
@@ -1648,7 +1658,7 @@ VAX8200 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
 	${PDP11D}/pdp11_hk.c ${PDP11D}/pdp11_vh.c ${PDP11D}/pdp11_dmc.c \
 	${PDP11D}/pdp11_td.c ${PDP11D}/pdp11_tc.c ${PDP11D}/pdp11_rk.c \
 	${PDP11D}/pdp11_io_lib.c ${PDP11D}/pdp11_ch.c ${PDP11D}/pdp11_dup.c
-VAX8200_OPT = -DVM_VAX -DVAX_820 -DUSE_INT64 -DUSE_ADDR64 -I VAX -I ${PDP11D} ${NETWORK_OPT}
+VAX8200_OPT = -DVM_VAX -DVAX_820 -DUSE_INT64 -DUSE_ADDR64 -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
 
 
 VAX8600 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
@@ -1664,7 +1674,7 @@ VAX8600 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
 	${PDP11D}/pdp11_vh.c ${PDP11D}/pdp11_dmc.c ${PDP11D}/pdp11_dup.c \
 	${PDP11D}/pdp11_td.c ${PDP11D}/pdp11_tc.c ${PDP11D}/pdp11_rk.c \
 	${PDP11D}/pdp11_io_lib.c ${PDP11D}/pdp11_ch.c
-VAX8600_OPT = -DVM_VAX -DVAX_860 -DUSE_INT64 -DUSE_ADDR64 -I VAX -I ${PDP11D} ${NETWORK_OPT}
+VAX8600_OPT = -DVM_VAX -DVAX_860 -DUSE_INT64 -DUSE_ADDR64 -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
 
 
 PDP10D = ${SIMHD}/PDP10
@@ -1988,7 +1998,7 @@ B5500D = ${SIMHD}/B5500
 B5500 = ${B5500D}/b5500_cpu.c ${B5500D}/b5500_io.c ${B5500D}/b5500_sys.c \
 	${B5500D}/b5500_dk.c ${B5500D}/b5500_mt.c ${B5500D}/b5500_urec.c \
 	${B5500D}/b5500_dr.c ${B5500D}/b5500_dtc.c
-B5500_OPT = -I.. -DUSE_INT64 -DB5500 -DUSE_SIM_CARD
+B5500_OPT = -I${B5500D} -DUSE_INT64 -DB5500 -DUSE_SIM_CARD
 
 BESM6D = ${SIMHD}/BESM6
 BESM6 = ${BESM6D}/besm6_cpu.c ${BESM6D}/besm6_sys.c ${BESM6D}/besm6_mmu.c \
