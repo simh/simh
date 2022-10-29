@@ -77,6 +77,7 @@ All Simulator updates on Open SIMH will be present in this repository, and any c
 - SHOW VERSION show the host system type that build the runing simulator when it is not the same as the current host system.
 - Support for building simulators without built-in boot or ROM code when building with DONT_USE_INTERNAL_ROM is defined, but to automatically and transparently fetch the needed ROM or other boot code when it is needed.  This is possibly useful for systems which don't want to distribute simulators with build-in binary code which may have unknown copyright status.
 - Reasonable output produced for all simulators from HELP BOOT.
+- Fix occasional hang of IBM1130 simulator while building with Visual Studio.
 
 #### Changes to the PDP-11 and VAX simulators
 
