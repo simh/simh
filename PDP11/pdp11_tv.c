@@ -598,7 +598,6 @@ t_stat tv_reset(DEVICE *dptr)
       r = vid_open_window (&tv_vptr[i], &tv_dev, title, TV_WIDTH, TV_HEIGHT, 0);
       if (r != SCPE_OK)
         return r;
-      fprintf(stderr, "Window %d is %p\r\n", i, tv_vptr[i]);
       tv_palette[i][0] = vid_map_rgb_window (tv_vptr[i], 0x00, 0x00, 0x00);
       tv_palette[i][1] = vid_map_rgb_window (tv_vptr[i], 0x00, 0xFF, 0x30);
       memset (TVCNSL, 0, sizeof TVCNSL);
