@@ -53,7 +53,7 @@ static uint16 COLORA;
 static uint8  tv_source[256];
 static uint8  tv_display[256];
 static uint16 TVINCR;
-static uint8  TVSEL;     /* Frame buffer select. */
+static uint16 TVSEL;     /* Frame buffer select. */
 static uint16 TVRADR;
 static uint16 tvdata;
 static uint16 TVWC;
@@ -106,7 +106,7 @@ REG tv_reg[] = {
   { ORDATAD(VIDSW,  VIDSW,     16, "Video switch") },
   { ORDATAD(COLORD, COLORD,    16, "Color map data") },
   { ORDATAD(TVINCR, TVINCR,    16, "Increment") },
-  { ORDATAD(TVSEL,  TVSEL,      8, "Console select") },
+  { ORDATAD(TVSEL,  TVSEL,     16, "Console select") },
   { ORDATAD(TVRADR, TVRADR,    16, "Regular transfer address") },
   { ORDATAD(TVWC,   TVWC,      16, "Word count") },
   { ORDATAD(TVDADR, TVDADR,    16, "Disk transfer address") },
