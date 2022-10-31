@@ -49,7 +49,10 @@
 # cause the build to use Link Time Optimization to maximally optimize 
 # the results.  Link Time Optimization can report errors which aren't 
 # otherwise detected and will also take significantly longer to 
-# complete.
+# complete.  Additionally, non debug builds default to build with an
+# optimization level of -O3.  This optimization level can be changed 
+# by invoking GNU OPTIMIZE=-O2 (or whatever optimize value you want) 
+# on the command line if desired.
 #
 # The default build will run per simulator tests if they are 
 # available.  If building without running tests is desired, 
@@ -555,7 +558,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
                 endif
                 OS_CCDEFS += -D_HPUX_SOURCE -D_LARGEFILE64_SOURCE
                 OS_LDFLAGS += -Wl,+b:
-                LTO =
+                override LTO =
               else
                 LIBEXT = a
               endif
@@ -1306,6 +1309,7 @@ endif
 ifneq (,$(UNSUPPORTED_BUILD))
   CFLAGS_GIT += -DSIM_BUILD=Unsupported=$(UNSUPPORTED_BUILD)
 endif
+OPTIMIZE ?= -O3
 ifneq ($(DEBUG),)
   CFLAGS_G = -g -ggdb -g3
   CFLAGS_O = -O0
@@ -1313,10 +1317,10 @@ ifneq ($(DEBUG),)
   LTO =
 else
   ifneq (,$(findstring clang,$(COMPILER_NAME))$(findstring LLVM,$(COMPILER_NAME)))
-    CFLAGS_O = -O3 -fno-strict-overflow
+    CFLAGS_O = $(OPTIMIZE) -fno-strict-overflow
     GCC_OPTIMIZERS_CMD = ${GCC} --help 2>&1
   else
-    CFLAGS_O := -O3
+    CFLAGS_O := $(OPTIMIZE)
   endif
   LDFLAGS_O = 
   GCC_MAJOR_VERSION = $(firstword $(subst  ., ,$(GCC_VERSION)))
@@ -1351,7 +1355,7 @@ else
     CFLAGS_O += -fno-strict-overflow
   endif
   ifneq (,$(findstring $(GCC_VERSION),$(LTO_EXCLUDE_VERSIONS)))
-    LTO =
+    override LTO =
   endif
   ifneq (,$(LTO))
     ifneq (,$(findstring -flto,$(GCC_OPTIMIZERS)))
