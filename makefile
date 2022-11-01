@@ -1358,9 +1358,6 @@ else
   ifneq (,$(LTO))
     ifneq (,$(findstring -flto,$(GCC_OPTIMIZERS)))
       CFLAGS_O += -flto
-      ifneq (,$(and $(or $(findstring gcc,$(COMPILER_NAME)),$(findstring GCC,$(COMPILER_NAME))),$(findstring -fwhole-program,$(GCC_OPTIMIZERS))))
-        CFLAGS_O += -fwhole-program
-      endif
       LTO_FEATURE = , with Link Time Optimization,
     endif
   endif
