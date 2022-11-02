@@ -913,11 +913,10 @@ static uint8 Do1793Command(uint8 cCommand)
                       " Error: READ_TRACK not implemented.\n", wd179x_info->sel_drive, PCX);
             break;
         case WD179X_WRITE_TRACK:
-            sim_debug(WR_DATA_MSG, &wd179x_dev, "WD179X[%d]: " ADDRESS_FORMAT
-                      " CMD=WRITE_TRACK\n", wd179x_info->sel_drive, PCX);
             sim_debug(FMT_MSG, &wd179x_dev, "WD179X[%d]: " ADDRESS_FORMAT
-                      " CMD=WRITE_TRACK, T:%2d/S:%d.\n", wd179x_info->sel_drive,
-                      PCX, pDrive->track, wd179x_info->fdc_head);
+                      " CMD=WRITE_TRACK, T:%2d/S:%d/N:%d.\n", wd179x_info->sel_drive,
+                      PCX, pDrive->track, wd179x_info->fdc_head,
+                      128 << wd179x_info->fdc_sec_len);
             wd179x_info->fdc_status |= (WD179X_STAT_DRQ);       /* Set DRQ */
             wd179x_info->drq = 1;
             wd179x_info->fdc_datacount = 128 << wd179x_info->fdc_sec_len;
