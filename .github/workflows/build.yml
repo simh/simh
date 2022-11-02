@@ -32,4 +32,4 @@ jobs:
       - name: Build
         env:
           SIM: ${{matrix.simulators}}
-        run: make LTO=1 $SIM
+        run: make LTO=1 OPTIMIZE=-O3 $SIM
