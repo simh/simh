@@ -722,11 +722,16 @@ static t_stat HDC1001_doCommand(void)
                 file_offset *= pDrive->sectsize;    /* Convert #sectors to byte offset */
 
                 fmtBuffer = calloc(data_len, sizeof(uint8));
+
+                if (fmtBuffer == NULL) {
+                    return SCPE_IERR;
+                }
+
                 if (HDC1001_FORMAT_FILL_BYTE != 0) {
                     memset(fmtBuffer, HDC1001_FORMAT_FILL_BYTE, data_len);
                 }
 
-                if (0 != (r = sim_fseek((pDrive->uptr)->fileref, file_offset, SEEK_SET))) {
+                if (0 == (r = sim_fseek((pDrive->uptr)->fileref, file_offset, SEEK_SET))) {
                     if (sim_fwrite(fmtBuffer, 1, data_len, (pDrive->uptr)->fileref) != data_len) {
                         r = SCPE_IOERR;
                     }
