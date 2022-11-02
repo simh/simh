@@ -155,6 +155,9 @@ render_word (uint8 buffer, uint16 address)
   uint16 data;
   int i;
 
+  if (display >= TV_WINDOWS)
+    return;
+
   buffer &= 077;
   address /= 2;
   address += (TVCNSL[buffer] & SCROLL) << 2;
@@ -175,6 +178,8 @@ render_display (uint16 display)
 {
   uint8 buffer = tv_source[display];
   int i;
+  if (display >= TV_WINDOWS)
+    return;
   sim_debug (DBG_VID, &tv_dev, "Render display %d buffer %d\n",
 	     display, buffer);
   for (i = 0; i < (TV_PIXELS / 8); i += 2)
