@@ -264,8 +264,8 @@ else
   # Platform Pkg Names  COMPILER PCAP          VDE            PCRE         EDITLINE      SDL         PNG          ZLIB       SDL_TTF
   PKGS_SRC_HOMEBREW   = -        -             vde            -            libedit       -           -            -          -
   PKGS_SRC_MACPORTS   = -        -             vde2           -            libedit       -           -            -          -
-  PKGS_SRC_APT        = -        libpcap-dev   libvdeplug-dev -            libedit-dev   -           -            -          -
-  PKGS_SRC_YUM        = -        libpcap-devel -              -            libedit-devel -           -            -          -
+  PKGS_SRC_APT        = gcc      libpcap-dev   libvdeplug-dev -            libedit-dev   -           -            -          -
+  PKGS_SRC_YUM        = gcc      libpcap-devel -              -            libedit-devel -           -            -          -
   PKGS_SRC_PKGSRC     = -        -             -              -            editline      -           -            -          -
   PKGS_SRC_PKGBSD     = -        -             -              -            libedit       -           -            -          -
   PKGS_SRC_PKGADD     = -        -             -              -            -             -           -            -          -
