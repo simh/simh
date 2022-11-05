@@ -1,7 +1,7 @@
 # SIMH v4.0 - 19-01 Current
 
 [![Coverity Scan Build Status](https://scan.coverity.com/projects/11982/badge.svg)](https://scan.coverity.com/projects/simh)
-[![Build Status](https://travis-ci.org/simh/simh.svg)](https://travis-ci.org/simh/simh)
+[![CI Build Status](https://travis-ci.org/simh/simh.svg)](https://github.com/simh/simh/actions)
 [![AppVeyor](https://ci.appveyor.com/api/projects/status/github/simh/simh)](https://ci.appveyor.com/project/simh/simh/history)
 
 ## Table of Contents:
@@ -78,6 +78,7 @@ All Simulator updates on Open SIMH will be present in this repository, and any c
 - Support for building simulators without built-in boot or ROM code when building with DONT_USE_INTERNAL_ROM is defined, but to automatically and transparently fetch the needed ROM or other boot code when it is needed.  This is possibly useful for systems which don't want to distribute simulators with build-in binary code which may have unknown copyright status.
 - Reasonable output produced for all simulators from HELP BOOT.
 - Fix occasional hang of IBM1130 simulator while building with Visual Studio.
+- Building with the simh makefile can optionally compile each source file separately and store the compiled result.   This approach lends itself to quicker building for folks who are developing new simulators or new simulator modules.  This was requested and discussed in #697.
 
 #### Changes to the PDP-11 and VAX simulators
 
