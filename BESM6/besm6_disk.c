@@ -717,7 +717,7 @@ void disk_ctl (int ctlr, uint32 cmd)
     KMD *c = &controller [ctlr];
     UNIT *u = c->dev < 0 ? &md_unit[0] : &md_unit [c->dev];
 
-    if ((md_dev[ctlr].dctrl & DEB_OPS || c->dev != -1 && u->dptr->dctrl & DEB_OPS) && cmd & BBIT(13)) {
+    if ((md_dev[ctlr].dctrl & DEB_OPS || (c->dev != -1 && u->dptr->dctrl & DEB_OPS)) && cmd & BBIT(13)) {
         besm6_debug ("::: КМД %c: bit 13 + %04o",
                      ctlr + '3', cmd & 07777);
     }
