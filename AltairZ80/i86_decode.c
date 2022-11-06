@@ -125,7 +125,7 @@ void cpu8086_intr(uint8 intrnum)
     i86_intr_raise(&cpu8086, intrnum);
 }
 
-static void setViewRegisters(void) {
+void setViewRegisters(void) {
     FLAGS_S = cpu8086.R_FLG;
     AX_S = cpu8086.R_AX;
     BX_S = cpu8086.R_BX;

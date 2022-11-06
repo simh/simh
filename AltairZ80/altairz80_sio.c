@@ -118,6 +118,7 @@ uint8 *URLContents(const char *URL, uint32 *length) {
 #define SLEEP_ALLOWED_START_DEFAULT 100         /* default initial value for sleepAllowedCounter*/
 #define DEFAULT_TIMER_DELTA         100         /* default value for timer delta in ms          */
 #define CPM_COMMAND_LINE_LENGTH     128
+#define CPM_FCB_ADDRESS             0x0080      /* Default FCB address for CP/M.                */
 
 static t_stat simh_dev_set_timeron  (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 static t_stat simh_dev_set_timeroff (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
@@ -165,6 +166,7 @@ extern void setClockFrequency(const uint32 Value);
 
 extern uint32 PCX;
 extern int32 SR;
+extern uint32 DS_S;
 extern UNIT cpu_unit;
 extern const char* handlerNameForPort(const int32 port);
 extern uint32 vectorInterrupt;            /* Interrupt Request */
@@ -229,6 +231,10 @@ static int32 genInterruptVec        = 0;        /* stores interrupt vector      
 static uint32 newClockFrequency;
 static int32 setClockFrequencyPos   = 0;        /* determines state for sending the clock frequency             */
 static int32 getClockFrequencyPos   = 0;        /* determines state for receiving the clock frequency           */
+
+/* Set FCB Address (needed for MS-DOS READ and WRITE commands. */
+static int32 setFCBAddressPos       = 0;        /* determines state for setting the FCB address                 */
+static int32 FCBAddress = CPM_FCB_ADDRESS;      /* FCB Address                                                  */
 
 /* support for wild card file expansion */
 
@@ -512,6 +518,10 @@ static REG simh_reg[] = {
                "Last command processed on SIMH port"), REG_RO                                       },
     { DRDATAD (CPOS,     getCommonPos,           8,
                "Status register for sending the COMMON register"), REG_RO                           },
+    { HRDATAD (FCBA,     FCBAddress,  16,
+               "Address of the FCB for file operations")                                            },
+    { DRDATAD (FCBAP,    setFCBAddressPos,8,
+               "Status register for receiving address of the FCB"), REG_RO                          },
     { NULL }
 };
 
@@ -1258,6 +1268,7 @@ enum simhPseudoDeviceCommands { /* do not change order or remove commands, add o
     getCPUClockFrequency,       /* 31 get the clock frequency of the CPU                                */
     setCPUClockFrequency,       /* 32 set the clock frequency of the CPU                                */
     genInterruptCmd,            /* 33 generate interrupt                                                */
+    setFCBAddressCmd,           /* 34 set the FCB address for file operations                           */
     kSimhPseudoDeviceCommands
 };
 
@@ -1296,13 +1307,14 @@ static const char *cmdNames[kSimhPseudoDeviceCommands] = {
     "getCPUClockFrequency",
     "setCPUClockFrequency",
     "genInterrupt",
+    "setFCBAddressCmd",
 };
 
 #define TIMER_STACK_LIMIT          10       /* stack depth of timer stack   */
 static uint32 markTime[TIMER_STACK_LIMIT];  /* timer stack                  */
 static struct tm currentTime;
 static int32 currentTimeValid = FALSE;
-static char version[] = "SIMH004";
+static char version[] = "SIMH005";
 
 #define URL_MAX_LENGTH              1024
 static uint32 urlPointer;
@@ -1334,6 +1346,8 @@ static t_stat simh_dev_reset(DEVICE *dptr) {
     urlPointer              = 0;
     getClockFrequencyPos    = 0;
     setClockFrequencyPos    = 0;
+    setFCBAddressPos        = 0;
+    FCBAddress              = CPM_FCB_ADDRESS;
     if (urlResult != NULL) {
         free(urlResult);
         urlResult = NULL;
@@ -1382,10 +1396,13 @@ static t_stat simh_svc(UNIT *uptr) {
     return SCPE_OK;
 }
 
+extern void setViewRegisters(void);
+
 static void createCPMCommandLine(void) {
-    int32 i, len = (GetBYTEWrapper(0x80) & 0x7f); /* 0x80 contains length of command line, discard first char   */
-    for (i = 0; i < len - 1; i++)
-        cpmCommandLine[i] = (char)GetBYTEWrapper(0x82 + i); /* the first char, typically ' ', is discarded      */
+    int32 i, len = (GetBYTEWrapper(FCBAddress) & 0x7f); /* 0x80 contains length of command line, discard first char   */
+    for (i = 0; i < len - 1; i++) {
+        cpmCommandLine[i] = (char)GetBYTEWrapper(FCBAddress + 0x02 + i); /* the first char, typically ' ', is discarded      */
+    }
     cpmCommandLine[i] = 0; /* make C string */
 }
 
@@ -1750,6 +1767,22 @@ static int32 simh_out(const int32 port, const int32 data) {
 		sim_printf("genInterruptVec=%d vectorInterrupt=%X dataBus=%02X genInterruptPos=%d\n", genInterruptVec, vectorInterrupt, data, genInterruptPos);
             }
             break;
+        case setFCBAddressCmd:
+            if (setFCBAddressPos == 0) {
+                FCBAddress = data;
+                setFCBAddressPos = 1;
+            }
+            else {
+                FCBAddress |= (data << 8);
+                if (chiptype == CHIP_TYPE_8086) {
+                    setViewRegisters();
+                    FCBAddress += (DS_S << 4);
+                    sim_debug(CMD_MSG, &simh_device, "SIMH: " ADDRESS_FORMAT
+                        " FCBAddress=0x%05x, DS=0x%04x\n", PCX, FCBAddress, DS_S);
+                }
+                setFCBAddressPos = lastCommand = 0;
+            }
+            break;
 
         default: /* lastCommand not yet set */
             sim_debug(CMD_MSG, &simh_device, "SIMH: " ADDRESS_FORMAT
@@ -1942,6 +1975,10 @@ static int32 simh_out(const int32 port, const int32 data) {
                 case readStopWatchCmd:
                     getStopWatchDeltaPos = 0;
                     stopWatchDelta = rtc_avail ? sim_os_msec() - stopWatchNow : 0;
+                    break;
+
+                case setFCBAddressCmd:
+                    setFCBAddressPos = 0;
                     break;
 
                 default:
