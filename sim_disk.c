@@ -639,6 +639,10 @@ t_stat sim_disk_set_autosize (UNIT *uptr, int32 val, CONST char *cptr, void *des
 {
 if (uptr == NULL)
     return SCPE_IERR;
+if ((uptr->drvtyp != NULL) &&
+    (DRVFL_GET_IFTYPE(uptr->drvtyp) == DRVFL_TYPE_SCSI) &&
+    (uptr->drvtyp->devtype == SCSI_TAPE))
+    return sim_messagef (SCPE_NOFNC, "%s: Autosizing Tapes is not supported\n", sim_uname (uptr));
 if (cptr != NULL)
     return sim_messagef (SCPE_ARG, "%s: Unexpected autosize argument: %s\n", sim_uname (uptr), cptr);
 if ((uptr->flags & UNIT_ATT) != 0)
@@ -656,6 +660,10 @@ return SCPE_OK;
 
 t_stat sim_disk_show_autosize (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
+if ((uptr->drvtyp != NULL) &&
+    (DRVFL_GET_IFTYPE(uptr->drvtyp) == DRVFL_TYPE_SCSI) &&
+    (uptr->drvtyp->devtype == SCSI_TAPE))
+    return SCPE_NOFNC;
 fprintf (st, "%sautosize", ((uptr->flags & DKUF_NOAUTOSIZE) != 0) ? "no" : "");
 return SCPE_OK;
 }
@@ -707,6 +715,10 @@ t_stat sim_disk_set_autozap (UNIT *uptr, int32 val, CONST char *cptr, void *desc
 {
 if (uptr == NULL)
     return SCPE_IERR;
+if ((uptr->drvtyp != NULL) &&
+    (DRVFL_GET_IFTYPE(uptr->drvtyp) == DRVFL_TYPE_SCSI) &&
+    (uptr->drvtyp->devtype == SCSI_TAPE))
+    return sim_messagef (SCPE_NOFNC, "%s: Autozapping Tapes is not supported\n", sim_uname (uptr));
 if (cptr != NULL)
     return sim_messagef (SCPE_ARG, "%s: Unexpected autozap argument: %s\n", sim_uname (uptr), cptr);
 if (val ^ ((uptr->flags & DKUF_AUTOZAP) == 0))
@@ -722,6 +734,10 @@ return SCPE_OK;
 
 t_stat sim_disk_show_autozap (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
+if ((uptr->drvtyp != NULL) &&
+    (DRVFL_GET_IFTYPE(uptr->drvtyp) == DRVFL_TYPE_SCSI) &&
+    (uptr->drvtyp->devtype == SCSI_TAPE))
+    return SCPE_NOFNC;
 fprintf (st, "%sautozap", ((uptr->flags & DKUF_AUTOZAP) != 0) ? "" : "no" );
 return SCPE_OK;
 }
@@ -7724,6 +7740,12 @@ if (cptr) {
         cap = cap * ((sim_switches & SWMASK ('B')) ? 2048 : 1954);
     if ((r != SCPE_OK) || (cap < DRV_MINC) || (cap > max))
         return sim_messagef (SCPE_ARG, "%s: Unreasonable capacity: %u\n", sim_uname (uptr), cap);
+    }
+if ((uptr->drvtyp != NULL) &&
+    (DRVFL_GET_IFTYPE(uptr->drvtyp) == DRVFL_TYPE_SCSI) &&
+    (uptr->drvtyp->devtype != drives[val].devtype)) {
+    sim_tape_set_fmt (uptr, 0, "SIMH", NULL);
+    sim_disk_set_fmt (uptr, 0, "AUTO", NULL);
     }
 uptr->drvtyp = &drives[val];
 set_writelock (uptr, ((uptr->drvtyp->flags & DRVFL_RO) != 0), NULL, NULL);
