@@ -4321,14 +4321,12 @@ static void i86op_lock(PC_ENV *m)
 static void i86op_repne(PC_ENV *m)
 {
    m->sysmode |= SYSMODE_PREFIX_REPNE;
-   DECODE_CLEAR_SEGOVR(m);
 }
 
 /*opcode=0xf3*/
 static void i86op_repe(PC_ENV *m)
 {
    m->sysmode |= SYSMODE_PREFIX_REPE;
-   DECODE_CLEAR_SEGOVR(m);
 }
 
 /*opcode=0xf4*/
