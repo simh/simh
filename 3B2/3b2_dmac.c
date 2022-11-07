@@ -1,6 +1,6 @@
-/* 3b2_dmac.c: AT&T 3B2 DMA Controller Implementation
+/* 3b2_dmac.c: AM9517 DMA Controller
 
-   Copyright (c) 2021, Seth J. Morabito
+   Copyright (c) 2021-2022, Seth J. Morabito
 
    Permission is hereby granted, free of charge, to any person
    obtaining a copy of this software and associated documentation
@@ -38,6 +38,8 @@
 #include "3b2_if.h"
 #include "3b2_iu.h"
 #include "3b2_mem.h"
+#include "3b2_stddev.h"
+#include "3b2_csr.h"
 
 DMA_STATE dma_state;
 
@@ -71,9 +73,13 @@ dmac_dma_handler device_dma_handlers[] = {
     {0,            0,                   NULL,            NULL,             NULL }
 };
 
-uint32 dma_address(uint8 channel, uint32 offset, t_bool r) {
+uint32 dma_address(uint8 channel, uint32 offset) {
     uint32 addr, page;
-    addr = (PHYS_MEM_BASE + (uint32)(dma_state.channels[channel].addr) + offset);
+    if (DMA_DECR(channel)) {
+        addr = (PHYS_MEM_BASE + (uint32)(dma_state.channels[channel].addr) - offset);
+    } else {
+        addr = (PHYS_MEM_BASE + (uint32)(dma_state.channels[channel].addr) + offset);
+    }
 #if defined (REV3)
     page = (uint32)dma_state.channels[channel].page;
 #else
@@ -94,6 +100,7 @@ t_stat dmac_reset(DEVICE *dptr)
     for (i = 0; i < 4; i++) {
         dma_state.channels[i].page = 0;
         dma_state.channels[i].addr = 0;
+        dma_state.channels[i].mode = 0;
         dma_state.channels[i].wcount = 0;
         dma_state.channels[i].addr_c = 0;
         dma_state.channels[i].wcount_c = -1;
@@ -111,83 +118,83 @@ uint32 dmac_read(uint32 pa, size_t size)
     reg = pa & 0xff;
 
     switch (base) {
-    case DMA_C:     /* 0x48xxx */
+    case DMA_C:
         switch (reg) {
         case 0: /* channel 0 current address reg */
             data = ((dma_state.channels[0].addr_c) >> (dma_state.bff * 8)) & 0xff;
             sim_debug(READ_MSG, &dmac_dev,
-                      "[%08x] Reading Channel 0 Addr Reg: %08x\n",
-                      R[NUM_PC], data);
+                      "Reading Channel 0 Addr Reg: %08x\n",
+                      data);
             dma_state.bff ^= 1;
             break;
         case 1: /* channel 0 current address reg */
             data = ((dma_state.channels[0].wcount_c) >> (dma_state.bff * 8)) & 0xff;
             sim_debug(READ_MSG, &dmac_dev,
-                      "[%08x] Reading Channel 0 Addr Count Reg: %08x\n",
-                      R[NUM_PC], data);
+                      "Reading Channel 0 Addr Count Reg: %08x\n",
+                      data);
             dma_state.bff ^= 1;
             break;
         case 2: /* channel 1 current address reg */
             data = ((dma_state.channels[1].addr_c) >> (dma_state.bff * 8)) & 0xff;
             sim_debug(READ_MSG, &dmac_dev,
-                      "[%08x] Reading Channel 1 Addr Reg: %08x\n",
-                      R[NUM_PC], data);
+                      "Reading Channel 1 Addr Reg: %08x\n",
+                      data);
             dma_state.bff ^= 1;
             break;
         case 3: /* channel 1 current address reg */
             data = ((dma_state.channels[1].wcount_c) >> (dma_state.bff * 8)) & 0xff;
             sim_debug(READ_MSG, &dmac_dev,
-                      "[%08x] Reading Channel 1 Addr Count Reg: %08x\n",
-                      R[NUM_PC], data);
+                      "Reading Channel 1 Addr Count Reg: %08x\n",
+                      data);
             dma_state.bff ^= 1;
             break;
         case 4: /* channel 2 current address reg */
             data = ((dma_state.channels[2].addr_c) >> (dma_state.bff * 8)) & 0xff;
             sim_debug(READ_MSG, &dmac_dev,
-                      "[%08x] Reading Channel 2 Addr Reg: %08x\n",
-                      R[NUM_PC], data);
+                      "Reading Channel 2 Addr Reg: %08x\n",
+                      data);
             dma_state.bff ^= 1;
             break;
         case 5: /* channel 2 current address reg */
             data = ((dma_state.channels[2].wcount_c) >> (dma_state.bff * 8)) & 0xff;
             sim_debug(READ_MSG, &dmac_dev,
-                      "[%08x] Reading Channel 2 Addr Count Reg: %08x\n",
-                      R[NUM_PC], data);
+                      "Reading Channel 2 Addr Count Reg: %08x\n",
+                      data);
             dma_state.bff ^= 1;
             break;
         case 6: /* channel 3 current address reg */
             data = ((dma_state.channels[3].addr_c) >> (dma_state.bff * 8)) & 0xff;
             sim_debug(READ_MSG, &dmac_dev,
-                      "[%08x] Reading Channel 3 Addr Reg: %08x\n",
-                      R[NUM_PC], data);
+                      "Reading Channel 3 Addr Reg: %08x\n",
+                      data);
             dma_state.bff ^= 1;
             break;
         case 7: /* channel 3 current address reg */
             data = ((dma_state.channels[3].wcount_c) >> (dma_state.bff * 8)) & 0xff;
             sim_debug(READ_MSG, &dmac_dev,
-                      "[%08x] Reading Channel 3 Addr Count Reg: %08x\n",
-                      R[NUM_PC], data);
+                      "Reading Channel 3 Addr Count Reg: %08x\n",
+                      data);
             dma_state.bff ^= 1;
             break;
         case 8:
             data = dma_state.status;
             sim_debug(READ_MSG, &dmac_dev,
-                      "[%08x] Reading DMAC Status %08x\n",
-                      R[NUM_PC], data);
+                      "Reading DMAC Status %08x\n",
+                      data);
             dma_state.status = 0;
             break;
         default:
             sim_debug(READ_MSG, &dmac_dev,
-                      "[%08x] DMAC READ %lu B @ %08x\n",
-                      R[NUM_PC], size, pa);
+                      "DMAC READ %lu B @ %08x\n",
+                      size, pa);
             data = 0;
         }
 
         return data;
     default:
         sim_debug(READ_MSG, &dmac_dev,
-                  "[%08x] [BASE: %08x] DMAC READ %lu B @ %08x\n",
-                  R[NUM_PC], base, size, pa);
+                  "[BASE: %08x] DMAC READ %lu B @ %08x\n",
+                  base, size, pa);
         return 0;
     }
 }
@@ -199,6 +206,12 @@ void dmac_program(uint8 reg, uint8 val)
 {
     uint8 channel_id, i, chan_num;
     dma_channel *channel;
+
+#if defined(REV3)
+    /* TODO: More general DMA interrupt clearing */
+    CPU_CLR_INT(INT_UART_DMA);
+    CLR_CSR(CSRDMA);
+#endif
 
     if (reg < 8) {
         switch (reg) {
@@ -259,13 +272,13 @@ void dmac_program(uint8 reg, uint8 val)
     case 8:  /* Command */
         dma_state.command = val;
         sim_debug(WRITE_MSG, &dmac_dev,
-                  "[%08x] Command: val=%02x\n",
-                  R[NUM_PC], val);
+                  "Command: val=%02x\n",
+                  val);
         break;
     case 9:  /* Request */
         sim_debug(WRITE_MSG, &dmac_dev,
-                  "[%08x] Request set: val=%02x\n",
-                  R[NUM_PC], val);
+                  "Request set: val=%02x\n",
+                  val);
         dma_state.request = val;
         break;
     case 10: /* Write Single Mask Register Bit */
@@ -281,14 +294,15 @@ void dmac_program(uint8 reg, uint8 val)
         }
 
         sim_debug(WRITE_MSG, &dmac_dev,
-                  "[%08x] Write Single Mask Register Bit. channel=%d set/clear=%02x\n",
-                  R[NUM_PC], channel_id, (val >> 2) & 1);
+                  "Write Single Mask Register Bit. channel=%d set/clear=%02x\n",
+                  channel_id, (val >> 2) & 1);
         break;
     case 11: /* Mode */
+        channel_id = val & 3;
         sim_debug(WRITE_MSG, &dmac_dev,
-                  "[%08x] Mode Set. val=%02x\n",
-                  R[NUM_PC], val);
-        dma_state.mode = val;
+                  "Mode Set. channel=%d val=%02x\n",
+                  channel_id, val);
+        dma_state.channels[channel_id].mode = val;
         break;
     case 12: /* Clear Byte Pointer Flip/Flop */
         dma_state.bff = 0;
@@ -308,19 +322,19 @@ void dmac_program(uint8 reg, uint8 val)
         break;
     case 15: /* Write All Mask Register Bits */
         sim_debug(WRITE_MSG, &dmac_dev,
-                  "[%08x] Write DMAC mask (all bits). Val=%02x\n",
-                  R[NUM_PC], val);
+                  "Write DMAC mask (all bits). Val=%02x\n",
+                  val);
         dma_state.mask = val & 0xf;
         break;
     case 16: /* Clear DMAC Interrupt */
         sim_debug(WRITE_MSG, &dmac_dev,
-                  "[%08x] Clear DMAC Interrupt in DMAC. val=%02x\n",
-                  R[NUM_PC], val);
+                  "Clear DMA Interrupt in DMAC. val=%02x\n",
+                  val);
         break;
     default:
         sim_debug(WRITE_MSG, &dmac_dev,
-                  "[%08x] Unhandled DMAC write. reg=%x val=%02x\n",
-                  R[NUM_PC], reg, val);
+                  "Unhandled DMAC write. reg=%x val=%02x\n",
+                  reg, val);
         break;
     }
 }
@@ -398,46 +412,45 @@ void dmac_generic_dma(uint8 channel, uint32 service_address)
 
     i = chan->wcount_c;
 
-    /* TODO: This does not handle decrement-mode transfers,
-       which don't seem to be used in SVR3 */
+    /* TODO: This assumes every transfer is a block mode, which is not
+       guaranteed to be valid, but is likely safe? */
 
-    switch ((dma_state.mode >> 2) & 0xf) {
-    case DMA_MODE_VERIFY:
+    switch (DMA_XFER(channel)) {
+    case DMA_XFER_VERIFY:
         sim_debug(EXECUTE_MSG, &dmac_dev,
-                  "[%08x] [dmac_generic_dma channel=%d] unhandled VERIFY request.\n",
-                  R[NUM_PC], channel);
+                  "[dmac_generic_dma channel=%d] unhandled VERIFY request.\n",
+                  channel);
         break;
-    case DMA_MODE_WRITE:
+    case DMA_XFER_WRITE:
         sim_debug(EXECUTE_MSG, &dmac_dev,
-                  "[%08x] [dmac_generic_dma channel=%d] write: %d bytes to %08x from %08x (page=%04x addr=%08x)\n",
-                  R[NUM_PC], channel,
+                  "[dmac_generic_dma channel=%d] write: %d bytes to %08x from %08x (page=%04x addr=%08x)\n",
+                  channel,
                   chan->wcount + 1,
-                  dma_address(channel, 0, TRUE),
+                  dma_address(channel, 0),
                   service_address,
                   dma_state.channels[channel].page,
                   dma_state.channels[channel].addr);
         for (; i >= 0; i--) {
             chan->wcount_c--;
-            addr = dma_address(channel, chan->ptr, TRUE);
-            chan->addr_c = dma_state.channels[channel].addr + chan->ptr;
-            chan->ptr++;
-            data = pread_b(service_address);
-            write_b(addr, data);
+            addr = dma_address(channel, chan->ptr++);
+            chan->addr_c = addr;
+            data = pread_b(service_address, BUS_PER);
+            write_b(addr, data, BUS_PER);
         }
         break;
-    case DMA_MODE_READ:
+    case DMA_XFER_READ:
         sim_debug(EXECUTE_MSG, &dmac_dev,
-                  "[%08x] [dmac_generic_dma channel=%d] read: %d bytes from %08x to %08x\n",
-                  R[NUM_PC], channel,
+                  "[dmac_generic_dma channel=%d] read: %d bytes from %08x to %08x\n",
+                  channel,
                   chan->wcount + 1,
-                  dma_address(channel, 0, TRUE),
+                  dma_address(channel, 0),
                   service_address);
         for (; i >= 0; i--) {
             chan->wcount_c = i;
-            addr = dma_address(channel, chan->ptr++, TRUE);
-            chan->addr_c = dma_state.channels[channel].addr + chan->ptr;
-            data = pread_b(addr);
-            write_b(service_address, data);
+            addr = dma_address(channel, chan->ptr++);
+            chan->addr_c = addr;
+            data = pread_b(addr, BUS_PER);
+            write_b(service_address, data, BUS_PER);
         }
         break;
     }

@@ -1,6 +1,6 @@
-/* 3b2_rev3_csr.h: AT&T 3B2/600G Control and Status Register
+/* 3b2_rev3_csr.h: CM518B System Board Control, Status & Error Register
 
-   Copyright (c) 2020, Seth J. Morabito
+   Copyright (c) 2020-2022, Seth J. Morabito
 
    Permission is hereby granted, free of charge, to any person
    obtaining a copy of this software and associated documentation
@@ -33,13 +33,13 @@
 
 #include "3b2_defs.h"
 
+typedef uint32 CSR_DATA;
+
 t_stat csr_svc(UNIT *uptr);
 t_stat csr_ex(t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
 t_stat csr_dep(t_value val, t_addr exta, UNIT *uptr, int32 sw);
 t_stat csr_reset(DEVICE *dptr);
 uint32 csr_read(uint32 pa, size_t size);
 void csr_write(uint32 pa, uint32 val, size_t size);
-
-extern uint32 csr_data;
 
 #endif

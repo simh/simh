@@ -1,6 +1,6 @@
-/* 3b2_rev3_timer.c: 82C54 Interval Timer.
+/* 3b2_timer.c: 8253/82C54 Interval Timer
 
-   Copyright (c) 2021, Seth J. Morabito
+   Copyright (c) 2021-2022, Seth J. Morabito
 
    Permission is hereby granted, free of charge, to any person
    obtaining a copy of this software and associated documentation
@@ -29,9 +29,7 @@
 */
 
 /*
- * 82C54 Timer.
- *
- * 82C54 (Rev3) Timer IC has three interval timers, which we treat
+ * The 8253/82C54 Timer IC has three interval timers, which we treat
  * here as three units.
  *
  * In the 3B2, the three timers are assigned specific purposes:
@@ -64,10 +62,10 @@
  * Implementaiton Notes
  * ====================
  *
- * In general, no attempt has been made to create an accurate
- * emulation of the 82C54 timer. This implementation is truly built
- * for the 3B2, and even more specifically for System V Unix, which is
- * the only operating system ever to have been ported to the 3B2.
+ * In general, no attempt has been made to create a truly accurate
+ * simulation of the 8253/82C54 timer. This implementation is built
+ * for the 3B2, and even more specifically to pass System V timer
+ * "Sanity/Interval Timer" diagnostics.
  *
  *  - The Bus Timeout Timer is not implemented other than a stub that
  *    is designed to pass hardware diagnostics. The simulator IO
@@ -77,9 +75,8 @@
  *  - The System Sanity Timer is also not implemented other than a
  *    stub to pass diagnostics.
  *
- *  - The main Unix Interval Timer is implemented as a true SIMH clock
- *    when set up for the correct mode. In other modes, it likewise
- *    implements a stub designed to pass diagnostics.
+ *  - The main Unix Interval Timer is more fully implemented, because
+ *    it drives system interrupts in System V UNIX.
  */
 
 #include "3b2_cpu.h"
@@ -87,18 +84,50 @@
 #include "3b2_defs.h"
 #include "3b2_timer.h"
 
+#define MIN_DIVIDER 50
+
+#if defined (REV3)
+#define QUICK_DELAY 10
+#else
+#define QUICK_DELAY 100
+#endif
+
+#define DELAY_US(C,N) ((TIMER_MODE(C) == 3) ?                \
+                       (TIME_BASE[(N)] * (C)->divider) / 2 : \
+                       TIME_BASE[(N)] * (C)->divider)
+
+#if defined(REV3)
+/* Microseconds per step (Version 3 system board):
+ *
+ * Timer 0: 10KHz time base
+ * Timer 1: 100KHz time base
+ * Timer 2: 500KHz time base
+ */
+static uint32 TIME_BASE[3] = {
+    100, 10, 1
+};
+#else
+/* Microseconds per step (Version 2 system board):
+ *
+ * Timer 0: 100Khz time base
+ * Timer 1: 100Khz time base
+ * Timer 2: 500Khz time base
+ */
+static uint32 TIME_BASE[3] = {
+    10, 10, 2
+};
+#endif
+
 struct timer_ctr TIMERS[3];
 
-int32 tmxr_poll = 16667;
-
 UNIT timer_unit[] = {
-    { UDATA(&timer0_svc, 0, 0) },
-    { UDATA(&timer1_svc, UNIT_IDLE, 0) },
-    { UDATA(&timer2_svc, 0, 0) },
+    { UDATA(&tmr_svc, UNIT_IDLE, 0) },
+    { UDATA(&tmr_svc, UNIT_IDLE, 0) },
+    { UDATA(&tmr_svc, UNIT_IDLE, 0) },
     { NULL }
 };
 
-UNIT *timer_clk_unit = &timer_unit[1];
+UNIT *tmr_int_unit = &timer_unit[3];
 
 REG timer_reg[] = {
     { HRDATAD(DIV0,   TIMERS[0].divider, 16, "Divider (0)") },
@@ -114,11 +143,32 @@ REG timer_reg[] = {
 };
 
 DEVICE timer_dev = {
-    "TIMER", timer_unit, timer_reg, NULL,
-    1, 16, 8, 4, 16, 32,
-    NULL, NULL, &timer_reset,
-    NULL, NULL, NULL, NULL,
-    DEV_DEBUG, 0, sys_deb_tab
+    "TMR",
+    timer_unit,
+    timer_reg,
+    NULL,
+    3,
+    16,
+    8,
+    4,
+    16,
+    32,
+    NULL,
+    NULL,
+    &timer_reset,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    DEV_DEBUG,
+    0,
+    sys_deb_tab,
+    NULL,
+    NULL,
+    &tmr_help,
+    NULL,
+    NULL,
+    &tmr_description
 };
 
 t_stat timer_reset(DEVICE *dptr) {
@@ -126,163 +176,110 @@ t_stat timer_reset(DEVICE *dptr) {
 
     memset(&TIMERS, 0, sizeof(struct timer_ctr) * 3);
 
+    /* Store the timer/counter number in the UNIT */
     for (i = 0; i < 3; i++) {
-        timer_unit[i].tmrnum = i;
-        timer_unit[i].tmr = (void *)&TIMERS[i];
+        timer_unit[i].u3 = i;
     }
-
-    /* TODO: I don't think this is right. Verify. */
-    /*
-    if (!sim_is_running) {
-        t = sim_rtcn_init_unit(timer_clk_unit, TPS_CLK, TMR_CLK);
-        sim_activate_after_abs(timer_clk_unit, 1000000 / t);
-    }
-    */
 
     return SCPE_OK;
+}
+
+/*
+ * Inhibit or allow a timer externally.
+ */
+void timer_gate(uint8 ctrnum, t_bool inhibit)
+{
+    struct timer_ctr *ctr = &TIMERS[ctrnum];
+
+    if (inhibit) {
+        ctr->gate = FALSE;
+        sim_cancel(&timer_unit[ctrnum]);
+    } else {
+        ctr->gate = TRUE;
+        if (ctr->enabled && !sim_is_active(&timer_unit[ctrnum])) {
+            sim_activate_after(&timer_unit[ctrnum], DELAY_US(ctr, ctrnum));
+            ctr->val--;
+        }
+    }
 }
 
 static void timer_activate(uint8 ctrnum)
 {
-    struct timer_ctr *ctr;
+    struct timer_ctr *ctr = &TIMERS[ctrnum];
 
-    ctr = &TIMERS[ctrnum];
-
-    switch (ctrnum) {
-    case TIMER_SANITY:
-        if ((csr_data & CSRISTIM) == 0) {
-            sim_debug(EXECUTE_MSG, &timer_dev,
-                      "[%08x] SANITY TIMER: Activating after %d steps\n",
-                      R[NUM_PC], ctr->val);
-            sim_activate_abs(&timer_unit[ctrnum], ctr->val);
-            ctr->val--;
+    if (ctr->enabled && ctr->gate) {
+        if (ctr->divider < MIN_DIVIDER) {
+            /* If the timer delay is too short, we need to force a
+               very quick activation */
+            sim_activate_abs(&timer_unit[ctrnum], QUICK_DELAY);
         } else {
-            sim_debug(EXECUTE_MSG, &timer_dev,
-                      "[%08x] SANITY TIMER: Currently disabled, not starting\n",
-                      R[NUM_PC]);
+            /* Otherwise, use a computed time in microseconds */
+            sim_activate_after_abs(&timer_unit[ctrnum], DELAY_US(ctr, ctrnum));
         }
-        break;
-    case TIMER_INTERVAL:
-        if ((csr_data & CSRITIM) == 0) {
-            sim_debug(EXECUTE_MSG, &timer_dev,
-                      "[%08x] INTERVAL TIMER: Activating after %d ms\n",
-                      R[NUM_PC], ctr->val);
-            sim_activate_after_abs(&timer_unit[ctrnum], ctr->val);
-            ctr->val--;
-        } else {
-            sim_debug(EXECUTE_MSG, &timer_dev,
-                      "[%08x] INTERVAL TIMER: Currently disabled, not starting\n",
-                      R[NUM_PC]);
-        }
-        break;
-    case TIMER_BUS:
-        if ((csr_data & CSRITIMO) == 0) {
-            sim_debug(EXECUTE_MSG, &timer_dev,
-                      "[%08x] BUS TIMER: Activating after %d steps\n",
-                      R[NUM_PC], ctr->val);
-            sim_activate_abs(&timer_unit[ctrnum], (ctr->val - 2));
-            ctr->val -= 2;
-        } else {
-            sim_debug(EXECUTE_MSG, &timer_dev,
-                      "[%08x] BUS TIMER: Currently disabled, not starting\n",
-                      R[NUM_PC]);
-        }
-        break;
-    default:
-        break;
     }
 }
 
-void timer_enable(uint8 ctrnum)
-{
-    sim_debug(EXECUTE_MSG, &timer_dev,
-              "[%08x] Enabling timer %d\n",
-              R[NUM_PC], ctrnum);
-    timer_activate(ctrnum);
-}
-
-void timer_disable(uint8 ctrnum)
-{
-    sim_debug(EXECUTE_MSG, &timer_dev,
-              "[%08x] Disabling timer %d\n",
-              R[NUM_PC], ctrnum);
-    sim_cancel(&timer_unit[ctrnum]);
-}
-
 /*
- * Sanity Timer
+ * Sanity, Non-calibrated Interval, and Bus Timeout Timer service routine
  */
-t_stat timer0_svc(UNIT *uptr)
+t_stat tmr_svc(UNIT *uptr)
 {
-    struct timer_ctr *ctr;
+    int32 ctr_num = uptr->u3;
+    uint32 usec_delay;
+    struct timer_ctr *ctr = &TIMERS[ctr_num];
 
-    ctr = (struct timer_ctr *)uptr->tmr;
-    
-    if (ctr->enabled) {
-        sim_debug(EXECUTE_MSG, &timer_dev,
-                  "[%08x] TIMER 0 COMPLETION.\n",
-                  R[NUM_PC]);
-        if (!(csr_data & CSRISTIM)) {
-            sim_debug(EXECUTE_MSG, &timer_dev,
-                      "[%08x] TIMER 0 NMI IRQ.\n",
-                      R[NUM_PC]);
-            ctr->val = 0xffff;
+    if (ctr == NULL) {
+        return SCPE_SUB;
+    }
+
+    /* If the timer isn't enabled, do nothing. */
+    if (!ctr->enabled) {
+        return SCPE_OK;
+    }
+
+    sim_debug(EXECUTE_MSG, &timer_dev,
+              "[tmr_svc] Handling timeout for ctr number %d\n",
+              ctr_num);
+
+    switch (ctr_num) {
+    case TMR_SANITY:
+#if defined (REV3)
+        if (!CSR(CSRISTIM) && TIMER_MODE(ctr) != 4) {
             cpu_nmi = TRUE;
             CSRBIT(CSRSTIMO, TRUE);
             CPU_SET_INT(INT_BUS_TMO);
-        }
-    }
-
-    return SCPE_OK;
-}
-
-/*
- * Interval Timer
- */
-t_stat timer1_svc(UNIT *uptr)
-{
-    struct timer_ctr *ctr;
-    int32 t;
-
-    ctr = (struct timer_ctr *)uptr->tmr;
-
-    if (ctr->enabled && !(csr_data & CSRITIM)) {
-        /* Fire the IPL 15 clock interrupt */
-        CSRBIT(CSRCLK, TRUE);
-        CPU_SET_INT(INT_CLOCK);
-    }
-
-    t = sim_rtcn_calb(TPS_CLK, TMR_CLK);
-    sim_activate_after_abs(uptr, 1000000/TPS_CLK);
-    tmxr_poll = t;
-
-    return SCPE_OK;
-}
-
-/*
- * Bus Timeout Timer
- */
-t_stat timer2_svc(UNIT *uptr)
-{
-    struct timer_ctr *ctr;
-
-    ctr = (struct timer_ctr *)uptr->tmr;
-
-    if (ctr->enabled && TIMER_RW(ctr) == CLK_LSB) {
-        sim_debug(EXECUTE_MSG, &timer_dev,
-                  "[%08x] TIMER 2 COMPLETION.\n",
-                  R[NUM_PC]);
-        if (!(csr_data & CSRITIMO)) {
-            sim_debug(EXECUTE_MSG, &timer_dev,
-                      "[%08x] TIMER 2 IRQ.\n",
-                      R[NUM_PC]);
             ctr->val = 0xffff;
+        }
+#endif
+        break;
+    case TMR_INT:
+        if (!CSR(CSRITIM)) {
+            CSRBIT(CSRCLK, TRUE);
+            CPU_SET_INT(INT_CLOCK);
+            if (ctr->enabled && ctr->gate) {
+                usec_delay = DELAY_US(ctr, TMR_INT);
+                sim_debug(EXECUTE_MSG, &timer_dev,
+                          "[tmr_svc] Re-triggering TMR_INT in %d usec\n", usec_delay);
+                sim_activate_after(uptr, usec_delay);
+            }
+            ctr->val = 0xffff;
+        }
+        break;
+    case TMR_BUS:
+#if defined (REV3)
+        /* Only used during diagnostics */
+        if (TIMER_RW(ctr) == CLK_LSB) {
+            sim_debug(EXECUTE_MSG, &timer_dev,
+                      "[tmr_svc] BUS TIMER FIRING. Setting memory fault and interrupt\n");
             CSRBIT(CSRTIMO, TRUE);
             CPU_SET_INT(INT_BUS_TMO);
-            /* Also trigger a bus abort */
             cpu_abort(NORMAL_EXCEPTION, EXTERNAL_MEMORY_FAULT);
+            ctr->val = 0xffff;
         }
+#endif
+        break;
     }
+
 
     return SCPE_OK;
 }
@@ -298,6 +295,9 @@ uint32 timer_read(uint32 pa, size_t size)
     ctrnum = (reg >> 2) & 0x3;
     ctr = &TIMERS[ctrnum];
 
+    sim_debug(EXECUTE_MSG, &timer_dev,
+              "timer_read: reg=%x\n", reg);
+
     switch (reg) {
     case TIMER_REG_DIVA:
     case TIMER_REG_DIVB:
@@ -307,78 +307,60 @@ uint32 timer_read(uint32 pa, size_t size)
         switch (TIMER_RW(ctr)) {
         case CLK_LSB:
             retval = ctr_val & 0xff;
-            sim_debug(READ_MSG, &timer_dev,
-                      "[%08x] [%d] [LSB] val=%d (0x%x)\n",
-                      R[NUM_PC], ctrnum, retval, retval);
             break;
         case CLK_MSB:
             retval = (ctr_val & 0xff00) >> 8;
-            sim_debug(READ_MSG, &timer_dev,
-                      "[%08x] [%d] [MSB] val=%d (0x%x)\n",
-                      R[NUM_PC], ctrnum, retval, retval);
             break;
         case CLK_LMB:
             if (ctr->r_ctrl_latch) {
                 ctr->r_ctrl_latch = FALSE;
                 retval = ctr->ctrl_latch;
-                sim_debug(READ_MSG, &timer_dev,
-                          "[%08x] [%d] [LATCH CTRL] val=%d (0x%x)\n",
-                          R[NUM_PC], ctrnum, retval, retval);
             } else if (ctr->r_cnt_latch) {
                 if (ctr->r_lmb) {
                     ctr->r_lmb = FALSE;
                     retval = (ctr->cnt_latch & 0xff00) >> 8;
                     ctr->r_cnt_latch = FALSE;
-                    sim_debug(READ_MSG, &timer_dev,
-                              "[%08x] [%d] [LATCH DATA MSB] val=%d (0x%x)\n",
-                              R[NUM_PC], ctrnum, retval, retval);
                 } else {
                     ctr->r_lmb = TRUE;
                     retval = ctr->cnt_latch & 0xff;
-                    sim_debug(READ_MSG, &timer_dev,
-                              "[%08x] [%d] [LATCH DATA LSB] val=%d (0x%x)\n",
-                              R[NUM_PC], ctrnum, retval, retval);
                 }
             } else if (ctr->r_lmb) {
                 ctr->r_lmb = FALSE;
                 retval = (ctr_val & 0xff00) >> 8;
-                sim_debug(READ_MSG, &timer_dev,
-                          "[%08x] [%d] [LMB - MSB] val=%d (0x%x)\n",
-                          R[NUM_PC], ctrnum, retval, retval);
             } else {
                 ctr->r_lmb = TRUE;
                 retval = ctr_val & 0xff;
-                sim_debug(READ_MSG, &timer_dev,
-                          "[%08x] [%d] [LMB - LSB] val=%d (0x%x)\n",
-                          R[NUM_PC], ctrnum, retval, retval);
             }
             break;
         default:
             retval = 0;
         }
 
-        return retval;
+        break;
     case TIMER_REG_CTRL:
-        return ctr->ctrl;
+        retval = ctr->ctrl;
+        break;
     case TIMER_CLR_LATCH:
         /* Clearing the timer latch has a side-effect
            of also clearing pending interrupts */
         CSRBIT(CSRCLK, FALSE);
         CPU_CLR_INT(INT_CLOCK);
-        return 0;
+        /* Acknowledge a clock tick */
+        sim_rtcn_tick_ack(1, TMR_CLK);
+        retval = 0;
+        break;
     default:
         /* Unhandled */
-        sim_debug(READ_MSG, &timer_dev,
-                  "[%08x] UNHANDLED TIMER READ. ADDR=%08x\n",
-                  R[NUM_PC], pa);
-        return 0;
+        retval = 0;
+        break;
     }
+
+    return retval;
 }
 
 void handle_timer_write(uint8 ctrnum, uint32 val)
 {
     struct timer_ctr *ctr;
-    UNIT *unit = &timer_unit[ctrnum];
 
     ctr = &TIMERS[ctrnum];
     ctr->enabled = TRUE;
@@ -387,17 +369,13 @@ void handle_timer_write(uint8 ctrnum, uint32 val)
     case CLK_LSB:
         ctr->divider = val & 0xff;
         ctr->val = ctr->divider;
-        sim_debug(WRITE_MSG, &timer_dev,
-                  "[%08x] [%d] [LSB] val=%d (0x%x)\n",
-                  R[NUM_PC], ctrnum, val & 0xff, val & 0xff);
+        sim_debug(EXECUTE_MSG, &timer_dev, "TIMER_WRITE: CTR=%d LSB=%02x\n", ctrnum, val & 0xff);
         timer_activate(ctrnum);
         break;
     case CLK_MSB:
         ctr->divider = (val & 0xff) << 8;
         ctr->val = ctr->divider;
-        sim_debug(WRITE_MSG, &timer_dev,
-                  "[%08x] [%d] [MSB] val=%d (0x%x)\n",
-                  R[NUM_PC], ctrnum, val & 0xff, val & 0xff);
+        sim_debug(EXECUTE_MSG, &timer_dev, "TIMER_WRITE: CTR=%d MSB=%02x\n", ctrnum, val & 0xff);
         timer_activate(ctrnum);
         break;
     case CLK_LMB:
@@ -405,17 +383,13 @@ void handle_timer_write(uint8 ctrnum, uint32 val)
             ctr->w_lmb = FALSE;
             ctr->divider = (uint16) ((ctr->divider & 0x00ff) | ((val & 0xff) << 8));
             ctr->val = ctr->divider;
-            sim_debug(WRITE_MSG, &timer_dev,
-                      "[%08x] [%d] [LMB - MSB] val=%d (0x%x)\n",
-                      R[NUM_PC], ctrnum, val & 0xff, val & 0xff);
+            sim_debug(EXECUTE_MSG, &timer_dev, "TIMER_WRITE: CTR=%d (L/M) MSB=%02x\n", ctrnum, val & 0xff);
             timer_activate(ctrnum);
         } else {
             ctr->w_lmb = TRUE;
             ctr->divider = (ctr->divider & 0xff00) | (val & 0xff);
             ctr->val = ctr->divider;
-            sim_debug(WRITE_MSG, &timer_dev,
-                      "[%08x] [%d] [LMB - LSB] val=%d (0x%x)\n",
-                      R[NUM_PC], ctrnum, val & 0xff, val & 0xff);
+            sim_debug(EXECUTE_MSG, &timer_dev, "TIMER_WRITE: CTR=%d (L/M) LSB=%02x\n", ctrnum, val & 0xff);
         }
         break;
     default:
@@ -431,6 +405,9 @@ void timer_write(uint32 pa, uint32 val, size_t size)
 
     reg = (uint8) (pa - TIMERBASE);
 
+    sim_debug(EXECUTE_MSG, &timer_dev,
+              "timer_write: reg=%x val=%x\n", reg, val);
+
     switch(reg) {
     case TIMER_REG_DIVA:
         handle_timer_write(0, val);
@@ -444,9 +421,6 @@ void timer_write(uint32 pa, uint32 val, size_t size)
     case TIMER_REG_CTRL:
         ctrnum = (val >> 6) & 3;
         if (ctrnum == 3) {
-            sim_debug(WRITE_MSG, &timer_dev,
-                      "[%08x] READ BACK COMMAND. DATA=%02x\n",
-                      R[NUM_PC], val);
             if (val & 2) {
                 ctr = &TIMERS[0];
                 if ((val & 0x20) == 0) {
@@ -481,9 +455,6 @@ void timer_write(uint32 pa, uint32 val, size_t size)
                 }
             }
         } else {
-            sim_debug(WRITE_MSG, &timer_dev,
-                      "[%08x] Timer Control Write: timer %d => %02x\n",
-                      R[NUM_PC], ctrnum, val & 0xff);
             ctr = &TIMERS[ctrnum];
             ctr->ctrl = (uint8) val;
             ctr->enabled = FALSE;
@@ -495,12 +466,41 @@ void timer_write(uint32 pa, uint32 val, size_t size)
         break;
     case TIMER_CLR_LATCH:
         sim_debug(WRITE_MSG, &timer_dev,
-                  "[%08x] unexpected write to clear timer latch\n",
-                  R[NUM_PC]);
+                  "unexpected write to clear timer latch\n");
         break;
     default:
         sim_debug(WRITE_MSG, &timer_dev,
-                  "[%08x] unknown timer register: %d\n",
-                  R[NUM_PC], reg);
+                  "unknown timer register: %d\n",
+                  reg);
     }
+}
+
+CONST char *tmr_description(DEVICE *dptr)
+{
+#if defined (REV3)
+    return "82C54 Programmable Interval Timer";
+#else
+    return "8253 Programmable Interval Timer";
+#endif
+}
+
+t_stat tmr_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+{
+#if defined (REV3)
+    fprintf(st, "82C54 Programmable Interval Timer (TMR)\n\n");
+    fprintf(st, "The TMR device implements three programmable timers used by the 3B2/700\n");
+#else
+    fprintf(st, "8253 Programmable Interval Timer (TMR)\n\n");
+    fprintf(st, "The TMR device implements three programmable timers used by the 3B2/400\n");
+#endif
+    fprintf(st, "to perform periodic tasks and sanity checks.\n\n");
+    fprintf(st, "- TMR0: Used as a system sanity timer.\n");
+    fprintf(st, "- TMR1: Used as a periodic 10 millisecond interval timer.\n");
+    fprintf(st, "- TMR2: Used as a bus timeout timer.\n");
+
+    fprint_set_help(st, dptr);
+    fprint_show_help(st, dptr);
+    fprint_reg_help(st, dptr);
+
+    return SCPE_OK;
 }

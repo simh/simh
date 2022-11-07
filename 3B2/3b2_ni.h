@@ -1,6 +1,6 @@
-/* 3b2_ni.h: AT&T 3B2 Model 400 "NI" feature card
+/* 3b2_ni.h: CM195A Network Interface CIO Card
 
-   Copyright (c) 2018, Seth J. Morabito
+   Copyright (c) 2018-2022, Seth J. Morabito
 
    Permission is hereby granted, free of charge, to any person
    obtaining a copy of this software and associated documentation
@@ -84,9 +84,6 @@
 #define NI_QPOLL_FAST          100
 #define NI_QPOLL_SLOW          50000
 
-#define NI_PUMP_CRC1           0xfab1057c
-#define NI_PUMP_CRC2           0xf6744bed
-
 #define EIG_TABLE_SIZE         40
 #define PKT_HEADER_LEN_OFFSET  EIG_TABLE_SIZE
 #define PKT_START_OFFSET       (PKT_HEADER_LEN_OFFSET + 4)
@@ -168,8 +165,7 @@ typedef struct {
 } ni_stat_info;
 
 typedef struct {
-    uint8           cid;
-    t_bool          initialized;
+    uint8           slot;
     t_bool          enabled;
     uint32          crc;
     uint32          poll_rate;
@@ -197,18 +193,18 @@ t_stat ni_attach(UNIT *uptr, CONST char *cptr);
 t_stat ni_detach(UNIT *uptr);
 t_stat ni_setmac(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat ni_showmac(FILE* st, UNIT *uptr, int32 val, CONST void *desc);
-t_stat ni_try_job(uint8 cid);
+t_stat ni_try_job(uint8 slot);
 t_stat ni_show_stats(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat ni_set_stats(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat ni_show_poll(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat ni_show_filters(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 const char *ni_description(DEVICE *dptr);
 t_stat ni_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
-void ni_cio_reset(uint8 cid);
+void ni_cio_reset(uint8 slot);
 void ni_process_packet();
-void ni_int_ack(uint8 cid);
-void ni_sysgen(uint8 cid);
-void ni_express(uint8 cid);
-void ni_full(uint8 cid);
+void ni_int_ack(uint8 slot);
+void ni_sysgen(uint8 slot);
+void ni_express(uint8 slot);
+void ni_full(uint8 slot);
 
 #endif /* _3B2_NI_H_ */

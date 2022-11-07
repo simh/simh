@@ -1,6 +1,6 @@
- /* 3b2_rev3_defs.h: AT&T 3B2 Rev 3 (Model 600G) Simulator Definitions
+/* 3b2_rev3_defs.h: Veresion 3 (3B2/700) Common Definitions
 
-   Copyright (c) 2021, Seth J. Morabito
+   Copyright (c) 2021-2022, Seth J. Morabito
 
    Permission is hereby granted, free of charge, to any person
    obtaining a copy of this software and associated documentation
@@ -90,14 +90,6 @@
 
 #define INT_MAP_LEN      0x2000
 
-/* Memory */
-#define MEMID_4M        6
-#define MEMID_16M       7
-#define MADDR_SLOT_0    0x4d000
-#define MADDR_SLOT_1    0x4d004
-#define MADDR_SLOT_2    0x4d008
-#define MADDR_SLOT_3    0x4d00c
-
 #define IFCSRBASE       0x40000
 #define IFCSRSIZE       0x100
 #define TIMERBASE       0x41000
@@ -121,9 +113,9 @@
 #define MMUBASE         0x4f000
 #define MMUSIZE         0x1000
 #define FLTLBASE        0x4c000
-#define FLTLSIZE        0x10
+#define FLTLSIZE        0x1000
 #define FLTHBASE        0x4d000
-#define FLTHSIZE        0x10
+#define FLTHSIZE        0x1000
 
 #define VCACHE_BOTTOM   0x1c00000
 #define VCACHE_TOP      0x2000000

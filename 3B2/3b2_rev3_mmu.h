@@ -1,6 +1,6 @@
-/* 3b2_rev3_mmu.h: AT&T 3B2/600G MMU (WE32201) Header
+/* 3b2_rev3_mmu.h: WE32201 MMU
 
-   Copyright (c) 2020, Seth J. Morabito
+   Copyright (c) 2020-2022, Seth J. Morabito
 
    Permission is hereby granted, free of charge, to any person
    obtaining a copy of this software and associated documentation
@@ -28,8 +28,8 @@
    from the author.
 */
 
-#ifndef _3B2_1000_MMU_H_
-#define _3B2_1000_MMU_H_
+#ifndef _3B2_REV3_MMU_H_
+#define _3B2_REV3_MMU_H_
 
 #include "3b2_defs.h"
 
@@ -54,6 +54,8 @@
 #define MMU_IDNR        13       /* ID Number Register */
 #define MMU_FIDNR       14       /* Flush ID Number Register */
 #define MMU_VR          15       /* Version Register */
+
+#define MMU_REV3_VER    0x23     /* Version byte returned by WE32201 MMU */
 
 #define MMU_CONF_M      (mmu_state.conf & 0x1)
 #define MMU_CONF_R      ((mmu_state.conf & 0x2) >> 1)
@@ -353,4 +355,4 @@ t_stat mmu_show_sdt(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat mmu_show_sdc(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat mmu_show_pdc(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
-#endif /* _3B2_1000_MMU_H_ */
+#endif /* _3B2_REV3_MMU_H_ */

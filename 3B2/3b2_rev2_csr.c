@@ -1,6 +1,6 @@
-/* 3b2_rev2_csr.c: AT&T 3B2 Rev 2 Control and Status Register
+/* 3b2_rev2_csr.c: ED System Board Control and Status Register
 
-   Copyright (c) 2017, Seth J. Morabito
+   Copyright (c) 2017-2022, Seth J. Morabito
 
    Permission is hereby granted, free of charge, to any person
    obtaining a copy of this software and associated documentation
@@ -33,8 +33,9 @@
 #include "3b2_cpu.h"
 #include "3b2_sys.h"
 #include "3b2_timer.h"
+#include "3b2_sys.h"
 
-uint16 csr_data;
+CSR_DATA csr_data;
 
 BITFIELD csr_bits[] = {
     BIT(IOF),
@@ -94,8 +95,8 @@ uint32 csr_read(uint32 pa, size_t size)
     uint32 reg = pa - CSRBASE;
 
     sim_debug(READ_MSG, &csr_dev,
-              "[%08x] CSR=%04x\n",
-              R[NUM_PC], csr_data);
+              "CSR=%04x\n",
+              csr_data);
 
     switch (reg) {
     case 0x2:
@@ -143,20 +144,15 @@ void csr_write(uint32 pa, uint32 val, size_t size)
         break;
     case 0x23:    /* Set Inhibit Timers */
         sim_debug(WRITE_MSG, &csr_dev,
-                  "[%08x] SET INHIBIT TIMERS\n", R[NUM_PC]);
+                  "SET INHIBIT TIMERS\n");
         csr_data |= CSRITIM;
+        timer_gate(TIMER_INTERVAL, TRUE);
         break;
     case 0x27:    /* Clear Inhibit Timers */
         sim_debug(WRITE_MSG, &csr_dev,
-                  "[%08x] CLEAR INHIBIT TIMERS\n", R[NUM_PC]);
-
-        /* A side effect of clearing the timer inhibit bit is to cause
-         * a simulated "tick" of any active timers.  This is a hack to
-         * make diagnostics pass. This is not 100% accurate, but it
-         * makes SVR3 and DGMON tests happy.
-         */
-        timer_tick();
+                  "CLEAR INHIBIT TIMERS\n");
         csr_data &= ~CSRITIM;
+        timer_gate(TIMER_INTERVAL, FALSE);
         break;
     case 0x2b:    /* Set Inhibit Faults */
         csr_data |= CSRIFLT;

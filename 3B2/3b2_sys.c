@@ -1,6 +1,6 @@
-/* 3b2_sys.c: AT&T 3B2 common system definitions
+/* 3b2_sys.c: Common System Definition
 
-   Copyright (c) 2021, Seth J. Morabito
+   Copyright (c) 2021-2022, Seth J. Morabito
 
    Permission is hereby granted, free of charge, to any person
    obtaining a copy of this software and associated documentation
@@ -53,25 +53,57 @@ const char *sim_stop_messages[SCPE_BASE] = {
     "Simulator Error"
 };
 
+/*
+ * ROM and Binary loader
+ *
+ * -r     load ROM
+ * -o     for memory, specify origin
+ *
+ */
 t_stat sim_load(FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
+    t_stat r;
     int32 i;
-    uint32 addr = 0;
+    uint32 origin = 0, limit = 0;
     int32 cnt = 0;
 
-    if ((*cptr != 0) || (flag != 0)) {
-        return SCPE_ARG;
+    if (flag) {
+        return sim_messagef(SCPE_NOFNC, "Command not implemented.");
     }
 
-    addr = R[NUM_PC];
-
-    while ((i = getc (fileref)) != EOF) {
-        pwrite_b(addr, (uint8)i);
-        addr++;
+    if (sim_switches & SWMASK('R')) {
+        origin = ROM_BASE;
+        limit = ROM_BASE + ROM_SIZE;
+    } else {
+        origin = 0;
+        limit = (uint32) cpu_unit.capac;
+        if (sim_switches & SWMASK('O')) {
+            origin = (uint32) get_uint(cptr, 16, 0xffffffff, &r);
+            if (r != SCPE_OK) {
+                return SCPE_ARG;
+            }
+        }
+    }
+    
+    while ((i = Fgetc (fileref)) != EOF) {
+        if (origin >= limit) {
+            return SCPE_NXM;
+        }
+        if (sim_switches & SWMASK('R')) {
+            pwrite_b_rom(origin, (uint8)i);
+        } else {
+            pwrite_b(origin, (uint8)i, BUS_CPU);
+        }
+        origin++;
         cnt++;
     }
 
-    printf ("%d Bytes loaded.\n", cnt);
+    if (sim_switches & SWMASK('R')) {
+        rom_loaded = TRUE;
+        sim_messagef(SCPE_OK, "%d bytes loaded into ROM\n", cnt);
+    } else {
+        sim_messagef(SCPE_OK, "%d bytes loaded at address 0x%08x\n", cnt, origin - cnt);
+    }
 
     return SCPE_OK;
 }

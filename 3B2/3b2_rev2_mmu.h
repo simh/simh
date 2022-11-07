@@ -1,6 +1,6 @@
-/* 3b2_rev2_mmu.c: AT&T 3B2 Rev 2 (Model 400) MMU (WE32101) Header
+/* 3b2_rev2_mmu.c: WE32101 MMU
 
-   Copyright (c) 2017, Seth J. Morabito
+   Copyright (c) 2017-2022, Seth J. Morabito
 
    Permission is hereby granted, free of charge, to any person
    obtaining a copy of this software and associated documentation
@@ -326,18 +326,6 @@ uint32 mmu_read(uint32 pa, size_t size);
 void mmu_write(uint32 pa, uint32 val, size_t size);
 CONST char *mmu_description(DEVICE *dptr);
 
-/* Physical memory read/write */
-uint8  pread_b(uint32 pa);
-uint16 pread_h(uint32 pa);
-uint32 pread_w(uint32 pa);
-uint32 pread_w_u(uint32 pa);
-void   pwrite_b(uint32 pa, uint8 val);
-void   pwrite_h(uint32 pa, uint16 val);
-void   pwrite_w(uint32 pa, uint32 val);
-
-/* TODO: REMOVE AFTER DEBUGGING */
-uint32 safe_read_w(uint32 va);
-
 /* Virtual memory translation */
 uint32 mmu_xlate_addr(uint32 va, uint8 r_acc);
 t_stat mmu_decode_vaddr(uint32 vaddr, uint8 r_acc,
@@ -360,19 +348,6 @@ t_stat mmu_decode_vaddr(uint32 vaddr, uint8 r_acc,
 
 #define SHOULD_UPDATE_PD_M_BIT(pd)              \
     (r_acc == ACC_W && !((pd) & PD_M_MASK))
-
-/* Dispatch to the MMU when enabled, or to physical RW when
-   disabled */
-uint8  read_b(uint32 va, uint8 r_acc);
-uint16 read_h(uint32 va, uint8 r_acc);
-uint32 read_w(uint32 va, uint8 r_acc);
-void   write_b(uint32 va, uint8 val);
-void   write_h(uint32 va, uint16 val);
-void   write_w(uint32 va, uint32 val);
-
-t_bool addr_is_rom(uint32 pa);
-t_bool addr_is_mem(uint32 pa);
-t_bool addr_is_io(uint32 pa);
 
 t_stat mmu_decode_va(uint32 va, uint8 r_acc, t_bool fc, uint32 *pa);
 void   mmu_enable();

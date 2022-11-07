@@ -1,7 +1,6 @@
-/* 3b2_rev2_mau.c: AT&T 3B2 Rev 2 (Model 400) Math Acceleration
-   Unit (WE32106 MAU) Implementation
+/* 3b2_mau.c: WE32106 and WE32206 Math Accelerator Unit
 
-   Copyright (c) 2019, Seth J. Morabito
+   Copyright (c) 2021-2022, Seth J. Morabito
 
    Permission is hereby granted, free of charge, to any person
    obtaining a copy of this software and associated documentation
@@ -30,11 +29,33 @@
 
    ---------------------------------------------------------------------
 
-   This file is part of a simulation of the WE32106 Math Acceleration
-   Unit. The WE32106 MAU is an IEEE-754 compabitle floating point
-   hardware math accelerator that was available as an optional
-   component on the AT&T 3B2/310 and 3B2/400, and a standard component
-   on the 3B2/500, 3B2/600, and 3B2/1000.
+   This file is part of a simulation of the WE 32106 and WE 32206 Math
+   Acceleration Units. The WE 32106 and WE 32206 are IEEE-754
+   compabitle floating point hardware math accelerators that were
+   available as an optional component on the AT&T 3B2/310 and 3B2/400,
+   and as a standard component on the 3B2/500, 3B2/600, 3B2/700, and
+   3B2/1000.
+
+   Unimplemented Features
+   ======================
+
+   All features of the WE 32106 MAU have been implemented, but there
+   remain some features of the WE 32206 that are not yet implemented.
+   Neither System V UNIX nor the Version 3 MAU diagnostics appear to
+   use these features in any way, but there is no guarantee that other
+   software does not use them. They are:
+
+   - The FE, UW, and WF bits of the Auxiliary Status Register
+   - The new operand registers f4 through f7
+   - The register bank select feature of the Command Register
+   - The RC and RCS bits of the Command Register
+   - The new WE 32206 instructions:
+     1. ATAN
+     2. COS
+     3. PI
+     4. SIN
+
+   ---------------------------------------------------------------------
 
    Portions of this code are derived from the SoftFloat 2c library by
    John R. Hauser. Functions derived from SoftFloat 2c are clearly
@@ -81,7 +102,7 @@
    ---------------------------------------------------------------------
 */
 
-#include "3b2_rev2_mau.h"
+#include "3b2_mau.h"
 
 #include <math.h>
 
@@ -123,8 +144,6 @@ static void sub_128(t_uint64 a0, t_uint64 a1,
 static void mul_64_to_128(t_uint64 a, t_uint64 b, t_uint64 *r_low, t_uint64 *r_high);
 static void mul_64_by_shifted_32_to_128(t_uint64 a, uint32 b, t_mau_128 *result);
 static t_uint64 estimate_div_128_to_64(t_uint64 a0, t_uint64 a1, t_uint64 b);
-static uint32 estimate_sqrt_32(int16 a_exp, uint32 a);
-
 static uint32 round_pack_int(t_bool sign, t_uint64 frac, RM rounding_mode);
 static t_int64 round_pack_int64(t_bool sign,
                                 t_uint64 abs_0, t_uint64 abs_1,
@@ -208,7 +227,13 @@ UNIT mau_unit = { UDATA(NULL, 0, 0) };
 MAU_STATE mau_state;
 
 BITFIELD asr_bits[] = {
+#if defined(REV3)
+    BIT(FE),
+    BITFFMT(VER,3,%d),
+    BIT(UW),
+#else
     BITNCF(5),
+#endif
     BIT(PR),
     BIT(QS),
     BIT(US),
@@ -219,7 +244,11 @@ BITFIELD asr_bits[] = {
     BIT(UM),
     BIT(OM),
     BIT(IM),
+#if defined(REV3)
+    BIT(WF),
+#else
     BITNCF(1),
+#endif
     BIT(UO),
     BIT(CSC),
     BIT(PS),
@@ -279,7 +308,7 @@ DEVICE mau_dev = {
 #ifdef REV3
     DEV_DEBUG,                      /* Rev 3 flags: Always required */
 #else
-    DEV_DISABLE|DEV_DIS|DEV_DEBUG,  /* Rev 2 flags */
+    DEV_DISABLE|DEV_DEBUG,          /* Rev 2 flags: Can be disabled */
 #endif
     0,                              /* debug control flags */
     mau_debug,                      /* debug flag names */
@@ -314,10 +343,18 @@ XFP GEN_NONTRAPPING_NAN = {
 };
 
 CONST char *mau_op_names[32] = {
-    "0x00",  "0x01",  "ADD",  "SUB",   "DIV",  "REM",  "MUL",  "MOVE",    /* 00-07 */
-    "RDASR", "WRASR", "CMP",  "CMPE",  "ABS",  "SQRT", "RTOI", "FTOI",    /* 08-0F */
-    "ITOF",  "DTOF",  "FTOD", "NOP",   "EROF", "0x15", "0x16", "NEG",     /* 10-17 */
-    "LDR",   "0x19",  "CMPS", "CMPES", "0x1C", "0x1D", "0x1E", "0x1F"     /* 18-1F */
+    "0x00",  "0x01",  "ADD",   "SUB",
+    "DIV",   "REM",   "MUL",   "MOVE",
+    "RDASR", "WRASR", "CMP",   "CMPE",
+    "ABS",   "SQRT",  "RTOI",  "FTOI",
+    "ITOF",  "DTOF",  "FTOD",  "NOP",
+    "EROF",  "0x15",  "0x16",  "NEG",
+    "LDR",   "0x19",  "CMPS",  "CMPES",
+#if defined(REV3)
+    "SIN",   "COS",   "ATAN",  "PI"
+#else
+    "0x1C",  "0x1D",  "0x1E",  "0x1F"
+#endif
 };
 
 CONST char *src_op_names[8] = {
@@ -366,8 +403,8 @@ static SIM_INLINE void mau_case_div_zero(XFP *op1, XFP *op2, XFP *result)
 static SIM_INLINE void mau_exc(uint32 flag, uint32 mask)
 {
     sim_debug(TRACE_DBG, &mau_dev,
-              "[%08x] [mau_exc] asr=%08x flag=%08x mask=%08x\n",
-              R[NUM_PC], mau_state.asr, flag, mask);
+              "[mau_exc] asr=%08x flag=%08x mask=%08x\n",
+              mau_state.asr, flag, mask);
 
     mau_state.asr |= flag;
 
@@ -427,8 +464,8 @@ static SIM_INLINE void abort_on_fault()
                 stop_reason = STOP_EX;
             }
             sim_debug(TRACE_DBG, &mau_dev,
-                      "[%08x] [abort_on_fault] Aborting on un-maskable overflow fault. ASR=%08x\n",
-                      R[NUM_PC], mau_state.asr);
+                      "[abort_on_fault] Aborting on un-maskable overflow fault. ASR=%08x\n",
+                      mau_state.asr);
             cpu_abort(NORMAL_EXCEPTION, INTEGER_OVERFLOW);
         }
 
@@ -438,8 +475,8 @@ static SIM_INLINE void abort_on_fault()
                 stop_reason = STOP_EX;
             }
             sim_debug(TRACE_DBG, &mau_dev,
-                      "[%08x] [abort_on_fault] Aborting on ECP fault. ASR=%08x\n",
-                      R[NUM_PC], mau_state.asr);
+                      "[abort_on_fault] Aborting on ECP fault. ASR=%08x\n",
+                      mau_state.asr);
             cpu_abort(NORMAL_EXCEPTION, EXTERNAL_MEMORY_FAULT);
         }
 
@@ -475,7 +512,6 @@ static void clear_asr()
  */
 static t_bool set_nz()
 {
-
     switch(mau_state.opcode) {
     case M_NOP:
     case M_RDASR:
@@ -490,6 +526,9 @@ static t_bool set_nz()
 t_stat mau_reset(DEVICE *dptr)
 {
     memset(&mau_state, 0, sizeof(MAU_STATE));
+#if defined(REV3)
+    mau_state.asr |= MAU_ASR_VER;  /* Version 1 MAU */
+#endif
     return SCPE_OK;
 }
 
@@ -844,44 +883,6 @@ static t_uint64 estimate_div_128_to_64(t_uint64 a0, t_uint64 a1, t_uint64 b)
     z |= (b0<<32 <= rem0) ? 0xffffffff : rem0 / b0;
 
     return z;
-}
-
-/*
- * Returns an approximation of the square root of the 32-bit
- * value 'a'.
- *
- * Derived from the SoftFloat 2c package (see copyright notice above)
- */
-static uint32 estimate_sqrt_32(int16 a_exp, uint32 a)
-{
-    static const uint16 sqrt_odd_adjust[] = {
-        0x0004, 0x0022, 0x005D, 0x00B1, 0x011D, 0x019F, 0x0236, 0x02E0,
-        0x039C, 0x0468, 0x0545, 0x0631, 0x072B, 0x0832, 0x0946, 0x0A67
-    };
-
-    static const uint16 sqrt_even_adjust[] = {
-        0x0A2D, 0x08AF, 0x075A, 0x0629, 0x051A, 0x0429, 0x0356, 0x029E,
-        0x0200, 0x0179, 0x0109, 0x00AF, 0x0068, 0x0034, 0x0012, 0x0002
-    };
-
-    int8 index;
-    uint32 z;
-
-    index = (a >> 27) & 0xf;
-
-    if (a_exp & 1) {
-        z = 0x4000 + (a >> 17) - sqrt_odd_adjust[index];
-        z = ((a / z) << 14) + (z << 15);
-        a >>= 1;
-    }
-    else {
-        z = 0x8000 + (a >> 17) - sqrt_even_adjust[index];
-        z = a / z + z;
-        z = (0x20000 <= z) ? 0xFFFF8000 : ( z<<15 );
-        if ( z <= a ) return (uint32) (((int32) a) >> 1);
-    }
-
-    return ((uint32) ((((t_uint64) a )<<31 ) / z)) + (z >> 1);
 }
 
 static uint32 approx_recip_sqrt_32(uint32 oddExpA, uint32 a)
@@ -1833,9 +1834,8 @@ void xfp_to_decimal(XFP *a, DEC *d, RM rounding_mode)
     d->h |= (uint32)digits[15] << 8;
 
     sim_debug(TRACE_DBG, &mau_dev,
-              "[%08x] [xfp_to_decimal] "
+              "[xfp_to_decimal] "
               "Digits: %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d 0x%x\n",
-              R[NUM_PC],
               digits[17], digits[16], digits[15], digits[14], digits[13], digits[12],
               digits[11], digits[10], digits[9], digits[8], digits[7], digits[6],
               digits[5], digits[4], digits[3], digits[2], digits[1], digits[0],
@@ -1855,8 +1855,8 @@ void mau_decimal_to_xfp(DEC *d, XFP *a)
     t_int64 signed_tmp;
 
     sim_debug(TRACE_DBG, &mau_dev,
-              "[%08x] [mau_decimal_to_xfp] DEC input: %08x %08x %08x\n",
-              R[NUM_PC], d->h, (uint32)(d->l >> 32), (uint32)(d->l));
+              "[mau_decimal_to_xfp] DEC input: %08x %08x %08x\n",
+              d->h, (uint32)(d->l >> 32), (uint32)(d->l));
 
     sign = (d->l) & 15;
     digits[0] = (d->l >> 4) & 15;
@@ -1879,9 +1879,8 @@ void mau_decimal_to_xfp(DEC *d, XFP *a)
     digits[17] = (d->h >> 8) & 15;
 
     sim_debug(TRACE_DBG, &mau_dev,
-              "[%08x] [mau_decimal_to_xfp] "
+              "[mau_decimal_to_xfp] "
               "Digits: %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d 0x%x\n",
-              R[NUM_PC],
               digits[17], digits[16], digits[15], digits[14], digits[13], digits[12],
               digits[11], digits[10], digits[9], digits[8], digits[7], digits[6],
               digits[5], digits[4], digits[3], digits[2], digits[1], digits[0],
@@ -1906,14 +1905,14 @@ void mau_decimal_to_xfp(DEC *d, XFP *a)
     }
 
     sim_debug(TRACE_DBG, &mau_dev,
-              "[%08x] [mau_decimal_to_xfp] tmp val = %lld\n",
-              R[NUM_PC], signed_tmp);
+              "[mau_decimal_to_xfp] tmp val = %lld\n",
+              signed_tmp);
 
     mau_int64_to_xfp((t_uint64) signed_tmp, a);
 
     sim_debug(TRACE_DBG, &mau_dev,
-              "[%08x] [mau_decimal_to_xfp] XFP = %04x%016llx\n",
-              R[NUM_PC], a->sign_exp, a->frac);
+              "[mau_decimal_to_xfp] XFP = %04x%016llx\n",
+              a->sign_exp, a->frac);
 
 }
 
@@ -2050,8 +2049,7 @@ static void xfp_add_fracs(XFP *a, XFP *b, t_bool sign, XFP *result, RM rounding_
     int32 exp_diff;
 
     sim_debug(TRACE_DBG, &mau_dev,
-              "[%08x] [ADD_FRACS] a=%04x%016llx  b=%04x%016llx\n",
-              R[NUM_PC],
+              "[ADD_FRACS] a=%04x%016llx  b=%04x%016llx\n",
               a->sign_exp, a->frac,
               b->sign_exp, b->frac);
 
@@ -2384,8 +2382,7 @@ static void xfp_mul(XFP *a, XFP *b, XFP *result, RM rounding_mode)
     t_uint64 a_frac, b_frac, r_frac_0, r_frac_1;
 
     sim_debug(TRACE_DBG, &mau_dev,
-              "[%08x] [MUL] op1=%04x%016llx  op2=%04x%016llx\n",
-              R[NUM_PC],
+              "[MUL] op1=%04x%016llx  op2=%04x%016llx\n",
               a->sign_exp, a->frac,
               b->sign_exp, b->frac);
 
@@ -2469,8 +2466,8 @@ static void xfp_div(XFP *a, XFP *b, XFP *result, RM rounding_mode)
     t_uint64 rem0, rem1, rem2, term0, term1, term2;
 
     sim_debug(TRACE_DBG, &mau_dev,
-              "[%08x] [DIV] op1=%04x%016llx op2=%04x%016llx\n",
-              R[NUM_PC], b->sign_exp, b->frac, a->sign_exp, a->frac);
+              "[DIV] op1=%04x%016llx op2=%04x%016llx\n",
+              b->sign_exp, b->frac, a->sign_exp, a->frac);
 
     a_sign = XFP_SIGN(a);
     a_exp = XFP_EXP(a);
@@ -2525,7 +2522,7 @@ static void xfp_div(XFP *a, XFP *b, XFP *result, RM rounding_mode)
             }
             /* Divide by zero - SPECIAL CASE 4 */
             sim_debug(TRACE_DBG, &mau_dev,
-                      "[%08x] [DIV] Divide by zero detected.\n", R[NUM_PC]);
+                      "[DIV] Divide by zero detected.\n");
             mau_case_div_zero(a, b, result);
             return;
         }
@@ -2583,8 +2580,8 @@ static void xfp_sqrt(XFP *a, XFP *result, RM rounding_mode)
     t_mau_128 nan_128, rem, y, term;
 
     sim_debug(TRACE_DBG, &mau_dev,
-              "[%08x] [SQRT] op1=%04x%016llx\n",
-              R[NUM_PC], a->sign_exp, a->frac);
+              "[SQRT] op1=%04x%016llx\n",
+              a->sign_exp, a->frac);
 
     a_sign = XFP_SIGN(a);
     a_exp  = XFP_EXP(a);
@@ -2844,12 +2841,12 @@ static void load_src_op(uint8 op, XFP *xfp)
         xfp->frac = mau_state.f3.frac;
         break;
     case M_OP_MEM_SINGLE:
-        sfp = read_w(mau_state.src, ACC_AF);
+        sfp = read_w(mau_state.src, ACC_AF, BUS_PER);
         sfp_to_xfp(sfp, xfp);
         break;
     case M_OP_MEM_DOUBLE:
-        dfp = (t_uint64) read_w(mau_state.src + 4, ACC_AF);
-        dfp |= ((t_uint64) read_w(mau_state.src, ACC_AF)) << 32;
+        dfp = (t_uint64) read_w(mau_state.src + 4, ACC_AF, BUS_PER);
+        dfp |= ((t_uint64) read_w(mau_state.src, ACC_AF, BUS_PER)) << 32;
         sim_debug(TRACE_DBG, &mau_dev,
                   "[load_src_op][DOUBLE] Loaded %016llx\n",
                   dfp);
@@ -2859,9 +2856,9 @@ static void load_src_op(uint8 op, XFP *xfp)
                   xfp->sign_exp, xfp->frac);
         break;
     case M_OP_MEM_TRIPLE:
-        xfp->frac = (t_uint64) read_w(mau_state.src + 8, ACC_AF);
-        xfp->frac |= ((t_uint64) read_w(mau_state.src + 4, ACC_AF)) << 32;
-        xfp->sign_exp = (uint32) read_w(mau_state.src, ACC_AF);
+        xfp->frac = (t_uint64) read_w(mau_state.src + 8, ACC_AF, BUS_PER);
+        xfp->frac |= ((t_uint64) read_w(mau_state.src + 4, ACC_AF, BUS_PER)) << 32;
+        xfp->sign_exp = (uint32) read_w(mau_state.src, ACC_AF, BUS_PER);
         break;
     default:
         break;
@@ -2877,9 +2874,9 @@ static void load_op1_decimal(DEC *d)
 
     switch (mau_state.op1) {
     case M_OP_MEM_TRIPLE:
-        low = read_w(mau_state.src + 8, ACC_AF);
-        mid = read_w(mau_state.src + 4, ACC_AF);
-        high = read_w(mau_state.src, ACC_AF);
+        low = read_w(mau_state.src + 8, ACC_AF, BUS_PER);
+        mid = read_w(mau_state.src + 4, ACC_AF, BUS_PER);
+        high = read_w(mau_state.src, ACC_AF, BUS_PER);
         d->l = low;
         d->l |= ((t_uint64) mid << 32);
         d->h = high;
@@ -2911,7 +2908,7 @@ static void store_op3_int(uint32 val)
         mau_state.f3.frac = (t_uint64)val;
         break;
     case M_OP3_MEM_SINGLE:
-        write_w(mau_state.dst, val);
+        write_w(mau_state.dst, val, BUS_PER);
         break;
     default:
         /* Indeterminate output, unsupported */
@@ -2927,9 +2924,9 @@ static void store_op3_decimal(DEC *d)
 
     switch(mau_state.op3) {
     case M_OP3_MEM_TRIPLE:
-        write_w(mau_state.dst, d->h);
-        write_w(mau_state.dst + 4, (uint32)((t_uint64)d->l >> 32));
-        write_w(mau_state.dst + 8, (uint32)d->l);
+        write_w(mau_state.dst, d->h, BUS_PER);
+        write_w(mau_state.dst + 4, (uint32)((t_uint64)d->l >> 32), BUS_PER);
+        write_w(mau_state.dst + 8, (uint32)d->l, BUS_PER);
         break;
     default:
         /* Unsupported */
@@ -2998,8 +2995,7 @@ static void store_op3(XFP *xfp)
     t_bool store_dr = FALSE;
 
     sim_debug(TRACE_DBG, &mau_dev,
-              "[%08x] [store_op3] op3=%04x%016llx\n",
-              R[NUM_PC],
+              "[store_op3] op3=%04x%016llx\n",
               xfp->sign_exp,
               xfp->frac);
 
@@ -3049,7 +3045,7 @@ static void store_op3(XFP *xfp)
                 mau_state.asr |= MAU_ASR_Z;
             }
         }
-        write_w(mau_state.dst, (uint32)sfp);
+        write_w(mau_state.dst, (uint32)sfp, BUS_PER);
         break;
     case M_OP3_MEM_DOUBLE:
         if (mau_state.ntnan) {
@@ -3074,18 +3070,18 @@ static void store_op3(XFP *xfp)
                 mau_state.asr |= MAU_ASR_Z;
             }
         }
-        write_w(mau_state.dst, (uint32)(dfp >> 32));
-        write_w(mau_state.dst + 4, (uint32)(dfp));
+        write_w(mau_state.dst, (uint32)(dfp >> 32), BUS_PER);
+        write_w(mau_state.dst + 4, (uint32)(dfp), BUS_PER);
         break;
     case M_OP3_MEM_TRIPLE:
         if (mau_state.ntnan) {
-            write_w(mau_state.dst, (uint32)(GEN_NONTRAPPING_NAN.sign_exp));
-            write_w(mau_state.dst + 4, (uint32)(GEN_NONTRAPPING_NAN.frac >> 32));
-            write_w(mau_state.dst + 8, (uint32)(GEN_NONTRAPPING_NAN.frac));
+            write_w(mau_state.dst, (uint32)(GEN_NONTRAPPING_NAN.sign_exp), BUS_PER);
+            write_w(mau_state.dst + 4, (uint32)(GEN_NONTRAPPING_NAN.frac >> 32), BUS_PER);
+            write_w(mau_state.dst + 8, (uint32)(GEN_NONTRAPPING_NAN.frac), BUS_PER);
         } else {
-            write_w(mau_state.dst, (uint32)(xfp->sign_exp));
-            write_w(mau_state.dst + 4, (uint32)(xfp->frac >> 32));
-            write_w(mau_state.dst + 8, (uint32)(xfp->frac));
+            write_w(mau_state.dst, (uint32)(xfp->sign_exp), BUS_PER);
+            write_w(mau_state.dst + 4, (uint32)(xfp->frac >> 32), BUS_PER);
+            write_w(mau_state.dst + 8, (uint32)(xfp->frac), BUS_PER);
         }
         if (set_nz()) {
             if (XFP_SIGN(xfp)) {
@@ -3114,22 +3110,22 @@ static void mau_rdasr()
     switch (mau_state.op3) {
         /* Handled */
     case M_OP3_MEM_SINGLE:
-        write_w(mau_state.dst, mau_state.asr);
+        write_w(mau_state.dst, mau_state.asr, BUS_PER);
         break;
     case M_OP3_MEM_DOUBLE:
-        write_w(mau_state.dst, mau_state.asr);
-        write_w(mau_state.dst + 4, mau_state.asr);
+        write_w(mau_state.dst, mau_state.asr, BUS_PER);
+        write_w(mau_state.dst + 4, mau_state.asr, BUS_PER);
         break;
     case M_OP3_MEM_TRIPLE:
-        write_w(mau_state.dst, mau_state.asr);
-        write_w(mau_state.dst + 4, mau_state.asr);
-        write_w(mau_state.dst + 8, mau_state.asr);
+        write_w(mau_state.dst, mau_state.asr, BUS_PER);
+        write_w(mau_state.dst + 4, mau_state.asr, BUS_PER);
+        write_w(mau_state.dst + 8, mau_state.asr, BUS_PER);
         break;
         /* Unhandled */
     default:
         sim_debug(TRACE_DBG, &mau_dev,
-                  "[%08x] [mau_rdasr] WARNING: Unhandled source: %02x\n",
-                  R[NUM_PC], mau_state.op3);
+                  "[mau_rdasr] WARNING: Unhandled source: %02x\n",
+                  mau_state.op3);
         break;
     }
 }
@@ -3139,15 +3135,14 @@ static void mau_wrasr()
     switch (mau_state.op1) {
         /* Handled */
     case M_OP_MEM_SINGLE:
-        mau_state.asr = read_w(mau_state.src, ACC_AF);
+        mau_state.asr = read_w(mau_state.src, ACC_AF, BUS_PER);
         sim_debug(TRACE_DBG, &mau_dev,
-                  "[%08x] [WRASR] Writing ASR with: %08x\n",
-                  R[NUM_PC], mau_state.asr);
+                  "[WRASR] Writing ASR with: %08x\n",
+                  mau_state.asr);
         break;
     default:
         sim_debug(TRACE_DBG, &mau_dev,
-                  "[%08x] [mau_wrasr] WARNING: Unhandled source: %02x\n",
-                  R[NUM_PC],
+                  "[mau_wrasr] WARNING: Unhandled source: %02x\n",
                   mau_state.op3);
         break;
     }
@@ -3206,8 +3201,8 @@ static void mau_ldr()
 
     load_src_op(mau_state.op1, &xfp);
     sim_debug(TRACE_DBG, &mau_dev,
-              "[%08x] [LDR] Loading DR with %04x%016llx\n",
-              R[NUM_PC], xfp.sign_exp, xfp.frac);
+              "[LDR] Loading DR with %04x%016llx\n",
+              xfp.sign_exp, xfp.frac);
     mau_state.dr.sign_exp = xfp.sign_exp;
     mau_state.dr.frac = xfp.frac;
 }
@@ -3244,17 +3239,17 @@ static void mau_erof()
         return;
     case M_OP3_MEM_SINGLE:
         sfp = xfp_to_sfp(&(mau_state.dr), MAU_RM);
-        write_w(mau_state.dst, (uint32)sfp);
+        write_w(mau_state.dst, (uint32)sfp, BUS_PER);
         return;
     case M_OP3_MEM_DOUBLE:
         dfp = xfp_to_dfp(&(mau_state.dr), MAU_RM);
-        write_w(mau_state.dst + 4, (uint32)(dfp >> 32));
-        write_w(mau_state.dst, (uint32)(dfp));
+        write_w(mau_state.dst + 4, (uint32)(dfp >> 32), BUS_PER);
+        write_w(mau_state.dst, (uint32)(dfp), BUS_PER);
         return;
     case M_OP3_MEM_TRIPLE:
-        write_w(mau_state.dst, (uint32)(mau_state.dr.sign_exp));
-        write_w(mau_state.dst + 4, (uint32)(mau_state.dr.frac >> 32));
-        write_w(mau_state.dst + 8, (uint32)(mau_state.dr.frac));
+        write_w(mau_state.dst, (uint32)(mau_state.dr.sign_exp), BUS_PER);
+        write_w(mau_state.dst + 4, (uint32)(mau_state.dr.frac >> 32), BUS_PER);
+        write_w(mau_state.dst + 8, (uint32)(mau_state.dr.frac), BUS_PER);
         return;
     default:
         sim_debug(TRACE_DBG, &mau_dev,
@@ -3349,8 +3344,7 @@ static void mau_div()
     load_src_op(mau_state.op1, &a);
     load_src_op(mau_state.op2, &b);
     sim_debug(TRACE_DBG, &mau_dev,
-              "[%08x] [DIV OP2/OP1] OP2=0x%04x%016llx OP1=0x%04x%016llx\n",
-              R[NUM_PC],
+              "[DIV OP2/OP1] OP2=0x%04x%016llx OP1=0x%04x%016llx\n",
               b.sign_exp, b.frac,
               a.sign_exp, a.frac);
     xfp_div(&b, &a, &result, MAU_RM);
@@ -3414,13 +3408,13 @@ static void mau_itof()
         mau_exc(MAU_ASR_IS, MAU_ASR_IM);
         return;
     case M_OP_MEM_SINGLE:
-        val = read_w(mau_state.src, ACC_AF);
+        val = read_w(mau_state.src, ACC_AF, BUS_PER);
         break;
     case M_OP_MEM_DOUBLE:
-        val = read_w(mau_state.src + 4, ACC_AF);
+        val = read_w(mau_state.src + 4, ACC_AF, BUS_PER);
         break;
     case M_OP_MEM_TRIPLE:
-        val = read_w(mau_state.src + 8, ACC_AF);
+        val = read_w(mau_state.src + 8, ACC_AF, BUS_PER);
         break;
     default:
         break;
@@ -3593,5 +3587,9 @@ t_stat mau_broadcast(uint32 cmd, uint32 src, uint32 dst)
 
 CONST char *mau_description(DEVICE *dptr)
 {
-    return "WE32106";
+#if defined(REV3)
+    return "WE 32106 MAU";
+#else
+    return "WE 32206 MAU";
+#endif
 }

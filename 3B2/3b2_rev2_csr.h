@@ -1,6 +1,6 @@
-/* 3b2_rev2_csr.h: AT&T 3B2 Rev 2 Control and Status Register
+/* 3b2_rev2_csr.h: ED System Board Control and Status Register
 
-   Copyright (c) 2021, Seth J. Morabito
+   Copyright (c) 2021-2022, Seth J. Morabito
 
    Permission is hereby granted, free of charge, to any person
    obtaining a copy of this software and associated documentation
@@ -33,6 +33,8 @@
 
 #include "3b2_defs.h"
 
+typedef uint16 CSR_DATA;
+
 /* CSR */
 t_stat csr_svc(UNIT *uptr);
 t_stat csr_ex(t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
@@ -40,7 +42,5 @@ t_stat csr_dep(t_value val, t_addr exta, UNIT *uptr, int32 sw);
 t_stat csr_reset(DEVICE *dptr);
 uint32 csr_read(uint32 pa, size_t size);
 void csr_write(uint32 pa, uint32 val, size_t size);
-
-extern uint16 csr_data;
 
 #endif /* 3B2_REV2_CSR_H_ */

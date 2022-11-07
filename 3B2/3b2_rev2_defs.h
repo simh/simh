@@ -1,6 +1,6 @@
-/* 3b2_rev2_defs.h: AT&T 3B2 Rev 2 (Model 400) Simulator Definitions
+/* 3b2_rev2_defs.h: Version 2 (3B2/400) Common Definitions
 
-   Copyright (c) 2017, Seth J. Morabito
+   Copyright (c) 2017-2022, Seth J. Morabito
 
    Permission is hereby granted, free of charge, to any person
    obtaining a copy of this software and associated documentation
@@ -83,7 +83,7 @@
 #define INT_SERR        0x01   /* IPL 15 */
 #define INT_CLOCK       0x02   /* IPL 15 */
 #define INT_DMA         0x04   /* IPL 13 */
-#define INT_UART        0x04   /* IPL 13 */
+#define INT_UART        0x08   /* IPL 13 */
 #define INT_DISK        0x10   /* IPL 11 */
 #define INT_FLOPPY      0x20   /* IPL 11 */
 #define INT_PIR9        0x40   /* IPL 9  */

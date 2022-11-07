@@ -1,6 +1,6 @@
-/* 3b2_ctc.c: AT&T 3B2 Model 400 "CTC" feature card
+/* 3b2_ctc.c: CM195H 23MB Cartridge Tape Controller CIO Card
 
-   Copyright (c) 2018, Seth J. Morabito
+   Copyright (c) 2018-2022, Seth J. Morabito
 
    Permission is hereby granted, free of charge, to any person
    obtaining a copy of this software and associated documentation
@@ -61,12 +61,7 @@
 
 #define VTOC_BLOCK    0
 
-/* Static function declarations */
-static t_stat ctc_show_cqueue(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
-static t_stat ctc_show_rqueue(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
-static t_stat ctc_show_queue_common(FILE *st, UNIT *uptr, int32 val, CONST void *desc, t_bool rq);
-
-static uint8   int_cid;             /* Interrupting card ID   */
+static uint8   int_slot;            /* Interrupting card ID   */
 static uint8   int_subdev;          /* Interrupting subdevice */
 static t_bool  ctc_conf = FALSE;    /* Has a CTC card been configured? */
 static uint32  ctc_crc;             /* CRC32 of downloaded memory */
@@ -101,14 +96,10 @@ UNIT ctc_unit = {
 };
 
 MTAB ctc_mod[] = {
-    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED",
         &set_writelock, &show_writelock,   NULL, "Write enable tape drive" },
-    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED",
         &set_writelock, NULL,   NULL, "Write lock tape drive" },
-    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "RQUEUE=n", NULL,
-      NULL, &ctc_show_rqueue, NULL, "Display Request Queue for card n" },
-    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "CQUEUE=n", NULL,
-      NULL, &ctc_show_cqueue, NULL, "Display Completion Queue for card n" },
     { 0 }
 };
 
@@ -147,9 +138,9 @@ DEVICE ctc_dev = {
     NULL,                           /* device description */
 };
 
-static void cio_irq(uint8 cid, uint8 dev, int32 delay)
+static void cio_irq(uint8 slot, uint8 dev, int32 delay)
 {
-    int_cid = cid;
+    int_slot = slot;
     int_subdev = dev & 0x3f;
     sim_activate_after(&ctc_unit, delay);
 }
@@ -204,49 +195,49 @@ static void ctc_update_vtoc(uint32 maxpass,
 {
     uint32 i;
 
-    pwrite_w(vtoc_addr + 12, VTOC_VALID);
-    pwrite_w(vtoc_addr + 16, vtoc->version);
+    pwrite_w(vtoc_addr + 12, VTOC_VALID, BUS_PER);
+    pwrite_w(vtoc_addr + 16, vtoc->version, BUS_PER);
     for (i = 0; i < 8; i++) {
-        pwrite_b(vtoc_addr + 20 + i, (uint8)(vtoc->volume[i]));
+        pwrite_b(vtoc_addr + 20 + i, (uint8)(vtoc->volume[i]), BUS_PER);
     }
-    pwrite_h(vtoc_addr + 28, vtoc->sectorsz);
-    pwrite_h(vtoc_addr + 30, vtoc->nparts);
+    pwrite_h(vtoc_addr + 28, vtoc->sectorsz, BUS_PER);
+    pwrite_h(vtoc_addr + 30, vtoc->nparts, BUS_PER);
 
     for (i = 0; i < VTOC_PART; i++) {
-        pwrite_h(vtoc_addr + 72 + (i * 12) + 0, vtoc_table[i].id);
-        pwrite_h(vtoc_addr + 72 + (i * 12) + 2, vtoc_table[i].flag);
-        pwrite_w(vtoc_addr + 72 + (i * 12) + 4, vtoc_table[i].sstart);
-        pwrite_w(vtoc_addr + 72 + (i * 12) + 8, vtoc_table[i].ssize);
+        pwrite_h(vtoc_addr + 72 + (i * 12) + 0, vtoc_table[i].id, BUS_PER);
+        pwrite_h(vtoc_addr + 72 + (i * 12) + 2, vtoc_table[i].flag, BUS_PER);
+        pwrite_w(vtoc_addr + 72 + (i * 12) + 4, vtoc_table[i].sstart, BUS_PER);
+        pwrite_w(vtoc_addr + 72 + (i * 12) + 8, vtoc_table[i].ssize, BUS_PER);
     }
 
     /* Write the pdinfo */
-    pwrite_w(pdinfo_addr, pdinfo->driveid);
-    pwrite_w(pdinfo_addr + 4, pdinfo->sanity);
-    pwrite_w(pdinfo_addr + 8, pdinfo->version);
+    pwrite_w(pdinfo_addr, pdinfo->driveid, BUS_PER);
+    pwrite_w(pdinfo_addr + 4, pdinfo->sanity, BUS_PER);
+    pwrite_w(pdinfo_addr + 8, pdinfo->version, BUS_PER);
     for (i = 0; i < 12; i++) {
-        pwrite_b(pdinfo_addr + 12 + i, pdinfo->serial[i]);
+        pwrite_b(pdinfo_addr + 12 + i, pdinfo->serial[i], BUS_PER);
     }
-    pwrite_w(pdinfo_addr + 24, pdinfo->cyls);
-    pwrite_w(pdinfo_addr + 28, pdinfo->tracks);
-    pwrite_w(pdinfo_addr + 32, pdinfo->sectors);
-    pwrite_w(pdinfo_addr + 36, pdinfo->bytes);
-    pwrite_w(pdinfo_addr + 40, pdinfo->logicalst);
-    pwrite_w(pdinfo_addr + 44, pdinfo->errlogst);
-    pwrite_w(pdinfo_addr + 48, pdinfo->errlogsz);
-    pwrite_w(pdinfo_addr + 52, pdinfo->mfgst);
-    pwrite_w(pdinfo_addr + 56, pdinfo->mfgsz);
-    pwrite_w(pdinfo_addr + 60, pdinfo->defectst);
-    pwrite_w(pdinfo_addr + 64, pdinfo->defectsz);
-    pwrite_w(pdinfo_addr + 68, pdinfo->relno);
-    pwrite_w(pdinfo_addr + 72, pdinfo->relst);
-    pwrite_w(pdinfo_addr + 76, pdinfo->relsz);
-    pwrite_w(pdinfo_addr + 80, pdinfo->relnext);
+    pwrite_w(pdinfo_addr + 24, pdinfo->cyls, BUS_PER);
+    pwrite_w(pdinfo_addr + 28, pdinfo->tracks, BUS_PER);
+    pwrite_w(pdinfo_addr + 32, pdinfo->sectors, BUS_PER);
+    pwrite_w(pdinfo_addr + 36, pdinfo->bytes, BUS_PER);
+    pwrite_w(pdinfo_addr + 40, pdinfo->logicalst, BUS_PER);
+    pwrite_w(pdinfo_addr + 44, pdinfo->errlogst, BUS_PER);
+    pwrite_w(pdinfo_addr + 48, pdinfo->errlogsz, BUS_PER);
+    pwrite_w(pdinfo_addr + 52, pdinfo->mfgst, BUS_PER);
+    pwrite_w(pdinfo_addr + 56, pdinfo->mfgsz, BUS_PER);
+    pwrite_w(pdinfo_addr + 60, pdinfo->defectst, BUS_PER);
+    pwrite_w(pdinfo_addr + 64, pdinfo->defectsz, BUS_PER);
+    pwrite_w(pdinfo_addr + 68, pdinfo->relno, BUS_PER);
+    pwrite_w(pdinfo_addr + 72, pdinfo->relst, BUS_PER);
+    pwrite_w(pdinfo_addr + 76, pdinfo->relsz, BUS_PER);
+    pwrite_w(pdinfo_addr + 80, pdinfo->relnext, BUS_PER);
 
     /* Now something horrible happens. We sneak RIGHT off the end of
      * the pdinfo struct and reach deep into the pdsector struct that
      * it is part of. */
 
-    pwrite_w(pdinfo_addr + 128, maxpass);
+    pwrite_w(pdinfo_addr + 128, maxpass, BUS_PER);
 }
 
 /*
@@ -257,7 +248,7 @@ static void ctc_update_vtoc(uint32 maxpass,
  * expects response parameters to be placed in specific fields of the
  * Completion Queue entry. It can be confusing to follow.
  */
-static void ctc_cmd(uint8 cid,
+static void ctc_cmd(uint8 slot,
                     cio_entry *rqe, uint8 *rapp_data,
                     cio_entry *cqe, uint8 *capp_data)
 {
@@ -283,7 +274,7 @@ static void ctc_cmd(uint8 cid,
     switch(rqe->opcode) {
     case CIO_DLM:
         for (i = 0; i < rqe->byte_count; i++) {
-            ctc_crc = cio_crc32_shift(ctc_crc, pread_b(rqe->address + i));
+            ctc_crc = cio_crc32_shift(ctc_crc, pread_b(rqe->address + i, BUS_PER));
         }
         sim_debug(TRACE_DBG, &ctc_dev,
                   "[ctc_cmd] CIO Download Memory: bytecnt=%04x "
@@ -311,11 +302,11 @@ static void ctc_cmd(uint8 cid,
         if (ctc_crc == CTC_DIAG_CRC1 ||
             ctc_crc == CTC_DIAG_CRC2 ||
             ctc_crc == CTC_DIAG_CRC3) {
-            pwrite_h(0x200f000, 0x1);   /* Test success */
-            pwrite_h(0x200f002, 0x0);   /* Test Number */
-            pwrite_h(0x200f004, 0x0);   /* Actual */
-            pwrite_h(0x200f006, 0x0);   /* Expected */
-            pwrite_b(0x200f008, 0x1);   /* Success flag again */
+            pwrite_h(0x200f000, 0x1, BUS_PER);   /* Test success */
+            pwrite_h(0x200f002, 0x0, BUS_PER);   /* Test Number */
+            pwrite_h(0x200f004, 0x0, BUS_PER);   /* Actual */
+            pwrite_h(0x200f006, 0x0, BUS_PER);   /* Expected */
+            pwrite_b(0x200f008, 0x1, BUS_PER);   /* Success flag again */
         }
 
         /* An interesting (?) side-effect of FORCE FUNCTION CALL is
@@ -323,7 +314,7 @@ static void ctc_cmd(uint8 cid,
          * required in order for new commands to work. In fact, an
          * INT0/INT1 combo _without_ a RESET can sysgen the board. So,
          * we reset the command bits here. */
-        cio[cid].sysgen_s = 0;
+        cio[slot].sysgen_s = 0;
         cqe->opcode = CTC_SUCCESS;
         break;
     case CIO_DOS:
@@ -339,9 +330,9 @@ static void ctc_cmd(uint8 cid,
                   rqe->opcode);
         delay = DELAY_DSD;
         /* Write subdevice information to the host. */
-        pwrite_h(rqe->address, CTC_NUM_SD);
-        pwrite_h(rqe->address + 2, CTC_SD_FT25);
-        pwrite_h(rqe->address + 4, CTC_SD_FD5);
+        pwrite_h(rqe->address, CTC_NUM_SD, BUS_PER);
+        pwrite_h(rqe->address + 2, CTC_SD_FT25, BUS_PER);
+        pwrite_h(rqe->address + 4, CTC_SD_FD5, BUS_PER);
         cqe->opcode = CTC_SUCCESS;
         break;
     case CTC_FORMAT:
@@ -503,7 +494,7 @@ static void ctc_cmd(uint8 cid,
             ctc_state[dev].time += 10;
             for (j = 0; j < VTOC_SECSZ; j++) {
                 /* Fill the buffer */
-                sec_buf[j] = pread_b(rqe->address + (b * VTOC_SECSZ) + j);
+                sec_buf[j] = pread_b(rqe->address + (b * VTOC_SECSZ) + j, BUS_PER);
             }
             lba = blkno + b;
             result = sim_disk_wrsect(&ctc_unit, lba, sec_buf, &secrw, 1);
@@ -601,7 +592,7 @@ static void ctc_cmd(uint8 cid,
                         offset = j;
                     }
                     c = sec_buf[offset];
-                    pwrite_b(dest++, c);
+                    pwrite_b(dest++, c, BUS_PER);
                     ctc_state[dev].bytnum++;
                 }
             } else {
@@ -634,10 +625,10 @@ static void ctc_cmd(uint8 cid,
         break;
     }
 
-    cio_irq(cid, rqe->subdevice, delay);
+    cio_irq(slot, rqe->subdevice, delay);
 }
 
-void ctc_sysgen(uint8 cid)
+void ctc_sysgen(uint8 slot)
 {
     cio_entry cqe = {0};
     uint8 rapp_data[12] = {0};
@@ -645,23 +636,23 @@ void ctc_sysgen(uint8 cid)
     ctc_crc = 0;
 
     sim_debug(TRACE_DBG, &ctc_dev, "[ctc_sysgen] Handling Sysgen.\n");
-    sim_debug(TRACE_DBG, &ctc_dev, "[ctc_sysgen]    rqp=%08x\n", cio[cid].rqp);
-    sim_debug(TRACE_DBG, &ctc_dev, "[ctc_sysgen]    cqp=%08x\n", cio[cid].cqp);
-    sim_debug(TRACE_DBG, &ctc_dev, "[ctc_sysgen]    rqs=%d\n", cio[cid].rqs);
-    sim_debug(TRACE_DBG, &ctc_dev, "[ctc_sysgen]    cqs=%d\n", cio[cid].cqs);
-    sim_debug(TRACE_DBG, &ctc_dev, "[ctc_sysgen]    ivec=%d\n", cio[cid].ivec);
-    sim_debug(TRACE_DBG, &ctc_dev, "[ctc_sysgen]    no_rque=%d\n", cio[cid].no_rque);
+    sim_debug(TRACE_DBG, &ctc_dev, "[ctc_sysgen]    rqp=%08x\n", cio[slot].rqp);
+    sim_debug(TRACE_DBG, &ctc_dev, "[ctc_sysgen]    cqp=%08x\n", cio[slot].cqp);
+    sim_debug(TRACE_DBG, &ctc_dev, "[ctc_sysgen]    rqs=%d\n", cio[slot].rqs);
+    sim_debug(TRACE_DBG, &ctc_dev, "[ctc_sysgen]    cqs=%d\n", cio[slot].cqs);
+    sim_debug(TRACE_DBG, &ctc_dev, "[ctc_sysgen]    ivec=%d\n", cio[slot].ivec);
+    sim_debug(TRACE_DBG, &ctc_dev, "[ctc_sysgen]    no_rque=%d\n", cio[slot].no_rque);
 
     cqe.opcode = 3; /* Sysgen success! */
 
-    cio_cexpress(cid, CTQCESIZE, &cqe, rapp_data);
-    cio_cqueue(cid, CIO_STAT, CTQCESIZE, &cqe, rapp_data);
+    cio_cexpress(slot, CTQCESIZE, &cqe, rapp_data);
+    cio_cqueue(slot, CIO_STAT, CTQCESIZE, &cqe, rapp_data);
 
-    int_cid = cid;
+    int_slot = slot;
     sim_activate_after(&ctc_unit, DELAY_SYSGEN);
 }
 
-void ctc_express(uint8 cid)
+void ctc_express(uint8 slot)
 {
     cio_entry rqe, cqe;
     uint8 rapp_data[12] = {0};
@@ -669,16 +660,13 @@ void ctc_express(uint8 cid)
 
     sim_debug(TRACE_DBG, &ctc_dev, "[ctc_express] Handling Express Request\n");
 
-    cio_rexpress(cid, CTQRESIZE, &rqe, rapp_data);
-    ctc_cmd(cid, &rqe, rapp_data, &cqe, capp_data);
+    cio_rexpress(slot, CTQRESIZE, &rqe, rapp_data);
+    ctc_cmd(slot, &rqe, rapp_data, &cqe, capp_data);
 
-    dump_entry(TRACE_DBG, &ctc_dev, "COMPLETION",
-               CTQCESIZE, &cqe, capp_data);
-
-    cio_cexpress(cid, CTQCESIZE, &cqe, capp_data);
+    cio_cexpress(slot, CTQCESIZE, &cqe, capp_data);
 }
 
-void ctc_full(uint8 cid)
+void ctc_full(uint8 slot)
 {
     cio_entry rqe, cqe;
     uint8 rapp_data[12] = {0};
@@ -686,69 +674,35 @@ void ctc_full(uint8 cid)
 
     sim_debug(TRACE_DBG, &ctc_dev, "[ctc_full] Handling Full Request\n");
 
-    while (cio_cqueue_avail(cid, CTQCESIZE) &&
-           cio_rqueue(cid, TAPE_DEV, CTQRESIZE, &rqe, rapp_data) == SCPE_OK) {
-        ctc_cmd(cid, &rqe, rapp_data, &cqe, capp_data);
+    while (cio_cqueue_avail(slot, CTQCESIZE) &&
+           cio_rqueue(slot, TAPE_DEV, CTQRESIZE, &rqe, rapp_data) == SCPE_OK) {
+        ctc_cmd(slot, &rqe, rapp_data, &cqe, capp_data);
     }
-    cio_cqueue(cid, CIO_STAT, CTQCESIZE, &cqe, capp_data);
+    cio_cqueue(slot, CIO_STAT, CTQCESIZE, &cqe, capp_data);
 }
 
 t_stat ctc_reset(DEVICE *dptr)
 {
-    uint8 cid;
+    uint8 slot;
+    t_stat r;
 
     ctc_crc = 0;
-
-    sim_debug(TRACE_DBG, &ctc_dev,
-              "[ctc_reset] Resetting CTC device\n");
 
     memset(ctc_state, 0, 2 * sizeof(CTC_STATE));
 
     if (dptr->flags & DEV_DIS) {
-        sim_debug(TRACE_DBG, &ctc_dev,
-                  "[ctc_reset] REMOVING CARD\n");
-
-        for (cid = 0; cid < CIO_SLOTS; cid++) {
-            if (cio[cid].id == CTC_ID) {
-                break;
-            }
-        }
-
-        if (cid == CIO_SLOTS) {
-            /* No card was ever attached */
-            return SCPE_OK;
-        }
-
-        cio[cid].id = 0;
-        cio[cid].ipl = 0;
-        cio[cid].ivec = 0;
-        cio[cid].exp_handler = NULL;
-        cio[cid].full_handler = NULL;
-        cio[cid].sysgen = NULL;
-
+        cio_remove_all(CTC_ID);
         ctc_conf = FALSE;
-    } else if (!ctc_conf) {
-        sim_debug(TRACE_DBG, &ctc_dev,
-                  "[ctc_reset] ATTACHING CARD\n");
+        return SCPE_OK;
+    }
 
-        /* Find the first avaialable slot */
-        for (cid = 0; cid < CIO_SLOTS; cid++) {
-            if (cio[cid].id == 0) {
-                break;
-            }
+    if (!ctc_conf) {
+        r = cio_install(CTC_ID, "CTC", CTC_IPL,
+                        &ctc_express, &ctc_full, &ctc_sysgen, NULL,
+                        &slot);
+        if (r != SCPE_OK) {
+            return r;
         }
-
-        /* Do we have room? */
-        if (cid == CIO_SLOTS) {
-            return SCPE_NXM;
-        }
-
-        cio[cid].id = CTC_ID;
-        cio[cid].ipl = CTC_IPL;
-        cio[cid].exp_handler = &ctc_express;
-        cio[cid].full_handler = &ctc_full;
-        cio[cid].sysgen = &ctc_sysgen;
-
         ctc_conf = TRUE;
     }
 
@@ -759,20 +713,20 @@ t_stat ctc_svc(UNIT *uptr)
 {
     uint16 lp, ulp;
 
-    if (cio[int_cid].ivec > 0) {
+    if (cio[int_slot].ivec > 0) {
         sim_debug(TRACE_DBG, &ctc_dev,
                   "[cio_svc] IRQ for board %d (VEC=%d)\n",
-                  int_cid, cio[int_cid].ivec);
-        CIO_SET_INT(int_cid);
+                  int_slot, cio[int_slot].ivec);
+        CIO_SET_INT(int_slot);
     }
 
     /* Check to see if the completion queue has more work in it. We
      * need to schedule an interrupt for each job if we've fallen
      * behind (this should be rare) */
-    lp = cio_c_lp(int_cid, CTQCESIZE);
-    ulp = cio_c_ulp(int_cid, CTQCESIZE);
+    lp = cio_c_lp(int_slot, CTQCESIZE);
+    ulp = cio_c_ulp(int_slot, CTQCESIZE);
 
-    if ((ulp + CTQCESIZE) % (CTQCESIZE * cio[int_cid].cqs) != lp) {
+    if ((ulp + CTQCESIZE) % (CTQCESIZE * cio[int_slot].cqs) != lp) {
         sim_debug(TRACE_DBG, &ctc_dev,
                   "[cio_svc] Completion queue has fallen behind (lp=%04x ulp=%04x)\n",
                   lp, ulp);
@@ -791,118 +745,4 @@ t_stat ctc_attach(UNIT *uptr, CONST char *cptr)
 t_stat ctc_detach(UNIT *uptr)
 {
     return sim_disk_detach(uptr);
-}
-
-t_stat ctc_show_rqueue(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
-{
-    return ctc_show_queue_common(st, uptr, val, desc, TRUE);
-}
-
-t_stat ctc_show_cqueue(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
-{
-    return ctc_show_queue_common(st, uptr, val, desc, FALSE);
-}
-
-
-static t_stat ctc_show_queue_common(FILE *st, UNIT *uptr, int32 val,
-                                      CONST void *desc, t_bool rq)
-{
-    uint8 cid;
-    char *cptr = (char *) desc;
-    t_stat result;
-    uint32 ptr, size, no_rque, i, j;
-    uint8  op, dev, seq, cmdstat;
-
-    if (cptr) {
-        cid = (uint8) get_uint(cptr, 10, 12, &result);
-        if (result != SCPE_OK) {
-            return SCPE_ARG;
-        }
-    } else {
-        return SCPE_ARG;
-    }
-
-    /* If the card is not sysgen'ed, give up */
-    if (cio[cid].sysgen_s != CIO_SYSGEN) {
-        fprintf(st, "No card in slot %d, or card has not completed sysgen\n", cid);
-        return SCPE_ARG;
-    }
-
-    if (rq) {
-        ptr = cio[cid].rqp;
-        size = cio[cid].rqs;
-        no_rque = cio[cid].no_rque;
-        fprintf(st, "Dumping %d Request Queues\n", no_rque);
-        fprintf(st, "---------------------------------------------------------\n");
-        fprintf(st, "EXPRESS ENTRY:\n");
-        fprintf(st, "    Byte Count: %d\n",     pread_h(ptr));
-        fprintf(st, "    Subdevice:  %d\n",     pread_b(ptr + 2));
-        fprintf(st, "    Opcode:     0x%02x\n", pread_b(ptr + 3));
-        fprintf(st, "    Addr/Data:  0x%08x\n", pread_w(ptr + 4));
-        fprintf(st, "    App Data:   0x%08x\n", pread_w(ptr + 8));
-        ptr += CTQRESIZE;
-
-        for (i = 0; i < no_rque; i++) {
-            fprintf(st, "---------------------------------------------------------\n");
-            fprintf(st, "REQUEST QUEUE %d\n", i);
-            fprintf(st, "---------------------------------------------------------\n");
-            fprintf(st, "Load Pointer:   %d\n", pread_h(ptr) / CTQRESIZE);
-            fprintf(st, "Unload Pointer: %d\n", pread_h(ptr + 2) / CTQRESIZE);
-            fprintf(st, "---------------------------------------------------------\n");
-            ptr += 4;
-            for (j = 0; j < size; j++) {
-                dev = pread_b(ptr + 2);
-                op = pread_b(ptr + 3);
-                seq = (dev & 0x40) >> 6;
-                cmdstat = (dev & 0x80) >> 7;
-                fprintf(st, "REQUEST ENTRY %d\n", j);
-                fprintf(st, "    Byte Count: %d\n",          pread_h(ptr));
-                fprintf(st, "    Subdevice:  %d\n",          dev & 0x3f);
-                fprintf(st, "    Cmd/Stat:   %d\n",          cmdstat);
-                fprintf(st, "    Seqbit:     %d\n",          seq);
-                fprintf(st, "    Opcode:     0x%02x (%d)\n", op, op);
-                fprintf(st, "    Addr/Data:  0x%08x\n",      pread_w(ptr + 4));
-                fprintf(st, "    App Data:   0x%08x 0x%08x 0x%08x\n",
-                        pread_w(ptr + 8), pread_w(ptr + 12), pread_w(ptr + 16));
-                ptr += CTQRESIZE;
-            }
-        }
-    } else {
-        ptr = cio[cid].cqp;
-        size = cio[cid].cqs;
-        no_rque = 0; /* Not used */
-        fprintf(st, "Dumping Completion Queue\n");
-        fprintf(st, "---------------------------------------------------------\n");
-        fprintf(st, "EXPRESS ENTRY:\n");
-        fprintf(st, "    Byte Count: %d\n",     pread_h(ptr));
-        fprintf(st, "    Subdevice:  %d\n",     pread_b(ptr + 2));
-        fprintf(st, "    Opcode:     0x%02x\n", pread_b(ptr + 3));
-        fprintf(st, "    Addr/Data:  0x%08x\n", pread_w(ptr + 4));
-        fprintf(st, "    App Data:   0x%08x\n", pread_w(ptr + 8));
-        ptr += CTQCESIZE;
-
-        fprintf(st, "---------------------------------------------------------\n");
-        fprintf(st, "Load Pointer:   %d\n", pread_h(ptr) / CTQCESIZE);
-        fprintf(st, "Unload Pointer: %d\n", pread_h(ptr + 2) / CTQCESIZE);
-        fprintf(st, "---------------------------------------------------------\n");
-        ptr += 4;
-        for (i = 0; i < size; i++) {
-            dev = pread_b(ptr + 2);
-            op = pread_b(ptr + 3);
-            seq = (dev & 0x40) >> 6;
-            cmdstat = (dev & 0x80) >> 7;
-            fprintf(st, "COMPLETION ENTRY %d\n", i);
-            fprintf(st, "    Byte Count: %d\n",          pread_h(ptr));
-            fprintf(st, "    Subdevice:  %d\n",          dev & 0x3f);
-            fprintf(st, "    Cmd/Stat:   %d\n",          cmdstat);
-            fprintf(st, "    Seqbit:     %d\n",          seq);
-            fprintf(st, "    Opcode:     0x%02x (%d)\n", op, op);
-            fprintf(st, "    Addr/Data:  0x%08x\n",      pread_w(ptr + 4));
-            fprintf(st, "    App Data:   0x%08x 0x%08x\n",
-                    pread_w(ptr + 8), pread_w(ptr + 12));
-            ptr += CTQCESIZE;
-        }
-    }
-
-    return SCPE_OK;
 }

@@ -2147,27 +2147,27 @@ KS10_OPT = -DKS=1 -DUSE_INT64 -I $(KS10D) -I $(PDP11D) ${NETWORK_OPT}
 
 ATT3B2D = ${SIMHD}/3B2
 ATT3B2M400 = ${ATT3B2D}/3b2_cpu.c ${ATT3B2D}/3b2_sys.c \
-	${ATT3B2D}/3b2_rev2_sys.c ${ATT3B2D}/3b2_rev2_mmu.c \
-	${ATT3B2D}/3b2_rev2_mau.c ${ATT3B2D}/3b2_rev2_csr.c \
-	${ATT3B2D}/3b2_rev2_timer.c ${ATT3B2D}/3b2_stddev.c \
-	${ATT3B2D}/3b2_mem.c ${ATT3B2D}/3b2_iu.c \
-	${ATT3B2D}/3b2_if.c ${ATT3B2D}/3b2_id.c \
-	${ATT3B2D}/3b2_dmac.c ${ATT3B2D}/3b2_io.c \
-	${ATT3B2D}/3b2_ports.c ${ATT3B2D}/3b2_ctc.c \
+    ${ATT3B2D}/3b2_rev2_sys.c ${ATT3B2D}/3b2_rev2_mmu.c \
+    ${ATT3B2D}/3b2_mau.c ${ATT3B2D}/3b2_rev2_csr.c \
+    ${ATT3B2D}/3b2_timer.c ${ATT3B2D}/3b2_stddev.c \
+    ${ATT3B2D}/3b2_mem.c ${ATT3B2D}/3b2_iu.c \
+    ${ATT3B2D}/3b2_if.c ${ATT3B2D}/3b2_id.c \
+    ${ATT3B2D}/3b2_dmac.c ${ATT3B2D}/3b2_io.c \
+    ${ATT3B2D}/3b2_ports.c ${ATT3B2D}/3b2_ctc.c \
 	${ATT3B2D}/3b2_ni.c \
 	$(NETWORK_DEPS)
 ATT3B2M400_OPT = -DUSE_INT64 -DUSE_ADDR64 -DREV2 -I ${ATT3B2D} ${NETWORK_OPT}
 
-ATT3B2M600 = ${ATT3B2D}/3b2_cpu.c ${ATT3B2D}/3b2_sys.c \
-	${ATT3B2D}/3b2_rev3_sys.c ${ATT3B2D}/3b2_rev3_mmu.c \
-	${ATT3B2D}/3b2_rev2_mau.c ${ATT3B2D}/3b2_rev3_csr.c \
-	${ATT3B2D}/3b2_rev3_timer.c ${ATT3B2D}/3b2_stddev.c \
-	${ATT3B2D}/3b2_mem.c ${ATT3B2D}/3b2_iu.c \
-	${ATT3B2D}/3b2_if.c ${ATT3B2D}/3b2_dmac.c \
-	${ATT3B2D}/3b2_io.c ${ATT3B2D}/3b2_ports.c \
+ATT3B2M700 = ${ATT3B2D}/3b2_cpu.c ${ATT3B2D}/3b2_sys.c \
+    ${ATT3B2D}/3b2_rev3_sys.c ${ATT3B2D}/3b2_rev3_mmu.c \
+    ${ATT3B2D}/3b2_mau.c ${ATT3B2D}/3b2_rev3_csr.c \
+    ${ATT3B2D}/3b2_timer.c ${ATT3B2D}/3b2_stddev.c \
+    ${ATT3B2D}/3b2_mem.c ${ATT3B2D}/3b2_iu.c \
+    ${ATT3B2D}/3b2_if.c ${ATT3B2D}/3b2_dmac.c \
+    ${ATT3B2D}/3b2_io.c ${ATT3B2D}/3b2_ports.c \
 	${ATT3B2D}/3b2_scsi.c ${ATT3B2D}/3b2_ni.c \
 	$(NETWORK_DEPS)
-ATT3B2M600_OPT = -DUSE_INT64 -DUSE_ADDR64 -DREV3 -I ${ATT3B2D} ${NETWORK_OPT}
+ATT3B2M700_OPT = -DUSE_INT64 -DUSE_ADDR64 -DREV3 -I ${ATT3B2D} ${NETWORK_OPT}
 
 SIGMAD = ${SIMHD}/sigma
 SIGMA = ${SIGMAD}/sigma_cpu.c ${SIGMAD}/sigma_sys.c ${SIGMAD}/sigma_cis.c \
@@ -2239,7 +2239,7 @@ ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	nova eclipse hp2100 hp3000 i1401 i1620 s3 altair altairz80 gri \
 	i7094 ibm1130 id16 id32 sds lgp h316 cdc1700 \
 	swtp6800mp-a swtp6800mp-a2 tx-0 ssem b5500 intel-mds \
-	scelbi 3b2 i701 i704 i7010 i7070 i7080 i7090 \
+	scelbi 3b2 3b2-700 i701 i704 i7010 i7070 i7080 i7090 \
 	sigma uc15 pdp10-ka pdp10-ki pdp10-kl pdp10-ks pdp6 i650 \
 	imlac tt2500 sel32 
 
@@ -2546,12 +2546,12 @@ b5500 : ${B5500} ${SIM}
 	$(MAKEIT) OPTS="$(B5500_OPT)" INDIR1="$(B5500D)"
 
 
-3b2 : ${ATT3B2M400} ${SIM} ${BUILD_ROMS}
-	$(MAKEIT) OPTS="$(ATT3B2M400_OPT)" INDIR1="$(ATT3B2D)"
+3b2 : ${ATT3B2M400} ${SIM}
+	$(MAKEIT) OPTS="$(ATT3B2M400_OPT)" INDIR1="$(ATT3B2D)" ALTNAME=3b2-400
  
 
-3b2-600 : ${ATT3B2M600} ${SIM} ${SCSI} ${BUILD_ROMS}
-	$(MAKEIT) OPTS="$(ATT3B2M600_OPT)" INDIR1="$(ATT3B2D)"
+3b2-700 : ${ATT3B2M700} ${SCSI} ${SIM}
+	$(MAKEIT) OPTS="$(ATT3B2M700_OPT)" INDIR1="$(ATT3B2D)"
 
 
 i7090 : ${I7090} ${SIM} 
