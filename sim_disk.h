@@ -209,10 +209,13 @@ struct DRVTYP {
 #define DRVFL_NOCHNG    (1u << DRVFL_V_NOCHNG)  /* Can't change drive type once set */
 #define DRVFL_V_NORMV   (DRVFL_V_NOCHNG + 1)
 #define DRVFL_NORMV     (1u << DRVFL_V_NORMV)   /* Can't change to a removable drive */
+#define DRVFL_V_QICTAPE (DRVFL_V_NORMV + 1)
+#define DRVFL_QICTAPE   (1u << DRVFL_V_QICTAPE) /* drive is a QIC (Quarter Inch Cartridge) tape */
 
 /* DRVTYP Initializer for SCSI disk and/or tape */
 #define DRV_SCSI(typ, pq, ver, rmv, bsz, lbn, man, prd, rev, nm, gap, txt) \
-    46, 9, 1549, lbn, nm, bsz, (rmv == TRUE) ? DRVFL_RMV : 0,              \
+    46, 9, 1549, lbn, nm, bsz,                                             \
+    DRVFL_TYPE_SCSI | ((rmv == TRUE) ? DRVFL_RMV|DRVFL_QICTAPE : 0),       \
     NULL, 0, 0, NULL, txt,                                                 \
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,                                          \
     typ, pq, ver, man, prd, rev, gap

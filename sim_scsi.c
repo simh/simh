@@ -489,6 +489,9 @@ scsi_set_req (bus);                                     /* request to send data 
 
 void scsi_mode_sel6 (SCSI_BUS *bus, uint8 *data, uint32 len)
 {
+UNIT *uptr = bus->dev[bus->target];
+uint32 blk_size;
+
 if (bus->phase == SCSI_CMD) {
     scsi_debug_cmd (bus, "Mode Select(6) - CMD\n");
     memcpy (&bus->cmd[0], &data[0], 6);
@@ -498,9 +501,25 @@ if (bus->phase == SCSI_CMD) {
     }
 else if (bus->phase == SCSI_DATO) {
     scsi_debug_cmd (bus, "Mode Select(6) - DATO\n");
-    /* Not currently implemented so just return
-       good status for now */
-    scsi_status (bus, STS_OK, KEY_OK, ASC_OK);
+    if ((DRVFL_GET_IFTYPE(uptr->drvtyp) == SCSI_TAPE) && 
+        (uptr->drvtyp->flags & DRVFL_QICTAPE)) {
+        blk_size = ((uint32)bus->buf[9]) << 16 |
+            ((uint32)bus->buf[10]) << 8 |
+            (uint32)bus->buf[11];
+        /* QIC tape ONLY supports requesting a fixed block size of
+         * 0x200 bytes. Any other block size will cause an illegal
+         * request. */
+        if (blk_size == uptr->drvtyp->sectsize) {
+            scsi_status(bus, STS_OK, KEY_OK, ASC_OK);
+            }
+        else {
+            scsi_status(bus, STS_CHK, KEY_ILLREQ|KEY_M_ILI, ASC_INVCDB);
+            }
+        }
+    else {
+        /* Not implemented for disk and non-QIC tape */
+        scsi_status(bus, STS_OK, KEY_OK, ASC_OK);
+        }
     }
 }
 
@@ -778,8 +797,9 @@ scsi_set_req (bus);                                     /* request to send data 
 void scsi_read6_tape (SCSI_BUS *bus, uint8 *data, uint32 len)
 {
 UNIT *uptr = bus->dev[bus->target];
-t_seccnt sects, sectsread;
+t_seccnt sects, sectsread, new_buf_b;
 t_stat r;
+uint32 i;
 
 if ((data[1] & 0x3) == 0x3) {                           /* SILI and FIXED? */
     scsi_status (bus, STS_CHK, KEY_ILLREQ, ASC_INVCDB);
@@ -787,6 +807,7 @@ if ((data[1] & 0x3) == 0x3) {                           /* SILI and FIXED? */
     }
 
 sects = GETW (data, 3) | (data[2] << 16);
+new_buf_b = 0;
 sectsread = 0;
 
 if (sects == 0) {                                       /* no data to read */
@@ -797,35 +818,64 @@ if (sects == 0) {                                       /* no data to read */
 scsi_debug_cmd (bus, "Read(6) blks %d fixed %d\n", sects, (data[1] & 0x1));
 
 if (uptr->flags & UNIT_ATT) {
-    if (data[1] & 0x1) {
-        r = sim_tape_rdrecf (uptr, &bus->buf[0], &sectsread, (sects * uptr->drvtyp->sectsize));
-        scsi_debug_cmd (bus, "Read tape blk %d, read %d, r = %d\n", sects, sectsread, r);
+    if (uptr->drvtyp->flags & DRVFL_QICTAPE) {
+        if (data[1] & 0x1) {
+            /* If this is a QIC tape drive and bit 0 is set, this is a
+               request to read multiple fixed-length blocks. */
+            scsi_debug_cmd(bus, "QIC in fixed block mode\n");
+            for (i = 0; i < sects; i++) {
+                r = sim_tape_rdrecf(uptr, &bus->buf[new_buf_b], &sectsread, uptr->drvtyp->sectsize);
+                scsi_debug_cmd(bus, "Read tape blk %d, read %d, r = %d\n",
+                               sects, sectsread, r);
+                if (r == MTSE_OK) {
+                    new_buf_b += uptr->drvtyp->sectsize;
+                } else {
+                    scsi_tape_status(bus, r);
+                    scsi_status(bus, bus->status, bus->sense_key, bus->sense_code);
+                    return;
+                }
+            }
+        } else {
+            /* QIC drives respond with an illegal request when the
+               request does not specify fixed-block mode */
+            scsi_debug_cmd(bus, "QIC not in fixed block mode, invalid command\n");
+            scsi_status(bus, STS_CHK, KEY_ILLREQ|KEY_M_ILI, ASC_INVCDB);
+            return;
+            }
         }
     else {
-        r = sim_tape_rdrecf (uptr, &bus->buf[0], &sectsread, sects);
-        scsi_debug_cmd (bus, "Read tape max %d, read %d, r = %d\n", sects, sectsread, r);
-        if (r == MTSE_INVRL) {                          /* overlength condition */
-            scsi_debug_cmd (bus, "Overlength\n");
-            if ((data[1] & 0x2) && (uptr->drvtyp->sectsize == 0)) { /* SILI set */
-                scsi_debug_cmd (bus, "SILI set\n");
+        /* Otherwise, this is a normal streaming tape read */
+        if (data[1] & 0x1) {
+            r = sim_tape_rdrecf (uptr, &bus->buf[0], &sectsread, (sects * uptr->drvtyp->sectsize));
+            scsi_debug_cmd (bus, "Read tape blk %d, read %d, r = %d\n", sects, sectsread, r);
+            }
+        else {
+            r = sim_tape_rdrecf (uptr, &bus->buf[0], &sectsread, sects);
+            scsi_debug_cmd (bus, "Read tape max %d, read %d, r = %d\n", sects, sectsread, r);
+            if (r == MTSE_INVRL) {                          /* overlength condition */
+                scsi_debug_cmd (bus, "Overlength\n");
+                if ((data[1] & 0x2) && (uptr->drvtyp->sectsize == 0)) { /* SILI set */
+                    scsi_debug_cmd (bus, "SILI set\n");
+                    }
+                else {
+                    scsi_debug_cmd (bus, "SILI not set - check condition\n");
+                    scsi_status (bus, STS_CHK, (KEY_OK | KEY_M_ILI), ASC_OK);
+                    return;
+                    }
                 }
-            else {
-                scsi_debug_cmd (bus, "SILI not set - check condition\n");
-                scsi_status (bus, STS_CHK, (KEY_OK | KEY_M_ILI), ASC_OK);
-                return;
+            else if ((r == MTSE_OK) && (sectsread < sects)) {  /* underlength condition */
+                scsi_debug_cmd (bus, "Underlength\n");
+                if (data[1] & 0x2) {                        /* SILI set */
+                    scsi_debug_cmd (bus, "SILI set\n");
+                    }
+                else {
+                    scsi_debug_cmd (bus, "SILI not set - check condition\n");
+                    scsi_status_deferred (bus, STS_CHK, (KEY_OK | KEY_M_ILI), ASC_OK);
+                    bus->sense_info = (sects - sectsread);
+                    }
                 }
             }
-        else if ((r == MTSE_OK) && (sectsread < sects)) {  /* underlength condition */
-            scsi_debug_cmd (bus, "Underlength\n");
-            if (data[1] & 0x2) {                        /* SILI set */
-                scsi_debug_cmd (bus, "SILI set\n");
-                }
-            else {
-                scsi_debug_cmd (bus, "SILI not set - check condition\n");
-                scsi_status_deferred (bus, STS_CHK, (KEY_OK | KEY_M_ILI), ASC_OK);
-                bus->sense_info = (sects - sectsread);
-                }
-            }
+        new_buf_b = sectsread;
         }
 
     if (r != MTSE_OK) {
@@ -839,7 +889,7 @@ else {
     }
 
 if (sectsread > 0) {
-    bus->buf_b = sectsread;
+    bus->buf_b = new_buf_b;
     scsi_set_phase (bus, SCSI_DATI);                    /* data in phase next */
     }
 else {
