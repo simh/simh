@@ -79,6 +79,7 @@ All Simulator updates on Open SIMH will be present in this repository, and any c
 - Reasonable output produced for all simulators from HELP BOOT.
 - Fix occasional hang of IBM1130 simulator while building with Visual Studio.
 - Building with the simh makefile can optionally compile each source file separately and store the compiled result.   This approach lends itself to quicker building for folks who are developing new simulators or new simulator modules.  This was requested and discussed in #697.
+- TAPE and SCSI libraries have been extended to fully support partial record reads of fixed sized records which may contain multiple records in recorded data.  Images of this type are common for QIC tape archives generally available on bitsavers and elsewhere.  Attach time checking on simulated QIC tape devices reports possible problems that may occur.
 
 #### Changes to the PDP-11 and VAX simulators
 
