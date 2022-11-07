@@ -8866,6 +8866,7 @@ for (i = 0; i < (device_count + sim_internal_device_count); i++) {/* loop thru d
         WRITE_I (uptr->buf);
         WRITE_I (uptr->recsize);
         WRITE_I (uptr->tape_eom);
+        WRITE_I (uptr->tape_chunk_size);
         WRITE_I (uptr->capac);                          /* [V3.5] capacity */
         fprintf (sfile, "%.0f\n", uptr->usecs_remaining);/* [V4.0] remaining wait */
         WRITE_I (uptr->pos);
@@ -9134,6 +9135,7 @@ for ( ;; ) {                                            /* device loop */
             READ_I (uptr->buf);
             READ_I (uptr->recsize);
             READ_I (uptr->tape_eom);
+            READ_I (uptr->tape_chunk_size);
             }
         old_capac = uptr->capac;                        /* save current capacity */
         if (v35) {                                      /* [V3.5+] capacity */

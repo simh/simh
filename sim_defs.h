@@ -608,6 +608,7 @@ struct UNIT {
     void                *tmxr;                          /* TMXR linkage */
     uint32              recsize;                        /* Tape specific info */
     t_addr              tape_eom;                       /* Tape specific info */
+    uint32              tape_chunk_size;                /* Tape specific info */
     t_bool              (*cancel)(UNIT *);
     double              usecs_remaining;                /* time balance for long delays */
     char                *uname;                         /* Unit name */

@@ -95,7 +95,13 @@
 
 #include "sim_defs.h"
 #include "sim_tape.h"
-#include <ctype.h>
+
+#ifndef MAX
+#define MAX(a,b)  (((a) >= (b)) ? (a) : (b))
+#endif
+#ifndef MIN
+#define MIN(a,b)  (((a) <= (b)) ? (a) : (b))
+#endif
 
 #if defined SIM_ASYNCH_IO
 #include <pthread.h>
@@ -144,6 +150,10 @@ struct tape_context {
     DEVICE              *dptr;              /* Device for unit (access to debug flags) */
     uint32              dbit;               /* debugging bit for trace */
     uint32              auto_format;        /* Format determined dynamically */
+    uint8               *chunk_buf;
+    uint32              chunk_buf_size;
+    uint32              chunk_data_size;
+    uint32              chunk_offset;
 #if defined SIM_ASYNCH_IO
     t_bool              asynch_io;          /* Asynchronous Interrupt scheduling enabled */
     int                 asynch_io_latency;  /* instructions to delay pending interrupt */
@@ -596,6 +606,12 @@ return SCPE_OK;
 #endif
 }
 
+t_stat sim_tape_set_chunk_mode (UNIT *uptr, uint32 chunk_size)
+{
+uptr->tape_chunk_size = chunk_size;
+return SCPE_OK;
+}
+
 /* 
    This routine is called when the simulator stops and any time
    the asynch mode is changed (enabled or disabled)
@@ -1024,6 +1040,7 @@ uptr->tape_eom = 0;
 uptr->pos = 0;
 MT_CLR_PNU (uptr);
 MT_CLR_INMRK (uptr);                                    /* Not within a TAR tapemark */
+free (ctx->chunk_buf);
 free (uptr->tape_ctx);
 uptr->tape_ctx = NULL;
 uptr->io_flush = NULL;
@@ -1920,6 +1937,14 @@ if (ctx == NULL)                                        /* if not properly attac
     return sim_messagef (SCPE_IERR, "Bad Attach\n");    /*   that's a problem */
 sim_debug_unit (ctx->dbit, uptr, "sim_tape_rdrecf(unit=%d, buf=%p, max=%d)\n", (int)(uptr-ctx->dptr->units), buf, max);
 
+if ((uptr->tape_chunk_size) &&
+    (ctx->chunk_data_size > ctx->chunk_offset)) {       /* remnant chunk data available? */
+    /* return the next chunk of data */
+    *bc = MIN (max, ctx->chunk_data_size - ctx->chunk_offset);
+    memcpy (buf, ctx->chunk_buf + ctx->chunk_offset, *bc);
+    ctx->chunk_offset += *bc;
+    return MTSE_OK;
+    }
 opos = uptr->pos;                                       /* old position */
 st = sim_tape_rdrlfwd (uptr, &tbc);                     /* read rec lnt */
 if (st != MTSE_OK) {
@@ -1928,9 +1953,29 @@ if (st != MTSE_OK) {
     }
 *bc = rbc = MTR_L (tbc);                                /* strip error flag */
 if (rbc > max) {                                        /* rec out of range? */
-    MT_SET_PNU (uptr);
-    uptr->pos = opos;
-    return MTSE_INVRL;
+    if (uptr->tape_chunk_size) {
+        /* prep the chunk buffer */
+        if (tbc > ctx->chunk_buf_size) {
+            ctx->chunk_buf_size = MAX (65536, tbc);
+            ctx->chunk_buf = (uint8 *)realloc (ctx->chunk_buf, ctx->chunk_buf_size);
+            }
+        ctx->chunk_data_size = ctx->chunk_offset = 0;
+        uptr->pos = opos;
+        /* Fill the chunk buffer */
+        st = sim_tape_rdrecf (uptr, ctx->chunk_buf, &ctx->chunk_data_size, ctx->chunk_buf_size);
+        if (st != MTSE_OK) {
+            MT_SET_PNU (uptr);
+            uptr->pos = opos;
+            return st;
+            }
+        /* return the first chunk */
+        return sim_tape_rdrecf (uptr, buf, bc, max);
+        }
+    else {
+        MT_SET_PNU (uptr);
+        uptr->pos = opos;
+        return MTSE_INVRL;
+        }
     }
 if (f < MTUF_F_ANSI) {
     i = (t_mtrlnt) sim_fread (buf, sizeof (uint8), rbc, uptr->fileref); /* read record */
@@ -1998,6 +2043,7 @@ if (ctx == NULL)                                        /* if not properly attac
     return sim_messagef (SCPE_IERR, "Bad Attach\n");    /*   that's a problem */
 sim_debug_unit (ctx->dbit, uptr, "sim_tape_rdrecr(unit=%d, buf=%p, max=%d)\n", (int)(uptr-ctx->dptr->units), buf, max);
 
+ctx->chunk_offset = ctx->chunk_data_size = 0;           /* discard any pending chunking */
 st = sim_tape_rdrlrev (uptr, &tbc);                     /* read rec lnt */
 if (st != MTSE_OK) {
     *bc = 0;
@@ -3631,6 +3677,45 @@ if (!stop_cpu) {            /* if SIGINT didn't interrupt the scan */
     if (unique_record_sizes > 2 * tapemark_total) {
         sim_messagef (SCPE_OK, "A potentially unreasonable number of record sizes(%u) vs tape marks (%u) have been found\n", unique_record_sizes, tapemark_total);
         sim_messagef (SCPE_OK, "The tape format (%s) might not be correct for the '%s' tape image\n", _sim_tape_format_name (uptr), uptr->filename);
+        }
+    if (uptr->tape_chunk_size > 0) {
+        t_bool good_chunks = TRUE;
+        uint32 chunk_total, error_total;
+
+        for (bc = 0; bc <= max; bc++) {
+            if ((rec_sizes[bc] != 0) &&
+                ((bc % uptr->tape_chunk_size) != 0)) {
+                sim_messagef (SCPE_OK, "Records of size %u are not a multiple of the required %u for this device\n", bc, uptr->tape_chunk_size);
+                good_chunks = FALSE;
+                }
+            }
+        if (good_chunks) {
+            error_total = chunk_total = tapemark_total = 0;
+            r = sim_tape_rewind (uptr);
+            while (r == SCPE_OK) {
+                if (stop_cpu) { /* SIGINT? */
+                    stop_cpu = FALSE;
+                    break;
+                    }
+                r = sim_tape_rdrecf (uptr, buf_f, &bc_f, uptr->tape_chunk_size);
+                switch (r) {
+                case MTSE_OK:                                   /* no error */
+                case MTSE_TMK:                                  /* tape mark */
+                    if (r == MTSE_OK)
+                        ++chunk_total;
+                    else
+                        ++tapemark_total;
+                    r = SCPE_OK;
+                    break;
+                case MTSE_EOM:                                  /* end of medium */
+                    break;
+                default:
+                    ++error_total;
+                    r = SCPE_OK;
+                    }
+                }
+            sim_tape_rewind (uptr);
+            }
         }
     }
 

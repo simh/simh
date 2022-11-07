@@ -7746,6 +7746,8 @@ if ((uptr->drvtyp != NULL) &&
     (uptr->drvtyp->devtype != drives[val].devtype)) {
     sim_tape_set_fmt (uptr, 0, "SIMH", NULL);
     sim_disk_set_fmt (uptr, 0, "AUTO", NULL);
+    sim_tape_set_chunk_mode (uptr, ((drives[val].devtype == SCSI_TAPE) && 
+                                    (drives[val].flags & DRVFL_QICTAPE)) ? drives[val].sectsize : 0);
     }
 uptr->drvtyp = &drives[val];
 set_writelock (uptr, ((uptr->drvtyp->flags & DRVFL_RO) != 0), NULL, NULL);
