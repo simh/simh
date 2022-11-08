@@ -68,21 +68,26 @@ t_stat sim_load(FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
     int32 cnt = 0;
 
     if (flag) {
-        return sim_messagef(SCPE_NOFNC, "Command not implemented.");
+        return sim_messagef(SCPE_NOFNC, "Command not implemented.\n");
     }
 
     if (sim_switches & SWMASK('R')) {
-        origin = ROM_BASE;
         limit = ROM_BASE + ROM_SIZE;
-    } else {
-        origin = 0;
-        limit = (uint32) cpu_unit.capac;
-        if (sim_switches & SWMASK('O')) {
-            origin = (uint32) get_uint(cptr, 16, 0xffffffff, &r);
-            if (r != SCPE_OK) {
-                return SCPE_ARG;
-            }
+        origin = ROM_BASE;
+    } else if (sim_switches & SWMASK('O')) {
+        limit = PHYS_MEM_BASE + (uint32) cpu_unit.capac;
+        origin = (uint32) get_uint(cptr, 16, 0xffffffff, &r);
+        if (r != SCPE_OK) {
+            return SCPE_ARG;
         }
+        if (origin < PHYS_MEM_BASE) {
+            return sim_messagef(SCPE_ARG,
+                                "Address not in RAM.\n");
+        }
+    } else {
+        return sim_messagef(SCPE_ARG,
+                            "Flag not understood. Use -r to load ROM "
+                            "or -o to load RAM.\n");
     }
     
     while ((i = Fgetc (fileref)) != EOF) {
@@ -100,12 +105,10 @@ t_stat sim_load(FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 
     if (sim_switches & SWMASK('R')) {
         rom_loaded = TRUE;
-        sim_messagef(SCPE_OK, "%d bytes loaded into ROM\n", cnt);
+        return sim_messagef(SCPE_OK, "%d bytes loaded into ROM\n", cnt);
     } else {
-        sim_messagef(SCPE_OK, "%d bytes loaded at address 0x%08x\n", cnt, origin - cnt);
+        return sim_messagef(SCPE_OK, "%d bytes loaded at address 0x%08x\n", cnt, origin - cnt);
     }
-
-    return SCPE_OK;
 }
 
 t_stat parse_sym(CONST char *cptr, t_addr exta, UNIT *uptr, t_value *val, int32 sw)
