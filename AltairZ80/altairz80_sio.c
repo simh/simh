@@ -166,7 +166,7 @@ extern void setClockFrequency(const uint32 Value);
 
 extern uint32 PCX;
 extern int32 SR;
-extern uint32 DS_S;
+extern int32 DS_S;
 extern UNIT cpu_unit;
 extern const char* handlerNameForPort(const int32 port);
 extern uint32 vectorInterrupt;            /* Interrupt Request */
