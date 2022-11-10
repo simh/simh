@@ -1555,7 +1555,7 @@ VAX = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c ${VAXD}/vax_io.c \
 	${PDP11D}/pdp11_xq.c ${PDP11D}/pdp11_vh.c ${PDP11D}/pdp11_cr.c \
 	${PDP11D}/pdp11_td.c ${PDP11D}/pdp11_io_lib.c ${PDP11D}/pdp11_dup.c \
 	$(NETWORK_DEPS)
-VAX_OPT = -DVM_VAX -DUSE_INT64 -DUSE_ADDR64 -DUSE_SIM_VIDEO -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT} ${VIDEO_CCDEFS}
+VAX_OPT = -DVM_VAX -DUSE_INT64 -DUSE_ADDR64 -DUSE_SIM_VIDEO -I${VAXD} -I ${PDP11D} ${NETWORK_OPT} ${VIDEO_CCDEFS}
 
 
 VAX410 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
@@ -2272,167 +2272,167 @@ MAKEFLAGS += --no-print-directory
 #
 
 pdp1 : $(PDP1) $(SIM)
-	$(MAKEIT) OPTS="$(PDP1_OPT)" INDIR1="$(PDP1D)"
+	$(MAKEIT) OPTS="$(PDP1_OPT)"
 
 
 pdp4 : $(PDP18B) $(SIM)
-	$(MAKEIT) OPTS="$(PDP4_OPT)" INDIR1="$(PDP18BD)"
+	$(MAKEIT) OPTS="$(PDP4_OPT)"
 
 
 pdp7 : $(PDP18B) ${PDP18BD}/pdp18b_dpy.c ${DISPLAYL} ${DISPLAY340} $(SIM)
-	$(MAKEIT) OPTS="$(PDP7_OPT)" INDIR1="$(PDP18BD)"
+	$(MAKEIT) OPTS="$(PDP7_OPT)"
 
 
 pdp8 : ${PDP8} ${SIM}
-	$(MAKEIT) OPTS="$(PDP8_OPT)" INDIR1="$(PDP8D)"
+	$(MAKEIT) OPTS="$(PDP8_OPT)"
 
 
 pdp9 : ${PDP18B} ${SIM}
-	$(MAKEIT) OPTS="$(PDP9_OPT)" INDIR1="$(PDP18BD)"
+	$(MAKEIT) OPTS="$(PDP9_OPT)"
 
 
 pdp15 : ${PDP18B} ${SIM}
-	$(MAKEIT) OPTS="$(PDP15_OPT)" INDIR1="$(PDP18BD)"
+	$(MAKEIT) OPTS="$(PDP15_OPT)"
 
 
 pdp10 : ${PDP10} ${SIM}
-	$(MAKEIT) OPTS="$(PDP10_OPT)" INDIR1="$(PDP10D)" INDIR2="$(PDP11D)"
+	$(MAKEIT) OPTS="$(PDP10_OPT)"
 
 
 imlac : ${IMLAC} ${SIM}
-	$(MAKEIT) OPTS="$(IMLAC_OPT)" INDIR1="$(IMLACD)"
+	$(MAKEIT) OPTS="$(IMLAC_OPT)"
 
 
 tt2500 : ${TT2500} ${SIM}
-	$(MAKEIT) OPTS="$(TT2500_OPT)" INDIR1="$(TT2500D)"
+	$(MAKEIT) OPTS="$(TT2500_OPT)"
 
 
 pdp11 : ${PDP11} ${SIM} ${BUILD_ROMS}
-	$(MAKEIT) OPTS="$(PDP11_OPT)" INDIR1="$(PDP11D)"
+	$(MAKEIT) OPTS="$(PDP11_OPT)"
 
 
 uc15 : ${UC15} ${SIM}
-	$(MAKEIT) OPTS="$(UC15_OPT)" INDIR1="$(PDP11D)"
+	$(MAKEIT) OPTS="$(UC15_OPT)"
 
 
 microvax3900 : vax
 
 vax : ${VAX} ${SIM} ${BUILD_ROMS}
-	$(MAKEIT) OPTS="$(VAX_OPT)" INDIR1="$(VAXD)" INDIR2="$(PDP11D)" TEST_NAME=vax-diag ALTNAME=microvax3900
+	$(MAKEIT) OPTS="$(VAX_OPT)" TEST_NAME=vax-diag ALTNAME=microvax3900
 
 
 microvax2000 : ${VAX410} ${SIM} ${SCSI} ${BUILD_ROMS}
-	$(MAKEIT) OPTS="$(VAX410_OPT)" INDIR1="$(VAXD)" TEST_NAME=vax-diag
+	$(MAKEIT) OPTS="$(VAX410_OPT)" TEST_NAME=vax-diag
 
 
 infoserver100 : ${VAX420} ${SCSI} ${SIM} ${BUILD_ROMS}
-	$(MAKEIT) OPTS="$(VAX411_OPT)" INDIR1="$(VAXD)" TEST_NAME=vax-diag
+	$(MAKEIT) OPTS="$(VAX411_OPT)" TEST_NAME=vax-diag
 
 
 infoserver150vxt : ${VAX420} ${SCSI} ${SIM} ${BUILD_ROMS}
-	$(MAKEIT) OPTS="$(VAX412_OPT)" INDIR1="$(VAXD)" TEST_NAME=vax-diag
+	$(MAKEIT) OPTS="$(VAX412_OPT)" TEST_NAME=vax-diag
 
 
 microvax3100 : ${VAX420} ${SCSI} ${SIM} ${BUILD_ROMS}
-	$(MAKEIT) OPTS="$(VAX41A_OPT)" INDIR1="$(VAXD)" TEST_NAME=vax-diag
+	$(MAKEIT) OPTS="$(VAX41A_OPT)" TEST_NAME=vax-diag
 
 
 microvax3100e : ${VAX420} ${SCSI} ${SIM} ${BUILD_ROMS}
-	$(MAKEIT) OPTS="$(VAX41D_OPT)" INDIR1="$(VAXD)" TEST_NAME=vax-diag
+	$(MAKEIT) OPTS="$(VAX41D_OPT)" TEST_NAME=vax-diag
 
 
 vaxstation3100m30 : ${VAX420} ${SCSI} ${SIM} ${BUILD_ROMS}
-	$(MAKEIT) OPTS="$(VAX42A_OPT)" INDIR1="$(VAXD)" TEST_NAME=vax-diag
+	$(MAKEIT) OPTS="$(VAX42A_OPT)" TEST_NAME=vax-diag
 
 
 vaxstation3100m38 : ${VAX420} ${SCSI} ${SIM} ${BUILD_ROMS}
-	$(MAKEIT) OPTS="$(VAX42B_OPT)" INDIR1="$(VAXD)" TEST_NAME=vax-diag
+	$(MAKEIT) OPTS="$(VAX42B_OPT)" TEST_NAME=vax-diag
 
 
 vaxstation3100m76 : ${VAX43} ${SCSI} ${SIM} ${BUILD_ROMS}
-	$(MAKEIT) OPTS="$(VAX43_OPT)" INDIR1="$(VAXD)" TEST_NAME=vax-diag
+	$(MAKEIT) OPTS="$(VAX43_OPT)" TEST_NAME=vax-diag
 
 
 vaxstation4000m60 : ${VAX440} ${SCSI} ${SIM} ${BUILD_ROMS}
-	$(MAKEIT) OPTS="$(VAX46_OPT)" INDIR1="$(VAXD)" TEST_NAME=vax-diag
+	$(MAKEIT) OPTS="$(VAX46_OPT)" TEST_NAME=vax-diag
 
 
 microvax3100m80 : ${VAX440} ${SCSI} ${SIM} ${BUILD_ROMS}
-	$(MAKEIT) OPTS="$(VAX47_OPT)" INDIR1="$(VAXD)" TEST_NAME=vax-diag
+	$(MAKEIT) OPTS="$(VAX47_OPT)" TEST_NAME=vax-diag
 
 
 vaxstation4000vlc : ${VAX440} ${SCSI} ${SIM} ${BUILD_ROMS}
-	$(MAKEIT) OPTS="$(VAX48_OPT)" INDIR1="$(VAXD)" TEST_NAME=vax-diag
+	$(MAKEIT) OPTS="$(VAX48_OPT)" TEST_NAME=vax-diag
 
 
 infoserver1000 : ${IS1000} ${SCSI} ${SIM} ${BUILD_ROMS}
-	$(MAKEIT) OPTS="$(IS1000_OPT)" INDIR1="$(VAXD)" TEST_NAME=vax-diag
+	$(MAKEIT) OPTS="$(IS1000_OPT)" TEST_NAME=vax-diag
 
 
 microvax1 : ${VAX610} ${SIM} ${BUILD_ROMS}
-	$(MAKEIT) OPTS="$(VAX610_OPT)" INDIR1="$(VAXD)" INDIR2="$(PDP11D)" TEST_NAME=vax-diag
+	$(MAKEIT) OPTS="$(VAX610_OPT)" TEST_NAME=vax-diag
 
 
 rtvax1000 : ${VAX630} ${SIM} ${BUILD_ROMS}
-	$(MAKEIT) OPTS="$(VAX620_OPT)" INDIR1="$(VAXD)" INDIR2="$(PDP11D)" TEST_NAME=vax-diag
+	$(MAKEIT) OPTS="$(VAX620_OPT)" TEST_NAME=vax-diag
 
 
 microvax2 : ${VAX630} ${SIM} ${BUILD_ROMS}
-	$(MAKEIT) OPTS="$(VAX630_OPT)" INDIR1="$(VAXD)" INDIR2="$(PDP11D)" TEST_NAME=vax-diag
+	$(MAKEIT) OPTS="$(VAX630_OPT)" TEST_NAME=vax-diag
 
 
 vax730 : ${VAX730} ${SIM} ${BUILD_ROMS}
-	$(MAKEIT) OPTS="$(VAX730_OPT)" INDIR1="$(VAXD)" INDIR2="$(PDP11D)" TEST_NAME=vax-diag
+	$(MAKEIT) OPTS="$(VAX730_OPT)" TEST_NAME=vax-diag
 
 
 vax750 : ${VAX750} ${SIM} ${BUILD_ROMS}
-	$(MAKEIT) OPTS="$(VAX750_OPT)" INDIR1="$(VAXD)" INDIR2="$(PDP11D)" TEST_NAME=vax-diag
+	$(MAKEIT) OPTS="$(VAX750_OPT)" TEST_NAME=vax-diag
 
 
 vax780 : ${VAX780} ${SIM} ${BUILD_ROMS}
-	$(MAKEIT) OPTS="$(VAX780_OPT)" INDIR1="$(VAXD)" INDIR2="$(PDP11D)" TEST_NAME=vax-diag
+	$(MAKEIT) OPTS="$(VAX780_OPT)" TEST_NAME=vax-diag
 
 
 vax8200 : ${VAX8200} ${SIM} ${BUILD_ROMS}
-	$(MAKEIT) OPTS="$(VAX8200_OPT)" INDIR1="$(VAXD)" INDIR2="$(PDP11D)" TEST_NAME=vax-diag
+	$(MAKEIT) OPTS="$(VAX8200_OPT)" TEST_NAME=vax-diag
 
 
 vax8600 : ${VAX8600} ${SIM} ${BUILD_ROMS}
-	$(MAKEIT) OPTS="$(VAX8600_OPT)" INDIR1="$(VAXD)" INDIR2="$(PDP11D)" TEST_NAME=vax-diag
+	$(MAKEIT) OPTS="$(VAX8600_OPT)" TEST_NAME=vax-diag
 
 
 nova : ${NOVA} ${SIM}
-	$(MAKEIT) OPTS="$(NOVA_OPT)" INDIR1="$(NOVAD)"
+	$(MAKEIT) OPTS="$(NOVA_OPT)"
 
 
 eclipse : ${ECLIPSE} ${SIM}
-	$(MAKEIT) OPTS="$(ECLIPSE_OPT)" INDIR1="$(NOVAD)"
+	$(MAKEIT) OPTS="$(ECLIPSE_OPT)"
 
 
 h316 : ${H316} ${SIM}
-	$(MAKEIT) OPTS="$(H316_OPT)" INDIR1="$(H316D)"
+	$(MAKEIT) OPTS="$(H316_OPT)"
 
 
 hp2100 : ${HP2100} ${SIM}
-	$(MAKEIT) OPTS="$(HP2100_OPT)" INDIR1="$(HP2100D)" NOCPP=1
+	$(MAKEIT) OPTS="$(HP2100_OPT)" NOCPP=1
 
 hp3000 : ${HP3000} ${SIM}
-	$(MAKEIT) OPTS="$(HP3000_OPT)" INDIR1="$(HP3000D)" NOCPP=1
+	$(MAKEIT) OPTS="$(HP3000_OPT)" NOCPP=1
 
 i1401 : ${I1401} ${SIM}
-	$(MAKEIT) OPTS="$(I1401_OPT)" INDIR1="$(I1401D)"
+	$(MAKEIT) OPTS="$(I1401_OPT)"
 
 
 i1620 : ${I1620} ${SIM}
-	$(MAKEIT) OPTS="$(I1620_OPT)" INDIR1="$(I1620D)"
+	$(MAKEIT) OPTS="$(I1620_OPT)"
 
 
 i7094 : ${I7094} ${SIM}
-	$(MAKEIT) OPTS="$(I7094_OPT)" INDIR1="$(I7094D)"
+	$(MAKEIT) OPTS="$(I7094_OPT)"
 
 
 ibm1130 : ${IBM1130} $(SIM)
-	$(MAKEIT) OPTS="$(IBM1130_OPT)" INDIR1="$(IBM1130D)" NOCPP=1
+	$(MAKEIT) OPTS="$(IBM1130_OPT)" NOCPP=1
 
 ${BIN}ibm1130${EXE} : ${IBM1130}
 ifneq (1,${CPP_BUILD}${CPP_FORCE})
@@ -2452,154 +2452,154 @@ else
 endif
 
 s3 : ${S3} ${SIM}
-	$(MAKEIT) OPTS="$(S3_OPT)" INDIR1="$(S3D)"
+	$(MAKEIT) OPTS="$(S3_OPT)"
 
 
 sel32: ${SEL32} ${SIM}
-	$(MAKEIT) OPTS="$(SEL32_OPT)" INDIR1="$(SEL32D)"
+	$(MAKEIT) OPTS="$(SEL32_OPT)"
 
 
 altair : ${ALTAIR} ${SIM}
-	$(MAKEIT) OPTS="$(ALTAIR_OPT)" INDIR1="$(ALTAIRD)"
+	$(MAKEIT) OPTS="$(ALTAIR_OPT)"
 
 
 altairz80 : ${ALTAIRZ80} ${SIM}
-	$(MAKEIT) OPTS="$(ALTAIRZ80_OPT)" INDIR1="$(ALTAIRZ80D)"
+	$(MAKEIT) OPTS="$(ALTAIRZ80_OPT)"
 
 
 gri : ${GRI} ${SIM}
-	$(MAKEIT) OPTS="$(GRI_OPT)" INDIR1="$(GRID)"
+	$(MAKEIT) OPTS="$(GRI_OPT)"
 
 
 lgp : ${LGP} ${SIM}
-	$(MAKEIT) OPTS="$(LGP_OPT)" INDIR1="$(LGPD)"
+	$(MAKEIT) OPTS="$(LGP_OPT)"
 
 
 id16 : ${ID16} ${SIM}
-	$(MAKEIT) OPTS="$(ID16_OPT)" INDIR1="$(ID32D)"
+	$(MAKEIT) OPTS="$(ID16_OPT)"
 
 
 id32 : ${ID32} ${SIM}
-	$(MAKEIT) OPTS="$(ID32_OPT)" INDIR1="$(ID32D)"
+	$(MAKEIT) OPTS="$(ID32_OPT)"
 
 
 sds : ${SDS} ${SIM}
-	$(MAKEIT) OPTS="$(SDS_OPT)" INDIR1="$(SDSD)"
+	$(MAKEIT) OPTS="$(SDS_OPT)"
 
 
 swtp6800mp-a : ${SWTP6800MP-A} ${SIM} ${BUILD_ROMS}
-	$(MAKEIT) OPTS="$(SWTP6800_OPT)" INDIR1="$(SWTP6800D)" INDIR2="$(SWTP6800C)"
+	$(MAKEIT) OPTS="$(SWTP6800_OPT)"
 
 
 swtp6800mp-a2 : ${SWTP6800MP-A2} ${SIM} ${BUILD_ROMS}
-	$(MAKEIT) OPTS="$(SWTP6800_OPT)" INDIR1="$(SWTP6800D)" INDIR2="$(SWTP6800C)"
+	$(MAKEIT) OPTS="$(SWTP6800_OPT)"
 
 
 intel-mds: ${INTEL_MDS} ${SIM} ${BUILD_ROMS}
-	$(MAKEIT) OPTS="$(INTEL_MDS_OPT)" INDIR1="$(INTEL_MDSD)" INDIR2="$(INTELSYSC)"
+	$(MAKEIT) OPTS="$(INTEL_MDS_OPT)"
 
 
 ibmpc: ${IBMPC} ${SIM} ${BUILD_ROMS}
-	$(MAKEIT) OPTS="$(IBMPC_OPT)" INDIR1="$(IBMPCD)"
+	$(MAKEIT) OPTS="$(IBMPC_OPT)"
 
 
 ibmpcxt: ${IBMPCXT} ${SIM} ${BUILD_ROMS}
-	$(MAKEIT) OPTS="$(IBMPCXT_OPT)" INDIR1="$(IBMPCXTD)"
+	$(MAKEIT) OPTS="$(IBMPCXT_OPT)"
 
 
 scelbi: ${SCELBI} ${SIM}
-	$(MAKEIT) OPTS="$(SCELBI_OPT)" INDIR1="$(SCELBID)" INDIR2="$(SCELBIC)"
+	$(MAKEIT) OPTS="$(SCELBI_OPT)"
 
 
 tx-0 : ${TX0} ${SIM}
-	$(MAKEIT) OPTS="$(TX0_OPT)" INDIR1="$(TX0D)"
+	$(MAKEIT) OPTS="$(TX0_OPT)"
 
 
 ssem : ${SSEM} ${SIM}
-	$(MAKEIT) OPTS="$(SSEM_OPT)" INDIR1="$(SSEMD)"
+	$(MAKEIT) OPTS="$(SSEM_OPT)"
 
 
 cdc1700 : ${CDC1700} ${SIM}
-	$(MAKEIT) OPTS="$(CDC1700_OPT)" INDIR1="$(CDC1700D)"
+	$(MAKEIT) OPTS="$(CDC1700_OPT)"
 
 
 besm6 : ${BESM6} ${SIM}
-	$(MAKEIT) OPTS="$(BESM6_OPT)" INDIR1="$(BESM6D)" NOCPP=1
+	$(MAKEIT) OPTS="$(BESM6_OPT)" NOCPP=1
 
 sigma : ${SIGMA} ${SIM}
-	$(MAKEIT) OPTS="$(SIGMA_OPT)" INDIR1="$(SIGMAD)"
+	$(MAKEIT) OPTS="$(SIGMA_OPT)"
 
 
 alpha : ${ALPHA} ${SIM}
-	$(MAKEIT) OPTS="$(ALPHA_OPT)" INDIR1="$(ALPHAD)"
+	$(MAKEIT) OPTS="$(ALPHA_OPT)"
 
 
 sage : ${SAGE} ${SIM}
-	$(MAKEIT) OPTS="$(SAGE_OPT)" INDIR1="$(SAGED)"
+	$(MAKEIT) OPTS="$(SAGE_OPT)"
 
 
 pdq3 : ${PDQ3} ${SIM}
-	$(MAKEIT) OPTS="$(PDQ3_OPT)" INDIR1="$(PDQ3D)"
+	$(MAKEIT) OPTS="$(PDQ3_OPT)"
 
 
 b5500 : ${B5500} ${SIM} 
-	$(MAKEIT) OPTS="$(B5500_OPT)" INDIR1="$(B5500D)"
+	$(MAKEIT) OPTS="$(B5500_OPT)"
 
 
 3b2 : ${ATT3B2M400} ${SIM}
-	$(MAKEIT) OPTS="$(ATT3B2M400_OPT)" INDIR1="$(ATT3B2D)" ALTNAME=3b2-400
+	$(MAKEIT) OPTS="$(ATT3B2M400_OPT)" ALTNAME=3b2-400
  
 
 3b2-700 : ${ATT3B2M700} ${SCSI} ${SIM}
-	$(MAKEIT) OPTS="$(ATT3B2M700_OPT)" INDIR1="$(ATT3B2D)"
+	$(MAKEIT) OPTS="$(ATT3B2M700_OPT)"
 
 
 i7090 : ${I7090} ${SIM} 
-	$(MAKEIT) OPTS="$(I7090_OPT)" INDIR1="$(I7000D)"
+	$(MAKEIT) OPTS="$(I7090_OPT)"
 
 
 i7080 : ${I7080} ${SIM} 
-	$(MAKEIT) OPTS="$(I7080_OPT)" INDIR1="$(I7080D)"
+	$(MAKEIT) OPTS="$(I7080_OPT)"
 
 
 i7070 : ${I7070} ${SIM} 
-	$(MAKEIT) OPTS="$(I7070_OPT)" INDIR1="$(I7070D)"
+	$(MAKEIT) OPTS="$(I7070_OPT)"
 
 
 i7010 : ${I7010} ${SIM} 
-	$(MAKEIT) OPTS="$(I7010_OPT)" INDIR1="$(I7010D)"
+	$(MAKEIT) OPTS="$(I7010_OPT)"
 
 
 i704 : ${I704} ${SIM} 
-	$(MAKEIT) OPTS="$(I704_OPT)" INDIR1="$(I704D)"
+	$(MAKEIT) OPTS="$(I704_OPT)"
 
 
 i701 : ${I701} ${SIM} 
-	$(MAKEIT) OPTS="$(I701_OPT)" INDIR1="$(I701D)"
+	$(MAKEIT) OPTS="$(I701_OPT)"
 
 
 i650 : ${I650} ${SIM} 
-	$(MAKEIT) OPTS="$(I650_OPT)" INDIR1="$(I650D)"
+	$(MAKEIT) OPTS="$(I650_OPT)"
 
 
 pdp6 : ${PDP6} ${SIM}
-	$(MAKEIT) OPTS="$(PDP6_OPT)" INDIR1="$(PDP10D)"
+	$(MAKEIT) OPTS="$(PDP6_OPT)"
 
 
 pdp10-ka : ${KA10} ${SIM}
-	$(MAKEIT) OPTS="$(KA10_OPT)" INDIR1="$(PDP10D)"
+	$(MAKEIT) OPTS="$(KA10_OPT)"
 
 
 pdp10-ki : ${KI10} ${SIM}
-	$(MAKEIT) OPTS="$(KI10_OPT)" INDIR1="$(PDP10D)"
+	$(MAKEIT) OPTS="$(KI10_OPT)"
 
 
 pdp10-kl : ${KL10} ${SIM}
-	$(MAKEIT) OPTS="$(KL10_OPT)" INDIR1="$(KL10D)"
+	$(MAKEIT) OPTS="$(KL10_OPT)"
 
 
 pdp10-ks : ${KS10} ${SIM}
-	$(MAKEIT) OPTS="$(KS10_OPT)" INDIR1="$(PDP10D)"
+	$(MAKEIT) OPTS="$(KS10_OPT)"
 
 
 
@@ -2620,8 +2620,6 @@ else # end of primary make recipies
 
   # potential specified input parameters
   #    OPTS      - the compile options (required)
-  #    INDIR1    - the primary source file directory (required)
-  #    INDIR2    - the secondary source file directory (optional)
   #    TEST_NAME - the name of the simulator test script (when not simply named <simulator-name>_test.ini)
   #    ALTNAME   - an optional alternate name for the current simulator target
   
@@ -2630,6 +2628,26 @@ else # end of primary make recipies
   ifeq (,$(OPTS))
     $(error *** ERROR ***  Missing build options.)
   endif
+
+  # Extract potential source code directories from the -I specifiers in the options
+
+  space = $(empty) $(empty)
+  # Combine all options separated with ^
+  D2=$(subst $(space),^,^$(OPTS))
+  # split the options with -I at the beginning of each element
+  D3=$(subst ^-I,$(space)^-I,$(D2))
+  # strip out includes for known support directories (system/dependenty includes 
+  # starting with /, slirp, display, etc - with or without spaces between the 
+  # -I and the directory)
+  D4=$(filter-out ^-I/%,$(filter-out ^-I^/%,$(filter-out ^-Islirp%,$(filter-out ^-I^slirp%,$(filter-out ^-Idisplay%,$(filter-out ^-I^display%,$(D3)))))))
+  # remove leading element if it isn't an include
+  D5=$(filter ^-I%,$(D4))
+  # strip off the leading -I include specifier
+  D6=$(foreach include,$(D5),$(patsubst ^-I%,%,$(include)))
+  # chop off any extra options beyond the include directory
+  D7=$(foreach include,$(D6),$(word 1,$(subst ^,$(space),$(include))))
+  DIRS = $(D7)
+
 
   find_test = RegisterSanityCheck $(abspath $(wildcard $(1)/tests/$(2)_test.ini)) </dev/null
 
@@ -2642,7 +2660,7 @@ else # end of primary make recipies
   $(file >>$(BLDDIR)/NEWLINE.file,)
   NEWLINE = $(file <$(BLDDIR)/NEWLINE.file)
   $(shell rm -f $(BLDDIR)/NEWLINE.file)
-  MAKE_INFO = $(foreach VAR,CC OPTS DEPS LDFLAGS INDIR1 INDIR2 BUILD_SEPARATE,$(VAR)=$($(VAR))$(NEWLINE))
+  MAKE_INFO = $(foreach VAR,CC OPTS DEPS LDFLAGS DIRS BUILD_SEPARATE,$(VAR)=$($(VAR))$(NEWLINE))
   ifneq ($(MAKE_INFO),$(file <$(BLDDIR)/Make.info)$(NEWLINE))
     # Different or no prior options, so start from scratch
     $(shell rm -rf $(BLDDIR)/* $(BIN)/$(TARGETNAME)$(EXE))
@@ -2653,15 +2671,15 @@ else # end of primary make recipies
     $(warning the $(TARGETNAME) simulator can not be built using C++)
   else
 
-$(BLDDIR)/%.o : $(INDIR1)/%.c
+$(BLDDIR)/%.o : $(word 1,$(DIRS))/%.c
 	@mkdir -p $(dir $@)
 	$(CC) -c $< -o $@ ${OPTS}
 
-$(BLDDIR)/%.o : $(INDIR1)/*/%.c
+$(BLDDIR)/%.o : $(word 1,$(DIRS))/*/%.c
 	@mkdir -p $(dir $@)
 	$(CC) -c $< -o $@ ${OPTS}
 
-$(BLDDIR)/%.o : $(INDIR1)/*/*/%.c
+$(BLDDIR)/%.o : $(word 1,$(DIRS))/*/*/%.c
 	@mkdir -p $(dir $@)
 	$(CC) -c $< -o $@ ${OPTS}
 
@@ -2681,18 +2699,31 @@ $(BLDDIR)/%.o : %.c
 	@mkdir -p $(dir $@)
 	$(CC) -c $< -o $@ ${OPTS}
 
-ifneq (,$(INDIR2))
-$(BLDDIR)/%.o : $(INDIR2)/%.c
+ifneq (,$(word 2,$(DIRS)))
+$(BLDDIR)/%.o : $(word 2,$(DIRS))/%.c
 	@mkdir -p $(dir $@)
 	$(CC) -c $< -o $@ ${OPTS}
 
-$(BLDDIR)/%.o : $(INDIR2)/*/%.c
+$(BLDDIR)/%.o : $(word 2,$(DIRS))/*/%.c
 	@mkdir -p $(dir $@)
 	$(CC) -c $< -o $@ ${OPTS}
 
-$(BLDDIR)/%.o : $(INDIR2)/*/*/%.c
+$(BLDDIR)/%.o : $(word 2,$(DIRS))/*/*/%.c
 	@mkdir -p $(dir $@)
 	$(CC) -c $< -o $@ ${OPTS}
+ifneq (,$(word 3,$(DIRS)))
+$(BLDDIR)/%.o : $(word 3,$(DIRS))/%.c
+	@mkdir -p $(dir $@)
+	$(CC) -c $< -o $@ ${OPTS}
+
+$(BLDDIR)/%.o : $(word 3,$(DIRS))/*/%.c
+	@mkdir -p $(dir $@)
+	$(CC) -c $< -o $@ ${OPTS}
+
+$(BLDDIR)/%.o : $(word 3,$(DIRS))/*/*/%.c
+	@mkdir -p $(dir $@)
+	$(CC) -c $< -o $@ ${OPTS}
+endif
 endif
 
 
@@ -2718,9 +2749,9 @@ $(BIN)$(TARGETNAME)$(EXE): $(DEPS)
 	copy $(@D)\$(TARGETNAME)${EXE} $(@D)\$(ALTNAME)${EXE}
       endif
     endif
-    ifneq (,$(call find_test,${INDIR1},$(TEST_NAME)))
+    ifneq (,$(call find_test,$(word 1,$(DIRS)),$(TEST_NAME)))
     # invoke the just built simulator to engage its test activities
-	$@ $(call find_test,${INDIR1},$(TEST_NAME)) ${TEST_ARG}
+	$@ $(call find_test,$(word 1,$(DIRS)),$(TEST_NAME)) ${TEST_ARG}
     endif
 
   endif  # CPP_BUILD
