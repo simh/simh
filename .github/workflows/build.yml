@@ -15,12 +15,12 @@ jobs:
         simulators:
           # These are supposed to match ALL in makefile.
           # Each job builds ~15 simulators.
-          - pdp1 pdp4 pdp6 pdp7 pdp8 pdp9 pdp10 pdp10-ka pdp10-ki pdp10-kl pdp10-ks pdp11 pdp15 vax 
-          - microvax2 vax730 vax750 vax780 vax8200 vax8600 microvax2000 infoserver100 infoserver150vxt microvax3100 microvax3100e vaxstation3100m30 vaxstation3100m38 
-          - microvax3100m80 vaxstation4000vlc infoserver1000 nova eclipse hp2100 hp3000 i1401 i1620 s3 altair altairz80 gri i7094 
-          - id16 id32 sds lgp h316 cdc1700 swtp6800mp-a swtp6800mp-a2 tx-0 ssem b5500 sage pdq3 alpha
-          - besm6 imlac tt2500 microvax3900 microvax1 rtvax1000 vaxstation3100m76 vaxstation4000m60
-          - scelbi 3b2 i701 i704 i7010 i7070 i7080 i7090 sigma uc15 i650 sel32 intel-mds ibm1130
+          - 3b2 alpha altair altairz80 b5500 besm6 cdc1700 eclipse gri h316 hp2100 hp3000
+          - i1401 i1620 i650 i701 i7010 i704 i7070 i7080 i7090 i7094 ibm1130 id16 id32 
+          - imlac infoserver100 infoserver1000 infoserver150vxt intel-mds lgp microvax1 microvax2 microvax2000 microvax3100 microvax3100e 
+          - microvax3100m80 microvax3900 nova pdp1 pdp10 pdp10-ka pdp10-ki pdp10-kl pdp10-ks pdp11 pdp15 pdp4 pdp6 pdp7 
+          - pdp8 pdp9 pdq3 rtvax1000 s3 sage scelbi sds sel32 sigma ssem swtp6800mp-a swtp6800mp-a2 tt2500 tx-0 
+          - uc15 vax vax730 vax750 vax780 vax8200 vax8600 vaxstation3100m30 vaxstation3100m38 vaxstation3100m76 vaxstation4000m60 vaxstation4000vlc 
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies
