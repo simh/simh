@@ -1,8 +1,8 @@
 #ifndef ROM_swtp_swtbugv10_bin_H
 #define ROM_swtp_swtbugv10_bin_H 0
 /*
-   swtp6800/swtp6800/swtp_swtbugv10_bin.h         produced at Wed Oct 19 10:15:15 2022
-   from swtp6800/swtp6800/swtbugv10.bin which was last modified at Sun Sep 25 10:27:45 2022
+   swtp6800/swtp6800/swtp_swtbugv10_bin.h         produced at Fri Nov 11 12:38:32 2022
+   from swtp6800/swtp6800/swtbugv10.bin which was last modified at Wed Oct 19 15:16:02 2022
    file size: 1024 (0x400) - checksum: 0xFFFE4FBC
    This file is a generated file and should NOT be edited or changed by hand.
 */
@@ -20,6 +20,7 @@
 #else
 #define BOOT_CODE_ARRAY swtp_swtbugv10_bin
 #endif
+#define BOOT_CODE_URL NULL
 #if !defined(BOOT_CODE_SIZE_1)
 #define BOOT_CODE_SIZE_1 0x400
 #define BOOT_CODE_CHECKSUM_1 0xFFFE4FBC
@@ -30,6 +31,7 @@
 #else
 #define BOOT_CODE_ARRAY_1 swtp_swtbugv10_bin
 #endif
+#define BOOT_CODE_URL_1 NULL
 #elif !defined(BOOT_CODE_SIZE_2)
 #define BOOT_CODE_SIZE_2 0x400
 #define BOOT_CODE_CHECKSUM_2 0xFFFE4FBC
@@ -40,6 +42,7 @@
 #else
 #define BOOT_CODE_ARRAY_2 swtp_swtbugv10_bin
 #endif
+#define BOOT_CODE_URL_2 NULL
 #elif !defined(BOOT_CODE_SIZE_3)
 #define BOOT_CODE_SIZE_3 0x400
 #define BOOT_CODE_CHECKSUM_3 0xFFFE4FBC
@@ -50,6 +53,7 @@
 #else
 #define BOOT_CODE_ARRAY_3 swtp_swtbugv10_bin
 #endif
+#define BOOT_CODE_URL_3 NULL
 #elif !defined(BOOT_CODE_SIZE_4)
 #define BOOT_CODE_SIZE_4 0x400
 #define BOOT_CODE_CHECKSUM_4 0xFFFE4FBC
@@ -60,6 +64,7 @@
 #else
 #define BOOT_CODE_ARRAY_4 swtp_swtbugv10_bin
 #endif
+#define BOOT_CODE_URL_4 NULL
 #endif
 #if !defined(DONT_USE_INTERNAL_ROM)
 unsigned char swtp_swtbugv10_bin[] = {

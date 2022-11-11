@@ -1,8 +1,8 @@
 #ifndef ROM_vax_vcb02_bin_H
 #define ROM_vax_vcb02_bin_H 0
 /*
-   VAX/vax_vcb02_bin.h         produced at Wed Oct 19 10:15:15 2022
-   from VAX/vcb02.bin which was last modified at Sun Sep 25 10:27:45 2022
+   VAX/vax_vcb02_bin.h         produced at Fri Nov 11 12:38:32 2022
+   from VAX/vcb02.bin which was last modified at Fri Nov 04 10:01:07 2022
    file size: 16384 (0x4000) - checksum: 0xFFF1D2AD
    This file is a generated file and should NOT be edited or changed by hand.
 */
@@ -20,6 +20,7 @@
 #else
 #define BOOT_CODE_ARRAY vax_vcb02_bin
 #endif
+#define BOOT_CODE_URL NULL
 #if !defined(BOOT_CODE_SIZE_1)
 #define BOOT_CODE_SIZE_1 0x4000
 #define BOOT_CODE_CHECKSUM_1 0xFFF1D2AD
@@ -30,6 +31,7 @@
 #else
 #define BOOT_CODE_ARRAY_1 vax_vcb02_bin
 #endif
+#define BOOT_CODE_URL_1 NULL
 #elif !defined(BOOT_CODE_SIZE_2)
 #define BOOT_CODE_SIZE_2 0x4000
 #define BOOT_CODE_CHECKSUM_2 0xFFF1D2AD
@@ -40,6 +42,7 @@
 #else
 #define BOOT_CODE_ARRAY_2 vax_vcb02_bin
 #endif
+#define BOOT_CODE_URL_2 NULL
 #elif !defined(BOOT_CODE_SIZE_3)
 #define BOOT_CODE_SIZE_3 0x4000
 #define BOOT_CODE_CHECKSUM_3 0xFFF1D2AD
@@ -50,6 +53,7 @@
 #else
 #define BOOT_CODE_ARRAY_3 vax_vcb02_bin
 #endif
+#define BOOT_CODE_URL_3 NULL
 #elif !defined(BOOT_CODE_SIZE_4)
 #define BOOT_CODE_SIZE_4 0x4000
 #define BOOT_CODE_CHECKSUM_4 0xFFF1D2AD
@@ -60,6 +64,7 @@
 #else
 #define BOOT_CODE_ARRAY_4 vax_vcb02_bin
 #endif
+#define BOOT_CODE_URL_4 NULL
 #endif
 #if !defined(DONT_USE_INTERNAL_ROM)
 unsigned char vax_vcb02_bin[] = {

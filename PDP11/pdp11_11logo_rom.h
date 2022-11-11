@@ -1,8 +1,8 @@
 #ifndef ROM_logo_lda_H
 #define ROM_logo_lda_H 0
 /*
-   PDP11/pdp11_11logo_rom.h         produced at Wed Oct 19 10:15:15 2022
-   from PDP11/11logo/11logo.lda which was last modified at Sun Sep 25 10:27:45 2022
+   PDP11/pdp11_11logo_rom.h         produced at Fri Nov 11 12:38:32 2022
+   from PDP11/11logo/11logo.lda which was last modified at Wed Oct 19 15:16:01 2022
    file size: 26009 (0x6599) - checksum: 0xFFDD77F7
    This file is a generated file and should NOT be edited or changed by hand.
 */
@@ -20,6 +20,7 @@
 #else
 #define BOOT_CODE_ARRAY logo_lda
 #endif
+#define BOOT_CODE_URL NULL
 #if !defined(BOOT_CODE_SIZE_1)
 #define BOOT_CODE_SIZE_1 0x6599
 #define BOOT_CODE_CHECKSUM_1 0xFFDD77F7
@@ -30,6 +31,7 @@
 #else
 #define BOOT_CODE_ARRAY_1 logo_lda
 #endif
+#define BOOT_CODE_URL_1 NULL
 #elif !defined(BOOT_CODE_SIZE_2)
 #define BOOT_CODE_SIZE_2 0x6599
 #define BOOT_CODE_CHECKSUM_2 0xFFDD77F7
@@ -40,6 +42,7 @@
 #else
 #define BOOT_CODE_ARRAY_2 logo_lda
 #endif
+#define BOOT_CODE_URL_2 NULL
 #elif !defined(BOOT_CODE_SIZE_3)
 #define BOOT_CODE_SIZE_3 0x6599
 #define BOOT_CODE_CHECKSUM_3 0xFFDD77F7
@@ -50,6 +53,7 @@
 #else
 #define BOOT_CODE_ARRAY_3 logo_lda
 #endif
+#define BOOT_CODE_URL_3 NULL
 #elif !defined(BOOT_CODE_SIZE_4)
 #define BOOT_CODE_SIZE_4 0x6599
 #define BOOT_CODE_CHECKSUM_4 0xFFDD77F7
@@ -60,6 +64,7 @@
 #else
 #define BOOT_CODE_ARRAY_4 logo_lda
 #endif
+#define BOOT_CODE_URL_4 NULL
 #endif
 #if !defined(DONT_USE_INTERNAL_ROM)
 unsigned char logo_lda[] = {
