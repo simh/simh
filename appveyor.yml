@@ -11,11 +11,11 @@ before_build:
   "\"C:\\Program Files (x86)\\Microsoft Visual Studio 9.0\\VC\\vcvarsall.bat\""
 build_script:
   - cmd: cd "Visual Studio Projects" & vcbuild /M%NUMBER_OF_PROCESSORS% /useenv /rebuild Simh.sln "Release|Win32"
-  - ps: mkdir PACKAGES
-  - ps: Compress-Archive -Path BIN\*.exe -DestinationPath PACKAGES\simh-Windows-Release-archive.zip
+  - ps: mkdir ..\PACKAGES
+  - ps: Compress-Archive -Path ..\BIN\*.exe -DestinationPath ..\PACKAGES\simh-Windows-Release-archive.zip
 
 artifacts:
-  - path: PACKAGES\*.zip
+  - path: ..\PACKAGES\*.zip
 
 notifications:
   - provider: Email
