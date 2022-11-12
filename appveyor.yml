@@ -15,7 +15,7 @@ build_script:
   - ps: Compress-Archive -Path ..\BIN\*.exe -DestinationPath ..\PACKAGES\simh-Windows-Release-archive.zip
 
 artifacts:
-  - path: ..\PACKAGES\*.zip
+  - path: PACKAGES\*.zip
 
 notifications:
   - provider: Email
