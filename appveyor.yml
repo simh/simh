@@ -1,18 +1,25 @@
 platform:
   - x86
+
 cache:
   - ../windows-build
+
 skip_commits:
   files:
     - doc/*
     - '**/*.md'
     - '**/*.txt'
+    
 before_build:
   "\"C:\\Program Files (x86)\\Microsoft Visual Studio 9.0\\VC\\vcvarsall.bat\""
 build_script:
   - cmd: cd "Visual Studio Projects" & vcbuild /M%NUMBER_OF_PROCESSORS% /useenv /rebuild Simh.sln "Release|Win32"
-  - ps: mkdir ..\PACKAGES
-  - ps: Compress-Archive -Path ..\BIN\*.exe -DestinationPath ..\PACKAGES\simh-Windows-Release-archive.zip
+  - ps: mkdir C:\projects\simh\PACKAGES
+  - ps: $id_line = Select-String -Path '.\Visual Studio Projects\.git-commit-id.h' -Pattern 'SIM_GIT_COMMIT_ID'
+  - ps: $id_name_pos = $id_line.line.IndexOf("SIM_GIT_COMMIT_ID")
+  - ps: $id = $id_line.Line.SubString($id_name_pos + 18, 8)
+  - ps: $datetime = Get-Date -Format "yyyy-mm-dd_hh-mm-ss"
+  - ps: Compress-Archive -Path C:\projects\simh\BIN\NT\Win32-Release\*.exe -DestinationPath C:\projects\simh\PACKAGES\simh-4.0-Current--$datetime-$id.zip
 
 artifacts:
   - path: PACKAGES\*.zip
