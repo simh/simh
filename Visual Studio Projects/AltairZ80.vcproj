@@ -378,6 +378,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\AltairZ80\s100_tdd.c"
+				>
+			</File>
+			<File
 				RelativePath="..\scp.c"
 				>
 			</File>
