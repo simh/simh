@@ -1946,6 +1946,7 @@ ALTAIRZ80 = ${ALTAIRZ80D}/altairz80_cpu.c ${ALTAIRZ80D}/altairz80_cpu_nommu.c \
 	${ALTAIRZ80D}/s100_ss1.c ${ALTAIRZ80D}/s100_64fdc.c \
 	${ALTAIRZ80D}/s100_scp300f.c \
 	${ALTAIRZ80D}/s100_tarbell.c \
+	${ALTAIRZ80D}/s100_tdd.c \
 	${ALTAIRZ80D}/wd179x.c ${ALTAIRZ80D}/s100_hdc1001.c \
 	${ALTAIRZ80D}/s100_if3.c ${ALTAIRZ80D}/s100_adcs6.c \
 	${ALTAIRZ80D}/m68k/m68kcpu.c ${ALTAIRZ80D}/m68k/m68kdasm.c ${ALTAIRZ80D}/m68k/m68kasm.c \
