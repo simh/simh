@@ -82,6 +82,7 @@ extern DEVICE n8vem_dev;
 extern DEVICE wdi2_dev;
 
 extern DEVICE scp300f_dev;
+extern DEVICE djhdc_dev;
 
 extern long disasm (unsigned char *data, char *output, int segsize, long offset);
 extern t_stat parse_sym_m68k(char* c, t_addr a, UNIT* u, t_value* val, int32 sw);
@@ -133,8 +134,9 @@ DEVICE      *sim_devices[]  = {
     &tdd_dev,
     /* iCOM Devices */
     &icom_dev,
-    /* Disk Jockey 2D Devices */
+    /* Morrow Devices */
     &dj2d_dev,
+    &djhdc_dev,
     /* MITS 88-2SIO */
     &m2sio0_dev,
     &m2sio1_dev,
