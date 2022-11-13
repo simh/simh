@@ -15,7 +15,7 @@ before_build:
 build_script:
   - cmd: cd "Visual Studio Projects" & vcbuild /M%NUMBER_OF_PROCESSORS% /useenv /rebuild Simh.sln "Release|Win32"
   - ps: mkdir C:\projects\simh\PACKAGES
-  - ps: $id_line = Select-String -Path '.\Visual Studio Projects\.git-commit-id.h' -Pattern 'SIM_GIT_COMMIT_ID'
+  - ps: $id_line = Select-String -Path 'C:\projects\simh\Visual Studio Projects\.git-commit-id.h' -Pattern 'SIM_GIT_COMMIT_ID'
   - ps: $id_name_pos = $id_line.line.IndexOf("SIM_GIT_COMMIT_ID")
   - ps: $id = $id_line.Line.SubString($id_name_pos + 18, 8)
   - ps: $datetime = Get-Date -Format "yyyy-mm-dd_hh-mm-ss"
