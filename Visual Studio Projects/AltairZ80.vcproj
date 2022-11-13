@@ -322,6 +322,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\AltairZ80\s100_djhdc.c"
+				>
+			</File>
+			<File
 				RelativePath="..\AltairZ80\s100_fif.c"
 				>
 			</File>
