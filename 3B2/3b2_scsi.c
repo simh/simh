@@ -63,7 +63,8 @@ static DRVTYP ha_tab[] = {
     HA_DISK(SD300),
     HA_DISK(SD327),
     HA_DISK(SD630),
-    HA_TAPE(ST120)
+    HA_TAPE(ST120),
+    { 0 }
 };
 
 UNIT ha_unit[9] = {0};  /* SCSI ID 0-7 + CIO Unit */
