@@ -980,7 +980,7 @@ const char *const text =
 " the RK11-D (There's also a -E for the PDP-15.). The -C is described in\n"
 " the 1972 PDP11 Peripherals handbook. In that controller, RKDS<11>\n"
 " distinguishes an RK02 (low density, 128 words/sector) drive from an RK03\n"
-" (high density, 256 words/drive).\n"
+" (high density, 256 words/sector).\n"
 "\n"
 " By 1973, the RK11-C had been superseded by the RK11-D. The RK11-D only\n"
 " supports high density drives: the RK03 Diablo drive, and the RK05 DEC\n"
