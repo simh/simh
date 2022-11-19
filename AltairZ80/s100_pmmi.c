@@ -183,9 +183,9 @@ static MTAB pmmi_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,                      "IOBASE",  "IOBASE",
         &set_iobase, &show_iobase, NULL, "Sets MITS 2SIO base I/O address"   },
     { UNIT_PMMI_RTS,       UNIT_PMMI_RTS,     "RTS",    "RTS",    NULL, NULL, NULL,
-        "RTS follows DTR" },
+        "RTS follows DTR (default)" },
     { UNIT_PMMI_RTS,       0,                  "NORTS",  "NORTS",  NULL, NULL, NULL,
-        "RTS does not follow DTR (default)" },
+        "RTS does not follow DTR" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR,  0,   "BAUD",  "BAUD",  &pmmi_set_baud, &pmmi_show_baud,
         NULL, "Set baud rate (default=300)" },
     { 0 }
@@ -194,7 +194,7 @@ static MTAB pmmi_mod[] = {
 static PMMI_CTX pmmi_ctx = {{0, 0, PMMI_IOBASE, PMMI_IOSIZE}, 0, pmmi_tmln, &pmmi_tmxr, PMMI_BAUD, 1};
 
 static UNIT pmmi_unit[] = {
-        { UDATA (&pmmi_svc, UNIT_ATTABLE | UNIT_DISABLE, 0), PMMI_WAIT },
+        { UDATA (&pmmi_svc, UNIT_ATTABLE | UNIT_DISABLE | UNIT_PMMI_RTS, 0), PMMI_WAIT },
 };
 
 static REG pmmi_reg[] = {
@@ -350,6 +350,11 @@ static t_stat pmmi_svc(UNIT *uptr)
 
         /* Enable receiver if CTS is active low */
         pmmi_ctx.tmln->rcve = !(pmmi_ctx.ireg2 & PMMI_CTS);
+
+        /* If socket, connection status follows CTS */
+        if (!pmmi_ctx.tmln->serport) {
+            pmmi_ctx.conn = !(pmmi_ctx.ireg2 & PMMI_CTS);
+        }
     }
 
     /* TX data */
