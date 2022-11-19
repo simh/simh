@@ -30,13 +30,18 @@
 
 #include "vax_defs.h"
 
-#ifndef DONT_USE_INTERNAL_ROM
 #include "vax_ka750_bin_old.h" /* Defines BOOT_CODE_FILENAME and BOOT_CODE_ARRAY, etc */
-#undef BOOT_CODE_FILENAME
-#undef BOOT_CODE_SIZE
-#undef BOOT_CODE_ARRAY
+#define BOOT_OLD BOOT_CODE_FILENAME
+#define BOOT_OLD_FILEPATH BOOT_CODE_FILEPATH
+#define BOOT_OLD_SIZE BOOT_CODE_SIZE
+#define BOOT_OLD_CHECKSUM BOOT_CODE_CHECKSUM
+#define BOOT_OLD_ARRAY BOOT_CODE_ARRAY
 #include "vax_ka750_bin_new.h" /* Defines BOOT_CODE_FILENAME and BOOT_CODE_ARRAY, etc */
-#endif /* DONT_USE_INTERNAL_ROM */
+#define BOOT_NEW BOOT_CODE_FILENAME_1
+#define BOOT_NEW_FILEPATH BOOT_CODE_FILEPATH_1
+#define BOOT_NEW_SIZE BOOT_CODE_SIZE_1
+#define BOOT_NEW_CHECKSUM BOOT_CODE_CHECKSUM_1
+#define BOOT_NEW_ARRAY BOOT_CODE_ARRAY_1
 
 /* Memory adapter register 0 */
 
@@ -242,14 +247,10 @@ return SCPE_OK;
 
 t_stat mctl_populate_rom (const char *rom_filename)
 {
-#ifdef DONT_USE_INTERNAL_ROM
-return cpu_load_bootcode (rom_filename, NULL, sizeof (rom), TRUE, 0);
-#else
-if (strcmp (rom_filename, "ka750_new.bin") == 0)
-    return cpu_load_bootcode ("ka750_new.bin", vax_ka750_bin_new, BOOT_CODE_SIZE, TRUE, 0);
+if (strcmp (rom_filename, BOOT_NEW) == 0)
+    return cpu_load_bootcode (BOOT_NEW, BOOT_NEW_ARRAY, BOOT_NEW_SIZE, TRUE, 0, BOOT_NEW_FILEPATH, BOOT_NEW_CHECKSUM);
 else
-    return cpu_load_bootcode ("ka750_old.bin", vax_ka750_bin_old, BOOT_CODE_SIZE, TRUE, 0);
-#endif
+    return cpu_load_bootcode (BOOT_OLD, BOOT_OLD_ARRAY, BOOT_OLD_SIZE, TRUE, 0, BOOT_OLD_FILEPATH, BOOT_OLD_CHECKSUM);
 }
 
 const char *mctl_description (DEVICE *dptr)

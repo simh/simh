@@ -27,7 +27,7 @@
     Code for Z80 CPU from Frank D. Cringle ((c) 1995 under GNU license)
 */
 
-#include "m68k.h"
+#include "m68k/m68k.h"
 #include <ctype.h>
 
 #define SWITCHCPU_DEFAULT 0xfd

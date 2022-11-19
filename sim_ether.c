@@ -1325,11 +1325,11 @@ int load_pcap(void) {
             /* attempt to load DLL */
 #ifdef _WIN32
       if (1) {
-        BOOL(WINAPI *p_SetDllDirectory)(LPCTSTR);
-        UINT(WINAPI *p_GetSystemDirectory)(LPTSTR lpBuffer, UINT uSize);
+        BOOL(WINAPI *p_SetDllDirectory)(const char *);
+        UINT(WINAPI *p_GetSystemDirectory)(char * lpBuffer, UINT uSize);
 
-        p_SetDllDirectory = (BOOL(WINAPI *)(LPCTSTR)) GetProcAddress(GetModuleHandleA("kernel32.dll"), "SetDllDirectoryA");
-        p_GetSystemDirectory = (UINT(WINAPI *)(LPTSTR, UINT)) GetProcAddress(GetModuleHandleA("kernel32.dll"), "GetSystemDirectoryA");
+        p_SetDllDirectory = (BOOL(WINAPI *)(const char *)) GetProcAddress(GetModuleHandleA("kernel32.dll"), "SetDllDirectoryA");
+        p_GetSystemDirectory = (UINT(WINAPI *)(char *, UINT)) GetProcAddress(GetModuleHandleA("kernel32.dll"), "GetSystemDirectoryA");
         if (p_SetDllDirectory && p_GetSystemDirectory) {
           char npcap_path[512] = "";
 

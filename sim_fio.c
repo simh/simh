@@ -1751,7 +1751,7 @@ if ((hFind =  FindFirstFileA (cptr, &File)) != INVALID_HANDLE_VALUE) {
         strlcat (FileName, File.cFileName, sizeof (FileName));
         stat (FileName, &filestat);
         entry (DirName, File.cFileName, FileSize, &filestat, context);
-        } while (FindNextFile (hFind, &File));
+        } while (FindNextFileA (hFind, &File));
     FindClose (hFind);
     }
 else

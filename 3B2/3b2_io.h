@@ -1,6 +1,6 @@
-/* 3b2_io.h: AT&T 3B2 Model 400 IO dispatch (Header)
+/* 3b2_io.h: Common I/O (CIO) Feature Card Support
 
-   Copyright (c) 2017, Seth J. Morabito
+   Copyright (c) 2017-2022, Seth J. Morabito
 
    Permission is hereby granted, free of charge, to any person
    obtaining a copy of this software and associated documentation
@@ -119,9 +119,18 @@
 #define IO_BOTTOM       0x40000
 #define IO_TOP          0x50000
 
+#if defined(REV3)
+#define UBUS_BOTTOM     0x1c00000
+#define UBUS_TOP        0x2000000
+#endif
+
 /* CIO area */
 #define CIO_BOTTOM      0x200000
+#if defined(REV3)
+#define CIO_TOP         0x1a00000
+#else
 #define CIO_TOP         0x2000000
+#endif
 
 #define IOF_ID          0
 #define IOF_VEC         1
@@ -143,7 +152,7 @@
 #define CIO_SYSGEN_OK   3
 
 /* Map a physical address to a card ID */
-#define CID(pa)         (((((pa) >> 0x14) & 0x1f) / 2) - 1)
+#define SLOT(pa)         (((((pa) >> 0x14) & 0x1f) / 2) - 1)
 /* Map a card ID to a base address */
 #define CADDR(bid)      (((((bid) + 1) * 2) << 0x14))
 
@@ -160,15 +169,19 @@
 #define CIO_INT1        2
 #define CIO_SYSGEN      3
 
-#define CIO_SET_INT(slot)   (cio_int_req |= (1 << slot))
+#define CIO_SET_INT(slot)   if (cio[slot].populated && cio[slot].ivec >= 2) (cio_int_req |= (1 << slot))
 #define CIO_CLR_INT(slot)   (cio_int_req &= ~(1 << slot))
 
+#define CIO_NAME_LEN    8
+
 typedef struct {
-    uint16 id;                           /* Card ID                          */
-    void   (*exp_handler)(uint8 cid);    /* Handler for express jobs         */
-    void   (*full_handler)(uint8 cid);   /* Handler for full jobs            */
-    void   (*sysgen)(uint8 cid);         /* Sysgen routine (optional)        */
-    void   (*reset_handler)(uint8 cid);  /* RESET request handler (optional) */
+    t_bool populated;                    /* Populated?                       */
+    uint16 id;                           /* CIO identifier                   */
+    char   name[CIO_NAME_LEN];           /* Device name                      */
+    void   (*exp_handler)(uint8 slot);   /* Handler for express jobs         */
+    void   (*full_handler)(uint8 slot);  /* Handler for full jobs            */
+    void   (*sysgen)(uint8 slot);        /* Sysgen routine (optional)        */
+    void   (*reset_handler)(uint8 slot); /* RESET request handler (optional) */
     uint32 rqp;                          /* Request Queue Pointer            */
     uint32 cqp;                          /* Completion Queue Pointer         */
     uint8  rqs;                          /* Request queue size               */
@@ -226,25 +239,31 @@ typedef struct {
 t_stat cio_reset(DEVICE *dptr);
 t_stat cio_svc(UNIT *uptr);
 
-void cio_clear(uint8 cid);
+t_stat cio_install(uint16 id,
+                   CONST char *name,
+                   uint8 ipl,
+                   void (*exp_handler)(uint8 slot),
+                   void (*full_handler)(uint8 slot),
+                   void (*sysgen)(uint8 slot),
+                   void (*reset_handler)(uint8 slot),
+                   uint8 *slot);
+void cio_remove(uint8 slot);
+void cio_remove_all(uint16 id);
 uint32 cio_crc32_shift(uint32 crc, uint8 data);
-void cio_cexpress(uint8 cid, uint32 esize, cio_entry *cqe, uint8 *app_data);
-void cio_cqueue(uint8 cid, uint8 cmd_stat, uint32 esize, cio_entry *cqe, uint8 *app_data);
-t_bool cio_cqueue_avail(uint8 cid, uint32 esize);
-void cio_rexpress(uint8 cid, uint32 esize, cio_entry *rqe, uint8 *app_data);
-t_stat cio_rqueue(uint8 cid, uint32 qnum, uint32 esize, cio_entry *rqe, uint8 *app_data);
-t_bool cio_rqueue_avail(uint8 cid, uint32 qnum, uint32 esize);
-uint16 cio_r_lp(uint8 cid, uint32 qnum, uint32 esize);
-uint16 cio_r_ulp(uint8 cid, uint32 qnum, uint32 esize);
-uint16 cio_c_lp(uint8 cid, uint32 esize);
-uint16 cio_c_ulp(uint8 cid, uint32 esize);
-void cio_sysgen(uint8 cid);
+void cio_cexpress(uint8 slot, uint32 esize, cio_entry *cqe, uint8 *app_data);
+void cio_cqueue(uint8 slot, uint8 cmd_stat, uint32 esize, cio_entry *cqe, uint8 *app_data);
+t_bool cio_cqueue_avail(uint8 slot, uint32 esize);
+void cio_rexpress(uint8 slot, uint32 esize, cio_entry *rqe, uint8 *app_data);
+t_stat cio_rqueue(uint8 slot, uint32 qnum, uint32 esize, cio_entry *rqe, uint8 *app_data);
+t_bool cio_rqueue_avail(uint8 slot, uint32 qnum, uint32 esize);
+uint16 cio_r_lp(uint8 slot, uint32 qnum, uint32 esize);
+uint16 cio_r_ulp(uint8 slot, uint32 qnum, uint32 esize);
+uint16 cio_c_lp(uint8 slot, uint32 esize);
+uint16 cio_c_ulp(uint8 slot, uint32 esize);
+void cio_sysgen(uint8 slot);
 
 uint32 io_read(uint32 pa, size_t size);
 void io_write(uint32 pa, uint32 val, size_t size);
-
-void dump_entry(uint32 dbits, DEVICE *dev, CONST char *type,
-                uint32 esize, cio_entry *entry, uint8 *app_data);
 
 extern uint16 cio_int_req;
 extern CIO_STATE cio[CIO_SLOTS];

@@ -26,7 +26,7 @@
     Contains code from Howard M. Harte for defining and changing disk geometry.
 */
 
-#include "m68k.h"
+#include "m68k/m68k.h"
 #include "sim_imd.h"
 
 /* Debug flags */

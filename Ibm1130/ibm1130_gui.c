@@ -132,7 +132,6 @@ t_stat console_reset (DEVICE *dptr)
             hConsoleWindow = GetConsoleWindow();
         }
 
-    update_gui(FALSE);
     return SCPE_OK;
 }
 
@@ -212,6 +211,8 @@ static HDC hCDC = NULL;
 static char szConsoleClassName[] = "1130CONSOLE";
 static DWORD PumpID = 0;
 static HANDLE hPump = INVALID_HANDLE_VALUE;
+static HANDLE hPumpReadyEvent = NULL;
+
 static int bmwid, bmht;
 static HANDLE hbm1442_full, hbm1442_empty, hbm1442_eof, hbm1442_middle;
 static HANDLE hbm1132_full, hbm1132_empty;
@@ -301,8 +302,13 @@ static void init_console_window (void)
     if (hConsoleWnd != NULL)
         return;
 
+    if ((hPumpReadyEvent  = CreateEvent(NULL, FALSE, FALSE, NULL)) == NULL)
+        scp_panic("Can't create pump ready event");
+
     if (PumpID == 0)
         hPump = CreateThread(NULL, 0, Pump, 0, 0, &PumpID);
+
+    WaitForSingleObject (hPumpReadyEvent, INFINITE);
 
     if (! did_atexit) {
         atexit(destroy_console_window);
@@ -327,6 +333,12 @@ static void destroy_console_window (void)
         PumpID = 0;
         hConsoleWnd = NULL;
     }
+
+    if (hPumpReadyEvent != NULL) {
+        CloseHandle (hPumpReadyEvent);
+        hPumpReadyEvent = NULL;
+    }
+
     if (hCDC != NULL) {
         DeleteDC(hCDC);
         hCDC = NULL;
@@ -906,6 +918,8 @@ static DWORD WINAPI Pump (LPVOID arg)
             SetWindowPos(hActWnd, 0, 0, 0, ra.right-ra.left+1, ra.bottom-ra.top+1, SWP_NOZORDER|SWP_NOMOVE);
         }
     }
+
+    SetEvent (hPumpReadyEvent);
 
     if (running)                                    /* if simulator is already running, start update timer */
         gui_run(TRUE);
@@ -1670,6 +1684,7 @@ static DWORD WINAPI CmdThread (LPVOID arg)
     HANDLE hStdIn = GetStdHandle(STD_INPUT_HANDLE);
     DWORD dwBytesRead;
 
+    SetEvent(hCmdReadyEvent);                           /* notify main thread a line is ready */
     for (;;) {
         if (WAIT_TIMEOUT == WaitForSingleObject(hCmdReadEvent, 2000))   /* wait for request */
             continue;                                           /* put breakpoint here to debug */
@@ -1725,7 +1740,7 @@ char *read_cmdline (char *ptr, int size, FILE *stream)
         if ((hCmdThread = CreateThread(NULL, 0, CmdThread, NULL, 0, &iCmdThreadID)) == NULL)
             scp_panic("Unable to create command line reading thread");
         atexit(read_atexit);
-        Sleep(500);                                         /* Let GUI threads startup and start to process messages */
+        WaitForSingleObject(hCmdReadyEvent, INFINITE); /* wait for read thread to start */
     }
 
     update_gui(TRUE);

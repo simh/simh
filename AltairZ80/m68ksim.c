@@ -77,7 +77,7 @@
 
  */
 
-#include "m68k.h"
+#include "m68k/m68k.h"
 
 /* Read/write macros */
 #define READ_BYTE(BASE, ADDR) (BASE)[ADDR]
@@ -121,6 +121,7 @@
 #define IRQ_MC6850      5
 
 extern uint32 PCX;
+extern uint32 SIMHSleep;
 
 /* Prototypes */
 static void MC6850_reset(void);
@@ -244,6 +245,8 @@ void m68k_clear_memory(void ) {
 void m68k_cpu_reset(void) {
     WRITE_LONG(m68k_ram, 0, 0x00006000);    // SP
     WRITE_LONG(m68k_ram, 4, 0x00000200);    // PC
+    m68k_init();
+    m68k_set_cpu_type(M68K_CPU_TYPE_68000);
     m68k_pulse_reset(); // also calls MC6850_reset()
     m68k_CPUToView();
 }
@@ -266,7 +269,6 @@ static void MC6850_reset(void) {
 }
 
 #define INITIAL_IDLE    100
-#define IDLE_SLEEP      20
 static uint32 idleCount = INITIAL_IDLE;
 
 static void m68k_input_device_update(void) {
@@ -279,8 +281,8 @@ static void m68k_input_device_update(void) {
     } else if (--idleCount == 0) {
         const t_stat ch = sim_poll_kbd();
         idleCount = INITIAL_IDLE;
-        if (IDLE_SLEEP)
-            sim_os_ms_sleep(IDLE_SLEEP);
+        if (SIMHSleep)
+            sim_os_ms_sleep(SIMHSleep);
         if (ch) {
             characterAvailable = TRUE;
             keyboardCharacter = ch;
@@ -292,15 +294,16 @@ static void m68k_input_device_update(void) {
 static uint32 MC6850_data_read(void) {
     t_stat ch;
     int_controller_clear(IRQ_MC6850);
-    m68k_MC6850_status &= ~0x81;          // clear data ready and interrupt flag
+    m68k_MC6850_status &= ~0x81;        // clear data ready and interrupt flag
     if (characterAvailable) {
         ch = keyboardCharacter;
         characterAvailable = FALSE;
     } else
         ch = sim_poll_kbd();
     while ((ch <= 0) && (!stop_cpu)) {
-        if (IDLE_SLEEP)
-            sim_os_ms_sleep(IDLE_SLEEP);
+        sim_interval -= KBD_POLL_WAIT;  // ensure progress
+        if (SIMHSleep)
+            sim_os_ms_sleep(SIMHSleep);
         ch = sim_poll_kbd();
     }
     if (ch == SCPE_STOP)

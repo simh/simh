@@ -1,34 +1,72 @@
 #ifndef ROM_vax_is1000_bin_H
 #define ROM_vax_is1000_bin_H 0
 /*
-   VAX/vax_is1000_bin.h         produced at Mon Aug 23 13:30:21 2021
-   from VAX/is1000.bin which was last modified at Mon Jul 26 08:03:31 2021
+   VAX/vax_is1000_bin.h         produced at Fri Nov 11 12:38:32 2022
+   from VAX/is1000.bin which was last modified at Fri Nov 04 10:00:46 2022
    file size: 524288 (0x80000) - checksum: 0xFCBCD74A
    This file is a generated file and should NOT be edited or changed by hand.
 */
 #undef BOOT_CODE_SIZE
 #define BOOT_CODE_SIZE 0x80000
+#undef BOOT_CODE_CHECKSUM
+#define BOOT_CODE_CHECKSUM 0xFCBCD74A
 #undef BOOT_CODE_FILENAME
 #define BOOT_CODE_FILENAME "is1000.bin"
+#undef BOOT_CODE_FILEPATH
+#define BOOT_CODE_FILEPATH "VAX/is1000.bin"
 #undef BOOT_CODE_ARRAY
+#if defined(DONT_USE_INTERNAL_ROM)
+#define BOOT_CODE_ARRAY NULL
+#else
 #define BOOT_CODE_ARRAY vax_is1000_bin
+#endif
+#define BOOT_CODE_URL NULL
 #if !defined(BOOT_CODE_SIZE_1)
 #define BOOT_CODE_SIZE_1 0x80000
+#define BOOT_CODE_CHECKSUM_1 0xFCBCD74A
 #define BOOT_CODE_FILENAME_1 "is1000.bin"
+#define BOOT_CODE_FILEPATH_1 "VAX/is1000.bin"
+#if defined(DONT_USE_INTERNAL_ROM)
+#define BOOT_CODE_ARRAY_1 NULL
+#else
 #define BOOT_CODE_ARRAY_1 vax_is1000_bin
+#endif
+#define BOOT_CODE_URL_1 NULL
 #elif !defined(BOOT_CODE_SIZE_2)
 #define BOOT_CODE_SIZE_2 0x80000
+#define BOOT_CODE_CHECKSUM_2 0xFCBCD74A
 #define BOOT_CODE_FILENAME_2 "is1000.bin"
+#define BOOT_CODE_FILEPATH_2 "VAX/is1000.bin"
+#if defined(DONT_USE_INTERNAL_ROM)
+#define BOOT_CODE_ARRAY_2 NULL
+#else
 #define BOOT_CODE_ARRAY_2 vax_is1000_bin
+#endif
+#define BOOT_CODE_URL_2 NULL
 #elif !defined(BOOT_CODE_SIZE_3)
 #define BOOT_CODE_SIZE_3 0x80000
+#define BOOT_CODE_CHECKSUM_3 0xFCBCD74A
 #define BOOT_CODE_FILENAME_3 "is1000.bin"
+#define BOOT_CODE_FILEPATH_3 "VAX/is1000.bin"
+#if defined(DONT_USE_INTERNAL_ROM)
+#define BOOT_CODE_ARRAY_3 NULL
+#else
 #define BOOT_CODE_ARRAY_3 vax_is1000_bin
+#endif
+#define BOOT_CODE_URL_3 NULL
 #elif !defined(BOOT_CODE_SIZE_4)
 #define BOOT_CODE_SIZE_4 0x80000
+#define BOOT_CODE_CHECKSUM_4 0xFCBCD74A
 #define BOOT_CODE_FILENAME_4 "is1000.bin"
+#define BOOT_CODE_FILEPATH_4 "VAX/is1000.bin"
+#if defined(DONT_USE_INTERNAL_ROM)
+#define BOOT_CODE_ARRAY_4 NULL
+#else
 #define BOOT_CODE_ARRAY_4 vax_is1000_bin
 #endif
+#define BOOT_CODE_URL_4 NULL
+#endif
+#if !defined(DONT_USE_INTERNAL_ROM)
 unsigned char vax_is1000_bin[] = {
 0x31,0xE1,0x12,0x00,0x01,0x06,0x01,0x08,0x01,0x01,0x01,0x01,0x00,0x01,0x02,0x03,
 0x55,0x55,0x55,0x55,0xAA,0xAA,0xAA,0xAA,0x33,0x33,0x33,0x33,0x04,0x04,0x04,0x04,
@@ -32798,4 +32836,5 @@ unsigned char vax_is1000_bin[] = {
 0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
 0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
 0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xF0,};
+#endif
 #endif /* ROM_vax_is1000_bin_H */

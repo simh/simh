@@ -1,6 +1,6 @@
-/* 3b2_ports.h: AT&T 3B2 Model 400 "PORTS" feature card
+/* 3b2_ports.h: CM195B 4-Port Serial CIO Card
 
-   Copyright (c) 2018, Seth J. Morabito
+   Copyright (c) 2018-2022, Seth J. Morabito
 
    Permission is hereby granted, free of charge, to any person
    obtaining a copy of this software and associated documentation
@@ -51,7 +51,8 @@
 #define PORTS_IPL       10
 #define PORTS_VERSION   1
 
-#define MAX_PORTS_CARDS 12
+#define MAX_CARDS       8  /* Up to 8 PORTS cards with 32 lines total
+                              supported */
 #define PORTS_LINES     4
 #define PORTS_RCV_QUEUE 5
 
@@ -216,15 +217,13 @@ typedef struct {
 
 t_stat ports_reset(DEVICE *dptr);
 t_stat ports_setnl(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
-t_stat ports_show_cqueue(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
-t_stat ports_show_rqueue(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat ports_rcv_svc(UNIT *uptr);
 t_stat ports_xmt_svc(UNIT *uptr);
 t_stat ports_cio_svc(UNIT *uptr);
 t_stat ports_attach(UNIT *uptr, CONST char *cptr);
 t_stat ports_detach(UNIT *uptr);
-void ports_sysgen(uint8 cid);
-void ports_express(uint8 cid);
-void ports_full(uint8 cid);
+void ports_sysgen(uint8 slot);
+void ports_express(uint8 slot);
+void ports_full(uint8 slot);
 
 #endif /* _3B2_PORTS_H_ */

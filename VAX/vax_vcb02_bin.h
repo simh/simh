@@ -1,34 +1,72 @@
 #ifndef ROM_vax_vcb02_bin_H
 #define ROM_vax_vcb02_bin_H 0
 /*
-   VAX/vax_vcb02_bin.h         produced at Mon Aug 23 13:30:21 2021
-   from VAX/vcb02.bin which was last modified at Mon Jul 26 08:03:31 2021
+   VAX/vax_vcb02_bin.h         produced at Fri Nov 11 12:38:32 2022
+   from VAX/vcb02.bin which was last modified at Fri Nov 04 10:01:07 2022
    file size: 16384 (0x4000) - checksum: 0xFFF1D2AD
    This file is a generated file and should NOT be edited or changed by hand.
 */
 #undef BOOT_CODE_SIZE
 #define BOOT_CODE_SIZE 0x4000
+#undef BOOT_CODE_CHECKSUM
+#define BOOT_CODE_CHECKSUM 0xFFF1D2AD
 #undef BOOT_CODE_FILENAME
 #define BOOT_CODE_FILENAME "vcb02.bin"
+#undef BOOT_CODE_FILEPATH
+#define BOOT_CODE_FILEPATH "VAX/vcb02.bin"
 #undef BOOT_CODE_ARRAY
+#if defined(DONT_USE_INTERNAL_ROM)
+#define BOOT_CODE_ARRAY NULL
+#else
 #define BOOT_CODE_ARRAY vax_vcb02_bin
+#endif
+#define BOOT_CODE_URL NULL
 #if !defined(BOOT_CODE_SIZE_1)
 #define BOOT_CODE_SIZE_1 0x4000
+#define BOOT_CODE_CHECKSUM_1 0xFFF1D2AD
 #define BOOT_CODE_FILENAME_1 "vcb02.bin"
+#define BOOT_CODE_FILEPATH_1 "VAX/vcb02.bin"
+#if defined(DONT_USE_INTERNAL_ROM)
+#define BOOT_CODE_ARRAY_1 NULL
+#else
 #define BOOT_CODE_ARRAY_1 vax_vcb02_bin
+#endif
+#define BOOT_CODE_URL_1 NULL
 #elif !defined(BOOT_CODE_SIZE_2)
 #define BOOT_CODE_SIZE_2 0x4000
+#define BOOT_CODE_CHECKSUM_2 0xFFF1D2AD
 #define BOOT_CODE_FILENAME_2 "vcb02.bin"
+#define BOOT_CODE_FILEPATH_2 "VAX/vcb02.bin"
+#if defined(DONT_USE_INTERNAL_ROM)
+#define BOOT_CODE_ARRAY_2 NULL
+#else
 #define BOOT_CODE_ARRAY_2 vax_vcb02_bin
+#endif
+#define BOOT_CODE_URL_2 NULL
 #elif !defined(BOOT_CODE_SIZE_3)
 #define BOOT_CODE_SIZE_3 0x4000
+#define BOOT_CODE_CHECKSUM_3 0xFFF1D2AD
 #define BOOT_CODE_FILENAME_3 "vcb02.bin"
+#define BOOT_CODE_FILEPATH_3 "VAX/vcb02.bin"
+#if defined(DONT_USE_INTERNAL_ROM)
+#define BOOT_CODE_ARRAY_3 NULL
+#else
 #define BOOT_CODE_ARRAY_3 vax_vcb02_bin
+#endif
+#define BOOT_CODE_URL_3 NULL
 #elif !defined(BOOT_CODE_SIZE_4)
 #define BOOT_CODE_SIZE_4 0x4000
+#define BOOT_CODE_CHECKSUM_4 0xFFF1D2AD
 #define BOOT_CODE_FILENAME_4 "vcb02.bin"
+#define BOOT_CODE_FILEPATH_4 "VAX/vcb02.bin"
+#if defined(DONT_USE_INTERNAL_ROM)
+#define BOOT_CODE_ARRAY_4 NULL
+#else
 #define BOOT_CODE_ARRAY_4 vax_vcb02_bin
 #endif
+#define BOOT_CODE_URL_4 NULL
+#endif
+#if !defined(DONT_USE_INTERNAL_ROM)
 unsigned char vax_vcb02_bin[] = {
 0x00,0x01,0x00,0x01,0x12,0x04,0x51,0x44,0x41,0x30,0x00,0x40,0x00,0x00,0x00,0x00,
 0x46,0xF5,0x01,0x00,0x44,0x49,0x41,0x47,0x30,0x20,0x20,0x20,0x20,0x20,0x58,0x22,
@@ -1054,4 +1092,5 @@ unsigned char vax_vcb02_bin[] = {
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x32,0x60,};
+#endif
 #endif /* ROM_vax_vcb02_bin_H */

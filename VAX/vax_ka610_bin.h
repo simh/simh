@@ -1,34 +1,72 @@
 #ifndef ROM_vax_ka610_bin_H
 #define ROM_vax_ka610_bin_H 0
 /*
-   VAX/vax_ka610_bin.h         produced at Mon Aug 23 13:30:20 2021
-   from VAX/ka610.bin which was last modified at Mon Jul 26 08:03:31 2021
+   VAX/vax_ka610_bin.h         produced at Fri Nov 11 12:38:31 2022
+   from VAX/ka610.bin which was last modified at Fri Nov 04 10:00:46 2022
    file size: 16384 (0x4000) - checksum: 0xFFEF3312
    This file is a generated file and should NOT be edited or changed by hand.
 */
 #undef BOOT_CODE_SIZE
 #define BOOT_CODE_SIZE 0x4000
+#undef BOOT_CODE_CHECKSUM
+#define BOOT_CODE_CHECKSUM 0xFFEF3312
 #undef BOOT_CODE_FILENAME
 #define BOOT_CODE_FILENAME "ka610.bin"
+#undef BOOT_CODE_FILEPATH
+#define BOOT_CODE_FILEPATH "VAX/ka610.bin"
 #undef BOOT_CODE_ARRAY
+#if defined(DONT_USE_INTERNAL_ROM)
+#define BOOT_CODE_ARRAY NULL
+#else
 #define BOOT_CODE_ARRAY vax_ka610_bin
+#endif
+#define BOOT_CODE_URL NULL
 #if !defined(BOOT_CODE_SIZE_1)
 #define BOOT_CODE_SIZE_1 0x4000
+#define BOOT_CODE_CHECKSUM_1 0xFFEF3312
 #define BOOT_CODE_FILENAME_1 "ka610.bin"
+#define BOOT_CODE_FILEPATH_1 "VAX/ka610.bin"
+#if defined(DONT_USE_INTERNAL_ROM)
+#define BOOT_CODE_ARRAY_1 NULL
+#else
 #define BOOT_CODE_ARRAY_1 vax_ka610_bin
+#endif
+#define BOOT_CODE_URL_1 NULL
 #elif !defined(BOOT_CODE_SIZE_2)
 #define BOOT_CODE_SIZE_2 0x4000
+#define BOOT_CODE_CHECKSUM_2 0xFFEF3312
 #define BOOT_CODE_FILENAME_2 "ka610.bin"
+#define BOOT_CODE_FILEPATH_2 "VAX/ka610.bin"
+#if defined(DONT_USE_INTERNAL_ROM)
+#define BOOT_CODE_ARRAY_2 NULL
+#else
 #define BOOT_CODE_ARRAY_2 vax_ka610_bin
+#endif
+#define BOOT_CODE_URL_2 NULL
 #elif !defined(BOOT_CODE_SIZE_3)
 #define BOOT_CODE_SIZE_3 0x4000
+#define BOOT_CODE_CHECKSUM_3 0xFFEF3312
 #define BOOT_CODE_FILENAME_3 "ka610.bin"
+#define BOOT_CODE_FILEPATH_3 "VAX/ka610.bin"
+#if defined(DONT_USE_INTERNAL_ROM)
+#define BOOT_CODE_ARRAY_3 NULL
+#else
 #define BOOT_CODE_ARRAY_3 vax_ka610_bin
+#endif
+#define BOOT_CODE_URL_3 NULL
 #elif !defined(BOOT_CODE_SIZE_4)
 #define BOOT_CODE_SIZE_4 0x4000
+#define BOOT_CODE_CHECKSUM_4 0xFFEF3312
 #define BOOT_CODE_FILENAME_4 "ka610.bin"
+#define BOOT_CODE_FILEPATH_4 "VAX/ka610.bin"
+#if defined(DONT_USE_INTERNAL_ROM)
+#define BOOT_CODE_ARRAY_4 NULL
+#else
 #define BOOT_CODE_ARRAY_4 vax_ka610_bin
 #endif
+#define BOOT_CODE_URL_4 NULL
+#endif
+#if !defined(DONT_USE_INTERNAL_ROM)
 unsigned char vax_ka610_bin[] = {
 0x31,0x26,0x01,0x06,0x80,0x81,0x82,0x83,0x13,0x5B,0x53,0x59,0x53,0x45,0x58,0x45,
 0x5D,0x53,0x59,0x53,0x42,0x4F,0x4F,0x54,0x2E,0x45,0x58,0x45,0x20,0x20,0x20,0x20,
@@ -1054,4 +1092,5 @@ unsigned char vax_ka610_bin[] = {
 0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
 0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
 0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x7E,0x41,};
+#endif
 #endif /* ROM_vax_ka610_bin_H */

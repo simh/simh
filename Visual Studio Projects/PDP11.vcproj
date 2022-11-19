@@ -47,6 +47,7 @@
 				RuntimeLibrary="1"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
+				WarnAsError="true"
 				DebugInformationFormat="3"
 				CompileAs="1"
 				ShowIncludes="false"
@@ -131,6 +132,7 @@
 				EnableFunctionLevelLinking="true"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
+				WarnAsError="true"
 				DebugInformationFormat="3"
 				CompileAs="1"
 			/>
@@ -228,6 +230,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\PDP11\pdp11_dh.c"
+				>
+			</File>
+			<File
 				RelativePath="..\PDP11\pdp11_dl.c"
 				>
 			</File>
@@ -273,6 +279,10 @@
 			</File>
 			<File
 				RelativePath="..\PDP11\pdp11_lp.c"
+				>
+			</File>
+			<File
+				RelativePath="..\PDP11\pdp11_mb.c"
 				>
 			</File>
 			<File
@@ -365,6 +375,10 @@
 			</File>
 			<File
 				RelativePath="..\PDP11\pdp11_tu.c"
+				>
+			</File>
+			<File
+				RelativePath="..\PDP11\pdp11_tv.c"
 				>
 			</File>
 			<File
@@ -689,7 +703,8 @@
 		</Filter>
 		<Filter
 			Name="Header Files"
-			Filter="h;hpp;hxx;hm;inl;inc"			>
+			Filter="h;hpp;hxx;hm;inl;inc"
+			>
 			<File
 				RelativePath="..\display\display.h"
 				>

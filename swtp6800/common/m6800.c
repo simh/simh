@@ -145,13 +145,11 @@ static const char* m6800_desc(DEVICE *dptr) {
 }
 
 /* function prototypes */
-
 t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat m6800_reset (DEVICE *dptr);
 t_stat m6800_ex(t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat m6800_dep(t_value val, t_addr addr, UNIT *uptr, int32 sw);
-
 void dump_regs(void);
 int32 fetch_byte(void);
 int32 fetch_word(void);
@@ -171,12 +169,12 @@ void condevalVs(int32 op1, int32 op2);
 void condevalHa(int32 op1, int32 op2);
 
 /* external routines */
-
 extern void CPU_BD_put_mbyte(int32 addr, int32 val);
 extern void CPU_BD_put_mword(int32 addr, int32 val);
 extern int32 CPU_BD_get_mbyte(int32 addr);
 extern int32 CPU_BD_get_mword(int32 addr);
 
+//disassembly opcode table
 static const char *opcode[] = {
 "???  ", "NOP  ", "???  ", "???  ",     //0x00
 "???  ", "???  ", "TAP  ", "TPA  ",
@@ -244,6 +242,7 @@ static const char *opcode[] = {
 "???  ", "???  ", "LDX  ", "STX  ",
 };
 
+//disassembly opcode length table
 int32 oplen[256] = {
 0,1,0,0,0,0,1,1,1,1,1,1,1,1,1,1,        //0x00
 1,1,0,0,0,0,1,1,0,1,0,1,0,0,0,0,

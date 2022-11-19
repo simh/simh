@@ -1,6 +1,6 @@
 /*************************************************************************
  *                                                                       *
- * Copyright (c) 2007-2020 Howard M. Harte.                              *
+ * Copyright (c) 2007-2022 Howard M. Harte.                              *
  * https://github.com/hharte                                             *
  *                                                                       *
  * Permission is hereby granted, free of charge, to any person obtaining *
@@ -16,16 +16,17 @@
  *                                                                       *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,       *
  * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF    *
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND                 *
- * NONINFRINGEMENT. IN NO EVENT SHALL HOWARD M. HARTE BE LIABLE FOR ANY  *
- * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,  *
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE     *
- * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                *
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-            *
+ * INFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE   *
+ * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN       *
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN     *
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE      *
+ * SOFTWARE.                                                             *
  *                                                                       *
- * Except as contained in this notice, the name of Howard M. Harte shall *
+ * Except as contained in this notice, the names of The Authors shall    *
  * not be used in advertising or otherwise to promote the sale, use or   *
  * other dealings in this Software without prior written authorization   *
- * Howard M. Harte.                                                      *
+ * from the Authors.                                                     *
  *                                                                       *
  * SIMH Interface based on altairz80_hdsk.c, by Peter Schorn.            *
  *                                                                       *
@@ -307,6 +308,8 @@ static t_stat wd179x_reset(DEVICE *dptr)
             return SCPE_ARG;
         }
     }
+
+    wd179x_info->cmdtype = 0;
 
     return SCPE_OK;
 }
@@ -910,11 +913,10 @@ static uint8 Do1793Command(uint8 cCommand)
                       " Error: READ_TRACK not implemented.\n", wd179x_info->sel_drive, PCX);
             break;
         case WD179X_WRITE_TRACK:
-            sim_debug(WR_DATA_MSG, &wd179x_dev, "WD179X[%d]: " ADDRESS_FORMAT
-                      " CMD=WRITE_TRACK\n", wd179x_info->sel_drive, PCX);
             sim_debug(FMT_MSG, &wd179x_dev, "WD179X[%d]: " ADDRESS_FORMAT
-                      " CMD=WRITE_TRACK, T:%2d/S:%d.\n", wd179x_info->sel_drive,
-                      PCX, pDrive->track, wd179x_info->fdc_head);
+                      " CMD=WRITE_TRACK, T:%2d/S:%d/N:%d.\n", wd179x_info->sel_drive,
+                      PCX, pDrive->track, wd179x_info->fdc_head,
+                      128 << wd179x_info->fdc_sec_len);
             wd179x_info->fdc_status |= (WD179X_STAT_DRQ);       /* Set DRQ */
             wd179x_info->drq = 1;
             wd179x_info->fdc_datacount = 128 << wd179x_info->fdc_sec_len;

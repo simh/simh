@@ -1,9 +1,7 @@
 /*************************************************************************
  *                                                                       *
- * $Id: s100_ss1.c 1997 2008-07-18 05:29:52Z hharte $                    *
- *                                                                       *
- * Copyright (c) 2007-2008 Howard M. Harte.                              *
- * http://www.hartetec.com                                               *
+ * Copyright (c) 2007-2022 Howard M. Harte.                              *
+ * https://github.com/hharte                                             *
  *                                                                       *
  * Permission is hereby granted, free of charge, to any person obtaining *
  * a copy of this software and associated documentation files (the       *
@@ -18,25 +16,23 @@
  *                                                                       *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,       *
  * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF    *
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND                 *
- * NONINFRINGEMENT. IN NO EVENT SHALL HOWARD M. HARTE BE LIABLE FOR ANY  *
- * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,  *
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE     *
- * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                *
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-            *
+ * INFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE   *
+ * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN       *
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN     *
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE      *
+ * SOFTWARE.                                                             *
  *                                                                       *
- * Except as contained in this notice, the name of Howard M. Harte shall *
+ * Except as contained in this notice, the names of The Authors shall    *
  * not be used in advertising or otherwise to promote the sale, use or   *
  * other dealings in this Software without prior written authorization   *
- * Howard M. Harte.                                                      *
+ * from the Authors.                                                     *
  *                                                                       *
  * SIMH Interface based on altairz80_hdsk.c, by Peter Schorn.            *
  *                                                                       *
  * Module Description:                                                   *
  *     CompuPro System Support 1 module for SIMH.                        *
  * Note this does not include the Boot ROM on the System Support 1 Card  *
- *                                                                       *
- * Environment:                                                          *
- *     User mode only                                                    *
  *                                                                       *
  *************************************************************************/
 
@@ -85,7 +81,7 @@ static void setClockSS1(void);
 
 /* SS1 Interrupt Controller notes:
  *
- * Msster 8259:
+ * Master 8259:
  * IRQ0 = VI0
  * IRQ1 = VI1       - DISK3 Interrupt
  * IRQ2 = VI2       - IF3 Rx Interrupt
@@ -182,10 +178,10 @@ typedef struct {
 RTC_REGS ss1_rtc[1] = { { 0 } };
 
 static UNIT ss1_unit[] = {
-    { UDATA (&ss1_svc, UNIT_FIX | UNIT_DISABLE | UNIT_ROABLE, 0) },
-    { UDATA (&ss1_svc, UNIT_FIX | UNIT_DISABLE | UNIT_ROABLE, 0) },
-    { UDATA (&ss1_svc, UNIT_FIX | UNIT_DISABLE | UNIT_ROABLE, 0) },
-    { UDATA (&ss1_svc, UNIT_FIX | UNIT_DISABLE | UNIT_ROABLE, 0) }
+    { UDATA (&ss1_svc, UNIT_FIX | UNIT_DISABLE | UNIT_DIS | UNIT_ROABLE, 0) },
+    { UDATA (&ss1_svc, UNIT_FIX | UNIT_DISABLE | UNIT_DIS | UNIT_ROABLE, 0) },
+    { UDATA (&ss1_svc, UNIT_FIX | UNIT_DISABLE | UNIT_DIS | UNIT_ROABLE, 0) },
+    { UDATA (&ss1_svc, UNIT_FIX | UNIT_DISABLE | UNIT_DIS | UNIT_ROABLE, 0) }
 };
 
 static REG ss1_reg[] = {
@@ -265,6 +261,11 @@ DEVICE ss1_dev = {
 static t_stat ss1_reset(DEVICE *dptr)
 {
     PNP_INFO *pnp = (PNP_INFO *)dptr->ctxt;
+
+    sim_cancel(&dptr->units[0]);
+    sim_cancel(&dptr->units[1]);
+    sim_cancel(&dptr->units[2]);
+    sim_cancel(&dptr->units[3]);
 
     if(dptr->flags & DEV_DIS) { /* Disconnect I/O Ports */
         sim_map_resource(pnp->io_base, pnp->io_size, RESOURCE_TYPE_IO, &ss1dev, "ss1dev", TRUE);

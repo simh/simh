@@ -4121,7 +4121,7 @@ static void i86op_opcD3_word_RM_CL(PC_ENV *m)
 /* opcode=0xd4*/
 static void i86op_aam(PC_ENV *m)
 {   uint8 a;
-    a = fetch_byte_imm(m);  /* this is a stupid encoding. */
+    a = fetch_byte_imm(m);
     if (a != 10)
         sim_printf("CPU: " ADDRESS_FORMAT " Error decoding AAM: Expected 0x0a but got 0x%2x.\n", m->Sp_regs.IP.I16_reg.x_reg, a);
     /* note the type change here --- returning AL and AH in AX. */
@@ -4132,6 +4132,10 @@ static void i86op_aam(PC_ENV *m)
 /* opcode=0xd5*/
 static void i86op_aad(PC_ENV *m)
 {
+    uint8 a;
+    a = fetch_byte_imm(m);
+    if (a != 10)
+        sim_printf("CPU: " ADDRESS_FORMAT " Error decoding AAD: Expected 0x0a but got 0x%2x.\n", m->Sp_regs.IP.I16_reg.x_reg, a);
     m->R_AX = aad_word(m,m->R_AX);
     DECODE_CLEAR_SEGOVR(m);
 }
@@ -4317,14 +4321,12 @@ static void i86op_lock(PC_ENV *m)
 static void i86op_repne(PC_ENV *m)
 {
    m->sysmode |= SYSMODE_PREFIX_REPNE;
-   DECODE_CLEAR_SEGOVR(m);
 }
 
 /*opcode=0xf3*/
 static void i86op_repe(PC_ENV *m)
 {
    m->sysmode |= SYSMODE_PREFIX_REPE;
-   DECODE_CLEAR_SEGOVR(m);
 }
 
 /*opcode=0xf4*/

@@ -1,6 +1,6 @@
-/* 3b2_id.h: AT&T 3B2 Model 400 Hard Disk (uPD7261) Header
+/* 3b2_id.h: uPD7261 Integrated Disk Controller
 
-   Copyright (c) 2017, Seth J. Morabito
+   Copyright (c) 2017-2022, Seth J. Morabito
 
    Permission is hereby granted, free of charge, to any person
    obtaining a copy of this software and associated documentation

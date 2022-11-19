@@ -1,9 +1,7 @@
 /*************************************************************************
  *                                                                       *
- * $Id: tx0_sys.c 2061 2009-02-24 07:05:58Z hharte $                     *
- *                                                                       *
- * Copyright (c) 2009-2012 Howard M. Harte.                              *
- * Based on pdp1_sys.c, Copyright (c) 1993-2007, Robert M. Supnik        *
+ * Copyright (c) 2009-2022 Howard M. Harte.                              *
+ * https://github.com/hharte                                             *
  *                                                                       *
  * Permission is hereby granted, free of charge, to any person obtaining *
  * a copy of this software and associated documentation files (the       *
@@ -18,22 +16,20 @@
  *                                                                       *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,       *
  * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF    *
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND                 *
- * NONINFRINGEMENT. IN NO EVENT SHALL HOWARD M. HARTE BE LIABLE FOR ANY  *
- * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,  *
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE     *
- * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                *
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-            *
+ * INFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE   *
+ * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN       *
+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN     *
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE      *
+ * SOFTWARE.                                                             *
  *                                                                       *
- * Except as contained in this notice, the name of Howard M. Harte shall *
+ * Except as contained in this notice, the names of The Authors shall    *
  * not be used in advertising or otherwise to promote the sale, use or   *
  * other dealings in this Software without prior written authorization   *
- * of Howard M. Harte.                                                   *
+ * from the Authors.                                                     *
  *                                                                       *
  * Module Description:                                                   *
- *     TX-0 simulator interface                                          *
- *                                                                       *
- * Environment:                                                          *
- *     User mode only                                                    *
+ *     TX-0 simulator interface: 4-bit opcode with index register.       *
  *                                                                       *
  *************************************************************************/
 

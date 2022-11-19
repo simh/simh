@@ -1,6 +1,6 @@
-/* 3b2_rev2_mmu.c: AT&T 3B2 Rev 2 (Model 400) MMU (WE32101) Implementation
+/* 3b2_rev2_mmu.c: WE32101 MMU
 
-   Copyright (c) 2017, Seth J. Morabito
+   Copyright (c) 2017-2022, Seth J. Morabito
 
    Permission is hereby granted, free of charge, to any person
    obtaining a copy of this software and associated documentation
@@ -32,6 +32,7 @@
 #include "3b2_cpu.h"
 #include "3b2_mmu.h"
 #include "3b2_sys.h"
+#include "3b2_mem.h"
 
 UNIT mmu_unit = { UDATA(NULL, 0, 0) };
 
@@ -260,13 +261,16 @@ static SIM_INLINE t_stat mmu_check_perm(uint8 flags, uint8 r_acc)
     case 0:  /* No Access */
         return SCPE_NXM;
     case 1:  /* Exec Only */
-        if (r_acc != ACC_IF && r_acc != ACC_IFAD) {
+        if (r_acc != ACC_IF &&
+            r_acc != ACC_IFAD) {
             return SCPE_NXM;
         }
         return SCPE_OK;
     case 2: /* Read / Execute */
-        if (r_acc != ACC_AF && r_acc != ACC_OF &&
-            r_acc != ACC_IF && r_acc != ACC_IFAD &&
+        if (r_acc != ACC_IF &&
+            r_acc != ACC_IFAD &&
+            r_acc != ACC_OF &&
+            r_acc != ACC_AF &&
             r_acc != ACC_MT) {
             return SCPE_NXM;
         }
@@ -288,8 +292,8 @@ static SIM_INLINE void mmu_update_sd(uint32 va, uint32 mask)
 
     /* We go back to main memory to find the SD because the SD may
        have been loaded from cache, which is lossy. */
-    sd0 = pread_w(SD_ADDR(va));
-    pwrite_w(SD_ADDR(va), sd0|mask);
+    sd0 = pread_w(SD_ADDR(va), BUS_PER);
+    pwrite_w(SD_ADDR(va), sd0|mask, BUS_PER);
 
     /* There is no 'R' bit in the SD cache, only an 'M' bit. */
     if (mask == SD_M_MASK) {
@@ -310,8 +314,8 @@ static SIM_INLINE void mmu_update_pd(uint32 va, uint32 pd_addr, uint32 mask)
 
     /* We go back to main memory to find the PD because the PD may
        have been loaded from cache, which is lossy. */
-    pd = pread_w(pd_addr);
-    pwrite_w(pd_addr, pd|mask);
+    pd = pread_w(pd_addr, BUS_PER);
+    pwrite_w(pd_addr, pd|mask, BUS_PER);
 
     /* Update in the cache */
 
@@ -349,50 +353,50 @@ uint32 mmu_read(uint32 pa, size_t size)
     case MMU_SDCL:
         data = mmu_state.sdcl[offset];
         sim_debug(READ_MSG, &mmu_dev,
-                  "[%08x] [pa=%08x] MMU_SDCL[%d] = %08x\n",
-                  R[NUM_PC], pa, offset, data);
+                  "[pa=%08x] MMU_SDCL[%d] = %08x\n",
+                  pa, offset, data);
         break;
     case MMU_SDCH:
         data = mmu_state.sdch[offset];
         sim_debug(READ_MSG, &mmu_dev,
-                  "[%08x] MMU_SDCH[%d] = %08x\n",
-                  R[NUM_PC], offset, data);
+                  "MMU_SDCH[%d] = %08x\n",
+                  offset, data);
         break;
     case MMU_PDCRL:
         data = mmu_state.pdcrl[offset];
         sim_debug(READ_MSG, &mmu_dev,
-                  "[%08x] MMU_PDCRL[%d] = %08x\n",
-                  R[NUM_PC], offset, data);
+                  "MMU_PDCRL[%d] = %08x\n",
+                  offset, data);
         break;
     case MMU_PDCRH:
         data = mmu_state.pdcrh[offset];
         sim_debug(READ_MSG, &mmu_dev,
-                  "[%08x] MMU_PDCRH[%d] = %08x\n",
-                  R[NUM_PC], offset, data);
+                  "MMU_PDCRH[%d] = %08x\n",
+                  offset, data);
         break;
     case MMU_PDCLL:
         data = mmu_state.pdcll[offset];
         sim_debug(READ_MSG, &mmu_dev,
-                  "[%08x] MMU_PDCLL[%d] = %08x\n",
-                  R[NUM_PC], offset, data);
+                  "MMU_PDCLL[%d] = %08x\n",
+                  offset, data);
         break;
     case MMU_PDCLH:
         data = mmu_state.pdclh[offset];
         sim_debug(READ_MSG, &mmu_dev,
-                  "[%08x] MMU_PDCLH[%d] = %08x\n",
-                  R[NUM_PC], offset, data);
+                  "MMU_PDCLH[%d] = %08x\n",
+                  offset, data);
         break;
     case MMU_SRAMA:
         data = mmu_state.sra[offset];
         sim_debug(READ_MSG, &mmu_dev,
-                  "[%08x] MMU_SRAMA[%d] = %08x\n",
-                  R[NUM_PC], offset, data);
+                  "MMU_SRAMA[%d] = %08x\n",
+                  offset, data);
         break;
     case MMU_SRAMB:
         data = mmu_state.srb[offset];
         sim_debug(READ_MSG, &mmu_dev,
-                  "[%08x] MMU_SRAMB[%d] = %08x\n",
-                  R[NUM_PC], offset, data);
+                  "MMU_SRAMB[%d] = %08x\n",
+                  offset, data);
         break;
     case MMU_FC:
         data = mmu_state.fcode;
@@ -403,14 +407,14 @@ uint32 mmu_read(uint32 pa, size_t size)
     case MMU_CONF:
         data = mmu_state.conf & 0x7;
         sim_debug(READ_MSG, &mmu_dev,
-                  "[%08x] MMU_CONF = %08x\n",
-                  R[NUM_PC], data);
+                  "MMU_CONF = %08x\n",
+                  data);
         break;
     case MMU_VAR:
         data = mmu_state.var;
         sim_debug(READ_MSG, &mmu_dev,
-                  "[%08x] MMU_VAR = %08x\n",
-                  R[NUM_PC], data);
+                  "MMU_VAR = %08x\n",
+                  data);
         break;
     }
 
@@ -466,8 +470,8 @@ void mmu_write(uint32 pa, uint32 val, size_t size)
         mmu_state.sec[offset].addr = val & 0xffffffe0;
         /* We flush the entire section on writing SRAMA */
         sim_debug(WRITE_MSG, &mmu_dev,
-                  "[%08x] MMU_SRAMA[%d] = %08x\n",
-                  R[NUM_PC], offset, val);
+                  "MMU_SRAMA[%d] = %08x\n",
+                  offset, val);
         flush_cache_sec((uint8) offset);
         break;
     case MMU_SRAMB:
@@ -476,8 +480,8 @@ void mmu_write(uint32 pa, uint32 val, size_t size)
         mmu_state.sec[offset].len = (val >> 10) & 0x1fff;
         /* We do not flush the cache on writing SRAMB */
         sim_debug(WRITE_MSG, &mmu_dev,
-                  "[%08x] MMU_SRAMB[%d] = %08x (len=%06x)\n",
-                  R[NUM_PC], offset, val, mmu_state.sec[offset].len);
+                  "MMU_SRAMB[%d] = %08x (len=%06x)\n",
+                  offset, val, mmu_state.sec[offset].len);
         break;
     case MMU_FC:
         mmu_state.fcode = val;
@@ -518,20 +522,20 @@ t_stat mmu_get_sd(uint32 va, uint8 r_acc, t_bool fc,
     if (SSL(va) > SRAMB_LEN(va)) {
         MMU_FAULT(MMU_F_SDTLEN);
         sim_debug(EXECUTE_MSG, &mmu_dev,
-                  "[%08x] SDT Length Fault. sramb_len=%x ssl=%x va=%08x\n",
-                  R[NUM_PC], SRAMB_LEN(va), SSL(va), va);
+                  "SDT Length Fault. sramb_len=%x ssl=%x va=%08x\n",
+                  SRAMB_LEN(va), SSL(va), va);
         return SCPE_NXM;
     }
 
     /* sd0 contains the segment descriptor, sd1 contains a pointer to
        the PDT or Segment */
-    *sd0 = pread_w(SD_ADDR(va));
-    *sd1 = pread_w(SD_ADDR(va) + 4);
+    *sd0 = pread_w(SD_ADDR(va), BUS_PER);
+    *sd1 = pread_w(SD_ADDR(va) + 4, BUS_PER);
 
     if (!SD_VALID(*sd0)) {
         sim_debug(EXECUTE_MSG, &mmu_dev,
-                  "[%08x] Invalid Segment Descriptor. va=%08x sd0=%08x\n",
-                  R[NUM_PC], va, *sd0);
+                  "Invalid Segment Descriptor. va=%08x sd0=%08x\n",
+                  va, *sd0);
         MMU_FAULT(MMU_F_INV_SD);
         return SCPE_NXM;
     }
@@ -547,14 +551,14 @@ t_stat mmu_get_sd(uint32 va, uint8 r_acc, t_bool fc,
     if (!SD_PRESENT(*sd0)) {
         if (SD_CONTIG(*sd0)) {
             sim_debug(EXECUTE_MSG, &mmu_dev,
-                      "[%08x] Segment Not Present. va=%08x",
-                      R[NUM_PC], va);
+                      "Segment Not Present. va=%08x",
+                      va);
             MMU_FAULT(MMU_F_SEG_NOT_PRES);
             return SCPE_NXM;
         } else {
             sim_debug(EXECUTE_MSG, &mmu_dev,
-                      "[%08x] PDT Not Present. va=%08x",
-                      R[NUM_PC], va);
+                      "PDT Not Present. va=%08x",
+                      va);
             MMU_FAULT(MMU_F_PDT_NOT_PRES);
             return SCPE_NXM;
         }
@@ -582,15 +586,15 @@ t_stat mmu_get_pd(uint32 va, uint8 r_acc, t_bool fc,
     /* Bounds checking on length */
     if ((PSL(va) * 4) >= MAX_OFFSET(sd0)) {
         sim_debug(EXECUTE_MSG, &mmu_dev,
-                  "[%08x] PDT Length Fault. "
+                  "PDT Length Fault. "
                   "PDT Offset=%08x Max Offset=%08x va=%08x\n",
-                  R[NUM_PC], (PSL(va) * 4),
+                  (PSL(va) * 4),
                   MAX_OFFSET(sd0), va);
         MMU_FAULT(MMU_F_PDTLEN);
         return SCPE_NXM;
     }
 
-    *pd = pread_w(pd_addr);
+    *pd = pread_w(pd_addr, BUS_PER);
 
     /* Copy the access flags from the SD */
     *pd_acc = SD_ACC(sd0);
@@ -614,23 +618,21 @@ t_stat mmu_decode_contig(uint32 va, uint8 r_acc,
         /* Update R and M bits if configured */
         if (SHOULD_UPDATE_SD_R_BIT(sd0)) {
             sim_debug(EXECUTE_MSG, &mmu_dev,
-                      "[%08x] Updating R bit in SD\n",
-                      R[NUM_PC]);
+                      "Updating R bit in SD\n");
             mmu_update_sd(va, SD_R_MASK);
         }
 
         if (SHOULD_UPDATE_SD_M_BIT(sd0)) {
             sim_debug(EXECUTE_MSG, &mmu_dev,
-                      "[%08x] Updating M bit in SD\n",
-                      R[NUM_PC]);
+                      "Updating M bit in SD\n");
             mmu_update_sd(va, SD_M_MASK);
         }
 
         /* Generate object trap if needed */
         if (SD_TRAP(sd0)) {
             sim_debug(EXECUTE_MSG, &mmu_dev,
-                      "[%08x] Object Trap. va=%08x",
-                      R[NUM_PC], va);
+                      "Object Trap. va=%08x",
+                      va);
             MMU_FAULT(MMU_F_OTRAP);
             return SCPE_NXM;
         }
@@ -647,9 +649,9 @@ t_stat mmu_decode_paged(uint32 va, uint8 r_acc, t_bool fc,
     /* If the PD is not marked present, fail */
     if (!PD_PRESENT(pd)) {
         sim_debug(EXECUTE_MSG, &mmu_dev,
-                  "[%08x] Page Not Present. "
+                  "Page Not Present. "
                   "pd=%08x r_acc=%x va=%08x\n",
-                  R[NUM_PC], pd, r_acc, va);
+                  pd, r_acc, va);
         MMU_FAULT(MMU_F_PAGE_NOT_PRES);
         return SCPE_NXM;
     }
@@ -659,8 +661,8 @@ t_stat mmu_decode_paged(uint32 va, uint8 r_acc, t_bool fc,
            the 'W' bit is set, trigger a write fault */
         if ((r_acc == ACC_W || r_acc == ACC_IR) && PD_WFAULT(pd)) {
             sim_debug(EXECUTE_MSG, &mmu_dev,
-                      "[%08x] Page Write Fault. va=%08x\n",
-                      R[NUM_PC], va);
+                      "Page Write Fault. va=%08x\n",
+                      va);
             MMU_FAULT(MMU_F_PW);
             return SCPE_NXM;
         }
@@ -668,16 +670,14 @@ t_stat mmu_decode_paged(uint32 va, uint8 r_acc, t_bool fc,
         /* If this is a write, modify the M bit */
         if (SHOULD_UPDATE_PD_M_BIT(pd)) {
             sim_debug(EXECUTE_MSG, &mmu_dev,
-                      "[%08x] Updating M bit in PD\n",
-                      R[NUM_PC]);
+                      "Updating M bit in PD\n");
             mmu_update_pd(va, PD_LOC(sd1, va), PD_M_MASK);
         }
 
         /* Modify the R bit and write it back */
         if (SHOULD_UPDATE_PD_R_BIT(pd)) {
             sim_debug(EXECUTE_MSG, &mmu_dev,
-                      "[%08x] Updating R bit in PD\n",
-                      R[NUM_PC]);
+                      "Updating R bit in PD\n");
             mmu_update_pd(va, PD_LOC(sd1, va), PD_R_MASK);
         }
     }
@@ -717,29 +717,29 @@ t_stat mmu_decode_va(uint32 va, uint8 r_acc, t_bool fc, uint32 *pa)
     if (sd_cached == SCPE_OK && pd_cached != SCPE_OK) {
         if (SD_PAGED(sd0) && mmu_get_pd(va, r_acc, fc, sd0, sd1, &pd, &pd_acc) != SCPE_OK) {
             sim_debug(EXECUTE_MSG, &mmu_dev,
-                      "[%08x] Could not get PD (partial miss). r_acc=%d, fc=%d, va=%08x\n",
-                      R[NUM_PC], r_acc, fc, va);
+                      "Could not get PD (partial miss). r_acc=%d, fc=%d, va=%08x\n",
+                      r_acc, fc, va);
             return SCPE_NXM;
         }
     } else if (sd_cached != SCPE_OK && pd_cached == SCPE_OK) {
         if (mmu_get_sd(va, r_acc, fc, &sd0, &sd1) != SCPE_OK) {
             sim_debug(EXECUTE_MSG, &mmu_dev,
-                      "[%08x] Could not get SD (partial miss). r_acc=%d, fc=%d, va=%08x\n",
-                      R[NUM_PC], r_acc, fc, va);
+                      "Could not get SD (partial miss). r_acc=%d, fc=%d, va=%08x\n",
+                      r_acc, fc, va);
             return SCPE_NXM;
         }
     } else if (sd_cached != SCPE_OK && pd_cached != SCPE_OK) {
         if (mmu_get_sd(va, r_acc, fc, &sd0, &sd1) != SCPE_OK) {
             sim_debug(EXECUTE_MSG, &mmu_dev,
-                      "[%08x] Could not get SD (full miss). r_acc=%d, fc=%d, va=%08x\n",
-                      R[NUM_PC], r_acc, fc, va);
+                      "Could not get SD (full miss). r_acc=%d, fc=%d, va=%08x\n",
+                      r_acc, fc, va);
             return SCPE_NXM;
         }
 
         if (SD_PAGED(sd0) && mmu_get_pd(va, r_acc, fc, sd0, sd1, &pd, &pd_acc) != SCPE_OK) {
             sim_debug(EXECUTE_MSG, &mmu_dev,
-                      "[%08x] Could not get PD (full miss). r_acc=%d, fc=%d, va=%08x\n",
-                      R[NUM_PC], r_acc, fc, va);
+                      "Could not get PD (full miss). r_acc=%d, fc=%d, va=%08x\n",
+                      r_acc, fc, va);
             return SCPE_NXM;
         }
     }
@@ -747,18 +747,17 @@ t_stat mmu_decode_va(uint32 va, uint8 r_acc, t_bool fc, uint32 *pa)
     if (SD_PAGED(sd0)) {
         if (fc && mmu_check_perm(pd_acc, r_acc) != SCPE_OK) {
             sim_debug(EXECUTE_MSG, &mmu_dev,
-                      "[%08x] PAGED: NO ACCESS TO MEMORY AT %08x.\n"
+                      "PAGED: NO ACCESS TO MEMORY AT %08x.\n"
                       "\t\tcpu_cm=%d r_acc=%x pd_acc=%02x\n"
                       "\t\tpd=%08x psw=%08x\n",
-                      R[NUM_PC], va, CPU_CM, r_acc, pd_acc,
+                      va, CPU_CM, r_acc, pd_acc,
                       pd, R[NUM_PSW]);
             MMU_FAULT(MMU_F_ACC);
             return SCPE_NXM;
         }
         if (PD_LAST(pd) && (PSL_C(va) | POT(va)) >= MAX_OFFSET(sd0)) {
             sim_debug(EXECUTE_MSG, &mmu_dev,
-                      "[%08x] PAGED: Segment Offset Fault.\n",
-                      R[NUM_PC]);
+                      "PAGED: Segment Offset Fault.\n");
             MMU_FAULT(MMU_F_SEG_OFFSET);
             return SCPE_NXM;
         }
@@ -766,20 +765,19 @@ t_stat mmu_decode_va(uint32 va, uint8 r_acc, t_bool fc, uint32 *pa)
     } else {
         if (fc && mmu_check_perm(SD_ACC(sd0), r_acc) != SCPE_OK) {
             sim_debug(EXECUTE_MSG, &mmu_dev,
-                      "[%08x] CONTIGUOUS: NO ACCESS TO MEMORY AT %08x.\n"
+                      "CONTIGUOUS: NO ACCESS TO MEMORY AT %08x.\n"
                       "\t\tsd0=%08x sd0_addr=%08x\n"
                       "\t\tcpu_cm=%d acc_req=%x sd_acc=%02x\n",
-                      R[NUM_PC], va,
-                      sd0, SD_ADDR(va),
+                      va, sd0, SD_ADDR(va),
                       CPU_CM, r_acc, SD_ACC(sd0));
             MMU_FAULT(MMU_F_ACC);
             return SCPE_NXM;
         }
         if (SOT(va) >= MAX_OFFSET(sd0)) {
             sim_debug(EXECUTE_MSG, &mmu_dev,
-                      "[%08x] CONTIGUOUS: Segment Offset Fault. "
+                      "CONTIGUOUS: Segment Offset Fault. "
                       "sd0=%08x sd_addr=%08x SOT=%08x len=%08x va=%08x\n",
-                      R[NUM_PC], sd0, SD_ADDR(va), SOT(va),
+                      sd0, SD_ADDR(va), SOT(va),
                       MAX_OFFSET(sd0), va);
             MMU_FAULT(MMU_F_SEG_OFFSET);
             return SCPE_NXM;
@@ -807,16 +805,14 @@ uint32 mmu_xlate_addr(uint32 va, uint8 r_acc)
 void mmu_enable()
 {
     sim_debug(EXECUTE_MSG, &mmu_dev,
-              "[%08x] Enabling MMU.\n",
-              R[NUM_PC]);
+              "Enabling MMU.\n");
     mmu_state.enabled = TRUE;
 }
 
 void mmu_disable()
 {
     sim_debug(EXECUTE_MSG, &mmu_dev,
-              "[%08x] Disabling MMU.\n",
-              R[NUM_PC]);
+              "Disabling MMU.\n");
     mmu_state.enabled = FALSE;
 }
 

@@ -1,34 +1,72 @@
 #ifndef ROM_swtp_swtbugv10_bin_H
 #define ROM_swtp_swtbugv10_bin_H 0
 /*
-   swtp6800/swtp6800/swtp_swtbugv10_bin.h         produced at Tue May 31 12:39:31 2022
-   from swtp6800/swtp6800/swtbugv10.bin which was last modified at Sat Mar 12 06:28:24 2022
+   swtp6800/swtp6800/swtp_swtbugv10_bin.h         produced at Fri Nov 11 12:38:32 2022
+   from swtp6800/swtp6800/swtbugv10.bin which was last modified at Wed Oct 19 15:16:02 2022
    file size: 1024 (0x400) - checksum: 0xFFFE4FBC
    This file is a generated file and should NOT be edited or changed by hand.
 */
 #undef BOOT_CODE_SIZE
 #define BOOT_CODE_SIZE 0x400
+#undef BOOT_CODE_CHECKSUM
+#define BOOT_CODE_CHECKSUM 0xFFFE4FBC
 #undef BOOT_CODE_FILENAME
 #define BOOT_CODE_FILENAME "swtbugv10.bin"
+#undef BOOT_CODE_FILEPATH
+#define BOOT_CODE_FILEPATH "swtp6800/swtp6800/swtbugv10.bin"
 #undef BOOT_CODE_ARRAY
+#if defined(DONT_USE_INTERNAL_ROM)
+#define BOOT_CODE_ARRAY NULL
+#else
 #define BOOT_CODE_ARRAY swtp_swtbugv10_bin
+#endif
+#define BOOT_CODE_URL NULL
 #if !defined(BOOT_CODE_SIZE_1)
 #define BOOT_CODE_SIZE_1 0x400
+#define BOOT_CODE_CHECKSUM_1 0xFFFE4FBC
 #define BOOT_CODE_FILENAME_1 "swtbugv10.bin"
+#define BOOT_CODE_FILEPATH_1 "swtp6800/swtp6800/swtbugv10.bin"
+#if defined(DONT_USE_INTERNAL_ROM)
+#define BOOT_CODE_ARRAY_1 NULL
+#else
 #define BOOT_CODE_ARRAY_1 swtp_swtbugv10_bin
+#endif
+#define BOOT_CODE_URL_1 NULL
 #elif !defined(BOOT_CODE_SIZE_2)
 #define BOOT_CODE_SIZE_2 0x400
+#define BOOT_CODE_CHECKSUM_2 0xFFFE4FBC
 #define BOOT_CODE_FILENAME_2 "swtbugv10.bin"
+#define BOOT_CODE_FILEPATH_2 "swtp6800/swtp6800/swtbugv10.bin"
+#if defined(DONT_USE_INTERNAL_ROM)
+#define BOOT_CODE_ARRAY_2 NULL
+#else
 #define BOOT_CODE_ARRAY_2 swtp_swtbugv10_bin
+#endif
+#define BOOT_CODE_URL_2 NULL
 #elif !defined(BOOT_CODE_SIZE_3)
 #define BOOT_CODE_SIZE_3 0x400
+#define BOOT_CODE_CHECKSUM_3 0xFFFE4FBC
 #define BOOT_CODE_FILENAME_3 "swtbugv10.bin"
+#define BOOT_CODE_FILEPATH_3 "swtp6800/swtp6800/swtbugv10.bin"
+#if defined(DONT_USE_INTERNAL_ROM)
+#define BOOT_CODE_ARRAY_3 NULL
+#else
 #define BOOT_CODE_ARRAY_3 swtp_swtbugv10_bin
+#endif
+#define BOOT_CODE_URL_3 NULL
 #elif !defined(BOOT_CODE_SIZE_4)
 #define BOOT_CODE_SIZE_4 0x400
+#define BOOT_CODE_CHECKSUM_4 0xFFFE4FBC
 #define BOOT_CODE_FILENAME_4 "swtbugv10.bin"
+#define BOOT_CODE_FILEPATH_4 "swtp6800/swtp6800/swtbugv10.bin"
+#if defined(DONT_USE_INTERNAL_ROM)
+#define BOOT_CODE_ARRAY_4 NULL
+#else
 #define BOOT_CODE_ARRAY_4 swtp_swtbugv10_bin
 #endif
+#define BOOT_CODE_URL_4 NULL
+#endif
+#if !defined(DONT_USE_INTERNAL_ROM)
 unsigned char swtp_swtbugv10_bin[] = {
 0xFE,0xA0,0x00,0x6E,0x00,0x8D,0x40,0x6E,0x00,0x10,0x16,0x04,0xBD,0xE3,0x34,0x8D,
 0x67,0x81,0x53,0x26,0xFA,0x8D,0x61,0x81,0x39,0x27,0x29,0x81,0x31,0x26,0xF0,0x7F,
@@ -94,4 +132,5 @@ unsigned char swtp_swtbugv10_bin[] = {
 0xBF,0x47,0xE1,0xD0,0x5A,0xC0,0x00,0x4D,0xE0,0x88,0x46,0xE1,0xAE,0x52,0xE1,0x30,
 0x4A,0xE0,0x05,0x43,0xE2,0xCC,0x44,0xE2,0x8F,0x42,0xE2,0xD9,0x4F,0xE2,0x69,0x50,
 0xE3,0x1A,0x4C,0xE0,0x0C,0x45,0xE3,0x1E,0xE0,0x00,0xE1,0x8B,0xE1,0xA7,0xE0,0xD0,};
+#endif
 #endif /* ROM_swtp_swtbugv10_bin_H */

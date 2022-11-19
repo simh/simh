@@ -1,34 +1,72 @@
 #ifndef ROM_dazzle_lda_H
 #define ROM_dazzle_lda_H 0
 /*
-   PDP11/pdp11_dazzle_dart_rom.h         produced at Mon Aug 23 13:30:21 2021
-   from PDP11/dazzledart/dazzle.lda which was last modified at Mon Jul 26 08:03:31 2021
+   PDP11/pdp11_dazzle_dart_rom.h         produced at Fri Nov 11 12:38:32 2022
+   from PDP11/dazzledart/dazzle.lda which was last modified at Wed Oct 19 15:16:01 2022
    file size: 6096 (0x17D0) - checksum: 0xFFF83848
    This file is a generated file and should NOT be edited or changed by hand.
 */
 #undef BOOT_CODE_SIZE
 #define BOOT_CODE_SIZE 0x17D0
+#undef BOOT_CODE_CHECKSUM
+#define BOOT_CODE_CHECKSUM 0xFFF83848
 #undef BOOT_CODE_FILENAME
 #define BOOT_CODE_FILENAME "dazzle.lda"
+#undef BOOT_CODE_FILEPATH
+#define BOOT_CODE_FILEPATH "PDP11/dazzledart/dazzle.lda"
 #undef BOOT_CODE_ARRAY
+#if defined(DONT_USE_INTERNAL_ROM)
+#define BOOT_CODE_ARRAY NULL
+#else
 #define BOOT_CODE_ARRAY dazzle_lda
+#endif
+#define BOOT_CODE_URL NULL
 #if !defined(BOOT_CODE_SIZE_1)
 #define BOOT_CODE_SIZE_1 0x17D0
+#define BOOT_CODE_CHECKSUM_1 0xFFF83848
 #define BOOT_CODE_FILENAME_1 "dazzle.lda"
+#define BOOT_CODE_FILEPATH_1 "PDP11/dazzledart/dazzle.lda"
+#if defined(DONT_USE_INTERNAL_ROM)
+#define BOOT_CODE_ARRAY_1 NULL
+#else
 #define BOOT_CODE_ARRAY_1 dazzle_lda
+#endif
+#define BOOT_CODE_URL_1 NULL
 #elif !defined(BOOT_CODE_SIZE_2)
 #define BOOT_CODE_SIZE_2 0x17D0
+#define BOOT_CODE_CHECKSUM_2 0xFFF83848
 #define BOOT_CODE_FILENAME_2 "dazzle.lda"
+#define BOOT_CODE_FILEPATH_2 "PDP11/dazzledart/dazzle.lda"
+#if defined(DONT_USE_INTERNAL_ROM)
+#define BOOT_CODE_ARRAY_2 NULL
+#else
 #define BOOT_CODE_ARRAY_2 dazzle_lda
+#endif
+#define BOOT_CODE_URL_2 NULL
 #elif !defined(BOOT_CODE_SIZE_3)
 #define BOOT_CODE_SIZE_3 0x17D0
+#define BOOT_CODE_CHECKSUM_3 0xFFF83848
 #define BOOT_CODE_FILENAME_3 "dazzle.lda"
+#define BOOT_CODE_FILEPATH_3 "PDP11/dazzledart/dazzle.lda"
+#if defined(DONT_USE_INTERNAL_ROM)
+#define BOOT_CODE_ARRAY_3 NULL
+#else
 #define BOOT_CODE_ARRAY_3 dazzle_lda
+#endif
+#define BOOT_CODE_URL_3 NULL
 #elif !defined(BOOT_CODE_SIZE_4)
 #define BOOT_CODE_SIZE_4 0x17D0
+#define BOOT_CODE_CHECKSUM_4 0xFFF83848
 #define BOOT_CODE_FILENAME_4 "dazzle.lda"
+#define BOOT_CODE_FILEPATH_4 "PDP11/dazzledart/dazzle.lda"
+#if defined(DONT_USE_INTERNAL_ROM)
+#define BOOT_CODE_ARRAY_4 NULL
+#else
 #define BOOT_CODE_ARRAY_4 dazzle_lda
 #endif
+#define BOOT_CODE_URL_4 NULL
+#endif
+#if !defined(DONT_USE_INTERNAL_ROM)
 unsigned char dazzle_lda[] = {
 0x01,0x00,0x0A,0x00,0x44,0x00,0x92,0x06,0xC0,0x00,0x59,0x01,0x00,0x08,0x00,0x80,
 0x01,0x80,0x01,0xF5,0x01,0x00,0x62,0x01,0x00,0x02,0x08,0x00,0x10,0x18,0x30,0x38,
@@ -411,4 +449,5 @@ unsigned char dazzle_lda[] = {
 0x49,0x00,0x5A,0x00,0x4A,0x00,0x59,0x00,0x49,0x00,0x59,0x00,0x4C,0x00,0x41,0x00,
 0x4A,0x00,0x41,0x00,0x49,0x00,0x41,0x00,0x49,0x00,0x43,0x44,0x60,0x88,0x60,0x02,
 0x62,0x0F,0xD0,0x0E,0xC8,0x40,0xC0,0x00,0xC1,0x26,0x01,0x00,0x06,0x00,0xAA,0x06,};
+#endif
 #endif /* ROM_dazzle_lda_H */

@@ -347,6 +347,7 @@ int32 relocW (int32 addr);
 void relocR_test (int32 va, int32 apridx);
 void relocW_test (int32 va, int32 apridx);
 int32 clean_MMR1 (int32 mmr1);
+int32 relocC (int32 va, int32 sw);
 t_bool PLF_test (int32 va, int32 apr);
 void reloc_abort (int32 err, int32 apridx);
 int32 ReadE (int32 addr);
@@ -645,6 +646,7 @@ MTAB cpu_mod[] = {
     { UNIT_MSIZE, 98304, NULL, "96K", &cpu_set_size, NULL, NULL, "Set memory size to 96Kb"},
     { UNIT_MSIZE, 131072, NULL, "128K", &cpu_set_size, NULL, NULL, "Set memory size to 128Kb"},
     { UNIT_MSIZE, 196608, NULL, "192K", &cpu_set_size, NULL, NULL, "Set memory size to 192Kb"},
+    { UNIT_MSIZE, 221184, NULL, "216K", &cpu_set_size, NULL, NULL, "Set memory size to 216Kb"},
     { UNIT_MSIZE, 262144, NULL, "256K", &cpu_set_size, NULL, NULL, "Set memory size to 256Kb"},
     { UNIT_MSIZE, 393216, NULL, "384K", &cpu_set_size, NULL, NULL, "Set memory size to 384Kb"},
     { UNIT_MSIZE, 524288, NULL, "512K", &cpu_set_size, NULL, NULL, "Set memory size to 512Kb"},
@@ -948,7 +950,7 @@ while (reason == 0)  {
     inst_psw = get_PSW ();
     saved_sim_interval = sim_interval;
     if (BPT_SUMM_PC) {                                  /* possible breakpoint */
-        t_addr pa = relocR (PC | isenable);             /* relocate PC */
+        t_addr pa = relocC (PC, 0);                     /* relocate PC */
         if (sim_brk_test (PC, BPT_PCVIR) ||             /* Normal PC breakpoint? */
             sim_brk_test (pa, BPT_PCPHY))               /* Physical Address breakpoint? */
             ABORT (ABRT_BKPT);                          /* stop simulation */

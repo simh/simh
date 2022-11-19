@@ -1,6 +1,6 @@
-/* 3b2_if.h: AT&T 3B2 Model Floppy Controller (TMS2797NL) Header
+/* 3b2_if.h: TMS2797 Integrated Floppy Controller
 
-   Copyright (c) 2017, Seth J. Morabito
+   Copyright (c) 2017-2022, Seth J. Morabito
 
    Permission is hereby granted, free of charge, to any person
    obtaining a copy of this software and associated documentation
@@ -44,7 +44,7 @@ typedef struct {
     uint8 read_addr_ptr;
     int8  step_dir;
     t_bool drq;
-#if defined(REV3)    
+#if defined(REV3)
     uint8 csr;
 #endif
 } IF_STATE;

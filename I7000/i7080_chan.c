@@ -64,7 +64,7 @@ extern uint16       selreg2;
 extern uint16       flags;
 extern uint32       MAC2;
 extern uint16       irqflags;
-extern uint8        ioflags[5000/8];
+extern uint8        ioflags[6200/8];
 
 #define UNIT_V_MOD      (UNIT_V_UF + 4)
 #define UNIT_V_HS       (UNIT_V_MOD + 1)

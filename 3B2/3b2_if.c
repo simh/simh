@@ -1,6 +1,6 @@
-/* 3b2_if.c: AT&T 3B2 Floppy Controller (TMS2797NL) Implementation
+/* 3b2_if.c: TMS2797 Integrated Floppy Controller
 
-   Copyright (c) 2017, Seth J. Morabito
+   Copyright (c) 2017-2022, Seth J. Morabito
 
    Permission is hereby granted, free of charge, to any person
    obtaining a copy of this software and associated documentation
@@ -51,12 +51,12 @@ static SIM_INLINE uint32 if_lba();
  *
  */
 
-#define IF_STEP_DELAY       3000     /* us */
-#define IF_R_DELAY          65000    /* us */
-#define IF_W_DELAY          70000    /* us */
-#define IF_VERIFY_DELAY     20000    /* us */
-#define IF_HLD_DELAY        60000    /* us */
-#define IF_HSW_DELAY        40000    /* us */
+#define IF_STEP_DELAY       300     /* us */
+#define IF_R_DELAY          6500    /* us */
+#define IF_W_DELAY          7000    /* us */
+#define IF_VERIFY_DELAY     2000    /* us */
+#define IF_HLD_DELAY        6000    /* us */
+#define IF_HSW_DELAY        4000    /* us */
 
 #if defined(REV3)
 #define SET_INT CPU_SET_INT(INT_FLOPPY)
@@ -97,9 +97,9 @@ uint32   if_sec_ptr = 0;
 
 /* Function implementation */
 
-static SIM_INLINE void if_activate(uint32 delay)
+static SIM_INLINE void if_activate(uint32 delay_us)
 {
-    sim_activate_abs(&if_unit, delay);
+    sim_activate_after(&if_unit, delay_us);
 }
 
 t_stat if_svc(UNIT *uptr)
@@ -618,6 +618,11 @@ t_stat if_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
     fprintf(st, "    ------   -----   -----------   -------------   -----------\n");
     fprintf(st, "    720 KB       2            80               9           512\n\n");
     fprintf(st, "Physical media is Double Sided/Quad Density, 96 tpi, 250kbps MFM encoding.\n");
+
+    fprint_set_help(st, dptr);
+    fprint_show_help(st, dptr);
+    fprint_reg_help(st, dptr);
+
     return SCPE_OK;
 }
 

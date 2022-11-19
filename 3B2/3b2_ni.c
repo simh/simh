@@ -1,6 +1,6 @@
-/* 3b2_ni.c: AT&T 3B2 Model 400 "NI" feature card
+/* 3b2_ni.c: CM195A Network Interface CIO Card
 
-   Copyright (c) 2018, Seth J. Morabito
+   Copyright (c) 2018-2022, Seth J. Morabito
 
    Permission is hereby granted, free of charge, to any person
    obtaining a copy of this software and associated documentation
@@ -97,26 +97,23 @@
 
 #include "3b2_io.h"
 #include "3b2_mem.h"
-#include "3b2_timer.h"
+#include "3b2_stddev.h"
 
 /* State container for the card */
 NI_STATE  ni;
+
+t_bool ni_conf = FALSE;
 
 /* Static Function Declarations */
 static void dump_packet(const char *direction, ETH_PACK *pkt);
 static void ni_enable();
 static void ni_disable();
-static void ni_cmd(uint8 cid, cio_entry *rentry, uint8 *rapp_data, t_bool is_exp);
-static t_stat ni_show_queue_common(FILE *st, UNIT *uptr, int32 val,
-                                   CONST void *desc, t_bool rq);
-static t_stat ni_show_rqueue(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
-static t_stat ni_show_cqueue(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+static void ni_cmd(uint8 slot, cio_entry *rentry, uint8 *rapp_data, t_bool is_exp);
 
 /*
- * When the NI card is pumped, its CRC depends on what slot it is
- * installed in and what version of driver has been installed.
+ * A list of pumped code CRCs that will cause Force Function Call to
+ * respond with "Test Passed". Must be null-terminated.
  */
-#define NI_DIAG_CRCS_LEN 7
 static const uint32 NI_DIAG_CRCS[] = {
     0x795268a4,
     0xfab1057c,
@@ -125,6 +122,23 @@ static const uint32 NI_DIAG_CRCS[] = {
     0x267b19a0,
     0x123f36c0,
     0xc04ca0ab,
+    0x96d0506e, /* Rev 3 NI, SVR 3.2.3 */
+    0x9d3fafde, /* Rev 3 NI, SVR 3.2.3 */
+    0,
+};
+
+/*
+ * A list of pumped code CRCs that will cause the sysgen routine to
+ * respond with a full completion request instead of an express
+ * completion request. Must be null-terminated.
+ */
+static const uint32 NI_PUMP_CRCS[] = {
+    0xfab1057c, /* Rev 2 NI, SVR 3.x */
+    0xf6744bed, /* Rev 2 NI, SVR 3.x */
+    0x96d0506e, /* Rev 3 NI, SVR 3.2.3 */
+    0x9d3fafde, /* Rev 3 NI, SVR 3.2.3 */
+    0x3553230a, /* Rev 3 NI, SVR 3.2.3 */
+    0,
 };
 
 /*
@@ -151,10 +165,6 @@ MTAB ni_mod[] = {
       &ni_set_stats, &ni_show_stats, NULL, "Display or reset statistics" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "POLL", NULL,
       NULL, &ni_show_poll, NULL, "Display the current polling mode" },
-    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "RQUEUE=n", NULL,
-      NULL, &ni_show_rqueue, NULL, "Display Request Queue for card n" },
-    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "CQUEUE=n", NULL,
-      NULL, &ni_show_cqueue, NULL, "Display Completion Queue for card n" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR|MTAB_NC, 0, "MAC", "MAC=xx:xx:xx:xx:xx:xx",
       &ni_setmac, &ni_showmac, NULL, "MAC address" },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "FILTERS", NULL,
@@ -291,10 +301,10 @@ static void ni_disable()
     sim_cancel(rq_unit);
     sim_cancel(cio_unit);
     sim_cancel(sanity_unit);
-    CIO_CLR_INT(ni.cid);
+    CIO_CLR_INT(ni.slot);
 }
 
-static void ni_cmd(uint8 cid, cio_entry *rentry, uint8 *rapp_data, t_bool is_exp)
+static void ni_cmd(uint8 slot, cio_entry *rentry, uint8 *rapp_data, t_bool is_exp)
 {
     int i, j;
     int32 delay;
@@ -310,14 +320,14 @@ static void ni_cmd(uint8 cid, cio_entry *rentry, uint8 *rapp_data, t_bool is_exp
     centry.subdevice = rentry->subdevice;
     centry.address = rentry->address;
 
-    cio[cid].op = rentry->opcode;
+    cio[slot].op = rentry->opcode;
 
     delay = NI_INT_DELAY;
 
     switch(rentry->opcode) {
     case CIO_DLM:
         for (i = 0; i < rentry->byte_count; i++) {
-            ni.crc = cio_crc32_shift(ni.crc, pread_b(rentry->address + i));
+            ni.crc = cio_crc32_shift(ni.crc, pread_b(rentry->address + i, BUS_PER));
         }
 
         centry.address = rentry->address + rentry->byte_count;
@@ -328,9 +338,9 @@ static void ni_cmd(uint8 cid, cio_entry *rentry, uint8 *rapp_data, t_bool is_exp
                   centry.address, centry.subdevice, ni.crc);
 
         if (is_exp) {
-            cio_cexpress(cid, NIQESIZE, &centry, app_data);
+            cio_cexpress(slot, NIQESIZE, &centry, app_data);
         } else {
-            cio_cqueue(cid, CIO_STAT, NIQESIZE, &centry, app_data);
+            cio_cqueue(slot, CIO_STAT, NIQESIZE, &centry, app_data);
         }
 
         break;
@@ -342,13 +352,13 @@ static void ni_cmd(uint8 cid, cio_entry *rentry, uint8 *rapp_data, t_bool is_exp
         /* If the currently running program is a diagnostics program,
          * we are expected to write results into memory at address
          * 0x200f000 */
-        for (i = 0; i < NI_DIAG_CRCS_LEN; i++) {
+        for (i = 0; NI_DIAG_CRCS[i] != 0; i++) {
             if (ni.crc == NI_DIAG_CRCS[i]) {
-                pwrite_h(0x200f000, 0x1);   /* Test success */
-                pwrite_h(0x200f002, 0x0);   /* Test Number */
-                pwrite_h(0x200f004, 0x0);   /* Actual */
-                pwrite_h(0x200f006, 0x0);   /* Expected */
-                pwrite_b(0x200f008, 0x1);   /* Success flag again */
+                pwrite_h(0x200f000, 0x1, BUS_PER);   /* Test success */
+                pwrite_h(0x200f002, 0x0, BUS_PER);   /* Test Number */
+                pwrite_h(0x200f004, 0x0, BUS_PER);   /* Actual */
+                pwrite_h(0x200f006, 0x0, BUS_PER);   /* Expected */
+                pwrite_b(0x200f008, 0x1, BUS_PER);   /* Success flag again */
                 break;
             }
         }
@@ -362,12 +372,12 @@ static void ni_cmd(uint8 cid, cio_entry *rentry, uint8 *rapp_data, t_bool is_exp
          * in the right state. */
 
         ni_disable();
-        cio[cid].sysgen_s = 0;
+        cio[slot].sysgen_s = 0;
 
-        if (cio[cid].ivec == 0 || cio[cid].ivec == 3) {
-            cio_cexpress(cid, NIQESIZE, &centry, app_data);
+        if (cio[slot].ivec == 0 || cio[slot].ivec == 3) {
+            cio_cexpress(slot, NIQESIZE, &centry, app_data);
         } else {
-            cio_cqueue(cid, CIO_STAT, NIQESIZE, &centry, app_data);
+            cio_cqueue(slot, CIO_STAT, NIQESIZE, &centry, app_data);
         }
 
         break;
@@ -378,12 +388,12 @@ static void ni_cmd(uint8 cid, cio_entry *rentry, uint8 *rapp_data, t_bool is_exp
 
         /* The system wants us to write sub-device structures at the
          * supplied address */
-        pwrite_h(rentry->address, 0x0);
+        pwrite_h(rentry->address, 0x0, BUS_PER);
 
         if (is_exp) {
-            cio_cexpress(cid, NIQESIZE, &centry, app_data);
+            cio_cexpress(slot, NIQESIZE, &centry, app_data);
         } else {
-            cio_cqueue(cid, CIO_STAT, NIQESIZE, &centry, app_data);
+            cio_cqueue(slot, CIO_STAT, NIQESIZE, &centry, app_data);
         }
 
         break;
@@ -393,7 +403,7 @@ static void ni_cmd(uint8 cid, cio_entry *rentry, uint8 *rapp_data, t_bool is_exp
 
         /* Try to read the mac from memory */
         for (i = 0; i < MAC_SIZE_BYTES; i++) {
-            ni.mac_bytes[i] = pread_b(rentry->address + i);
+            ni.mac_bytes[i] = pread_b(rentry->address + i, BUS_PER);
         }
 
         snprintf(ni.mac_str, MAC_SIZE_CHARS, "%02x:%02x:%02x:%02x:%02x:%02x",
@@ -406,7 +416,7 @@ static void ni_cmd(uint8 cid, cio_entry *rentry, uint8 *rapp_data, t_bool is_exp
 
         status = ni_setmac(ni_dev.units, 0, ni.mac_str, NULL);
 
-        cio_cqueue(cid, CIO_STAT, NIQESIZE, &centry, app_data);
+        cio_cqueue(slot, CIO_STAT, NIQESIZE, &centry, app_data);
 
         break;
     case NI_TURNOFF:
@@ -415,7 +425,7 @@ static void ni_cmd(uint8 cid, cio_entry *rentry, uint8 *rapp_data, t_bool is_exp
 
         ni_disable();
 
-        cio_cqueue(cid, CIO_STAT, NIQESIZE, &centry, app_data);
+        cio_cqueue(slot, CIO_STAT, NIQESIZE, &centry, app_data);
 
         break;
     case NI_TURNON:
@@ -424,14 +434,14 @@ static void ni_cmd(uint8 cid, cio_entry *rentry, uint8 *rapp_data, t_bool is_exp
 
         ni_enable();
 
-        cio_cqueue(cid, CIO_STAT, NIQESIZE, &centry, app_data);
+        cio_cqueue(slot, CIO_STAT, NIQESIZE, &centry, app_data);
 
         break;
     case NI_STATS:
         sim_debug(DBG_TRACE, &ni_dev,
                   "[ni_cmd] NI STATS Operation\n");
 
-        cio_cqueue(cid, CIO_STAT, NIQESIZE, &centry, app_data);
+        cio_cqueue(slot, CIO_STAT, NIQESIZE, &centry, app_data);
 
         break;
     case NI_SEND:
@@ -471,25 +481,25 @@ static void ni_cmd(uint8 cid, cio_entry *rentry, uint8 *rapp_data, t_bool is_exp
         ni.wr_buf.oversize = NULL;
 
         /* Read the size of the header */
-        hdrsize = pread_h(rentry->address + EIG_TABLE_SIZE);
+        hdrsize = pread_h(rentry->address + EIG_TABLE_SIZE, BUS_PER);
 
         /* Read out the packet frame */
         for (i = 0; i < rentry->byte_count; i++) {
-            ni.wr_buf.msg[i] = pread_b(rentry->address + PKT_START_OFFSET + i);
+            ni.wr_buf.msg[i] = pread_b(rentry->address + PKT_START_OFFSET + i, BUS_PER);
         }
 
         /* Get a pointer to the buffer containing the protocol data */
         prot_info_offset = 0;
         i = 0;
         do {
-            ni.prot.addr = pread_w(rentry->address + prot_info_offset);
-            ni.prot.size = pread_h(rentry->address + prot_info_offset + 4);
-            ni.prot.last = pread_h(rentry->address + prot_info_offset + 6);
+            ni.prot.addr = pread_w(rentry->address + prot_info_offset, BUS_PER);
+            ni.prot.size = pread_h(rentry->address + prot_info_offset + 4, BUS_PER);
+            ni.prot.last = pread_h(rentry->address + prot_info_offset + 6, BUS_PER);
             prot_info_offset += 8;
 
             /* Fill in the frame from this buffer */
             for (j=0; j < ni.prot.size; i++, j++) {
-                ni.wr_buf.msg[hdrsize + i] = pread_b(ni.prot.addr + j);
+                ni.wr_buf.msg[hdrsize + i] = pread_b(ni.prot.addr + j, BUS_PER);
             }
         } while (!ni.prot.last);
 
@@ -521,7 +531,7 @@ static void ni_cmd(uint8 cid, cio_entry *rentry, uint8 *rapp_data, t_bool is_exp
             centry.byte_count <<= 8;
         }
 
-        cio_cqueue(cid, CIO_STAT, NIQESIZE, &centry, app_data);
+        cio_cqueue(slot, CIO_STAT, NIQESIZE, &centry, app_data);
 
         delay = 0;
 
@@ -531,7 +541,7 @@ static void ni_cmd(uint8 cid, cio_entry *rentry, uint8 *rapp_data, t_bool is_exp
                   "[ni_cmd] Opcode %d Not Handled Yet\n",
                   rentry->opcode);
 
-        cio_cqueue(cid, CIO_STAT, NIQESIZE, &centry, app_data);
+        cio_cqueue(slot, CIO_STAT, NIQESIZE, &centry, app_data);
 
         break;
     }
@@ -595,8 +605,10 @@ t_stat ni_show_filters(FILE* st, UNIT* uptr, int32 val, CONST void* desc)
     return SCPE_OK;
 }
 
-void ni_sysgen(uint8 cid)
+void ni_sysgen(uint8 slot)
 {
+    int i;
+    t_bool pumped = FALSE;
     cio_entry cqe = {0};
     uint8 app_data[4] = {0};
 
@@ -607,16 +619,21 @@ void ni_sysgen(uint8 cid)
 
     sim_debug(DBG_TRACE, &ni_dev,
               "[ni_sysgen]   CIO SYSGEN. rqp=%08x, cqp=%08x, nrq=%d, rqs=%d cqs=%d\n",
-              cio[cid].rqp, cio[cid].cqp, cio[cid].no_rque, cio[cid].rqs, cio[cid].cqs);
+              cio[slot].rqp, cio[slot].cqp, cio[slot].no_rque, cio[slot].rqs, cio[slot].cqs);
 
     /* If the card has been successfully pumped, then we respond with
      * a full completion queue entry.  Otherwise, an express entry is
      * used. */
-    if (ni.crc == NI_PUMP_CRC1 ||
-        ni.crc == NI_PUMP_CRC2) {
-        cio_cqueue(cid, CIO_STAT, NIQESIZE, &cqe, app_data);
-    } else {
-        cio_cexpress(cid, NIQESIZE, &cqe, app_data);
+    for (i = 0; NI_PUMP_CRCS[i] != 0; i++) {
+        if (NI_PUMP_CRCS[i] == ni.crc) {
+            cio_cqueue(slot, CIO_STAT, NIQESIZE, &cqe, app_data);
+            pumped = TRUE;
+            break;
+        }
+    }
+
+    if (!pumped) {
+        cio_cexpress(slot, NIQESIZE, &cqe, app_data);
     }
 
     /* Now clear out the old CRC value, in case the card needs to be
@@ -629,7 +646,7 @@ void ni_sysgen(uint8 cid)
 /*
  * Handler for CIO INT0 (express job) requests.
  */
-void ni_express(uint8 cid)
+void ni_express(uint8 slot)
 {
     cio_entry rqe = {0};
     uint8 app_data[4] = {0};
@@ -637,14 +654,14 @@ void ni_express(uint8 cid)
     sim_debug(DBG_TRACE, &ni_dev,
               "[ni_express] Handling express CIO request.\n");
 
-    cio_rexpress(cid, NIQESIZE, &rqe, app_data);
-    ni_cmd(cid, &rqe, app_data, TRUE);
+    cio_rexpress(slot, NIQESIZE, &rqe, app_data);
+    ni_cmd(slot, &rqe, app_data, TRUE);
 }
 
 /*
  * Handler for CIO INT1 (full job) requests.
  */
-void ni_full(uint8 cid)
+void ni_full(uint8 slot)
 {
     cio_entry rqe = {0};
     uint8 app_data[4] = {0};
@@ -652,88 +669,48 @@ void ni_full(uint8 cid)
     sim_debug(DBG_TRACE, &ni_dev,
               "[ni_full] INT1 received. Handling full CIO request.\n");
 
-    while (cio_cqueue_avail(cid, NIQESIZE) &&
-           cio_rqueue(cid, GE_QUEUE, NIQESIZE, &rqe, app_data) == SCPE_OK) {
-        ni_cmd(cid, &rqe, app_data, FALSE);
+    while (cio_cqueue_avail(slot, NIQESIZE) &&
+           cio_rqueue(slot, GE_QUEUE, NIQESIZE, &rqe, app_data) == SCPE_OK) {
+        ni_cmd(slot, &rqe, app_data, FALSE);
     }
 }
 
 /*
  * Handler for CIO RESET requests.
  */
-void ni_cio_reset(uint8 cid)
+void ni_cio_reset(uint8 slot)
 {
-    UNUSED(cid);
+    UNUSED(slot);
 
     ni_disable();
 }
 
-t_stat ni_autoconfig()
-{
-    uint8 cid;
-
-    /* Clear the CIO table of NI cards */
-    for (cid = 0; cid < CIO_SLOTS; cid++) {
-        if (cio[cid].id == NI_ID) {
-            cio[cid].id = 0;
-            cio[cid].ipl = 0;
-            cio[cid].ivec = 0;
-            cio[cid].exp_handler = NULL;
-            cio[cid].full_handler = NULL;
-            cio[cid].reset_handler = NULL;
-            cio[cid].sysgen = NULL;
-        }
-    }
-
-    /* Find the first avaialable slot */
-    for (cid = 0; cid < CIO_SLOTS; cid++) {
-        if (cio[cid].id == 0) {
-            break;
-        }
-    }
-
-    /* Do we have room? */
-    if (cid >= CIO_SLOTS) {
-        return SCPE_NXM;
-    }
-
-    /* Remember the card slot */
-    ni.cid = cid;
-
-    /* Set up the ni structure */
-    cio[cid].id = NI_ID;
-    cio[cid].ipl = NI_IPL;
-    cio[cid].exp_handler = &ni_express;
-    cio[cid].full_handler = &ni_full;
-    cio[cid].reset_handler = &ni_cio_reset;
-    cio[cid].sysgen = &ni_sysgen;
-
-    return SCPE_OK;
-}
-
 t_stat ni_reset(DEVICE *dptr)
 {
-    t_stat status;
+    t_stat r;
+    uint8 slot;
     char uname[16];
 
-    sim_debug(DBG_TRACE, &ni_dev,
-              "[ni_reset] Resetting NI device\n");
-
-    /* Initial setup that should only ever be done once. */
-    if (!(dptr->flags & DEV_DIS) && !ni.initialized) {
-        /* Autoconfiguration will select the correct backplane slot
-         * for the device, and enable CIO routines. This should only
-         * be done once. */
-        status = ni_autoconfig();
-        if (status != SCPE_OK) {
-            return status;
-        }
-
-        /* Set an initial MAC address in the AT&T NI range */
-        ni_setmac(ni_dev.units, 0, "80:00:10:03:00:00/32", NULL);
-
-        ni.initialized = TRUE;
+    if (dptr->flags & DEV_DIS) {
+        cio_remove_all(NI_ID);
+        ni_conf = FALSE;
+        return SCPE_OK;
     }
+
+    if (!ni_conf) {
+        r = cio_install(NI_ID, "NI", NI_IPL,
+                        &ni_express, &ni_full, &ni_sysgen, &ni_cio_reset,
+                        &slot);
+        if (r != SCPE_OK) {
+            return r;
+        }
+        /* Remember the card slot */
+        ni.slot = slot;
+        ni_conf = TRUE;
+    }
+
+    /* Set an initial MAC address in the AT&T NI range */
+    ni_setmac(ni_dev.units, 0, "80:00:10:03:00:00/32", NULL);
 
     /* Set up unit names */
     snprintf(uname, 16, "%s-RCV", dptr->name);
@@ -755,9 +732,6 @@ t_stat ni_reset(DEVICE *dptr)
     /* Make sure the transceiver is disabled and all
      * polling activity and interrupts are disabled. */
     ni_disable();
-
-    /* We make no attempt to autoconfig until the device
-     * is attached. */
 
     return SCPE_OK;
 }
@@ -798,16 +772,16 @@ t_stat ni_rq_svc(UNIT *uptr)
     UNUSED(uptr);
 
     rq_taken = FALSE;
-    no_rque = cio[ni.cid].no_rque - 1;
+    no_rque = cio[ni.slot].no_rque - 1;
 
     for (i = 0; i < no_rque; i++) {
-        while (NI_CACHE_HAS_SPACE(i) && cio_rqueue(ni.cid, i+1, NIQESIZE, &rqe, slot) == SCPE_OK) {
+        while (NI_CACHE_HAS_SPACE(i) && cio_rqueue(ni.slot, i+1, NIQESIZE, &rqe, slot) == SCPE_OK) {
             sim_debug(DBG_CACHE, &ni_dev,
                       "[cache -  FILL] %s packet entry. lp=%02x ulp=%02x "
                       "slot=%d addr=0x%08x\n",
                       i == 0 ? "Small" : "Large",
-                      cio_r_lp(ni.cid, i+1, NIQESIZE),
-                      cio_r_ulp(ni.cid, i+1, NIQESIZE),
+                      cio_r_lp(ni.slot, i+1, NIQESIZE),
+                      cio_r_ulp(ni.slot, i+1, NIQESIZE),
                       slot[3], rqe.address);
             wp = ni.job_cache[i].wp;
             ni.job_cache[i].req[wp].addr = rqe.address;
@@ -835,11 +809,7 @@ t_stat ni_rq_svc(UNIT *uptr)
     if (ni.poll_rate == NI_QPOLL_FAST) {
         sim_activate_abs(rq_unit, NI_QPOLL_FAST);
     } else {
-        if (sim_idle_enab) {
-            sim_clock_coschedule(rq_unit, tmxr_poll);
-        } else {
-            sim_activate_abs(rq_unit, NI_QPOLL_SLOW);
-        }
+        sim_clock_coschedule(rq_unit, 1000);
     }
 
     return SCPE_OK;
@@ -867,11 +837,9 @@ t_stat ni_sanity_svc(UNIT *uptr)
               "[ni_sanity_svc] Firing sanity timer.\n");
 
     cqe.opcode = NI_SANITY;
-    cio_cqueue(ni.cid, CIO_STAT, NIQESIZE, &cqe, app_data);
+    cio_cqueue(ni.slot, CIO_STAT, NIQESIZE, &cqe, app_data);
 
-    if (cio[ni.cid].ivec > 0) {
-        CIO_SET_INT(ni.cid);
-    }
+    CIO_SET_INT(ni.slot);
 
     sim_activate_after(sanity_unit, NI_SANITY_INTERVAL_US);
 
@@ -882,11 +850,9 @@ t_stat ni_cio_svc(UNIT *uptr)
 {
     UNUSED(uptr);
 
-    if (cio[ni.cid].ivec > 0) {
-        sim_debug(DBG_TRACE, &ni_dev,
-                  "[ni_cio_svc] Handling a CIO service (Setting Interrupt) for board %d\n", ni.cid);
-        CIO_SET_INT(ni.cid);
-    }
+    sim_debug(DBG_TRACE, &ni_dev,
+              "[ni_cio_svc] Handling a CIO service (Setting Interrupt) for board %d\n", ni.slot);
+    CIO_SET_INT(ni.slot);
 
     return SCPE_OK;
 }
@@ -924,13 +890,13 @@ void ni_process_packet()
               "[cache - DRAIN] %s packet entry. lp=%02x ulp=%02x "
               "slot=%d addr=0x%08x\n",
               que_num == 0 ? "Small" : "Large",
-              cio_r_lp(ni.cid, que_num+1, NIQESIZE),
-              cio_r_ulp(ni.cid, que_num+1, NIQESIZE),
+              cio_r_lp(ni.slot, que_num+1, NIQESIZE),
+              cio_r_ulp(ni.slot, que_num+1, NIQESIZE),
               slot, addr);
 
     /* Store the packet into main memory */
     for (i = 0; i < len; i++) {
-        pwrite_b(addr + i, rbuf[i]);
+        pwrite_b(addr + i, rbuf[i], BUS_PER);
     }
 
     if (ni_dev.dctrl & DBG_DAT) {
@@ -948,12 +914,10 @@ void ni_process_packet()
     capp_data[3] = slot;
 
     /* TODO: We should probably also check status here. */
-    cio_cqueue(ni.cid, CIO_STAT, NIQESIZE, &centry, capp_data);
+    cio_cqueue(ni.slot, CIO_STAT, NIQESIZE, &centry, capp_data);
 
     /* Trigger an interrupt */
-    if (cio[ni.cid].ivec > 0) {
-        CIO_SET_INT(ni.cid);
-    }
+    CIO_SET_INT(ni.slot);
 }
 
 t_stat ni_attach(UNIT *uptr, CONST char *cptr)
@@ -1154,138 +1118,4 @@ const char *ni_description(DEVICE *dptr)
     UNUSED(dptr);
 
     return "NI 10BASE5 Ethernet controller";
-}
-
-/*
- * Useful routines for debugging request and completion queues
- */
-
-static t_stat ni_show_rqueue(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
-{
-    return ni_show_queue_common(st, uptr, val, desc, TRUE);
-}
-
-static t_stat ni_show_cqueue(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
-{
-    return ni_show_queue_common(st, uptr, val, desc, FALSE);
-}
-
-static t_stat ni_show_queue_common(FILE *st, UNIT *uptr, int32 val,
-                                   CONST void *desc, t_bool rq)
-{
-    uint8 cid;
-    char *cptr = (char *) desc;
-    t_stat result;
-    uint32 ptr, size, no_rque, i, j;
-    uint16 lp, ulp;
-    uint8  op, dev, seq, cmdstat;
-
-    UNUSED(uptr);
-    UNUSED(val);
-
-    if (cptr) {
-        cid = (uint8) get_uint(cptr, 10, 12, &result);
-        if (result != SCPE_OK) {
-            return SCPE_ARG;
-        }
-    } else {
-        return SCPE_ARG;
-    }
-
-    /* If the card is not sysgen'ed, give up */
-    if (cio[cid].sysgen_s != CIO_SYSGEN) {
-        fprintf(st, "No card in slot %d, or card has not completed sysgen\n", cid);
-        return SCPE_ARG;
-    }
-
-    fprintf(st, "---------------------------------------------------------\n");
-    fprintf(st, "Sysgen Block:\n");
-    fprintf(st, "---------------------------------------------------------\n");
-    fprintf(st, "    Request Queue Pointer: 0x%08x\n", cio[cid].rqp);
-    fprintf(st, " Completion Queue Pointer: 0x%08x\n", cio[cid].cqp);
-    fprintf(st, "       Request Queue Size: 0x%02x\n", cio[cid].rqs);
-    fprintf(st, "    Completion Queue Size: 0x%02x\n", cio[cid].cqs);
-    fprintf(st, "         Interrupt Vector: %d (0x%02x)\n", cio[cid].ivec, cio[cid].ivec);
-    fprintf(st, " Number of Request Queues: %d\n", cio[cid].no_rque);
-    fprintf(st, "---------------------------------------------------------\n");
-
-    /* Get the top of the queue */
-    if (rq) {
-        ptr = cio[cid].rqp;
-        size = cio[cid].rqs;
-        no_rque = cio[cid].no_rque;
-    } else {
-        ptr = cio[cid].cqp;
-        size = cio[cid].cqs;
-        no_rque = 0; /* Not used */
-    }
-
-    if (rq) {
-        fprintf(st, "Dumping %d Request Queues\n", no_rque);
-    } else {
-        fprintf(st, "Dumping Completion Queue\n");
-    }
-
-    fprintf(st, "---------------------------------------------------------\n");
-    fprintf(st, "EXPRESS ENTRY:\n");
-    fprintf(st, "    Byte Count: %d\n",     pread_h(ptr));
-    fprintf(st, "    Subdevice:  %d\n",     pread_b(ptr + 2));
-    fprintf(st, "    Opcode:     0x%02x\n", pread_b(ptr + 3));
-    fprintf(st, "    Addr/Data:  0x%08x\n", pread_w(ptr + 4));
-    fprintf(st, "    App Data:   0x%08x\n", pread_w(ptr + 8));
-    ptr += 12;
-
-    if (rq) {
-        for (i = 0; i < no_rque; i++) {
-            lp = pread_h(ptr);
-            ulp = pread_h(ptr + 2);
-            ptr += 4;
-            fprintf(st, "---------------------------------------------------------\n");
-            fprintf(st, "REQUEST QUEUE %d\n", i);
-            fprintf(st, "---------------------------------------------------------\n");
-            fprintf(st, "Load Pointer:   0x%04x (%d)\n", lp, (lp / NIQESIZE) + 1);
-            fprintf(st, "Unload Pointer: 0x%04x (%d)\n", ulp, (ulp / NIQESIZE) + 1);
-            fprintf(st, "---------------------------------------------------------\n");
-            for (j = 0; j < size; j++) {
-                dev = pread_b(ptr + 2);
-                op = pread_b(ptr + 3);
-                seq = (dev & 0x40) >> 6;
-                cmdstat = (dev & 0x80) >> 7;
-                fprintf(st, "REQUEST ENTRY %d (@ 0x%08x)\n", j + 1, ptr);
-                fprintf(st, "    Byte Count: 0x%04x\n",      pread_h(ptr));
-                fprintf(st, "    Subdevice:  %d\n",          dev & 0x3f);
-                fprintf(st, "    Cmd/Stat:   %d\n",          cmdstat);
-                fprintf(st, "    Seqbit:     %d\n",          seq);
-                fprintf(st, "    Opcode:     0x%02x (%d)\n", op, op);
-                fprintf(st, "    Addr/Data:  0x%08x\n",      pread_w(ptr + 4));
-                fprintf(st, "    App Data:   0x%08x\n",      pread_w(ptr + 8));
-                ptr += 12;
-            }
-        }
-    } else {
-        lp = pread_h(ptr);
-        ulp = pread_h(ptr + 2);
-        ptr += 4;
-        fprintf(st, "---------------------------------------------------------\n");
-        fprintf(st, "Load Pointer:   0x%04x (%d)\n", lp, (lp / NIQESIZE) + 1);
-        fprintf(st, "Unload Pointer: 0x%04x (%d)\n", ulp, (ulp / NIQESIZE) + 1);
-        fprintf(st, "---------------------------------------------------------\n");
-        for (i = 0; i < size; i++) {
-            dev = pread_b(ptr + 2);
-            op = pread_b(ptr + 3);
-            seq = (dev & 0x40) >> 6;
-            cmdstat = (dev & 0x80) >> 7;
-            fprintf(st, "COMPLETION ENTRY %d (@ 0x%08x)\n", i + 1, ptr);
-            fprintf(st, "    Byte Count: 0x%04x\n",      pread_h(ptr));
-            fprintf(st, "    Subdevice:  %d\n",          dev & 0x3f);
-            fprintf(st, "    Cmd/Stat:   %d\n",          cmdstat);
-            fprintf(st, "    Seqbit:     %d\n",          seq);
-            fprintf(st, "    Opcode:     0x%02x (%d)\n", op, op);
-            fprintf(st, "    Addr/Data:  0x%08x\n",      pread_w(ptr + 4));
-            fprintf(st, "    App Data:   0x%08x\n",      pread_w(ptr + 8));
-            ptr += 12;
-        }
-    }
-
-    return SCPE_OK;
 }

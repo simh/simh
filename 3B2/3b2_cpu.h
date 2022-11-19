@@ -1,6 +1,6 @@
-/* 3b2_cpu.h: AT&T 3B2 CPU (WE32100 and WE32200) Header
+/* 3b2_cpu.h: WE32100 and WE32200 CPU
 
-   Copyright (c) 2017, Seth J. Morabito
+   Copyright (c) 2017-2022, Seth J. Morabito
 
    Permission is hereby granted, free of charge, to any person
    obtaining a copy of this software and associated documentation
@@ -127,6 +127,29 @@
 #define PSW_CFD_MASK          (1u << PSW_CFD)
 #define PSW_CUR_IPL           (((R[NUM_PSW] & PSW_IPL_MASK) >> PSW_IPL) & 0xf)
 
+#if defined(REV3)
+#define PSW_X                 26
+#define PSW_AR                27
+#define PSW_EXUC              28
+#define PSW_EA                29
+
+#define PSW_X_MASK            (1u << PSW_X)
+#define PSW_AR_MASK           (1u << PSW_AR)
+#define PSW_EXUC_MASK         (1u << PSW_EXUC)
+#define PSW_EA_MASK           (1u << PSW_EA)
+#endif
+
+#if defined(REV3)
+#define QIE_PSW_MASK          (PSW_EA_MASK|PSW_EXUC_MASK|PSW_X_MASK|    \
+                               PSW_CFD_MASK|PSW_QIE_MASK|PSW_CD_MASK|PSW_OE_MASK| \
+                               PSW_N_MASK|PSW_Z_MASK|PSW_V_MASK|PSW_C_MASK| \
+                               PSW_TE_MASK|PSW_IPL_MASK|PSW_PM_MASK|PSW_I_MASK)
+#else
+#define QIE_PSW_MASK          (PSW_CFD_MASK|PSW_QIE_MASK|PSW_CD_MASK|PSW_OE_MASK| \
+                               PSW_N_MASK|PSW_Z_MASK|PSW_V_MASK|PSW_C_MASK| \
+                               PSW_TE_MASK|PSW_IPL_MASK|PSW_PM_MASK|PSW_I_MASK)
+#endif
+
 /* A helper to set the PSW, preserving read-only fields */
 #define PSW_RO_MASK           0x17f   /* ET, TM, ISC, and R are read-only! */
 #define WRITE_PSW(V)          (R[NUM_PSW] = ((R[NUM_PSW] & PSW_RO_MASK) | ((V) & ~PSW_RO_MASK)))
@@ -225,7 +248,6 @@
  * Opcodes
  */
 typedef enum {
-    HALT    = 0x00, /* Undocumented instruction */
     SPOPRD  = 0x02,
     SPOPD2  = 0x03,
     MOVAW   = 0x04,
@@ -254,7 +276,7 @@ typedef enum {
     SWAPWI  = 0x1C,
 #if defined(REV3)
     TGEDTH  = 0x1D,
-#endif    
+#endif
     SWAPHI  = 0x1E,
     SWAPBI  = 0x1F,
     POPW    = 0x20,
@@ -310,7 +332,7 @@ typedef enum {
     RGTRU   = 0x54,
     BGUH    = 0x56,
     BGUB    = 0x57,
-    BLSSU   = 0x58,
+    RLSSU   = 0x58,
     BLUH    = 0x5A,
     BLUB    = 0x5B,
     RLEQU   = 0x5C,
@@ -455,6 +477,9 @@ typedef enum {
     RETG    = 0x3045,
     GATE    = 0x3061,
     CALLPS  = 0x30ac,
+#if defined(REV3)
+    UCALLPS = 0x30c0,
+#endif
     RETPS   = 0x30c8
 } opcode;
 
@@ -498,6 +523,8 @@ typedef enum {
 typedef enum {
     OP_NONE, /* NULL type */
     OP_DESC, /* Descriptor byte */
+    OP_DESB, /* Descriptor with byte displacement (WE32200 only) */
+    OP_DESH, /* Descriptor with halfword displacement (WE32200 only) */
     OP_BYTE, /* 8-bit signed value */
     OP_HALF, /* 16-bit signed value */
     OP_COPR  /* Coprocessor instruction */
@@ -536,6 +563,9 @@ typedef struct {
 typedef struct {
     uint8   mode;        /* Embedded data addressing mode */
     uint8   reg;         /* Operand register (0-15) */
+#if defined(REV3)
+    uint8   reg2;        /* Operand register 2 (16-31) */
+#endif
     int8    dtype;       /* Default type for the operand */
     int8    etype;       /* Expanded type (-1 if none) */
     union {
@@ -561,18 +591,6 @@ typedef struct {
     t_bool valid;
     operand operands[4];
 } instr;
-
-/*
- * A mapping of CIO identifier word to CIO device name.
- *
- * Each CIO expansion card in a 3B2 system identifies itself with a
- * well-knon 16-bit value, used by drivers to identify the type of
- * card installed in each slot.
- */
-typedef struct {
-    uint16 id;
-    const char name[8];
-} cio_device;
 
 /* Function prototypes */
 t_stat sys_boot(int32 flag, CONST char *ptr);
@@ -650,13 +668,13 @@ void cpu_abort(uint8 et, uint8 isc);
 #define CPU_SET_INT(flags) (sbd_int_req |= flags)
 #define CPU_CLR_INT(flags) (sbd_int_req &= ~(flags))
 
+extern t_bool rom_loaded;
 extern volatile int32 stop_reason;
 extern uint16 sbd_int_req;
-extern uint32 rom_size;
 extern instr *cpu_instr;
 extern t_bool cpu_nmi;
-extern uint32 *ROM;
-extern uint32 *RAM;
+extern uint8 *ROM;
+extern uint8 *RAM;
 extern uint32 R[NUM_REGISTERS];
 extern REG cpu_reg[];
 extern UNIT cpu_unit;

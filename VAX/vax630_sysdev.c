@@ -35,19 +35,11 @@
 
 #include "vax_defs.h"
 
-#ifdef DONT_USE_INTERNAL_ROM
-#if defined(VAX_620)
-#define BOOT_CODE_FILENAME "ka620.bin"
-#else
-#define BOOT_CODE_FILENAME "ka320.bin"
-#endif
-#else /* !DONT_USE_INTERNAL_ROM */
 #if defined(VAX_620)
 #include "vax_ka620_bin.h" /* Defines BOOT_CODE_FILENAME and BOOT_CODE_ARRAY, etc */
 #else
 #include "vax_ka630_bin.h" /* Defines BOOT_CODE_FILENAME and BOOT_CODE_ARRAY, etc */
 #endif
-#endif /* DONT_USE_INTERNAL_ROM */
 
 
 #define UNIT_V_NODELAY  (UNIT_V_UF + 0)                 /* ROM access equal to RAM access */
@@ -930,7 +922,7 @@ conpsl = PSL_IS | PSL_IPL1F | CON_PWRUP;
 if (rom == NULL)
     return SCPE_IERR;
 if (*rom == 0) {                                        /* no boot? */
-    r = cpu_load_bootcode (BOOT_CODE_FILENAME, BOOT_CODE_ARRAY, BOOT_CODE_SIZE, TRUE, 0);
+    r = cpu_load_bootcode (BOOT_CODE_FILENAME, BOOT_CODE_ARRAY, BOOT_CODE_SIZE, TRUE, 0, BOOT_CODE_FILEPATH, BOOT_CODE_CHECKSUM);
     if (r != SCPE_OK)
         return r;
     }

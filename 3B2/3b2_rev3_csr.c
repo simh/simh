@@ -1,6 +1,6 @@
-/* 3b2_rev3_csr.c: AT&T 3B2/600G Control and Status Register
+/* 3b2_rev3_csr.c: CM518B System Board Control, Status & Error Register
 
-   Copyright (c) 2020, Seth J. Morabito
+   Copyright (c) 2020-2022, Seth J. Morabito
 
    Permission is hereby granted, free of charge, to any person
    obtaining a copy of this software and associated documentation
@@ -32,8 +32,9 @@
 #include "3b2_csr.h"
 #include "3b2_if.h"
 #include "3b2_timer.h"
+#include "3b2_sys.h"
 
-uint32 csr_data;
+CSR_DATA csr_data;
 
 BITFIELD csr_bits[] = {
     BIT(UTIM),
@@ -104,8 +105,14 @@ t_stat csr_dep(t_value val, t_addr exta, UNIT *uptr, int32 sw)
 
 t_stat csr_reset(DEVICE *dptr)
 {
-    /* Accordig to the technical reference manual, the CSR is NOT
-       cleared on reset */
+    CSRBIT(CSRFECC, TRUE);
+    CSRBIT(CSRTHERM, FALSE);
+    CSRBIT(CSRITIM, TRUE);
+    CSRBIT(CSRISTIM, TRUE);
+    CSRBIT(CSRIBUB, TRUE);
+    CSRBIT(CSRPWRSPDN, FALSE);
+    CSRBIT(CSRFLPMO, TRUE);
+
     return SCPE_OK;
 }
 
@@ -124,8 +131,8 @@ uint32 csr_read(uint32 pa, size_t size)
         return (csr_data >> 24) & 0xff;
     default:
         sim_debug(WRITE_MSG, &csr_dev,
-                  "[%08x] CSR READ. Warning, unexpected register = %02x)\n",
-                  R[NUM_PC], reg);
+                  "CSR READ. Warning, unexpected register = %02x)\n",
+                  reg);
         return 0;
     }
 }
@@ -174,36 +181,15 @@ void csr_write(uint32 pa, uint32 val, size_t size)
         break;
     case 0x1c:
         CSRBIT(CSRITIM, val);
-        sim_debug(WRITE_MSG, &csr_dev,
-                  "[%08x] CSR WRITE. Inhibit Interval Timer = %d\n",
-                  R[NUM_PC], val);
-        if (csr_data & CSRITIM) {
-            timer_disable(TIMER_INTERVAL);
-        } else {
-            timer_enable(TIMER_INTERVAL);
-        }
+        timer_gate(TIMER_INTERVAL, CSR(CSRITIM));
         break;
     case 0x20:
         CSRBIT(CSRISTIM, val);
-        sim_debug(WRITE_MSG, &csr_dev,
-                  "[%08x] CSR WRITE. Inhibit Sanity Timer = %d\n",
-                  R[NUM_PC], val);
-        if (csr_data & CSRISTIM) {
-            timer_disable(TIMER_SANITY);
-        } else {
-            timer_enable(TIMER_SANITY);
-        }
+        timer_gate(TIMER_SANITY, CSR(CSRISTIM));
         break;
     case 0x24:
         CSRBIT(CSRITIMO, val);
-        sim_debug(WRITE_MSG, &csr_dev,
-                  "[%08x] CSR WRITE. Inhibit Bus Timer = %d\n",
-                  R[NUM_PC], val);
-        if (csr_data & CSRITIMO) {
-            timer_disable(TIMER_BUS);
-        } else {
-            timer_enable(TIMER_BUS);
-        }
+        timer_gate(TIMER_BUS, CSR(CSRITIMO));
         break;
     case 0x28:
         CSRBIT(CSRICPUFLT, val);
@@ -219,6 +205,9 @@ void csr_write(uint32 pa, uint32 val, size_t size)
         break;
     case 0x38:
         CSRBIT(CSRFECC, val);
+        sim_debug(WRITE_MSG, &csr_dev,
+                  "CSR WRITE. Force ECC Syndrome = %d\n",
+                  val);
         break;
     case 0x3c:
         CSRBIT(CSRTHERM, val);
@@ -229,6 +218,10 @@ void csr_write(uint32 pa, uint32 val, size_t size)
         break;
     case 0x44:
         CSRBIT(CSRPWRSPDN, val);
+        if (!val) {
+            /* Stop the simulator - power down */
+            stop_reason = STOP_POWER;
+        }
         break;
     case 0x48:
         CSRBIT(CSRFLPFST, val);
@@ -290,6 +283,7 @@ void csr_write(uint32 pa, uint32 val, size_t size)
         break;
     case 0x7c:
         /* System reset request */
+        full_reset();
         cpu_boot(0, &cpu_dev);
         break;
     default:

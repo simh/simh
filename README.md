@@ -1,7 +1,7 @@
 # SIMH v4.0 - 19-01 Current
 
 [![Coverity Scan Build Status](https://scan.coverity.com/projects/11982/badge.svg)](https://scan.coverity.com/projects/simh)
-[![Build Status](https://travis-ci.org/simh/simh.svg)](https://travis-ci.org/simh/simh)
+[![CI Build Status](https://travis-ci.org/simh/simh.svg)](https://github.com/simh/simh/actions)
 [![AppVeyor](https://ci.appveyor.com/api/projects/status/github/simh/simh)](https://ci.appveyor.com/project/simh/simh/history)
 
 ## Table of Contents:
@@ -73,7 +73,13 @@ All Simulator updates on Open SIMH will be present in this repository, and any c
 - Extended video component version information displayed in SHOW VERSION output.
 - Add a global SET AUTOZAP command or per drive SET <unit> AUTOZAP which removes metadata from disk containers at detach time if the container has metadata.
 - DISKINFO command displays disk container metadata (if present) and container size along with detected file system information if a known file system type is present.
-- makefile builds which have potentially useful dependencies not found will prompt to install these components prior to building.  MacOS Brew dependencies can be directly done from within the makefile.  Other platforms (or package management systems) which require root access to install will display the appropriate package management commands and and exit.
+- makefile builds which have potentially useful dependencies not found will prompt to install these components prior to building.  MacOS Brew dependencies can be directly done from within the makefile.  Other platforms (or package management systems) which require root access to install will display the appropriate package management commands and and exit.  Support for macOS (HomeBrew and MacPorts), Linux (Ubuntu/Debian, RedHat/Fedora), NetBSD, FreeBSD, OpenBSD.
+- SHOW VERSION show the host system type that build the runing simulator when it is not the same as the current host system.
+- Support for building simulators without built-in boot or ROM code when building with DONT_USE_INTERNAL_ROM is defined, but to automatically and transparently fetch the needed ROM or other boot code when it is needed.  This is possibly useful for systems which don't want to distribute simulators with build-in binary code which may have unknown copyright status.
+- Reasonable output produced for all simulators from HELP BOOT.
+- Fix occasional hang of IBM1130 simulator while building with Visual Studio.
+- Building with the simh makefile can optionally compile each source file separately and store the compiled result.   This approach lends itself to quicker building for folks who are developing new simulators or new simulator modules.  This was requested and discussed in #697.
+- TAPE and SCSI libraries have been extended to fully support partial record reads of fixed sized records which may contain multiple records in recorded data.  Images of this type are common for QIC tape archives generally available on bitsavers and elsewhere.  Attach time checking on simulated QIC tape devices reports possible problems that may occur.
 
 #### Changes to the PDP-11 and VAX simulators
 
@@ -608,6 +614,18 @@ Ubuntu/Debian:
 Fedora/RedHat:
 
     # yum install libpcap-dev libvdeplug-dev libpcre3-dev libedit-dev libsdl2-dev libpng-dev libsdl2-ttf-dev
+
+###### NetBSD - Dependencies
+
+    # pkgin install pcre editline SDL2 png SDL2_ttf
+
+###### FreeBSD - Dependencies
+
+    # pkg install libedit sdl2 png sdl2_ttf
+
+###### OpenBSD - Dependencies
+
+    # pkg install sdl2 png sdl2-ttf
 
 #### Windows
 

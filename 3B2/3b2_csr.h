@@ -1,6 +1,6 @@
-/* 3b2_csr.h: Common CSR header
+/* 3b2_csr.h: Common CSR/CSER header
 
-   Copyright (c) 2021, Seth J. Morabito
+   Copyright (c) 2021-2022, Seth J. Morabito
 
    Permission is hereby granted, free of charge, to any person
    obtaining a copy of this software and associated documentation
@@ -40,5 +40,7 @@
 #define SET_CSR(FLAGS)  (csr_data |= (FLAGS))
 #define CLR_CSR(FLAGS)  (csr_data &= ~(FLAGS))
 #define CSR(FLAGS)      ((csr_data & FLAGS) != 0)
+
+extern CSR_DATA csr_data;
 
 #endif /* _3B2_CSR_H_ */

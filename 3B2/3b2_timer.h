@@ -1,6 +1,6 @@
-/* 3b2_timer.h: Common TIMER header
+/* 3b2_timer.h: 8253/82C54 Interval Timer
 
-   Copyright (c) 2021, Seth J. Morabito
+   Copyright (c) 2021-2022, Seth J. Morabito
 
    Permission is hereby granted, free of charge, to any person
    obtaining a copy of this software and associated documentation
@@ -31,12 +31,48 @@
 #ifndef _3B2_TIMER_H_
 #define _3B2_TIMER_H_
 
-#if defined(REV3)
-#include "3b2_rev3_timer.h"
-#else
-#include "3b2_rev2_timer.h"
-#endif
+#include "3b2_defs.h"
 
-extern int32 tmxr_poll;
+#define TIMER_REG_DIVA    0x03
+#define TIMER_REG_DIVB    0x07
+#define TIMER_REG_DIVC    0x0b
+#define TIMER_REG_CTRL    0x0f
+#define TIMER_CLR_LATCH   0x13
+
+#define TIMER_MODE(ctr)   (((ctr->ctrl) >> 1) & 7)
+#define TIMER_RW(ctr)     (((ctr->ctrl) >> 4) & 3)
+
+#define CLK_LATCH         0
+#define CLK_LSB           1
+#define CLK_MSB           2
+#define CLK_LMB           3
+
+#define TMR_SANITY        0
+#define TMR_INT           1
+#define TMR_BUS           2
+
+struct timer_ctr {
+    uint16 divider;
+    uint16 val;
+    uint8  ctrl_latch;
+    uint16 cnt_latch;
+    uint8  ctrl;
+    t_bool r_lmb;
+    t_bool w_lmb;
+    t_bool enabled;
+    t_bool gate;
+    t_bool r_ctrl_latch;
+    t_bool r_cnt_latch;
+};
+
+t_stat timer_reset(DEVICE *dptr);
+uint32 timer_read(uint32 pa, size_t size);
+void timer_write(uint32 pa, uint32 val, size_t size);
+void timer_gate(uint8 ctrnum, t_bool inhibit);
+
+t_stat tmr_svc(UNIT *uptr);
+t_stat tmr_int_svc(UNIT *uptr);
+CONST char *tmr_description(DEVICE *dptr);
+t_stat tmr_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 
 #endif /* _3B2_TIMER_H_ */

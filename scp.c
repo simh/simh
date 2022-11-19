@@ -1047,7 +1047,7 @@ static const char simh_help1[] =
       " There are two forms of execution stop criteria:\n"
       "+1. A temporary breakpoint (which exists only until it is encountered).\n"
       "+2. A string which will stop execution when the simulator has output\n"
-      "++the indicated string.\n"
+      "++the indicated string.\n\n"
 #define HLP_GO          "*Commands Running_A_Simulated_Program GO"
       "3GO {start_pc_addr} {UNTIL stop_pc_addr|\"output-string\"}\n"
       " The GO command does not reset devices, deposits its argument (if given)\n"
@@ -1057,11 +1057,11 @@ static const char simh_help1[] =
       " There are two forms of execution stop criteria:\n"
       "+1. A temporary breakpoint (which exists only until it is encountered).\n"
       "+2. A string which will stop execution when the simulator has output\n"
-      "++the indicated string.\n"
+      "++the indicated string.\n\n"
 #define HLP_CONTINUE    "*Commands Running_A_Simulated_Program CONTINUE"
       "3CONTINUE\n"
       " The CONT command (abbreviated CO) does not reset devices and resumes\n"
-      " execution at the current PC.\n"
+      " execution at the current PC.\n\n"
 #define HLP_STEP        "*Commands Running_A_Simulated_Program STEP"
       "3STEP\n"
       " The STEP command (abbreviated S) resumes execution at the current PC for\n"
@@ -1075,12 +1075,12 @@ static const char simh_help1[] =
       " The NEXT command (abbreviated N) resumes execution at the current PC for\n"
       " one instruction, attempting to execute through a subroutine calls.\n"
       " If the next instruction to be executed is not a subroutine call,\n"
-      " one instruction is executed.\n"
+      " one instruction is executed.\n\n"
 #define HLP_BOOT        "*Commands Running_A_Simulated_Program BOOT"
-      "3BOOT\n"
+      "3BOOT {dev|unit}\n"
       " The BOOT command (abbreviated BO) resets all devices and bootstraps the\n"
       " device and unit given by its argument.  If no unit is supplied, unit 0 is\n"
-      " bootstrapped.  The specified unit must be attached.\n"
+      " bootstrapped.  The specified unit, generally, must be attached.\n\n"
        /***************** 80 character line width template *************************/
       "2Stopping The Simulator\n"
       " Programs run until the simulator detects an error or stop condition, or\n"
@@ -1152,13 +1152,15 @@ static const char simh_help1[] =
       " diagnostic which didn't achieve explicit success or failure within\n"
       " some user specified time.  The RUNLIMIT command provides ways to\n"
       " limit execution.\n\n"
-      "++RUNLIMIT n {%C|MICROSECONDS|SECONDS|MINUTES|HOURS}\n"
-      "++NORUNLIMIT\n\n"
+      "+RUNLIMIT n{K|M} {%C|MICROSECONDS|SECONDS|MINUTES|HOURS}\n"
+      "+NORUNLIMIT\n\n"
       "  Equivalently:\n\n"
-      "++SET RUNLIMIT n {%C|MICROSECONDS|SECONDS|MINUTES|HOURS}\n"
-      "++SET NORUNLIMIT\n\n"
+      "+SET RUNLIMIT n{K|M} {%C|MICROSECONDS|SECONDS|MINUTES|HOURS}\n"
+      "+SET NORUNLIMIT\n\n"
+      " The value n can be expressed as a bare number or as nK or nM to represent\n"
+      " thousands or millions of the specified units.\n\n"
       " The run limit state can be examined with:\n\n"
-      "++SHOW RUNLIMIT\n\n"
+      "+SHOW RUNLIMIT\n\n"
       " If the units of the run limit are not specified, the default units are\n"
       " %C.  Once an execution run limit has been reached, any subsequent\n"
       " GO, RUN, CONTINUE, STEP or BOOT commands will cause the simulator to\n"
@@ -1750,75 +1752,92 @@ static const char simh_help2[] =
       " %%DATE_MONTH%%, %%DATE_DD%%, %%DATE_D%%, %%DATE_WYYYY%%, %%DATE_WW%%,\n"
       " %%TIME_HH%%, %%TIME_MM%%, %%TIME_SS%%, %%TIME_MSEC%%, %%STATUS%%, %%TSTATUS%%,\n"
       " %%SIM_VERIFY%%, %%SIM_QUIET%%, %%SIM_MESSAGE%% %%SIM_MESSAGE%%\n"
-      " %%SIM_NAME%%, %%SIM_BIN_NAME%%, %%SIM_BIN_PATH%%m %%SIM_OSTYPE%%\n\n"
+      " %%SIM_NAME%%, %%SIM_BIN_NAME%%, %%SIM_BIN_PATH%% %%SIM_OSTYPE%%,\n"
+      " %%SIM_RUNTIME%%, %%SIM_RUNTIME_UNITS%%\n\n"
       "+Token %%0 expands to the command file name.\n"
       "+Token %%n (n being a single digit) expands to the n'th argument\n"
       "+Token %%* expands to the whole set of arguments (%%1 ... %%9)\n\n"
       "+The input sequence \"%%%%\" represents a literal \"%%\".  All other\n"
       "+character combinations are rendered literally.\n\n"
       "+Omitted parameters result in null-string substitutions.\n\n"
-      "+Tokens preceeded and followed by %% characters are expanded as environment\n"
-      "+variables, and if an environment variable isn't found then it can be one of\n"
-      "+several special variables:\n\n"
-      "++%%DATE%%              yyyy-mm-dd\n"
-      "++%%TIME%%              hh:mm:ss\n"
-      "++%%DATETIME%%          yyyy-mm-ddThh:mm:ss\n"
-      "++%%LDATE%%             mm/dd/yy (Locale Formatted)\n"
-      "++%%LTIME%%             hh:mm:ss am/pm (Locale Formatted)\n"
-      "++%%CTIME%%             Www Mmm dd hh:mm:ss yyyy (Locale Formatted)\n"
-      "++%%UTIME%%             nnnn (Unix time - seconds since 1/1/1970)\n"
-      "++%%DATE_YYYY%%         yyyy        (0000-9999)\n"
-      "++%%DATE_YY%%           yy          (00-99)\n"
-      "++%%DATE_MM%%           mm          (01-12)\n"
-      "++%%DATE_MMM%%          mmm         (JAN-DEC)\n"
-      "++%%DATE_MONTH%%        month       (January-December)\n"
-      "++%%DATE_DD%%           dd          (01-31)\n"
-      "++%%DATE_WW%%           ww          (01-53)     ISO 8601 week number\n"
-      "++%%DATE_WYYYY%%        yyyy        (0000-9999) ISO 8601 week year number\n"
-      "++%%DATE_D%%            d           (1-7)       ISO 8601 day of week\n"
-      "++%%DATE_JJJ%%          jjj         (001-366) day of year\n"
-      "++%%DATE_19XX_YY%%      yy          A year prior to 2000 with the same\n"
-      "++++++++++   calendar days as the current year\n"
-      "++%%DATE_19XX_YYYY%%    yyyy        A year prior to 2000 with the same\n"
-      "++++++++++   calendar days as the current year\n"
-      "++%%TIME_HH%%           hh          (00-23)\n"
-      "++%%TIME_MM%%           mm          (00-59)\n"
-      "++%%TIME_SS%%           ss          (00-59)\n"
-      "++%%TIME_MSEC%%         msec        (000-999)\n"
-      "++%%STATUS%%            Status value from the last command executed\n"
-      "++%%TSTATUS%%           The text form of the last status value\n"
-      "++%%SIM_VERIFY%%        The Verify/Verbose mode of the current Do command file\n"
-      "++%%SIM_VERBOSE%%       The Verify/Verbose mode of the current Do command file\n"
-      "++%%SIM_QUIET%%         The Quiet mode of the current Do command file\n"
-      "++%%SIM_MESSAGE%%       The message display status of the current Do command file\n"
-      "++%%SIM_NAME%%          The name of the current simulator\n"
-      "++%%SIM_BIN_NAME%%      The program name of the current simulator\n"
-      "++%%SIM_BIN_PATH%%      The program path that invoked the current simulator\n"
-      "++%%SIM_OSTYPE%%        The Operating System running the current simulator\n\n"
-      "+Environment variable lookups are done first with the precise name between\n"
-      "+the %% characters and if that fails, then the name between the %% characters\n"
-      "+is upcased and a lookup of that valus is attempted.\n\n"
-      "+The first Space delimited token on the line is extracted in uppercase and\n"
-      "+then looked up as an environment variable.  If found it the value is\n"
-      "+supstituted for the original string before expanding everything else.  If\n"
-      "+it is not found, then the original beginning token on the line is left\n"
-      "+untouched.\n\n"
+      "+Tokens preceeded and followed by %% characters are expanded as\n"
+      "+environment variables, and if an environment variable isn't found then\n"
+      "+it can be one of several special variables:\n\n"
+      "++%%DATE%%                 yyyy-mm-dd\n"
+      "++%%TIME%%                 hh:mm:ss\n"
+      "++%%DATETIME%%             yyyy-mm-ddThh:mm:ss\n"
+      "++%%LDATE%%                mm/dd/yy (Locale Formatted)\n"
+      "++%%LTIME%%                hh:mm:ss am/pm (Locale Formatted)\n"
+      "++%%CTIME%%                Www Mmm dd hh:mm:ss yyyy (Locale\n"
+      "+++++++++++      Formatted)\n"
+      "++%%UTIME%%                nnnn (Unix time - seconds since\n"
+      "+++++++++++      1/1/1970)\n"
+      "++%%DATE_YYYY%%            yyyy        (0000-9999)\n"
+      "++%%DATE_YY%%              yy          (00-99)\n"
+      "++%%DATE_MM%%              mm          (01-12)\n"
+      "++%%DATE_MMM%%             mmm         (JAN-DEC)\n"
+      "++%%DATE_MONTH%%           month       (January-December)\n"
+      "++%%DATE_DD%%              dd          (01-31)\n"
+      "++%%DATE_WW%%              ww          (01-53)     ISO 8601\n"
+      "+++++++++++      week number\n"
+      "++%%DATE_WYYYY%%           yyyy        (0000-9999) ISO 8601\n"
+      "+++++++++++      week year number\n"
+      "++%%DATE_D%%               d           (1-7)       ISO 8601\n"
+      "+++++++++++      day of week\n"
+      "++%%DATE_JJJ%%             jjj         (001-366) day of year\n"
+      "++%%DATE_19XX_YY%%         yy          A year prior to 2000\n"
+      "+++++++++++      with the same calendar\n"
+      "+++++++++++      days as the current year\n"
+      "++%%DATE_19XX_YYYY%%       yyyy        A year prior to 2000\n"
+      "+++++++++++      with the same calendar days\n"
+      "+++++++++++      as the current year\n"
+      "++%%TIME_HH%%              hh          (00-23)\n"
+      "++%%TIME_MM%%              mm          (00-59)\n"
+      "++%%TIME_SS%%              ss          (00-59)\n"
+      "++%%TIME_MSEC%%            msec        (000-999)\n"
+      "++%%STATUS%%               Status value from the last command executed\n"
+      "++%%TSTATUS%%              The text form of the last status value\n"
+      "++%%SIM_VERIFY%%           The Verify/Verbose mode of the current Do\n"
+      "++++++++      command file\n"
+      "++%%SIM_VERBOSE%%          The Verify/Verbose mode of the current Do\n"
+      "++++++++      command file\n"
+      "++%%SIM_QUIET%%            The Quiet mode of the current Do command\n"
+      "++++++++      file\n"
+      "++%%SIM_MESSAGE%%          The message display status of the current\n"
+      "++++++++      Do command file\n"
+      "++%%SIM_NAME%%             The name of the current simulator\n"
+      "++%%SIM_BIN_NAME%%         The program name of the current simulator\n"
+      "++%%SIM_BIN_PATH%%         The program path that invoked the current\n"
+      "++++++++      simulator\n"
+      "++%%SIM_OSTYPE%%           The Operating System running the current\n"
+      "++++++++      simulator\n"
+      "++%%SIM_RUNTIME%%          The Number simulated instructions or cycles\n"
+      "++++++++      performed\n"
+      "++%%SIM_RUNTIME_UNITS%%    The units of the SIM_RUNTIME value\n\n"
+      "+Environment variable lookups are done first with the precise name\n"
+      "+between the %% characters and if that fails, then the name between\n"
+      "+the %% characters is upcased and a lookup of that valus is attempted.\n\n"
+      "+The first Space delimited token on a sim> command line is extracted\n"
+      "+in uppercase and then looked up as an environment variable.  If found\n"
+      "+it the value is supstituted for the original string before expanding\n"
+      "+everything else.  If it is not found, then the original beginning\n"
+      "+token on the line is left untouched.\n\n"
       "+Environment variable string substitution:\n\n"
       "++%%XYZ:str1=str2%%\n\n"
       "+would expand the XYZ environment variable, substituting each occurrence\n"
       "+of \"str1\" in the expanded result with \"str2\".  \"str2\" can be the empty\n"
-      "+string to effectively delete all occurrences of \"str1\" from the expanded\n"
-      "+output.  \"str1\" can begin with an asterisk, in which case it will match\n"
-      "+everything from the beginning of the expanded output to the first\n"
-      "+occurrence of the remaining portion of str1.\n\n"
+      "+string to effectively delete all occurrences of \"str1\" from the\n"
+      "+expanded output.  \"str1\" can begin with an asterisk, in which case it\n"
+      "+will match everything from the beginning of the expanded output to the\n"
+      "+first occurrence of the remaining portion of str1.\n\n"
       "+May also specify substrings for an expansion.\n\n"
       "++%%XYZ:~10,5%%\n\n"
       "+would expand the XYZ environment variable, and then use only the 5\n"
       "+characters that begin at the 11th (offset 10) character of the expanded\n"
       "+result.  If the length is not specified, then it defaults to the\n"
-      "+remainder of the variable value.  If either number (offset or length) is\n"
-      "+negative, then the number used is the length of the environment variable\n"
-      "+value added to the offset or length specified.\n\n"
+      "+remainder of the variable value.  If either number (offset or length)\n"
+      "+is negative, then the number used is the length of the environment\n"
+      "+variable value added to the offset or length specified.\n\n"
       "++%%XYZ:~-10%%\n\n"
       "+would extract the last 10 characters of the XYZ variable.\n\n"
       "++%%XYZ:~0,-2%%\n\n"
@@ -1827,7 +1846,8 @@ static const char simh_help2[] =
       " The value of environment variables can be parsed as filenames\n"
       " and have their values be expanded to full paths and/or into pieces.\n"
       " Parsing and expansion of file names.\n\n"
-      "++%%~I%%     - expands the value of %%I%% removing any surrounding quotes (\")\n"
+      "++%%~I%%     - expands the value of %%I%% removing any surrounding\n"
+      "+++++       quotes (\")\n"
       "++%%~fI%%    - expands the value of %%I%% to a fully qualified path name\n"
       "++%%~pI%%    - expands the value of %%I%% to a path only\n"
       "++%%~nI%%    - expands the value of %%I%% to a file name only\n"
@@ -1836,7 +1856,8 @@ static const char simh_help2[] =
       "++%%~zI%%    - expands the value of %%I%% to size of file\n\n"
       " The modifiers can be combined to get compound results:\n\n"
       "++%%~pnI%%   - expands the value of %%I%% to a path and name only\n"
-      "++%%~nxI%%   - expands the value of %%I%% to a file name and extension only\n\n"
+      "++%%~nxI%%   - expands the value of %%I%% to a file name and extension\n"
+      "+++++       only\n\n"
       " In the above example above %%I%% can be replaced by other\n"
       " environment variables or numeric parameters to a DO command\n"
       " invokation.\n"
@@ -3987,7 +4008,7 @@ if (*cptr) {
                     }
                 else {
                     if (((cmdp->action == &exdep_cmd) || (0 == strcmp(cmdp->name, "BOOT"))) &&
-                        sim_dflt_dev->help) {
+                        (cmdp->help == NULL) && (sim_dflt_dev->help != NULL)) {
                             sim_dflt_dev->help (stdout, sim_dflt_dev, sim_dflt_dev->units, 0, cmdp->name);
                             if (sim_log && (!sim_oline))
                                 sim_dflt_dev->help (sim_log, sim_dflt_dev, sim_dflt_dev->units, 0, cmdp->name);
@@ -4842,6 +4863,14 @@ if (!ap) {                              /* no environment variable found? */
         }
     else if (!strcmp ("SIM_MESSAGE", gbuf)) {
         sprintf (rbuf, "%s", sim_show_message ? "" : "-Q");
+        ap = rbuf;
+        }
+    else if (!strcmp ("SIM_RUNTIME", gbuf)) {
+        sprintf (rbuf, "%s", sim_fmt_numeric (sim_gtime ()));
+        ap = rbuf;
+        }
+    else if (!strcmp ("SIM_RUNTIME_UNITS", gbuf)) {
+        sprintf (rbuf, "%s", sim_vm_interval_units);
         ap = rbuf;
         }
     }
@@ -6731,7 +6760,7 @@ FILE *f;
 memset (toolversion, 0, sizeof(toolversion));
 toolpath = sim_get_tool_path (tool);
 if (toolpath[0]) {
-    snprintf (versioncmd, sizeof (versioncmd), "%s --version", tool);
+    snprintf (versioncmd, sizeof (versioncmd), "%s --version 2>&1", tool);
     if ((f = popen (versioncmd, "r"))) {
         do {
             if (NULL == fgets (toolversion, sizeof(toolversion)-1, f))
@@ -6950,8 +6979,11 @@ if (flag) {
         char tarversion[PATH_MAX+1] = "";
         char curlversion[PATH_MAX+1] = "";
         FILE *f;
+#if defined(SIM_BUILD_OS_VERSION)
+        char buildosversion[2*PATH_MAX+1] = S_xstr(SIM_BUILD_OS_VERSION);
+#endif
         
-        if ((f = popen ("uname -a", "r"))) {
+        if ((f = popen ("uname -a | sed 's/,//g'", "r"))) {
             memset (osversion, 0, sizeof (osversion));
             do {
                 if (NULL == fgets (osversion, sizeof (osversion)-1, f))
@@ -6960,7 +6992,11 @@ if (flag) {
                 } while (osversion[0] == '\0');
             pclose (f);
             }
-        fprintf (st, "\n        OS: %s", osversion);
+#if defined(SIM_BUILD_OS_VERSION)
+        if (strcmp(osversion, buildosversion) != 0)
+            fprintf (st, "\n        Building OS: %s", buildosversion);
+#endif
+        fprintf (st, "\n        Running OS: %s", osversion);
         if ((f = popen ("uname", "r"))) {
             memset (os_type, 0, sizeof (os_type));
             do {
@@ -7383,9 +7419,9 @@ for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
         ((mptr->mask & MTAB_XTD)?
             (MODMASK(mptr,flag) && !MODMASK(mptr,MTAB_NMO)): 
             ((MTAB_VUN == (uint32)flag) && ((uptr->flags & mptr->mask) == mptr->match)))) {
-        if (*toks > 2) {
+        if ((*toks > 2) && (r == SCPE_OK)) {/* something emitted already? */
             fprintf (st, "\n");
-            *toks = 0;
+            *toks = 0;                      /* force device/unit name indent on next output */
             }
         if (r == SCPE_OK)
             fprint_sep (st, toks, flag);
@@ -8025,14 +8061,14 @@ if (sim_runlimit_switches & SWMASK ('T')) {
     sim_runlimit_d_initial = sim_runlimit_d = num * usec_factor * sim_host_speed_factor ();
     if (sim_host_speed_factor () > 1.0)
         sim_messagef (SCPE_OK, "Slow host - adjusting RUNLIMIT from %d %s to %.1f %s\n", num, units, num * sim_host_speed_factor (), units);
-    snprintf (runlimit, sizeof (runlimit), "%.f", num * sim_host_speed_factor ());
+    snprintf (runlimit, sizeof (runlimit), "%s", sim_fmt_secs (num * sim_host_speed_factor ()));
     setenv ("SIM_RUNLIMIT", runlimit, 1);
     setenv ("SIM_RUNLIMIT_UNITS", units, 1);
     return sim_activate_after_d (&sim_runlimit_unit, sim_runlimit_d);
     }
 else {
     sim_runlimit_initial = sim_runlimit = num;
-    snprintf (runlimit, sizeof (runlimit), "%d", num);
+    snprintf (runlimit, sizeof (runlimit), "%s", sim_fmt_numeric ((double)num));
     setenv ("SIM_RUNLIMIT", runlimit, 1);
     setenv ("SIM_RUNLIMIT_UNITS", units, 1);
     return sim_activate (&sim_runlimit_unit, sim_runlimit);
@@ -8060,14 +8096,14 @@ if (sim_runlimit_enabled) {
         }
     else {
         if (sim_runlimit_initial != sim_runlimit) {
-            fprintf (st, "%d %s initially, ", sim_runlimit_initial, sim_vm_interval_units);
+            fprintf (st, "%s %s initially, ", sim_fmt_numeric ((double)sim_runlimit_initial), sim_vm_interval_units);
             if (sim_is_active (&sim_runlimit_unit))
-                fprintf (st, "and %d %s remaining\n", sim_activate_time (&sim_runlimit_unit), sim_vm_interval_units);
+                fprintf (st, "and %s %s remaining\n", sim_fmt_numeric ((double)sim_activate_time (&sim_runlimit_unit)), sim_vm_interval_units);
             else
                 fprintf (st, "expired now\n");
             }
         else
-            fprintf (st, "%d %s\n", sim_runlimit_initial, sim_vm_interval_units);
+            fprintf (st, "%s %s\n", sim_fmt_numeric ((double)sim_runlimit_initial), sim_vm_interval_units);
         }
     }
 else
@@ -8236,12 +8272,21 @@ for (mtab = dptr->modifiers; (mtab != NULL) && (mtab->mstring != NULL); ++mtab) 
 
 static const unsigned char *mem_data = NULL;
 static size_t mem_data_size = 0;
+static const char *mem_filepath;
+static unsigned int mem_checksum;
+
+t_stat sim_set_memory_load_file_ex (const unsigned char *builtin_code, size_t size, const char *filepath, unsigned int checksum)
+{
+mem_data = builtin_code;
+mem_data_size = size;
+mem_filepath = filepath;
+mem_checksum = checksum;
+return SCPE_OK;
+}
 
 t_stat sim_set_memory_load_file (const unsigned char *data, size_t size)
 {
-mem_data = data;
-mem_data_size = size;
-return SCPE_OK;
+return sim_set_memory_load_file_ex (data, size, NULL, 0);
 }
 
 int Fgetc (FILE *f)
@@ -8261,22 +8306,68 @@ t_stat load_cmd (int32 flag, CONST char *cptr)
 {
 char gbuf[CBUFSIZE];
 FILE *loadfile = NULL;
-t_stat reason;
+t_stat reason = SCPE_OK;
 
 GET_SWITCHES (cptr);                                    /* get switches */
 if (*cptr == 0)                                         /* must be more */
     return SCPE_2FARG;
 cptr = get_glyph_nc (cptr, gbuf, 0);                    /* get file name */
-if (!mem_data) {
+if (mem_data == NULL) {
+    if (mem_filepath != NULL)
+        reason = sim_fetch_binary_file (gbuf, mem_filepath, mem_data_size, mem_checksum);
+    if (reason != SCPE_OK)
+        return reason;
     loadfile = sim_fopen (gbuf, flag? "wb": "rb");      /* open for wr/rd */
     if (loadfile == NULL)
-        return SCPE_OPENERR;
+        return sim_messagef (SCPE_OPENERR, "Error opening '%s' - %s\n", gbuf, strerror (errno));
     }
 GET_SWITCHES (cptr);                                    /* get switches */
 reason = sim_load (loadfile, (CONST char *)cptr, gbuf, flag);/* load or dump */
 if (loadfile)
     fclose (loadfile);
 return reason;
+}
+
+#define SIM_REPO_PATH "https://github.com/simh/simh/raw/master/"
+
+t_stat sim_fetch_binary_file (const char *filename, const char *filepath, size_t size, unsigned int checksum)
+{
+struct stat filestat;
+t_stat r = SCPE_OK;
+FILE *f;
+t_bool fetched = FALSE;
+int byte;
+unsigned int thissum = 0;
+size_t bytes = 0;
+
+if (sim_stat (filename, &filestat)) {
+    char cmd[CBUFSIZE];
+
+    if ((errno == EACCES) || (errno == EPERM))
+        return SCPE_OPENERR;
+    sim_messagef (SCPE_OK, "Fetching %s from %s%s\n", filename, SIM_REPO_PATH, filepath);
+    snprintf (cmd, sizeof (cmd), "-LJOs %s%s", SIM_REPO_PATH, filepath);
+    r = curl_cmd (0, cmd);
+    if (r != SCPE_OK)
+        return sim_messagef (SCPE_OPENERR, "Can't acquire '%s' remotely\n", filename);
+    fetched = TRUE;
+    }
+f = sim_fopen (filename, "rb");
+if (f == NULL)
+    return sim_messagef (SCPE_OPENERR, "Can't open '%s' - %s\n", filename, strerror (errno));
+while (EOF != (byte = fgetc (f))) {
+    ++bytes;
+    thissum += (unsigned char)byte;
+    }
+fclose (f);
+thissum = ~thissum;
+if (((bytes != size) || (thissum != checksum)) && fetched)
+    unlink (filename);
+if (bytes != size)
+    return sim_messagef (SCPE_OPENERR, "'%s' Expected file size found %d instead of %d\n", filename, (int)bytes, (int)size);
+if (thissum != checksum)
+    return sim_messagef (SCPE_OPENERR, "'%s' Expected file size found 0x%X instead of 0x%X\n", filename, thissum, checksum);
+return SCPE_OK;
 }
 
 /* Attach command
@@ -8804,6 +8895,7 @@ for (i = 0; i < (device_count + sim_internal_device_count); i++) {/* loop thru d
         WRITE_I (uptr->buf);
         WRITE_I (uptr->recsize);
         WRITE_I (uptr->tape_eom);
+        WRITE_I (uptr->tape_chunk_size);
         WRITE_I (uptr->capac);                          /* [V3.5] capacity */
         fprintf (sfile, "%.0f\n", uptr->usecs_remaining);/* [V4.0] remaining wait */
         WRITE_I (uptr->pos);
@@ -9072,6 +9164,7 @@ for ( ;; ) {                                            /* device loop */
             READ_I (uptr->buf);
             READ_I (uptr->recsize);
             READ_I (uptr->tape_eom);
+            READ_I (uptr->tape_chunk_size);
             }
         old_capac = uptr->capac;                        /* save current capacity */
         if (v35) {                                      /* [V3.5+] capacity */
@@ -10723,6 +10816,7 @@ return FALSE;
 t_value get_uint (const char *cptr, uint32 radix, t_value max, t_stat *status)
 {
 t_value val;
+uint32 factor = 1;
 CONST char *tptr;
 
 *status = SCPE_OK;
@@ -10732,17 +10826,18 @@ if ((cptr == tptr) || (val > max))
 else {
     while (sim_isspace (*tptr)) tptr++;
     if (sim_toupper (*tptr) == 'K') {
-        val *= 1000;
+        factor = 1000;
         ++tptr;
         }
     else {
         if (sim_toupper (*tptr) == 'M') {
-            val *= 1000000;
+            factor = 1000000;
             ++tptr;
             }
         }
-    if ((*tptr != 0) || (val > max))
+    if ((*tptr != 0) || (val > (max / factor)))
         *status = SCPE_ARG;
+    val *= factor;
     }
 return val;
 }
@@ -12091,10 +12186,21 @@ const char *sim_fmt_numeric (double number)
 {
 static char buf[60];
 char tmpbuf[60];
+const char *factor = "";
 size_t len;
 uint32 c;
 char *p;
 
+if (0 == (number - ((int)(number / 1000000.0)) * 1000000.0)) {
+    factor = "M";
+    number /= 1000000.0;
+    }
+else {
+    if (0 == (number - ((int)(number / 1000.0)) * 1000.0)) {
+            factor = "K";
+            number /= 1000.0;
+        }
+    }
 sprintf (tmpbuf, "%.0f", number);
 len = strlen (tmpbuf);
 for (c=0, p=buf; c < len; c++) {
@@ -12105,6 +12211,7 @@ for (c=0, p=buf; c < len; c++) {
     *(p++) = tmpbuf[c];
     }
 *p = '\0';
+strlcat (buf, factor, sizeof (buf));
 return buf;
 }
 

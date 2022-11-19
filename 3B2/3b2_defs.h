@@ -1,6 +1,6 @@
 /* 3b2_defs.h: AT&T 3B2 Shared Simulator Definitions
 
-   Copyright (c) 2017, Seth J. Morabito
+   Copyright (c) 2017-2022, Seth J. Morabito
 
    Permission is hereby granted, free of charge, to any person
    obtaining a copy of this software and associated documentation
@@ -81,6 +81,9 @@
 
 #define PCHAR(c) (((char) (c) >= 0x20 && (char) (c) < 0x7f) ? (char) (c) : '.')
 
+#define ROM_SIZE       (128 * 1024)
+#define POLL_WAIT      70000
+
 #define UNIT_V_EXBRK   (UNIT_V_UF + 0)
 #define UNIT_V_OPBRK   (UNIT_V_UF + 1)
 #define UNIT_EXBRK     (1u << UNIT_V_EXBRK)
@@ -88,6 +91,7 @@
 
 #define EX_V_FLAG      1 << 21
 
+#define ROM_BASE       0
 #define PHYS_MEM_BASE  0x2000000
 
 #define MSIZ_512K      0x80000
@@ -131,10 +135,8 @@
 #define TIMER_INTERVAL 1
 #define TIMER_BUS      2
 
-/* Timer */
-#define TMR_CLK        0     /* The clock responsible for IPL 15 interrupts */
-#define TPS_CLK        100   /* 100 ticks per second */
-
+/* Timers */
+#define TMR_CLK        0     /* Calibrated 100Hz timer */
 
 /* Global symbols */
 
@@ -159,6 +161,6 @@ extern DEVICE tto_dev;
 #if defined(REV3)
 extern DEVICE flt_dev;
 extern DEVICE ha_dev;
-#endif
+#endif /* defined(REV3) */
 
-#endif
+#endif /* _3B2_DEFS_H_ */

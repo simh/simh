@@ -1,6 +1,6 @@
-/* 3b2_iu.h:  SCN2681A Dual UART Header
+/* 3b2_iu.h: SCN2681A Dual UART
 
-   Copyright (c) 2017, Seth J. Morabito
+   Copyright (c) 2017-2022, Seth J. Morabito
 
    Permission is hereby granted, free of charge, to any person
    obtaining a copy of this software and associated documentation
@@ -56,17 +56,21 @@
 #define STS_FER         0x40              /* Framing error */
 #define STS_RXB         0x80              /* Received break */
 
-#define ISTS_TAI        0x01              /* Transmitter ready A */
-#define ISTS_RAI        0x02              /* Receiver ready A */
-#define ISTS_CBA        0x04              /* Change in break A */
+#define ISTS_TXRA       0x01              /* Transmitter ready A */
+#define ISTS_RXRA       0x02              /* Receiver ready A */
+#define ISTS_DBA        0x04              /* Delta Break A */
 #define ISTS_CRI        0x08              /* Counter ready */
-#define ISTS_TBI        0x10              /* Transmitter ready B */
-#define ISTS_RBI        0x20              /* Receiver ready B */
-#define ISTS_CBB        0x40              /* Change in break B */
+#define ISTS_TXRB       0x10              /* Transmitter ready B */
+#define ISTS_RXRB       0x20              /* Receiver ready B */
+#define ISTS_DBB        0x40              /* Delta Break B */
 #define ISTS_IPC        0x80              /* Interrupt port change */
 
 #define MODE_V_CHM      6                 /* Channel mode */
 #define MODE_M_CHM      0x3
+
+/* Transmitter State bits */
+#define T_HOLD        1
+#define T_XMIT        2
 
 /* Used by the DMAC */
 #define IUA_DATA_REG  3
@@ -81,7 +85,7 @@
 #define CTL           7
 #define SRB           9
 #define RHRB          11
-#define INPRT         13  /* Input port data */
+#define INPRT         13
 #define START_CTR     14
 #define STOP_CTR      15
 
@@ -108,16 +112,14 @@
 #define TX_EN         1
 #define RX_EN         2
 
-#define UM_CTR_EXT    0
-#define UM_CTR_TXCA   1
-#define UM_CTR_TXCB   2
-#define UM_CTR_DIV16  3
-#define UM_TMR_EXT    4
-#define UM_TMR_EXT16  5
-#define UM_TMR_XTL    6
-#define UM_TMR_XTL16  7
-#define UM_MASK       0x70
-#define UM_SHIFT      4
+/* Control Register commands */
+#define CR_RST_MR     1
+#define CR_RST_RX     2
+#define CR_RST_TX     3
+#define CR_RST_ERR    4
+#define CR_RST_BRK    5
+#define CR_START_BRK  6
+#define CR_STOP_BRK   7
 
 /* IMR bits */
 #define IMR_TXRA      0x01
@@ -139,40 +141,57 @@
 
 #define IU_BUF_SIZE       3
 
-#define IU_DCDA           0x01
+/* Data Carrier Detect inputs and input change bits */
+#if defined(REV3)
+#define IU_DCDB_CH        0x80
+#define IU_DCDA_CH        0x40
+#define IU_DCDB           0x08
+#define IU_DCDA           0x04
+#else
+#define IU_DCDB_CH        0x20
+#define IU_DCDA_CH        0x10
 #define IU_DCDB           0x02
-#define IU_DTRA           0x01
-#define IU_DTRB           0x02
-
-#define DMA_NONE   0
-#define DMA_VERIFY 1
-#define DMA_WRITE  2
-#define DMA_READ   4
+#define IU_DCDA           0x01
+#endif
 
 /* Default baud rate generator (9600 baud) */
 #define BRG_DEFAULT       11
 
-#define IU_TIMER_RATE     2.114 /* microseconds per step */
+/* The 2681 DUART includes a 16-bit timer/counter that can be used to
+ * trigger an interrupt after a certain amount of time has passed.
+ *
+ * The 2681 uses a crystal with a frequency of 3.686400 MHz, and the
+ * timer/counter uses this frequency divided by 16, giving a final
+ * timer/counter frequency of 230,400 Hz. There are therefore 4.34
+ * microseconds of wall time per tick of the timer.
+ *
+ * The multiplier defined below is a default that can be adjusted to
+ * make IU timing faster, but less accurate, if desired */
 
+#define IU_TIMER_MULTIPLIER  4
 
 typedef struct iu_port {
-    uint8 stat;               /* Port Status */
     uint8 cmd;                /* Command */
     uint8 mode[2];            /* Two mode buffers */
     uint8 modep;              /* Point to mode[0] or mode[1] */
     uint8 conf;               /* Configuration bits */
-    uint8 txbuf;              /* Transmit Holding Register */
+    uint8 sr;                 /* Status Register */
+    uint8 thr;                /* Transmit Holding Register */
+    uint8 txr;                /* Transmit Shift Register */
+    uint8 rxr;                /* Receive Shift Register */
     uint8 rxbuf[IU_BUF_SIZE]; /* Receive Holding Register (3 bytes) */
-    uint8 w_p;                /* Buffer Write Pointer */
-    uint8 r_p;                /* Buffer Read Pointer */
-    uint8 dma;                /* Currently active DMA mode */
+    uint8 w_p;                /* Receive Buffer Write Pointer */
+    uint8 r_p;                /* Receive Buffer Read Pointer */
+    uint8 tx_state;           /* Transmitting state flags (HOLD, XMIT) */
+    t_bool dma;               /* DMA currently active */
     t_bool drq;               /* DMA request enabled */
+    t_bool rxr_full;          /* Receive Shift Register is full */
 } IU_PORT;
 
 typedef struct iu_state {
-    uint8 istat;          /* Interrupt Status */
+    uint8 isr;            /* Interrupt Status Register */
     uint8 imr;            /* Interrupt Mask Register */
-    uint8 acr;
+    uint8 acr;            /* Aux. Control Register */
     uint8 opcr;           /* Output Port Configuration */
     uint8 inprt;          /* Input Port Data */
     uint8 ipcr;           /* Input Port Change Register */
@@ -189,12 +208,13 @@ t_stat contty_detach(UNIT *uptr);
 t_stat tti_reset(DEVICE *dptr);
 t_stat contty_reset(DEVICE *dptr);
 t_stat iu_timer_reset(DEVICE *dptr);
+t_stat iu_timer_set_mult(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat iu_timer_show_mult(FILE *st, UNIT *uptr, int val, CONST void *desc);
 t_stat iu_svc_tti(UNIT *uptr);
 t_stat iu_svc_tto(UNIT *uptr);
-t_stat iu_svc_contty_rcv(UNIT *uptr);
+t_stat iu_svc_contty(UNIT *uptr);
 t_stat iu_svc_contty_xmt(UNIT *uptr);
 t_stat iu_svc_timer(UNIT *uptr);
-t_stat iu_tx(uint8 portno, uint8 val);
 uint32 iu_read(uint32 pa, size_t size);
 void iu_write(uint32 pa, uint32 val, size_t size);
 void iua_drq_handled();

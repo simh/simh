@@ -63,7 +63,6 @@
 
 /* function prototypes */
 
-t_stat  BOOTROM_svc (UNIT *uptr);
 t_stat  BOOTROM_config (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat  BOOTROM_attach (UNIT *uptr, CONST char *cptr);
 t_stat  BOOTROM_reset (DEVICE *dptr);

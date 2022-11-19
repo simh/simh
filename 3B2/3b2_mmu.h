@@ -1,6 +1,6 @@
 /* 3b2_mmu.h: Common MMU header
 
-   Copyright (c) 2021, Seth J. Morabito
+   Copyright (c) 2021-2022, Seth J. Morabito
 
    Permission is hereby granted, free of charge, to any person
    obtaining a copy of this software and associated documentation

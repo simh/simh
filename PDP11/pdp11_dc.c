@@ -157,7 +157,7 @@ DIB dci_dib = {
     2, IVCL (DCI), VEC_AUTO, { &dci_iack, &dco_iack }, IOLN_DC,
     };
 
-UNIT dci_unit = { UDATA (&dci_svc, 0, 0), TMLN_SPD_9600_BPS };
+UNIT dci_unit = { UDATA (&dci_svc, UNIT_IDLE, 0), TMLN_SPD_9600_BPS };
 
 REG dci_reg[] = {
     { BRDATAD (BUF,          dci_buf, DEV_RDX, 8, DCX_LINES,  "input control/stats register") },

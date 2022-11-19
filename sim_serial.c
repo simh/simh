@@ -584,7 +584,7 @@ DWORD commsize = sizeof (commdefault);
 COMMTIMEOUTS cto;
 char win32name[1028];
 
-if (!GetDefaultCommConfig (name, &commdefault, &commsize)) {    /* get default comm parameters */
+if (!GetDefaultCommConfigA (name, &commdefault, &commsize)) {    /* get default comm parameters */
     error = GetLastError ();                                    /* function failed; get error */
 
     if (error != ERROR_INVALID_PARAMETER)                       /* not a communications port name? */
@@ -594,8 +594,8 @@ if (!GetDefaultCommConfig (name, &commdefault, &commsize)) {    /* get default c
     }
 
 snprintf (win32name, sizeof (win32name), "\\\\.\\%s", name);
-hPort = CreateFile (win32name, GENERIC_READ | GENERIC_WRITE, /* open the port */
-                   0, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, 0);
+hPort = CreateFileA (win32name, GENERIC_READ | GENERIC_WRITE, /* open the port */
+                    0, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, 0);
 
 if (hPort == INVALID_HANDLE_VALUE) {                    /* open failed? */
     error = GetLastError ();                            /* get error code */

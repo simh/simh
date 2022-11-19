@@ -47,6 +47,7 @@
 				RuntimeLibrary="1"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
+				WarnAsError="true"
 				DebugInformationFormat="3"
 				CompileAs="1"
 				ShowIncludes="false"
@@ -131,6 +132,7 @@
 				EnableFunctionLevelLinking="true"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
+				WarnAsError="true"
 				DebugInformationFormat="3"
 				CompileAs="1"
 			/>
@@ -314,7 +316,8 @@
 		</Filter>
 		<Filter
 			Name="Header Files"
-			Filter="h;hpp;hxx;hm;inl;inc"			>
+			Filter="h;hpp;hxx;hm;inl;inc"
+			>
 			<File
 				RelativePath="..\GRI\gri_defs.h"
 				>
