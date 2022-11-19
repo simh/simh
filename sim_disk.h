@@ -48,12 +48,14 @@ typedef uint32          t_lba;                          /* disk logical block ad
 #define DKUF_W_ENC      2                               /* 2b of data encoding/packing */
 #define DKUF_M_ENC      ((1u << DKUF_W_ENC) - 1)
 #define DKUF_V_NOAUTOSIZE (DKUF_V_ENC + DKUF_W_ENC)     /* Don't Autosize disk option */
-#define DKUF_V_UF       (DKUF_V_NOAUTOSIZE + 1)
+#define DKUF_V_AUTOZAP  (DKUF_V_NOAUTOSIZE + 1)         /* Auto ZAP disk option */
+#define DKUF_V_UF       (DKUF_V_AUTOZAP + 1)
 #define DKUF_WLK        UNIT_WLK
 #define DKUF_FMT        (DKUF_M_FMT << DKUF_V_FMT)
 #define DKUF_ENC        (DKUF_M_ENC << DKUF_V_ENC)
 #define DKUF_WRP        (DKUF_WLK | UNIT_RO)
 #define DKUF_NOAUTOSIZE (1 << DKUF_V_NOAUTOSIZE)
+#define DKUF_AUTOZAP    (1 << DKUF_V_AUTOZAP)
 
 /* Encoding/Packing specfics */
 
@@ -140,8 +142,8 @@ t_bool sim_disk_vhd_support (void);
 t_bool sim_disk_raw_support (void);
 void sim_disk_data_trace (UNIT *uptr, const uint8 *data, size_t lba, size_t len, const char* txt, int detail, uint32 reason);
 t_stat sim_disk_info_cmd (int32 flag, CONST char *ptr);
-t_stat sim_disk_set_noautosize (int32 flag, CONST char *cptr);
-t_bool sim_disk_autosize_disabled (void);
+t_stat sim_disk_set_all_noautosize (int32 flag, CONST char *cptr);
+t_stat sim_disk_set_all_autozap (int32 flag, CONST char *cptr);
 t_stat sim_disk_set_drive_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat sim_disk_set_drive_type_by_name (UNIT *uptr, const char *drive_type);
 t_stat sim_disk_show_drive_type (FILE *st, UNIT *uptr, int32 val, CONST void *desc);

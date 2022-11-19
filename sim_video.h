@@ -252,6 +252,11 @@ extern int (*vid_display_kb_event_process)(SIM_KEY_EVENT *kev);
 #endif
 
 #if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
+
+#if defined(__APPLE__)
+#define SDL_MAIN_AVAILABLE
+#endif
+
 #include <SDL.h>
 #endif /* HAVE_LIBSDL */
 

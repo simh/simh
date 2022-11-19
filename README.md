@@ -48,11 +48,11 @@
 
 ## WHAT'S NEW since the Open SIMH fork
 
-All Simulator updates on Open SIMH will be present in this repository, and any changes to the master branch code in this repository authored by anyone except Mark Pizzolato will be posted as pull requestss on the Open simh repo.
+All Simulator updates on Open SIMH will be present in this repository, and any changes to the master branch code in this repository authored by anyone except Mark Pizzolato may be posted as pull requestss on the Open simh repo.
 
 ### Mark Pizzolato's changes not present in the Open SIMH repo:
 
-#### Changes to SCP (the simulator framework or command execution environment)
+#### Visible changes to SCP (the simulator framework or command execution environment)
 
 - Add descriptive messages for cases when NOPARAM status is returned.
 - Avoid excessive DO command context lines when commands produce multiple lines of output.
@@ -66,6 +66,14 @@ All Simulator updates on Open SIMH will be present in this repository, and any c
 - Add extended register sanity checks including duplicate name detection.  Fixed simulator devices with duplicate register names.
 - Simulators with video devices that may be enabled, no longer disable the screen saver until the video display is presented.  Optionally enabling or disabling the OS screen saver by an environment variable.
 - More readable output of SHOW <dev>|<unit> with variable sized DEVICE and UNIT names.
+- Automatic Cryllic Font detection in BESM6 simulator at runtime rather than build time.  More relevant for distribution binaries.
+- Build-in command history and tab file name completion previously done by GPL readline now done by BSD licensed library available on all platforms (expecially Windows).
+- Robust register sanity checking for all register definition macros.
+- When building on windows, the windows-build dependency libraries are automatically downloaded even if git is not available.
+- Extended video component version information displayed in SHOW VERSION output.
+- Add a global SET AUTOZAP command or per drive SET <unit> AUTOZAP which removes metadata from disk containers at detach time if the container has metadata.
+- DISKINFO command displays disk container metadata (if present) and container size along with detected file system information if a known file system type is present.
+- makefile builds which have potentially useful dependencies not found will prompt to install these components prior to building.  MacOS Brew dependencies can be directly done from within the makefile.  Other platforms (or package management systems) which require root access to install will display the appropriate package management commands and and exit.
 
 #### Changes to the PDP-11 and VAX simulators
 
@@ -579,23 +587,27 @@ functionality.
 
 ###### OS X - Dependencies
 
-The MacPorts package manager is available to provide these external packages.  Once MacPorts is installed, these commands will install the required dependent packages:
+The HomeBrew package manager can be used to provide these packages:
 
-    # port install vde2 libsdl2 libsdl2_ttf libpng zlib pcre
+    $ brew install vde pcre libedit sdl2 libpng zlib sdl2_ttf
 
 OR
 
-The HomeBrew package manager can be used to provide these packages:
+The MacPorts package manager is available to provide these external packages.  Once MacPorts is installed, this commands will install the required dependent packages:
 
-    $ brew install vde sdl2 sdl2_ttf libpng zlib pcre
+    # port install vde2 pcre libedit libsdl2 libpng zlib libsdl2_ttf
 
 ###### Linux - Dependencies
 
 Different Linux distributions have different package management systems:
 
-Ubuntu:
+Ubuntu/Debian:
 
-    # apt-get install libpcap-dev libpcre3-dev vde2 libsdl2-dev libsdl2_ttf-dev
+    # apt-get install libpcap-dev libpcre3-dev vde2 libsdl2-dev libsdl2_ttf-dev libedit-dev
+
+Fedora/RedHat:
+
+    # yum install libpcap-dev libvdeplug-dev libpcre3-dev libedit-dev libsdl2-dev libpng-dev libsdl2-ttf-dev
 
 #### Windows
 
@@ -610,6 +622,8 @@ The file https://github.com/simh/simh/blob/master/Visual%20Studio%20Projects/0Re
 
 ##### MinGW32
 
+
+Building with MinGW32 is deprecated and may be removed in the future since the original motivation for MinGW32 builds was due to there not being a free compiler environment on Windows.  That hasn't been the case for at least 15 years.
 Building with MinGW32 requires the same directory organization and the dependent package support described for Visual Studio in the file https://github.com/simh/simh/blob/master/Visual%20Studio%20Projects/0ReadMe_Projects.txt.  Building with MinGW64 is not supported.
 
 #### VMS

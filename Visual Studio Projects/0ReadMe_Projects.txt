@@ -32,14 +32,10 @@ automatically.  Git for windows can be downloaded from:
 
     https://git-scm.com/download/win
     
-If git isn't available, then the contents of the windows-build 
-directory can be downloaded from:
-
-    https://github.com/simh/windows-build/archive/windows-build.zip
-
-Download and extract the contents of this zip file into the appropriate 
-place in your directory structure.  You do not need to do anything else
-but have this directory properly located.
+If git isn't available, and you're running on a recent version of 
+Windows (10 or 11), then the contents of the windows-build 
+directory will be automatically downloaded and installed in the 
+appropriate location relative to the simh source.
 
 Network devices are capable of using pthreads to enhance their performance.  
 To realize these benefits, you must build the desire simulator with 

@@ -1594,7 +1594,27 @@ static const char simh_help1[] =
       "++++++++                     available\n"
 #define HLP_NOAUTOSIZE  "*Commands SET NoAutosize"
       "3NoAutosize\n"
-      "+SET NOAUTOSIZE              disables disk autosizing for all disks\n";
+      "+SET NOAUTOSIZE              disables disk autosizing for all disks\n"
+      "++++++++                     in the simulator which support multiple\n"
+      "++++++++                     drive types or sizes\n"
+      "+SET <unit> NOAUTOSIZE       disables disk autosizing for a specific\n"
+      "++++++++                     unit in the simulator that supports\n"
+      "++++++++                     different drive types or sizes\n"
+      "+SET AUTOSIZE                enables disk autosizing for all disks\n"
+      "++++++++                     in the simulator which support multiple\n"
+      "++++++++                     drive types or sizes\n"
+      "+SET <unit> AUTOSIZE         enables disk autosizing for a specific\n"
+      "++++++++                     unit in the simulator that supports\n"
+      "++++++++                     different drive types or sizes\n"
+#define HLP_AUTOZAP     "*Commands SET Autozap"
+      "3Autozap\n"
+      "+SET AUTOZAP                 enables automatic metadata removal on\n"
+      "++++++++                     detach for all disks with metadata\n"
+      "++++++++                     capabilities in the simulator\n"
+      "+SET <unit> AUTOZAP          enables automatic metadata removal on\n"
+      "++++++++                     detach for a specific unit in the simulator\n"
+      "+SET <unit> NOAUTOZAP        disables automatic metadata removal on\n"
+      "++++++++                     detach for a specific unit in the simulator\n";
 static const char simh_help2[] =
       /***************** 80 character line width template *************************/
 #define HLP_SHOW        "*Commands SHOW"
@@ -2538,8 +2558,24 @@ static const char simh_help2[] =
       "++sim> curl --help\n\n"
 #define HLP_DISKINFO    "*Commands Disk_Container_Information"
       "2Disk Container Information\n"
-      " Information about a Disk Container can be displayed with the DISKINFO command:\n\n"
-      "++DISKINFO container-spec    show information about a disk container\n\n";
+      " Information about a Disk Container can be displayed with the DISKINFO\n"
+      " command:\n\n"
+      "++DISKINFO container-spec       show information about a disk container\n\n"
+      " Disk Containers that have metadata that describes details about the\n"
+      " the container's type and attributes will display that detailed\n"
+      " information for the container.  Disk Containers that don't have metadata\n"
+      " merely have their size reported.\n\n"
+      " In either case, if a known file system type is recognized on the container\n"
+      " the details about that file system are indicated.\n\n"
+#define HLP_ZAPTYPE     "*Commands Removing_Disk_Metadata"
+      "2Removing Disk Metadata\n"
+      " Metadata on disk containers can be removed by using the ZAPTYPE command:\n\n"
+      "++ZAPTYPE container-spec       remove disk metadata if present\n\n"
+      " Disk Containers that have metadata will have that metadata removed and\n"
+      " the container's last write time reflected in the file timestamp and the\n"
+      " container's size will shrink back to the further of the file's size when\n"
+      " the metadat was added or the furthest write point in the container.\n"
+      " Disk Containers that don't have metadata will not be modified\n\n";
 
 
 static CTAB cmd_table[] = {
@@ -2615,7 +2651,7 @@ static CTAB cmd_table[] = {
     { "NORUNLIMIT", &runlimit_cmd,  0,          HLP_RUNLIMIT,   NULL, NULL },
     { "TESTLIB",    &test_lib_cmd,  0,          HLP_TESTLIB,    NULL, NULL },
     { "DISKINFO",   &sim_disk_info_cmd,  0,     HLP_DISKINFO,   NULL, NULL },
-    { "ZAPTYPE",    &sim_disk_info_cmd,  1,     NULL,           NULL, NULL },
+    { "ZAPTYPE",    &sim_disk_info_cmd,  1,     HLP_ZAPTYPE,    NULL, NULL },
     { NULL,         NULL,           0,          NULL,           NULL, NULL }
     };
 
@@ -2650,7 +2686,10 @@ static CTAB set_glob_tab[] = {
     { "PROMPT",     &set_prompt,                0, HLP_SET_PROMPT },
     { "RUNLIMIT",   &set_runlimit,              1, HLP_RUNLIMIT },
     { "NORUNLIMIT", &set_runlimit,              0, HLP_RUNLIMIT },
-    { "NOAUTOSIZE", &sim_disk_set_noautosize,   1, HLP_NOAUTOSIZE },
+    { "NOAUTOSIZE", &sim_disk_set_all_noautosize, 1, HLP_NOAUTOSIZE },
+    { "AUTOSIZE",   &sim_disk_set_all_noautosize, 0, HLP_NOAUTOSIZE },
+    { "AUTOZAP",    &sim_disk_set_all_autozap,  1, HLP_AUTOZAP },
+    { "NOAUTOZAP",  &sim_disk_set_all_autozap,  0, HLP_AUTOZAP },
     { NULL,         NULL,                       0 }
     };
 
@@ -6762,7 +6801,6 @@ if (flag) {
         fprintf (st, "\n        Virtual Hard Disk (VHD) support");
     if (sim_disk_raw_support())
         fprintf (st, "\n        RAW disk and CD/DVD ROM support");
-    fprintf (st, "\n        Autosizing of disks is %s", sim_disk_autosize_disabled() ? "disabled" : "enabled");
 #if defined (SIM_ASYNCH_IO)
     fprintf (st, "\n        Asynchronous I/O support (%s)", AIO_QUEUE_MODE);
 #endif
@@ -10447,38 +10485,69 @@ return read_line_p (NULL, cptr, size, stream);
                         NULL if EOF
 */
 
+#if defined (HAVE_LIBEDIT)
+#include <editline/readline.h>
+#endif
+#if defined(_WIN32)
+#define dlopen(X,Y)    LoadLibraryA((X))
+#define dlsym(X,Y)     GetProcAddress((HINSTANCE)(X),(Y))
+#define dlclose(X)     FreeLibrary((X))
+#ifndef RTLD_NOW
+#define RTLD_NOW 0
+#endif
+#ifndef RTLD_LOCAL
+#define RTLD_LOCAL 0
+#endif
+#define EDIT_DEFAULT_LIB "edit."
+#define SIM_HAVE_DLOPEN DLL
+#else /* !defined(_WIN32) */
+#define EDIT_DEFAULT_LIB "libedit."
+#endif /* defined(_WIN32) */
+
 char *read_line_p (const char *prompt, char *cptr, int32 size, FILE *stream)
 {
-char *tptr;
-#if defined(SIM_HAVE_DLOPEN)
 static int initialized = 0;
 typedef char *(*readline_func)(const char *);
 static readline_func p_readline = NULL;
 typedef void (*add_history_func)(const char *);
 static add_history_func p_add_history = NULL;
+typedef void (*free_line_func)(void *);
+static free_line_func p_free_line = NULL;
+char *tptr;
 
 if (prompt && (!initialized)) {
     initialized = 1;
-    void *handle;
+
+#if defined(HAVE_LIBEDIT)
+    p_readline = (readline_func)&readline;
+    p_add_history = (add_history_func)&add_history;
+#if !defined(RL_READLINE_VERSION)
+    p_free_line = (free_line_func)&rl_free;
+#else
+    p_free_line = (free_line_func)&free;
+#endif
+#else /* !defined(HAVE_LIBEDIT) */
+#if defined(SIM_HAVE_DLOPEN)
+    if (!p_readline) {   /* libedit not available at compile time, try OS shared object? */
+        void *handle;
 
 #define S__STR_QUOTE(tok) #tok
 #define S__STR(tok) S__STR_QUOTE(tok)
-    handle = dlopen("libncurses." S__STR(SIM_HAVE_DLOPEN), RTLD_NOW|RTLD_GLOBAL);
-    handle = dlopen("libcurses." S__STR(SIM_HAVE_DLOPEN), RTLD_NOW|RTLD_GLOBAL);
-    handle = dlopen("libreadline." S__STR(SIM_HAVE_DLOPEN), RTLD_NOW|RTLD_GLOBAL);
-    if (!handle)
-        handle = dlopen("libreadline." S__STR(SIM_HAVE_DLOPEN) ".8", RTLD_NOW|RTLD_GLOBAL);
-    if (!handle)
-        handle = dlopen("libreadline." S__STR(SIM_HAVE_DLOPEN) ".7", RTLD_NOW|RTLD_GLOBAL);
-    if (!handle)
-        handle = dlopen("libreadline." S__STR(SIM_HAVE_DLOPEN) ".6", RTLD_NOW|RTLD_GLOBAL);
-    if (!handle)
-        handle = dlopen("libreadline." S__STR(SIM_HAVE_DLOPEN) ".5", RTLD_NOW|RTLD_GLOBAL);
-    if (handle) {
-        p_readline = (readline_func)((size_t)dlsym(handle, "readline"));
-        p_add_history = (add_history_func)((size_t)dlsym(handle, "add_history"));
+        handle = dlopen(EDIT_DEFAULT_LIB S__STR(SIM_HAVE_DLOPEN), RTLD_NOW|RTLD_GLOBAL);
+        if (!handle)
+            handle = dlopen(EDIT_DEFAULT_LIB S__STR(SIM_HAVE_DLOPEN) ".2", RTLD_NOW|RTLD_GLOBAL);
+        if (handle) {
+            p_readline = (readline_func)((size_t)dlsym(handle, "readline"));
+            p_add_history = (add_history_func)((size_t)dlsym(handle, "add_history"));
+            p_free_line = (free_line_func)((size_t)dlsym(handle, "rl_free"));
+            if (p_free_line == NULL)
+                p_free_line = (free_line_func)&free;
+            }
         }
+#endif /* defined(SIM_HAVE_DLOPEN) */
+#endif /* defined(HAVE_LIBEDIT) */
     }
+
 if (prompt) {                                           /* interactive? */
     if (p_readline) {
         char *tmpc = p_readline (prompt);               /* get cmd line */
@@ -10486,7 +10555,7 @@ if (prompt) {                                           /* interactive? */
             cptr = NULL;
         else {
             strlcpy (cptr, tmpc, size);                 /* copy result */
-            free (tmpc) ;                               /* free temp */
+            p_free_line (tmpc) ;                        /* free temp */
             }
         }
     else {
@@ -10495,14 +10564,8 @@ if (prompt) {                                           /* interactive? */
         cptr = fgets (cptr, size, stream);              /* get cmd line */
         }
     }
-else cptr = fgets (cptr, size, stream);                 /* get cmd line */
-#else
-if (prompt) {                                           /* interactive? */
-    printf ("%s", prompt);                              /* display prompt */
-    fflush (stdout);
-    }
-cptr = fgets (cptr, size, stream);                      /* get cmd line */
-#endif
+else
+    cptr = fgets (cptr, size, stream);                  /* get cmd line */
 
 if (cptr == NULL) {
     clearerr (stream);                                  /* clear error */
@@ -10526,10 +10589,8 @@ if ((*cptr == ';') || (*cptr == '#')) {                 /* ignore comment */
     *cptr = 0;
     }
 
-#if defined (SIM_HAVE_DLOPEN)
 if (prompt && p_add_history && *cptr)                   /* Save non blank lines in history */
     p_add_history (cptr);
-#endif
 
 return cptr;
 }
@@ -16371,7 +16432,7 @@ for (i = 0; (dptr = devices[i]) != NULL; i++) {
                             Bad = TRUE;
                             Mprintf (f, "\tthe %u depth of the UNIT array exceeds the number of units on the %s device which is %u\n", rptr->depth, dptr->name, udptr->numunits);
                             }
-                        if (rptr->obj_size > sizeof (t_value)) {
+                        if (rptr->size > sizeof (t_value)) {
                             Bad = TRUE;
                             Mprintf (f, "\t%u is larger than the size of the t_value type (%u)\n", (uint32)rptr->obj_size, (uint32)sizeof (t_value));
                             }
@@ -16442,7 +16503,7 @@ static struct validation_test {
     REG reg[7];
     t_stat expected_result;
     } validations[] = {
-        { { { BRDATAD (STRUCT,  validate_units,   16, 8*sizeof(treg16), sizeof(validate_units)/sizeof(treg16), "an invalid array of scalars") },
+        { { { BRDATAD (STRUCT,  validate_units,   16, 8*sizeof(treg16), sizeof(validate_units)/2, "an invalid array of scalars") },
             {NULL} },
          SCPE_IERR},
         { { { SRDATAD (AMBIG,   validate_units,   pos,   10, 32, 0, 3, "a basic register array") },

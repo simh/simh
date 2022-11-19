@@ -98,6 +98,10 @@ static int vid_gamepad_ok = 0; /* Or else just joysticks. */
 
 char vid_release_key[64] = "Ctrl-Right-Shift";
 
+#if defined(__APPLE__)
+#define SDL_MAIN_AVAILABLE
+#endif
+
 #include <SDL.h>
 #include <SDL_thread.h>
 
@@ -2739,9 +2743,72 @@ void vid_beep (void)
 return;
 }
 
+#if defined(HAVE_LIBSDL)
+#include <SDL.h>
+#if defined(HAVE_LIBSDL_TTF)
+#include <SDL_ttf.h>
+#endif
+#endif
+
 const char *vid_version (void)
 {
+#if defined(HAVE_LIBSDL)
+static char SDLVersion[160];
+SDL_version compiled, running;
+
+SDL_GetVersion(&running);
+
+SDL_VERSION(&compiled);
+
+SDLVersion[sizeof (SDLVersion) - 1] = '\0';
+if ((compiled.major == running.major) &&
+    (compiled.minor == running.minor) &&
+    (compiled.patch == running.patch))
+    snprintf(SDLVersion, sizeof (SDLVersion), "SDL Version %d.%d.%d", 
+                        compiled.major, compiled.minor, compiled.patch);
+else
+    snprintf(SDLVersion, sizeof (SDLVersion), "SDL Version (Compiled: %d.%d.%d, Runtime: %d.%d.%d)", 
+                        compiled.major, compiled.minor, compiled.patch,
+                        running.major, running.minor, running.patch);
+#if defined(HAVE_LIBSDL_TTF)
+SDL_TTF_VERSION(&compiled);
+running = *TTF_Linked_Version();
+if ((compiled.major == running.major) &&
+    (compiled.minor == running.minor) &&
+    (compiled.patch == running.patch))
+    snprintf(&SDLVersion[strlen (SDLVersion)], sizeof (SDLVersion) - (strlen (SDLVersion) + 1), 
+                        ", SDL TTF Version %d.%d.%d", 
+                        compiled.major, compiled.minor, compiled.patch);
+else
+    snprintf(&SDLVersion[strlen (SDLVersion)], sizeof (SDLVersion) - (strlen (SDLVersion) + 1), 
+                        ", SDL TTF Version (Compiled: %d.%d.%d, Runtime: %d.%d.%d)", 
+                        compiled.major, compiled.minor, compiled.patch,
+                        running.major, running.minor, running.patch);
+#define _SDL_TTF_VERSION_ATLEAST(X, Y, Z)                                               \
+    ((SDL_TTF_MAJOR_VERSION >= X) &&                                                    \
+     (SDL_TTF_MAJOR_VERSION > X || SDL_TTF_MINOR_VERSION >= Y) &&                       \
+     (SDL_TTF_MAJOR_VERSION > X || SDL_TTF_MINOR_VERSION > Y || SDL_TTF_PATCHLEVEL >= Z))
+#if _SDL_TTF_VERSION_ATLEAST(2, 0, 18)
+if (1) {
+    int major, minor, patch;
+
+    TTF_Init();
+    TTF_GetFreeTypeVersion(&major, &minor, &patch);
+    snprintf(&SDLVersion[strlen (SDLVersion)], sizeof (SDLVersion) - (strlen (SDLVersion) + 1), 
+                        ", FreeType Version %d.%d.%d", 
+                        major, minor, patch);
+    TTF_GetHarfBuzzVersion(&major, &minor, &patch);
+    if ((major != 0) || (minor != 0) || (patch != 0))
+        snprintf(&SDLVersion[strlen (SDLVersion)], sizeof (SDLVersion) - (strlen (SDLVersion) + 1), 
+                            ", HarfBuzz Version %d.%d.%d", 
+                            major, minor, patch);
+    }
+#endif /* _SDL_TTF_VERSION_ATLEAST(2, 0, 18) */
+#endif /* HAVE_LIBSDL_TTF */
+return (const char *)SDLVersion;
+#else
 return "No Video Support";
+#endif
 }
 
 t_stat vid_set_release_key (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
