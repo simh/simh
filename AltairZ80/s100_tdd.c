@@ -64,7 +64,6 @@ typedef struct {
 extern WD179X_INFO_PUB *wd179x_infop;
 
 static TDD_INFO tdd_info_data = { { 0x0000, 0, TDD_IO_BASE, TDD_IO_SIZE } };
-static TDD_INFO *tdd_info = &tdd_info_data;
 
 extern t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
