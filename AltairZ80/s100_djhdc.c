@@ -112,6 +112,8 @@
 #define DJHDC_IOPB_LINK_H   14
 #define DJHDC_IOPB_LINK_E   15
 
+#define DJHDC_INT         1   /* DJHDC interrupts tied to VI1 */
+
 typedef struct {
     UNIT *uptr;
     DISK_INFO *imd;
@@ -205,7 +207,10 @@ static t_stat djhdc_detach(UNIT *uptr);
 static t_stat djhdc_unit_set_geometry(UNIT* uptr, int32 value, CONST char* cptr, void* desc);
 static t_stat djhdc_unit_show_geometry(FILE* st, UNIT* uptr, int32 value, CONST void* desc);
 static int DJHDC_Validate_CHSN(DJHDC_DRIVE_INFO* pDrive);
+#ifdef DJHDC_INTERRUPTS
 static void raise_djhdc_interrupt(void);
+#endif /* DJHDC_INTERRUPTS */
+
 static const char* djhdc_description(DEVICE *dptr);
 
 static int32 djhdcdev(const int32 port, const int32 io, const int32 data);
@@ -849,12 +854,11 @@ static int DJHDC_Validate_CHSN(DJHDC_DRIVE_INFO* pDrive)
     return (status);
 }
 
-#define VI1_INT         1   /* DJHDC interrupts tied to VI1 */
-
+#ifdef DJHDC_INTERRUPTS
 static void raise_djhdc_interrupt(void)
 {
     sim_debug(IRQ_MSG, &djhdc_dev, DEV_NAME ": " ADDRESS_FORMAT " Interrupt\n", PCX);
 
-    raise_scp300f_interrupt(VI1_INT);
-
+    raise_scp300f_interrupt(DJHDC_INT);
 }
+#endif /* DJHDC_INTERRUPTS */
