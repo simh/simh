@@ -40,6 +40,7 @@
 #define ADDRMASKEXTENDED        (MAXMEMORY - 1)             /* extended address mask                        */
 #define BANKMASK                (MAXBANKS - 1)              /* bank mask                                    */
 #define MEMORYSIZE              (cpu_unit.capac)            /* actual memory size                           */
+#define MEMORYMASK              (cpu_unit.capac - 1)        /* actual memory size mask                      */
 #define KB                      1024                        /* kilo byte                                    */
 #define KBLOG2                  10                          /* log2 of KB                                   */
 #define ALTAIR_ROM_LOW          0xff00                      /* start address of regular Altair ROM          */

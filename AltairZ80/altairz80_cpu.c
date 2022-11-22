@@ -179,6 +179,8 @@ static uint32 GetBYTE(register uint32 Addr);
 static void PutWORD(register uint32 Addr, const register uint32 Value);
 static void PutBYTE(register uint32 Addr, const register uint32 Value);
 static const char* cpu_description(DEVICE *dptr);
+static t_stat cpu_cmd_memory(int32 flag, CONST char *cptr);
+static t_stat cpu_cmd_reg(int32 flag, CONST char *cptr);
 void out(const uint32 Port, const uint32 Value);
 uint32 in(const uint32 Port);
 void altairz80_init(void);
@@ -604,6 +606,13 @@ static MTAB cpu_mod[] = {
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_VALO|MTAB_SHP, 0, "HISTORY", "HISTORY",   &cpu_set_hist, &cpu_show_hist,
       NULL, "CPU instruction history buffer"},
     { 0 }
+};
+
+/* Simulator-specific commands */
+static CTAB cpu_cmd_tbl[] = {
+    { "MEM", &cpu_cmd_memory, 0, "MEM <address>    Dump a block of memory\n" },
+    { "REG", &cpu_cmd_reg,    0, "REG              Display registers\n" },
+    { NULL, NULL, 0, NULL }
 };
 
 /* Debug Flags */
@@ -6356,6 +6365,7 @@ static t_stat cpu_reset(DEVICE *dptr) {
     int32 i;
     if (sim_vm_is_subroutine_call == NULL) { /* First time reset? */
         sim_vm_is_subroutine_call = cpu_is_pc_a_subroutine_call;
+        sim_vm_cmd = cpu_cmd_tbl;
         altairz80_init();
     }
     AF_S = AF1_S = 0;
@@ -7300,3 +7310,110 @@ void cpu_raise_interrupt(uint32 irq) {
                (chiptype < NUM_CHIP_TYPE) ? cpu_mod[chiptype].mstring : "????");
     }
 }
+
+static t_addr disp_addr = 0;
+
+static t_stat cpu_cmd_memory(int32 flag, const char *cptr) {
+    const char *result;
+    char abuf[16];
+    t_addr lo, hi, last;
+    t_value byte;
+
+    if ((result = get_range(NULL, cptr, &lo, &hi, 16, MEMORYMASK, 0)) == NULL) {
+        lo = hi = disp_addr;
+    }
+    else {
+        disp_addr = lo & ~(0x0f);
+    }
+
+    if (hi == lo) {
+        hi = (lo & ~(0x0f)) + 0xff;
+    }
+
+    last = hi | 0x00000f;
+
+    while (disp_addr <= last && disp_addr <= MEMORYMASK) {
+
+        if (!(disp_addr & 0x0f)) {
+            if (MEMORYSIZE <= 0x10000) {
+                sim_printf("%04X ", disp_addr);
+            }
+            else {
+                sim_printf("%02X:%04X ", disp_addr >> 16, disp_addr & 0xffff);
+            }
+        }
+
+        if (disp_addr < lo || disp_addr > hi) {
+            sim_printf("   ");
+            abuf[disp_addr & 0x0f] = ' ';
+        }
+        else {
+            cpu_ex(&byte, disp_addr, &cpu_unit, 0);
+            sim_printf("%02X ", byte);
+            abuf[disp_addr & 0x0f] = sim_isprint(byte) ? byte : '.';
+        }
+
+        if ((disp_addr & 0x000f) == 0x000f) {
+            sim_printf("%16.16s\n", abuf);
+        }
+
+        disp_addr++;
+    }
+
+    if (disp_addr > MEMORYMASK) {
+        disp_addr = 0;
+    }
+
+    return SCPE_OK | SCPE_NOMESSAGE;
+}
+
+static t_stat cpu_cmd_reg(int32 flag, CONST char *cptr)
+{
+    t_value op[INST_MAX_BYTES];
+    int i;
+
+    if (chiptype != CHIP_TYPE_8080 && chiptype != CHIP_TYPE_Z80) {
+        sim_printf("REG requires 8080 or Z80 CPU\n");
+        return SCPE_NOFNC;
+    }
+
+    for (i = 0; i < INST_MAX_BYTES; i++) {
+        op[i] = GetBYTE(PC_S + i);
+    }
+
+    if (chiptype == CHIP_TYPE_8080) {
+        /*
+        ** Use DDT output:
+        ** CfZfMfEfIf A=bb B=dddd D=dddd H=dddd S=dddd P=dddd inst
+        */
+        sim_printf("C%dZ%dM%dE%dI%d A=%02X B=%04X D=%04X H=%04X S=%04X P=%04X ",
+            TSTFLAG2(AF_S, C),
+            TSTFLAG2(AF_S, Z),
+            TSTFLAG2(AF_S, S),
+            TSTFLAG2(AF_S, P),
+            TSTFLAG2(AF_S, H),
+            HIGH_REGISTER(AF_S), (uint16) BC_S, (uint16) DE_S, (uint16) HL_S, (uint16) SP_S, (uint16) PC_S);
+        fprint_sym (stdout, PC_S, op, &cpu_unit, SWMASK ('M'));
+    } else {    /* Z80 */
+        /*
+        ** Use DDT/Z output:
+        */
+        sim_printf("C%dZ%dS%dV%dH%dN%d A =%02X BC =%04X DE =%04X HL =%04X S =%04X P =%04X ",
+            TSTFLAG2(AF_S, C),
+            TSTFLAG2(AF_S, Z),
+            TSTFLAG2(AF_S, S),
+            TSTFLAG2(AF_S, P),
+            TSTFLAG2(AF_S, H),
+            TSTFLAG2(AF_S, N),
+            HIGH_REGISTER(AF_S), (uint16) BC_S, (uint16) DE_S, (uint16) HL_S, (uint16) SP_S, (uint16) PC_S);
+        fprint_sym (stdout, PC_S, op, &cpu_unit, SWMASK ('M'));
+        sim_printf("\n");
+        sim_printf("             A'=%02X BC'=%04X DE'=%04X HL'=%04X IX=%04X IY=%04X",
+            HIGH_REGISTER(AF1_S), (uint16) BC1_S, (uint16) DE1_S, (uint16) HL1_S, (uint16) IX_S, (uint16) IY_S);
+    }
+
+    sim_printf("\n");
+
+    return SCPE_OK | SCPE_NOMESSAGE;
+}
+
