@@ -7507,7 +7507,7 @@ gbuf[sizeof(gbuf)-1] = '\0';
 strlcpy (gbuf, cptr, sizeof(gbuf));
 sim_trim_endspc(gbuf);
 if (sim_chdir(gbuf) != 0)
-    return sim_messagef(SCPE_IOERR, "Unable to directory change to: %s\n", gbuf);
+    return sim_messagef(SCPE_IOERR, "Unable to change directory to: %s\n", gbuf);
 return SCPE_OK;
 }
 
