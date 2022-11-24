@@ -58,13 +58,16 @@ in this directory.
 
 The installer for Visual Studio 2008 SP1 is available from:
 
-http://download.microsoft.com/download/E/8/E/E8EEB394-7F42-4963-A2D8-29559B738298/VS2008ExpressWithSP1ENUX1504728.iso
+https://download.microsoft.com/download/E/8/E/E8EEB394-7F42-4963-A2D8-29559B738298/VS2008ExpressWithSP1ENUX1504728.iso
 
 Then install Visual Studio Express Visual C++ by executing VCExpress\setup.exe 
 on that DVD image.  No need to install "Silverlight Runtime" or 
 "Microsoft SQL Server 2008 Express Edition".  Depending on your OS Version 
 you may be prompted to install an older version of .NET Framework which should 
 be installed.
+
+Visual Studio Express 2008 will build executables that will run on all Windows 
+versions from XP onward with equivalent functionality.
 
 Note: VS2008 can readily coexist on Windows systems that also have later 
 versions of Visual Studio installed.
@@ -77,3 +80,36 @@ conversion process.
 If you have a version of Visual Studio installed and want to build all the
 simulators from a command prompt, the file build_vstudio.bat in the root
 of the simh source tree will do that without any furthur interaction.
+
+Almost all newer Visual Studio versions after VS2008 will build executables 
+that only run on the system that built it or one running the same OS.
+
+If you're using Visual Studio Community 2022, and you follow these 
+installation instructions, you can also build simulator executables which 
+will run on all versions of Windows from XP onward if you install as 
+indicated here and you use the build_vstudio.bat file to perform the
+project conversions.  Once projects are converted, they can be used in 
+the Visual Studio 2022 IDE for further development.
+
+- New install
+  - In the "Workloads" pane, check "Desktop development with C++" workload's
+    checkbox, if not already checked.
+  - Click on the tab labeled "Individual components"
+  - In the "Individual components" pane:
+    - Enter "XP" in the "Search components (Ctrl-Q)" field.
+    - Locate the "Compilers, build tools and runtimes" heading
+    - Select "C++ for Windows XP Support for VS 2017 (v141) tools [Deprecated]" checkbox.
+  - Continue to customize your VS 2022 installation as needed.
+  - Click on "Install" in the lower right hand corner
+
+- Modifying an existing VS2022 installation
+  - Click on the Visual Studio 2022 `Modify` button.
+  - In the "Modifying --" window, click on "Individual Components"
+  - Click on the tab labeled "Individual components"
+  - In the "Individual components" pane:
+    - Enter "XP" in the "Search components (Ctrl-Q)" field.
+    - Locate the "Compilers, build tools and runtimes" heading
+    - Select "C++ for Windows XP Support for VS 2017 (v141) tools [Deprecated]" checkbox.
+  - Continue to customize your VS 2022 installation as needed.
+  - Click on the "Modify" button in the lower right corner of the Window.
+

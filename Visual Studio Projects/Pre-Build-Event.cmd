@@ -30,7 +30,11 @@ rem Everything implicitly requires BUILD to also be set to have
 rem any meaning, it always gets set.
 set _X_BUILD=BUILD
 set _X_REQUIRED_WINDOWS_BUILD=20221109
-call :FindVCVersion _VC_VER
+call :FindVCVersion _VC_VER _MSVC_VER _MSVC_TOOLSET_VER  _MSVC_TOOLSET_DIR
+echo _VC_VER=%_VC_VER%
+echo _MSVC_VER=%_MSVC_VER%
+echo _MSVC_TOOLSET_VER=%_MSVC_TOOLSET_VER%
+echo _MSVC_TOOLSET_DIR=%_MSVC_TOOLSET_DIR%
 
 set _PDB=%~dpn1.pdb
 if exist "%_PDB%" del/q "%_PDB%"
@@ -118,7 +122,7 @@ ren ..\..\windows-build-windows-build windows-build
 if errorlevel 1 goto _notice3
 if exist ../../windows-build-windows-build goto _notice3
 :_check_files
-call :FindVCVersion _VC_VER
+call :FindVCVersion _VC_VER _MSVC_VER _MSVC_TOOLSET_VER _MSVC_TOOLSET_DIR
 if not exist ..\..\windows-build goto _notice1
 if not exist ..\..\windows-build/lib goto _notice2
 set _X_WINDOWS_BUILD=
@@ -138,6 +142,10 @@ set _X_LAST_WINDOWS_BUILD=
 if not exist ../../windows-build/lib/VisualCVersionSupport.txt goto _find_vc_support
 
 set _X_VC_VER=
+if "%_MSVC_TOOLSET_VER%" EQU "v140" set _VC_VER=2015
+if "%_MSVC_TOOLSET_VER%" EQU "v141" set _VC_VER=2017
+if "%_MSVC_TOOLSET_VER%" EQU "v142" set _VC_VER=2019
+if "%_MSVC_TOOLSET_VER%" EQU "v143" set _VC_VER=2022
 for /F "usebackq tokens=2*" %%i in (`findstr /C:"_VC_VER=%_VC_VER% " ..\..\windows-build\lib\VisualCVersionSupport.txt`) do SET _X_VC_VER=%%i %%j
 if "%_X_VC_VER%" neq "" echo Library support for %_X_VC_VER% is available
 if "%_X_VC_VER%" neq "" goto _done_libsdl
@@ -150,7 +158,7 @@ for /F "usebackq tokens=2*" %%i in (`findstr /C:"_VC_VER=%_VC_VER% " "%_X_VC_VER
 echo Enabling Library support for %_X_VC_VER%
 call "%_X_VC_VER_DIR%\Install-Library-Support.cmd"
 :_done_libsdl
-call :FindVCVersion _VC_VER
+call :FindVCVersion _VC_VER _MSVC_VER _MSVC_TOOLSET_VER _MSVC_TOOLSET_DIR
 if not exist "..\..\windows-build\libpng-1.6.18\projects\Release Library" goto _setup_library
 if not exist "..\..\windows-build\libpng-1.6.18\projects\Release Library\VisualC.version" set _LIB_VC_VER=9
 if exist "..\..\windows-build\libpng-1.6.18\projects\Release Library\VisualC.version" for /f "usebackq delims=." %%v in (`type "..\..\windows-build\libpng-1.6.18\projects\Release Library\VisualC.version"`) do set _LIB_VC_VER=%%v
@@ -314,10 +322,10 @@ goto _ProjectInfo
 :_notice4
 echo *********************************
 echo *********************************
-echo **  Visual Studio Version: %_VC_VER%  **
-echo **  Visual Studio Version: %_VC_VER%  **
-echo **  Visual Studio Version: %_VC_VER%  **
-echo **  Visual Studio Version: %_VC_VER%  **
+echo **  Visual Studio Version: %_VC_VER%  Compiler Version: %_MSVC_VER% Toolset Version: %_MSVC_TOOLSET_VER% **
+echo **  Visual Studio Version: %_VC_VER%  Compiler Version: %_MSVC_VER% Toolset Version: %_MSVC_TOOLSET_VER% **
+echo **  Visual Studio Version: %_VC_VER%  Compiler Version: %_MSVC_VER% Toolset Version: %_MSVC_TOOLSET_VER% **
+echo **  Visual Studio Version: %_VC_VER%  Compiler Version: %_MSVC_VER% Toolset Version: %_MSVC_TOOLSET_VER% **
 echo *****************************************************
 echo *****************************************************
 echo **  Windows Build support for your Microsoft       **
@@ -446,13 +454,29 @@ exit /B 0
 
 :FindVCVersion
 call :WhichInPath cl.exe _VC_CL_
-for /f "tokens=3-9 delims=\" %%a in ("%_VC_CL_%") do call :VCCheck _VC_VER_NUM_ "%%a" "%%b" "%%c" "%%d" "%%e" "%%f" "%%g"
+for /f "tokens=3-10 delims=\" %%a in ("%_VC_CL_%") do call :VCCheck _VC_VER_NUM_ "%%a" "%%b" "%%c" "%%d" "%%e" "%%f" "%%g" "%%h"
 for /f "delims=." %%a in ("%_VC_VER_NUM_%") do set %1=%%a
+set _VC_CL_STDERR_=%TEMP%\cl_stderr%RANDOM%.tmp
+set VS_UNICODE_OUTPUT=
+"%_VC_CL_%" /? 2>"%_VC_CL_STDERR_%" 1>NUL 
+for /f "usebackq tokens=4-9" %%a in (`findstr Version "%_VC_CL_STDERR_%"`) do call :MSVCCheck _MSVC_VER_NUM_ "%%a" "%%b" "%%c" "%%d" "%%e"
+if "%4" NEQ "" set %4=%_MSVC_TOOLSET_%
+if "%_MSVC_TOOLSET_%" NEQ "" set _MSVC_TOOLSET_=v%_MSVC_TOOLSET_:~0,2%%_MSVC_TOOLSET_:~3,1%
+if "%3" NEQ "" set %3=%_MSVC_TOOLSET_%
+set _MSVC_TOOLSET_=
+set %2=%_MSVC_VER_NUM_%
+set _MSVC_VER_NUM_=
+for /f "delims=." %%a in ("%_MSVC_VER_NUM_%") do set %2=%%a
+del %_VC_CL_STDERR_%
+set _VC_CL_STDERR_=
 set _VC_CL=
 exit /B 0
 
+:: Scan the elements of the file path of cl.exe to determine the Visual
+:: Studio Version and potentially the toolset version
 :VCCheck
 set _VC_TMP=%1
+set _VC_TOOLSET=
 :_VCCheck_Next
 shift
 set _VC_TMP_=%~1
@@ -463,9 +487,35 @@ if "%_VC_NUM_%" neq "" set %_VC_TMP%=%~1
 if "%_VC_NUM_%" neq "" goto _VCCheck_Done
 goto _VCCheck_Next
 :_VCCheck_Done
+set _VC_TMP=_MSVC_TOOLSET_
+:_VCTSCheck_Next
+shift
+set _VC_TMP_=%~1
+if "%_VC_TMP_%" equ "" goto _VCTSCheck_Done
+call :IsNumeric _VC_NUM_ %_VC_TMP_%
+if "%_VC_NUM_%" neq "" set %_VC_TMP%=%~1
+if "%_VC_NUM_%" neq "" goto _VCTSCheck_Done
+goto _VCTSCheck_Next
+:_VCTSCheck_Done
 set _VC_TMP_=
 set _VC_TMP=
 set _VC_NUM_=
+exit /B 0
+
+:MSVCCheck
+set _MSVC_TMP=%1
+:_MSVCCheck_Next
+shift
+set _MSVC_TMP_=%~1
+if "%_MSVC_TMP_%" equ "" goto _VCCheck_Done
+call :IsNumeric _MSVC_NUM_ %_MSVC_TMP_%
+if "%_MSVC_NUM_%" neq "" set %_MSVC_TMP%=%~1
+if "%_MSVC_NUM_%" neq "" goto _MSVCCheck_Done
+goto _MSVCCheck_Next
+:_MSVCCheck_Done
+set _MSVC_TMP_=
+set _MSVC_TMP=
+set _MSVC_NUM_=
 exit /B 0
 
 :CheckDirectoryVCSupport

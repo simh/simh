@@ -6,6 +6,12 @@
 :: otherwise the installed Visual Studio tools will be used 
 :: prefering newer Visual Studio versions over older ones.
 ::
+:: If this is invoked with Visual Studio 2022 installed along with
+:: the "C++ for Windows XP Support for VS 2017 (v141) tools" option
+:: installed, then the project files will be converted, if needed
+:: to leverage the available support so that the executables created
+:: will run on all versions of Windows from XP onward.
+::
 :: If this procedure is invoked from a Developer command prompt
 :: then the tool chain provided with the command prompt is used
 :: to build the simh projects.
@@ -50,6 +56,15 @@ set _VC_VER=
 call :FindVCVersion _VC_VER
 if not "%_VC_VER%" == "" goto GotVC
 if exist "%ProgramFiles(x86)%\Microsoft Visual Studio 9.0\VC\vcvarsall.bat" call "%ProgramFiles(x86)%\Microsoft Visual Studio 9.0\VC\vcvarsall.bat" 
+call :FindVCVersion _VC_VER
+if not "%_VC_VER%" == "" goto GotVC
+if exist "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars32.bat" call "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars32.bat"
+call :FindVCVersion _VC_VER
+if not "%_VC_VER%" == "" goto GotVC
+if exist "%ProgramFiles%\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvars32.bat" call "%ProgramFiles%\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvars32.bat"
+call :FindVCVersion _VC_VER
+if not "%_VC_VER%" == "" goto GotVC
+if exist "%ProgramFiles%\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars32.bat" call "%ProgramFiles%\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars32.bat"
 call :FindVCVersion _VC_VER
 if not "%_VC_VER%" == "" goto GotVC
 if exist "%ProgramFiles(x86)%\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars32.bat" call "%ProgramFiles(x86)%\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars32.bat"
@@ -169,8 +184,15 @@ goto _NextProject
 
 :_DoMSBuild
 if "%_X_SLN_VERSION%" == "10.00" echo Converting the VS2008 projects to VS%_VC_VER%, this will take several (3-5) minutes & DevEnv /Upgrade "%_BUILD_PROJECT_DIR%Simh.sln"
-if "%_BUILD_PROJECTS%" == "" MSBuild /nologo "%_BUILD_PROJECT_DIR%Simh.sln" /maxCpuCount:%_BUILD_PARALLEL% /Target:Rebuild /Property:Configuration=%_BUILD_CONFIG% /Property:Platform=Win32 & goto :EOF
-
+if not "%_VC_VER%" == "2022" goto _RunBuild
+if not exist "%ProgramFiles%\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v150\Platforms\x64\PlatformToolsets\v141_xp" goto _RunBuild
+for /F "usebackq tokens=1" %%a in (`findstr /C:"<WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>" "%_BUILD_PROJECT_DIR%BuildROMs.vcxproj"`) do SET _X_PROJS_CONVERTED=%%a
+if not "%_X_PROJS_CONVERTED%" == "" goto _RunBuild
+echo Converting the VS2022 projects to generate XP compatible binaries
+Powershell -NoLogo -File "%~dp0\Visual Studio Projects\ConvertToXPProject.ps1" "%~dp0\Visual Studio Projects\*.vcxproj"
+set _X_PROJS_CONVERTED=
+:_RunBuild
+if "%_BUILD_PROJECTS%" == "" MSBuild /nologo "%_BUILD_PROJECT_DIR%Simh.sln" /maxCpuCount:%_BUILD_PARALLEL% /Target:Rebuild /Property:Configuration=%_BUILD_CONFIG% /Property:Platform=Win32 /fileLogger "/fileLoggerParameters:LogFile=%_BUILD_PROJECT_DIR%Build-VS%_VC_VER%.log" & goto :EOF
 set _BUILD_PROJECTS=%_BUILD_PROJECTS:~1%
 set _REBUILD_PROJECTS=%_REBUILD_PROJECTS:~1%
-MSBuild /nologo "%_BUILD_PROJECT_DIR%Simh.sln" /maxCpuCount:%_BUILD_PARALLEL% /Target:%_REBUILD_PROJECTS% /Property:Configuration=%_BUILD_CONFIG% /Property:Platform=Win32 & goto :EOF
+MSBuild /nologo "%_BUILD_PROJECT_DIR%Simh.sln" /maxCpuCount:%_BUILD_PARALLEL% /Target:%_REBUILD_PROJECTS% /Property:Configuration=%_BUILD_CONFIG% /Property:Platform=Win32 "/fileLoggerParameters:LogFile=%_BUILD_PROJECT_DIR%Build-VS%_VC_VER%.log" & goto :EOF

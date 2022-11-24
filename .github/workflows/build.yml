@@ -7,7 +7,7 @@ defaults:
     shell: bash
 
 jobs:
-  build:
+  cmake-unix:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -22,7 +22,7 @@ jobs:
           - pdp8 pdp9 pdq3 rtvax1000 s3 sage scelbi sds sel32 sigma ssem swtp6800mp-a swtp6800mp-a2 tt2500 tx-0 
           - uc15 vax vax730 vax750 vax780 vax8200 vax8600 vaxstation3100m30 vaxstation3100m38 vaxstation3100m76 vaxstation4000m60 vaxstation4000vlc 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install dependencies
         if: ${{runner.os == 'macOS'}}
         run: sh -ex .travis/deps.sh osx
@@ -33,3 +33,30 @@ jobs:
         env:
           SIM: ${{matrix.simulators}}
         run: make LTO=1 OPTIMIZE=-O3 $SIM
+
+  cmake-vs2022xp:
+    name: VS 2022 XP-compatible 
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [windows-latest]
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install v141_xp (XP toolkit)
+        shell: pwsh
+        run: |
+            $packageParams = @( "--productId", "Microsoft.VisualStudio.Product.Enterprise", 
+                "--channelId", "VisualStudio.17.Release",
+                "--add", "Microsoft.VisualStudio.Component.VC.v141.x86.x64",
+                "--add", "Microsoft.VisualStudio.Component.WinXP",
+                "--no-includeRecommended",
+                "--includeOptional",
+                "--quiet",
+                "--locale en-US" ) -join " "
+            choco install visualstudio2022-workload-nativedesktop --package-parameters $packageParams
+
+      - name: vs2022-xp build
+        shell: cmd
+            build_vstudio.bat
