@@ -145,6 +145,9 @@ extern uint8 MOPT[MAXBANKSIZE];
 extern t_stat sim_instr_8086(void);
 extern void cpu8086reset(void);
 
+extern unsigned int m68k_cpu_read_byte_raw(unsigned int address);
+void m68k_cpu_write_byte_raw(unsigned int address, unsigned int value);
+
 /* function prototypes */
 static t_stat cpu_set_switcher  (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 static t_stat cpu_reset_switcher(UNIT *uptr, int32 value, CONST char *cptr, void *desc);
@@ -276,11 +279,13 @@ typedef struct {
     t_value op[INST_MAX_BYTES];
 } insthist_t;
 
-static  uint32 hst_p = 0;                           /* history pointer      */
-static  uint32 hst_lnt = 0;                         /* history length       */
-static  insthist_t *hst = NULL;                     /* instruction history  */
+static  uint32 hst_p = 0;                           /* history pointer          */
+static  uint32 hst_lnt = 0;                         /* history length           */
+static  insthist_t *hst = NULL;                     /* instruction history      */
 
-uint32 m68k_registers[M68K_REG_CPU_TYPE + 1];       /* M68K CPU registers   */
+uint32 m68k_registers[M68K_REG_CPU_TYPE + 1];       /* M68K CPU registers       */
+uint32 mmiobase = 0xff0000;                         /* M68K MMIO base address   */
+uint32 mmiosize = 0x10000;                          /* M68K MMIO window size    */
 
 
 /* data structure for IN/OUT instructions */
@@ -475,10 +480,14 @@ REG cpu_reg[] = {
     }, /* 82 */
     { HRDATAD(COMMONLOW,common_low,         1, "If set, use low memory for common area"),
     }, /* 83 */
-    { HRDATAD(VECINT,vectorInterrupt,       2, "Vector Interrupt psuedo register"),
+    { HRDATAD(VECINT,vectorInterrupt,       2, "Vector Interrupt pseudo register"),
     }, /* 84 */
     { BRDATAD (DATABUS, dataBus, 16, 8,     MAX_INT_VECTORS, "Data bus pseudo register"),
         REG_RO + REG_CIRC   }, /* 85 */
+    { HRDATAD(MMIOBASE,  mmiobase,          24, "Base address for 68K Memory-mapped I/O"),
+    }, /* 86 */
+    { HRDATAD(MMIOSIZE,  mmiosize,          17, "Size of 68K Memory-mapped I/O window"),
+    }, /* 87 */
     { NULL }
 };
 
@@ -1953,6 +1962,8 @@ uint32 getCommon(void) {
 uint8 GetBYTEWrapper(const uint32 Addr) {
     if (chiptype == CHIP_TYPE_8086)
         return GetBYTEExtended(Addr);
+    else if (chiptype == CHIP_TYPE_M68K)
+        return m68k_cpu_read_byte_raw(Addr);
     else if (cpu_unit.flags & UNIT_CPU_MMU)
         return GetBYTE(Addr);
     else
@@ -1963,6 +1974,8 @@ uint8 GetBYTEWrapper(const uint32 Addr) {
 void PutBYTEWrapper(const uint32 Addr, const uint32 Value) {
     if (chiptype == CHIP_TYPE_8086)
         PutBYTEExtended(Addr, Value);
+    else if (chiptype == CHIP_TYPE_M68K)
+        m68k_cpu_write_byte_raw(Addr, Value);
     else if (cpu_unit.flags & UNIT_CPU_MMU)
         PutBYTE(Addr, Value);
     else
@@ -1971,14 +1984,18 @@ void PutBYTEWrapper(const uint32 Addr, const uint32 Value) {
 
 /* DMA memory access during a simulation, suggested by Tony Nicholson */
 uint8 GetByteDMA(const uint32 Addr) {
-    if ((chiptype == CHIP_TYPE_8086) || (cpu_unit.flags & UNIT_CPU_MMU))
+    if (chiptype == CHIP_TYPE_M68K)
+        return m68k_cpu_read_byte_raw(Addr);
+    else if ((chiptype == CHIP_TYPE_8086) || (cpu_unit.flags & UNIT_CPU_MMU))
         return GetBYTEExtended(Addr);
     else
         return MOPT[Addr & ADDRMASK];
 }
 
 void PutByteDMA(const uint32 Addr, const uint32 Value) {
-    if ((chiptype == CHIP_TYPE_8086) || (cpu_unit.flags & UNIT_CPU_MMU))
+    if (chiptype == CHIP_TYPE_M68K)
+        m68k_cpu_write_byte_raw(Addr, Value);
+    else if ((chiptype == CHIP_TYPE_8086) || (cpu_unit.flags & UNIT_CPU_MMU))
         PutBYTEExtended(Addr, Value);
     else
         MOPT[Addr & ADDRMASK] = Value & 0xff;

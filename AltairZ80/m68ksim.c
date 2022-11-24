@@ -154,10 +154,16 @@ extern int32 hdsk_read(void);
 extern int32 hdsk_write(void);
 extern int32 hdsk_flush(void);
 
+/* Interface to SIMH I/O devices */
+extern void out(const uint32 Port, const uint32 Value);
+extern uint32 in(const uint32 Port);
+
 static uint32 m68k_fc;                              /* Current function code from CPU */
 
 extern uint32 m68k_registers[M68K_REG_CPU_TYPE + 1];
 extern UNIT cpu_unit;
+extern uint32 mmiobase;                             /* M68K MMIO base address   */
+extern uint32 mmiosize;                             /* M68K MMIO window size    */
 
 #define M68K_BOOT_LENGTH        (32 * 1024)                 /* size of bootstrap    */
 #define M68K_BOOT_PC            0x000400                    /* initial PC for boot  */
@@ -350,6 +356,10 @@ unsigned int m68k_cpu_read_byte(unsigned int address) {
         case MC6850_STAT:
             return MC6850_status_read();
         default:
+            if ((address >= mmiobase) && (address < mmiobase + mmiosize)) {
+                /* Memory-mapped I/O */
+                return (in(address & 0xff) & 0xff);
+            }
             break;
     }
     if (address > M68K_MAX_RAM) {
@@ -416,6 +426,10 @@ void m68k_cpu_write_byte(unsigned int address, unsigned int value) {
             MC6850_control_write(value & 0xff);
             return;
         default:
+            if ((address >= mmiobase) && (address < mmiobase + mmiosize)) {
+                /* Memory-mapped I/O */
+                out(address & 0xff, value & 0xff);
+            }
             break;
     }
     if (address > M68K_MAX_RAM) {
