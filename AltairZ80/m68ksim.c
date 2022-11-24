@@ -162,8 +162,9 @@ static uint32 m68k_fc;                              /* Current function code fro
 
 extern uint32 m68k_registers[M68K_REG_CPU_TYPE + 1];
 extern UNIT cpu_unit;
-extern uint32 mmiobase;                             /* M68K MMIO base address   */
-extern uint32 mmiosize;                             /* M68K MMIO window size    */
+extern uint32 mmiobase;                             /* M68K MMIO base address            */
+extern uint32 mmiosize;                             /* M68K MMIO window size             */
+extern uint32 m68kvariant;                          /* M68K variant (68000, 68010, etc.) */
 
 #define M68K_BOOT_LENGTH        (32 * 1024)                 /* size of bootstrap    */
 #define M68K_BOOT_PC            0x000400                    /* initial PC for boot  */
@@ -249,10 +250,16 @@ void m68k_clear_memory(void ) {
 }
 
 void m68k_cpu_reset(void) {
+
     WRITE_LONG(m68k_ram, 0, 0x00006000);    // SP
     WRITE_LONG(m68k_ram, 4, 0x00000200);    // PC
     m68k_init();
-    m68k_set_cpu_type(M68K_CPU_TYPE_68000);
+
+    if ((m68kvariant == M68K_CPU_TYPE_INVALID) || (m68kvariant > M68K_CPU_TYPE_SCC68070)) {
+        sim_printf("M68K variant %u not supported, using 68000\n", m68kvariant);
+        m68kvariant = M68K_CPU_TYPE_68000;
+    }
+    m68k_set_cpu_type(m68kvariant);
     m68k_pulse_reset(); // also calls MC6850_reset()
     m68k_CPUToView();
 }

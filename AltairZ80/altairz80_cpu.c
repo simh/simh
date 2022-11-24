@@ -162,6 +162,7 @@ static t_stat cpu_set_nonbanked     (UNIT *uptr, int32 value, CONST char *cptr, 
 static t_stat cpu_set_ramtype       (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 static t_stat cpu_set_chiptype      (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 static t_stat cpu_set_size          (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat m68k_set_chiptype     (UNIT * uptr, int32 value, CONST char* cptr, void* desc);
 static t_stat cpu_set_memory        (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 static t_stat cpu_set_hist          (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 static t_stat cpu_show_hist         (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
@@ -286,7 +287,7 @@ static  insthist_t *hst = NULL;                     /* instruction history      
 uint32 m68k_registers[M68K_REG_CPU_TYPE + 1];       /* M68K CPU registers       */
 uint32 mmiobase = 0xff0000;                         /* M68K MMIO base address   */
 uint32 mmiosize = 0x10000;                          /* M68K MMIO window size    */
-
+uint32 m68kvariant = M68K_CPU_TYPE_68000;
 
 /* data structure for IN/OUT instructions */
 struct idev {
@@ -488,6 +489,8 @@ REG cpu_reg[] = {
     }, /* 86 */
     { HRDATAD(MMIOSIZE,  mmiosize,          17, "Size of 68K Memory-mapped I/O window"),
     }, /* 87 */
+    { DRDATAD(M68KVAR,   m68kvariant,       17, "M68K Type (68000, 68010, etc.)"),
+    }, /* 88 */
     { NULL }
 };
 
@@ -578,6 +581,26 @@ static MTAB cpu_mod[] = {
         NULL, NULL, "Sets the RAM size to 60KB for 8080 / Z80 / 8086"       },
     { MTAB_VDV,             64,                 NULL,           "64KB",         &cpu_set_size,
         NULL, NULL, "Sets the RAM size to 64KB for 8080 / Z80 / 8086"       },
+    { MTAB_VDV,  M68K_CPU_TYPE_68000,NULL,           "68000",        &m68k_set_chiptype,
+        NULL, NULL, "Sets the M68K variant to 68000"  },
+    { MTAB_VDV,  M68K_CPU_TYPE_68010,NULL,           "68010",        &m68k_set_chiptype,
+        NULL, NULL, "Sets the M68K variant to 68010"  },
+    { MTAB_VDV,  M68K_CPU_TYPE_68020,NULL,           "68020",        &m68k_set_chiptype,
+        NULL, NULL, "Sets the M68K variant to 68020"  },
+    { MTAB_XTD | MTAB_VDV,  M68K_CPU_TYPE_68EC020,NULL,         "68EC020",      &m68k_set_chiptype,
+        NULL, NULL, "Sets the M68K variant to 68EC020"  },
+    { MTAB_XTD | MTAB_VDV,  M68K_CPU_TYPE_68030,NULL,           "68030",        &m68k_set_chiptype,
+        NULL, NULL, "Sets the M68K variant to 68030"  },
+    { MTAB_XTD | MTAB_VDV,  M68K_CPU_TYPE_68EC030,NULL,         "68EC030",      &m68k_set_chiptype,
+        NULL, NULL, "Sets the M68K variant to 68EC030"  },
+    { MTAB_XTD | MTAB_VDV,  M68K_CPU_TYPE_68040,NULL,           "68040",        &m68k_set_chiptype,
+        NULL, NULL, "Sets the M68K variant to 68040"  },
+    { MTAB_XTD | MTAB_VDV,  M68K_CPU_TYPE_68EC040,NULL,         "68EC040",      &m68k_set_chiptype,
+        NULL, NULL, "Sets the M68K variant to 68EC040"  },
+    { MTAB_XTD | MTAB_VDV,  M68K_CPU_TYPE_68LC040,NULL,         "68LC040",      &m68k_set_chiptype,
+        NULL, NULL, "Sets the M68K variant to 68LC040"  },
+    { MTAB_XTD | MTAB_VDV,  M68K_CPU_TYPE_SCC68070,NULL,        "SCC68070",     &m68k_set_chiptype,
+        NULL, NULL, "Sets the M68K variant to SCC68070" },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_VALO|MTAB_SHP, 0, "HISTORY", "HISTORY",   &cpu_set_hist, &cpu_show_hist,
       NULL, "CPU instruction history buffer"},
     { 0 }
@@ -6542,13 +6565,27 @@ const static CPUFLAG *cpuflags[NUM_CHIP_TYPE] = { cpuflags8080, cpuflagsZ80,
 /* needs to be set for each ramtype <= MAX_RAM_TYPE */
 static const char *ramTypeToString[] = { "AZ80", "HRAM", "VRAM", "CRAM", "B810" };
 
+static const char* m68kVariantToString[] = {
+    "INVALID",
+    "68000",   "68010",
+    "68EC020", "68020",
+    "68EC030", "68030",
+    "68EC040", "680LC40", "68040",
+    "SCC68070"
+};
+
 static t_stat chip_show(FILE *st, UNIT *uptr, int32 val, CONST void *desc) {
     fprintf(st, cpu_unit.flags & UNIT_CPU_OPSTOP ? "ITRAP, " : "NOITRAP, ");
-    if (chiptype < NUM_CHIP_TYPE)
+    if (chiptype < NUM_CHIP_TYPE) {
         fprintf(st, "%s", cpu_mod[chiptype].mstring);
+        if (chiptype == CHIP_TYPE_M68K) {
+            fprintf(st, " (%s)", m68kVariantToString[m68kvariant]);
+        }
+    }
     fprintf(st, ", ");
     if (ramtype <= MAX_RAM_TYPE)
         fprintf(st, "%s", ramTypeToString[ramtype]);
+
     return SCPE_OK;
 }
 
@@ -6595,11 +6632,15 @@ static t_stat cpu_show(FILE *st, UNIT *uptr, int32 val, CONST void *desc) {
             if (*flagregister[chiptype] & cpuflags[chiptype][i].mask) {
                 if (first) {
                     first = FALSE;
-                    fprintf(st, "\nFlags");
+                    fprintf(st, "\n\tFlags");
                 }
                 fprintf(st, " %s", cpuflags[chiptype][i].flagName);
             }
     }
+    if (chiptype == CHIP_TYPE_M68K) {
+        fprintf(st, "\n\tMemory-Mapped I/O: 0x%06x-0x%06x", mmiobase, mmiobase + (mmiosize - 1));
+    }
+
     return SCPE_OK;
 }
 
@@ -6979,6 +7020,18 @@ static t_stat cpu_set_memory(UNIT *uptr, int32 value, CONST char *cptr, void *de
             ((cptr[i + 1] == 'B') && (cptr[i + 2] == 0))))
         return set_size(size);
     return SCPE_ARG;
+}
+
+static t_stat m68k_set_chiptype(UNIT* uptr, int32 value, CONST char* cptr, void* desc) {
+
+    if (value == m68kvariant) {
+        if (cpu_unit.flags & UNIT_CPU_VERBOSE)
+            sim_printf("M68K Variant unchanged\n");
+        return SCPE_OK;
+    }
+
+    m68kvariant = value;
+    return SCPE_OK;
 }
 
 static t_stat cpu_set_hist(UNIT *uptr, int32 val, CONST char *cptr, void *desc) {
