@@ -308,7 +308,7 @@ static t_stat hdc1001_detach(UNIT *uptr)
 {
     HDC1001_DRIVE_INFO *pDrive;
     t_stat r;
-    int8 i;
+    int32 i;
 
     i = find_unit_index(uptr);
 
@@ -333,7 +333,7 @@ static t_stat hdc1001_detach(UNIT *uptr)
 static t_stat hdc1001_unit_set_geometry(UNIT* uptr, int32 value, CONST char* cptr, void* desc)
 {
     HDC1001_DRIVE_INFO* pDrive;
-    int8 i;
+    int32 i;
     int32 result;
     uint16 newCyls, newHeads, newSPT, newSecLen;
 
@@ -386,7 +386,7 @@ static t_stat hdc1001_unit_set_geometry(UNIT* uptr, int32 value, CONST char* cpt
 static t_stat hdc1001_unit_show_geometry(FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
     HDC1001_DRIVE_INFO* pDrive;
-    int8 i;
+    int32 i;
 
     i = find_unit_index(uptr);
 
@@ -407,7 +407,7 @@ static t_stat hdc1001_unit_show_geometry(FILE* st, UNIT* uptr, int32 val, CONST 
 static int32 hdc1001dev(const int32 port, const int32 io, const int32 data)
 {
     if(io) {
-        HDC1001_Write(port, data);
+        HDC1001_Write(port, (uint8)data);
         return 0;
     } else {
         return(HDC1001_Read(port));
