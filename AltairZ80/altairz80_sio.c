@@ -1768,19 +1768,45 @@ static int32 simh_out(const int32 port, const int32 data) {
             }
             break;
         case setFCBAddressCmd:
-            if (setFCBAddressPos == 0) {
+            /* SETFCBADDR command always takes four bytes:
+             * Byte Z80     8086    68000   32-Bit Address Space (future)
+             * ---- -----   -----   -----   -----------------------------
+             * 1     A7:0    A7:0    A7:0    A7:0
+             * 2    A15:8   A15:8   A15:8   A15:8
+             * 3        0      DS   A23:16  A23:16
+             * 4        0       0       0   A31:24
+             * For 8086, the FCB address is updated by writing the fourth
+             * byte, using the offset A15:0 from the first two bytes and
+             * taking the segment from the CPU's DS register.
+             */
+            switch (setFCBAddressPos) {
+            case 0: /* Address 7:0 */
                 FCBAddress = data;
-                setFCBAddressPos = 1;
-            }
-            else {
+                setFCBAddressPos++;
+                break;
+            case 1: /* Address 15:8 */
                 FCBAddress |= (data << 8);
+                setFCBAddressPos++;
+                break;
+            case 2: /* Address 23:16 */
+                FCBAddress |= (data << 16);
+                setFCBAddressPos++;
+                break;
+            default: /* Address 31:24 */
                 if (chiptype == CHIP_TYPE_8086) {
+                    /* Mask the offset to 16-bits and add in the segment from DS register. */
                     setViewRegisters();
+                    FCBAddress &= 0xFFFF;
                     FCBAddress += (DS_S << 4);
                     sim_debug(CMD_MSG, &simh_device, "SIMH: " ADDRESS_FORMAT
                         " FCBAddress=0x%05x, DS=0x%04x\n", PCX, FCBAddress, DS_S);
+                } else {
+                    FCBAddress |= (data << 24);
+                    sim_debug(CMD_MSG, &simh_device, "SIMH: " ADDRESS_FORMAT
+                        " FCBAddress=0x%08x\n", PCX, FCBAddress);
                 }
                 setFCBAddressPos = lastCommand = 0;
+                break;
             }
             break;
 
@@ -1919,6 +1945,8 @@ static int32 simh_out(const int32 port, const int32 data) {
                     markTimeSP  = 0;
                     lastCommand = 0;
                     deleteNameList();
+                    setFCBAddressPos = 0;
+                    FCBAddress = CPM_FCB_ADDRESS;
                     break;
 
                 case showTimerCmd:  /* show time difference to timer on top of stack */
