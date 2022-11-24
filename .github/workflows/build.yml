@@ -59,4 +59,4 @@ jobs:
 
       - name: vs2022-xp build
         shell: cmd
-            build_vstudio.bat
+        run: build_vstudio.bat
