@@ -185,7 +185,10 @@ goto _NextProject
 :_DoMSBuild
 if "%_X_SLN_VERSION%" == "10.00" echo Converting the VS2008 projects to VS%_VC_VER%, this will take several (3-5) minutes & DevEnv /Upgrade "%_BUILD_PROJECT_DIR%Simh.sln"
 if not "%_VC_VER%" == "2022" goto _RunBuild
-if not exist "%ProgramFiles%\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v150\Platforms\x64\PlatformToolsets\v141_xp" goto _RunBuild
+if exist "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\MSBuild\Microsoft\VC\v150\Platforms\x64\PlatformToolsets\v141_xp" goto _DoXPConvert
+if exist "%ProgramFiles%\Microsoft Visual Studio\2022\Professional\MSBuild\Microsoft\VC\v150\Platforms\x64\PlatformToolsets\v141_xp" goto _DoXPConvert
+if exist "%ProgramFiles%\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v150\Platforms\x64\PlatformToolsets\v141_xp" goto _DoXPConvert
+:_DoXPConvert
 for /F "usebackq tokens=1" %%a in (`findstr /C:"<WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>" "%_BUILD_PROJECT_DIR%BuildROMs.vcxproj"`) do SET _X_PROJS_CONVERTED=%%a
 if not "%_X_PROJS_CONVERTED%" == "" goto _RunBuild
 echo Converting the VS2022 projects to generate XP compatible binaries
