@@ -1,4 +1,4 @@
-@echo off
+@echo on
 :: Rebuild all of SIMH simulators using Visual Studio
 ::
 :: If this procedure is not invoked from a Developer command prompt
@@ -33,7 +33,7 @@
 set _BUILD_CONFIG=Release
 set _BUILD_PROJECTS=
 set _REBUILD_PROJECTS=
-set _BUILD_PROJECT_DIR=%~dp0\Visual Studio Projects\
+set _BUILD_PROJECT_DIR=%~dp0Visual Studio Projects\
 :_CheckArg
 if "%1" == "" goto _DoneArgs
 if /i "%1" == "Debug" set _BUILD_CONFIG=Debug& shift & goto _CheckArg
@@ -166,11 +166,14 @@ exit /B 0
 :GotVC
 set _BUILD_PARALLEL=8
 if %_BUILD_PARALLEL% GTR %NUMBER_OF_PROCESSORS% set _BUILD_PARALLEL=%NUMBER_OF_PROCESSORS%
+set _SLN_FILE=%_BUILD_PROJECT_DIR%Simh.sln
+if exist "%_BUILD_PROJECT_DIR%Simh-%_VC_VER%.sln" set _SLN_FILE=%_BUILD_PROJECT_DIR%Simh-%_VC_VER%.sln
 SET _X_SLN_VERSION=
-for /F "usebackq tokens=8" %%a in (`findstr /C:"Microsoft Visual Studio Solution File, Format Version" "%_BUILD_PROJECT_DIR%Simh.sln"`) do SET _X_SLN_VERSION=%%a
+echo _SLN_FILE=%_SLN_FILE%
+for /F "usebackq tokens=8" %%a in (`findstr /C:"Microsoft Visual Studio Solution File, Format Version" "%_SLN_FILE%"`) do SET _X_SLN_VERSION=%%a
 
 if not "%_VC_VER%" == "9" goto _DoMSBuild
-if "%_BUILD_PROJECTS%" == "" vcbuild /nologo /M%_BUILD_PARALLEL% /useenv /rebuild "%_BUILD_PROJECT_DIR%Simh.sln" "%_BUILD_CONFIG%|Win32" & goto :EOF
+if "%_BUILD_PROJECTS%" == "" vcbuild /nologo /M%_BUILD_PARALLEL% /useenv /rebuild "%_SLN_FILE%" "%_BUILD_CONFIG%|Win32" & goto :EOF
 
 set _BUILD_PROJECTS=%_BUILD_PROJECTS:~1%
 :_NextProject
@@ -183,19 +186,23 @@ vcbuild /nologo /useenv /rebuild "%_BUILD_PROJECT_DIR%%_BUILD_PROJECT%.vcproj" "
 goto _NextProject
 
 :_DoMSBuild
-if "%_X_SLN_VERSION%" == "10.00" echo Converting the VS2008 projects to VS%_VC_VER%, this will take several (3-5) minutes & DevEnv /Upgrade "%_BUILD_PROJECT_DIR%Simh.sln"
+if "%_X_SLN_VERSION%" == "10.00" set _NEW_SLN_FILE=%_BUILD_PROJECT_DIR%Simh-%_VC_VER%.sln
+if "%_X_SLN_VERSION%" == "10.00" copy /y "%_SLN_FILE%" "%_NEW_SLN_FILE%" >NUL & echo Converting the VS2008 projects to VS%_VC_VER%, this will take several (3-5) minutes & DevEnv /Upgrade "%_NEW_SLN_FILE%" & set _SLN_FILE=%_NEW_SLN_FILE%
+set _NEW_SLN_FILE=
 if not "%_VC_VER%" == "2022" goto _RunBuild
 if exist "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\MSBuild\Microsoft\VC\v150\Platforms\x64\PlatformToolsets\v141_xp" goto _DoXPConvert
 if exist "%ProgramFiles%\Microsoft Visual Studio\2022\Professional\MSBuild\Microsoft\VC\v150\Platforms\x64\PlatformToolsets\v141_xp" goto _DoXPConvert
 if exist "%ProgramFiles%\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v150\Platforms\x64\PlatformToolsets\v141_xp" goto _DoXPConvert
 :_DoXPConvert
-for /F "usebackq tokens=1" %%a in (`findstr /C:"<WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>" "%_BUILD_PROJECT_DIR%BuildROMs.vcxproj"`) do SET _X_PROJS_CONVERTED=%%a
+set _X_PROJS_CONVERTED=
+for /F "usebackq tokens=1" %%a in (`findstr /C:"<WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>" "%_BUILD_PROJECT_DIR%BuildROMs.vcxproj"`) do set _X_PROJS_CONVERTED=%%a
 if not "%_X_PROJS_CONVERTED%" == "" goto _RunBuild
 echo Converting the VS2022 projects to generate XP compatible binaries
 Powershell -NoLogo -File "%~dp0\Visual Studio Projects\ConvertToXPProject.ps1" "%~dp0\Visual Studio Projects\*.vcxproj"
 set _X_PROJS_CONVERTED=
 :_RunBuild
-if "%_BUILD_PROJECTS%" == "" MSBuild /nologo "%_BUILD_PROJECT_DIR%Simh.sln" /maxCpuCount:%_BUILD_PARALLEL% /Target:Rebuild /Property:Configuration=%_BUILD_CONFIG% /Property:Platform=Win32 /fileLogger "/fileLoggerParameters:LogFile=%_BUILD_PROJECT_DIR%Build-VS%_VC_VER%.log" & goto :EOF
+if "%_BUILD_PROJECTS%" == "" MSBuild /nologo "%_SLN_FILE%" /maxCpuCount:%_BUILD_PARALLEL% /Target:Rebuild /Property:Configuration=%_BUILD_CONFIG% /Property:Platform=Win32 /fileLogger "/fileLoggerParameters:LogFile=%_BUILD_PROJECT_DIR%Build-VS%_VC_VER%.log" & goto :EOF
 set _BUILD_PROJECTS=%_BUILD_PROJECTS:~1%
 set _REBUILD_PROJECTS=%_REBUILD_PROJECTS:~1%
-MSBuild /nologo "%_BUILD_PROJECT_DIR%Simh.sln" /maxCpuCount:%_BUILD_PARALLEL% /Target:%_REBUILD_PROJECTS% /Property:Configuration=%_BUILD_CONFIG% /Property:Platform=Win32 "/fileLoggerParameters:LogFile=%_BUILD_PROJECT_DIR%Build-VS%_VC_VER%.log" & goto :EOF
+MSBuild /nologo "%_SLN_FILE%" /maxCpuCount:%_BUILD_PARALLEL% /Target:%_REBUILD_PROJECTS% /Property:Configuration=%_BUILD_CONFIG% /Property:Platform=Win32 "/fileLoggerParameters:LogFile=%_BUILD_PROJECT_DIR%Build-VS%_VC_VER%.log" & goto :EOF
+set _SLN_FILE=

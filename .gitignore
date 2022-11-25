@@ -44,6 +44,7 @@ ipch/
 Visual Studio Projects/*
 !Visual Studio Projects/*.vcproj
 !Visual Studio Projects/*.sln
+Visual Studio Projects/*-*.sln
 !Visual Studio Projects/0ReadMe_Projects.txt
 
 

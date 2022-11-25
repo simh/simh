@@ -1,4 +1,4 @@
-This dirctory contains a set of Visual Studio 2008 build projects for the 
+This directory contains a set of Visual Studio 2008 build projects for the 
 current simh code base.  When used (with Visual Studio Express 2008 or 
 or a later Visual Studio version) it populates a directory tree under the 
 BIN directory of the Simh distribution for temporary build files and 
@@ -79,7 +79,10 @@ conversion process.
 
 If you have a version of Visual Studio installed and want to build all the
 simulators from a command prompt, the file build_vstudio.bat in the root
-of the simh source tree will do that without any furthur interaction.
+of the simh source tree will do that without any furthur interaction.  In 
+fact, the best way to convert the VS2008 solution and project files is by 
+using build_vstudio.bat since it will create a new solution file named 
+Simh-2022.sln that can then be used directly by the Visual Studio IDE.
 
 Almost all newer Visual Studio versions after VS2008 will build executables 
 that only run on the system that built it or one running the same OS.
