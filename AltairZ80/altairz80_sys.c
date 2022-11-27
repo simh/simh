@@ -156,11 +156,12 @@ DEVICE      *sim_devices[]  = {
 static char memoryAccessMessage[256];
 static char instructionMessage[256];
 const char *sim_stop_messages[SCPE_BASE] = {
-    "HALT instruction",
+    "Unknown error",            /* 0 is reserved/unknown */
     "Breakpoint",
     memoryAccessMessage,
     instructionMessage,
-    "Invalid Opcode"
+    "Invalid Opcode",
+    "HALT instruction"
 };
 
 static const char *const Mnemonics8080[] = {

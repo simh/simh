@@ -9763,7 +9763,7 @@ t_value pcval;
 
 fputc ('\n', st);                                       /* start on a new line */
 
-if (v >= SCPE_BASE)                                     /* SCP error? */
+if (v == SCPE_OK || v >= SCPE_BASE)                                     /* SCP error? */
     fputs (sim_error_text (v), st);                     /* print it from the SCP list */
 else {                                                  /* VM error */
     if (sim_stop_messages [v])

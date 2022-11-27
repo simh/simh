@@ -63,11 +63,11 @@ typedef enum {
 } ChipType;
 
 /* simulator stop codes */
-#define STOP_HALT       0   /* HALT                                             */
 #define STOP_IBKPT      1   /* breakpoint   (program counter)                   */
 #define STOP_MEM        2   /* breakpoint   (memory access)                     */
 #define STOP_INSTR      3   /* breakpoint   (instruction access)                */
 #define STOP_OPCODE     4   /* invalid operation encountered (8080, Z80, 8086)  */
+#define STOP_HALT       5   /* HALT                                             */
 
 #define UNIT_CPU_V_OPSTOP       (UNIT_V_UF+0)               /* stop on invalid operation                    */
 #define UNIT_CPU_OPSTOP         (1 << UNIT_CPU_V_OPSTOP)
