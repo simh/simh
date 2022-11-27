@@ -1756,9 +1756,8 @@ static const char simh_help2[] =
       " %%CTIME%%, %%DATE_YYYY%%, %%DATE_YY%%, %%DATE_YC%%, %%DATE_MM%%, %%DATE_MMM%%,\n"
       " %%DATE_MONTH%%, %%DATE_DD%%, %%DATE_D%%, %%DATE_WYYYY%%, %%DATE_WW%%,\n"
       " %%TIME_HH%%, %%TIME_MM%%, %%TIME_SS%%, %%TIME_MSEC%%, %%STATUS%%, %%TSTATUS%%,\n"
-      " %%SIM_VERIFY%%, %%SIM_QUIET%%, %%SIM_MESSAGE%% %%SIM_MESSAGE%%\n"
-      " %%SIM_NAME%%, %%SIM_BIN_NAME%%, %%SIM_BIN_PATH%% %%SIM_OSTYPE%%,\n"
-      " %%SIM_RUNTIME%%, %%SIM_RUNTIME_UNITS%%\n\n"
+      " %%SIM_VERIFY%%, %%SIM_QUIET%%, %%SIM_MESSAGE%%, %%SIM_NAME%%, %%SIM_BIN_NAME%%,\n"
+      " %%SIM_BIN_PATH%%, %%SIM_OSTYPE%%, %%SIM_RUNTIME%%, %%SIM_RUNTIME_UNITS%%\n\n"
       "+Token %%0 expands to the command file name.\n"
       "+Token %%n (n being a single digit) expands to the n'th argument\n"
       "+Token %%* expands to the whole set of arguments (%%1 ... %%9)\n\n"
@@ -4860,7 +4859,11 @@ if (!ap) {                              /* no environment variable found? */
         ap = rbuf;
         }
     else if (!strcmp ("TSTATUS", gbuf)) {
-        sprintf (rbuf, "%s", sim_error_text (sim_last_cmd_stat));
+        t_stat stat = SCPE_BARE_STATUS(sim_last_cmd_stat);
+        if ((stat > SCPE_OK) && (stat < SCPE_BASE) && (sim_stop_messages[stat] != NULL))
+            sprintf (rbuf, "%s", sim_stop_messages[stat]);
+        else
+            sprintf (rbuf, "%s", sim_error_text (stat));
         ap = rbuf;
         }
     else if (!strcmp ("SIM_VERIFY", gbuf)) {
