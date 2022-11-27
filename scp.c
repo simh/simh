@@ -2019,15 +2019,19 @@ static const char simh_help2[] =
       " the ON command.\n"
       "4Enabling Error Traps\n"
       " Error trapping is enabled with:\n\n"
-      "++set on {INHERIT|NOINHERIT}  enable error traps\n\n"
+      "++set on                   enable error traps\n\n"
+      "4Disabling Error Traps\n"
+      " Error trapping is disabled with:\n\n"
+      "++set noon                 disable error traps\n\n"
+      " Disables error traps for the currently running command file.\n\n"
+      "4Inheritance of Error Traps\n"
+      " Error traps can be local the current command file or inherited into\n"
+      " nested command file invocations:\n\n"
+      "++set on INHERIT|NOINHERIT enable/disable inheritance\n\n"
       " By default, ON state is NOINHERIT which means that the scope of pending ON\n"
       " actions is bound to the currently executing command file.  If INHERIT is\n"
       " enabled, the currently defined ON actions are inherited by nested command\n"
       " files that may be invoked.\n\n"
-      "4Disabling Error Traps\n"
-      " Error trapping is disabled with:\n\n"
-      "++set noon                    disable error traps\n\n"
-      " Disables error traps for the currently running command file.\n\n"
       "4ON\n"
       " To set the action(s) to take when a specific error status is returned by\n"
       " a command in the currently running do command file:\n\n"
@@ -7373,9 +7377,11 @@ for (lvl=sim_do_depth; lvl >= 0; --lvl) {
             fprintf(st, "Console Input commands\n");
         }
     if (sim_do_filename[lvl][0]) {
-        fprintf (st, "File: %s\n", sim_do_filename[lvl]);
+        fprintf (st, "File: %s", sim_relative_path (sim_do_filename[lvl]));
         if (strcasecmp (sim_do_filename[lvl], "<stdin>"))
-            fprintf (st, "Line: %d\n", sim_goto_line[lvl]);
+            fprintf (st, " Line: %d\n", sim_goto_line[lvl]);
+        else
+            fprintf (st, "\n");
         }
     if (sim_if_cmd[lvl])
         fprintf (st, "Processing IF command\n");
