@@ -6331,10 +6331,10 @@ _rand_uuid_gen (uuidaddr);
 #endif
 
 static VHDHANDLE
-CreateVirtualDisk(const char *szVHDPath,
-                  uint32 SizeInSectors,
-                  uint32 BlockSize,
-                  t_bool bFixedVHD)
+sim_CreateVirtualDisk(const char *szVHDPath,
+                      uint32 SizeInSectors,
+                      uint32 BlockSize,
+                      t_bool bFixedVHD)
 {
 VHD_Footer Footer;
 VHD_DynamicDiskHeader Dynamic;
@@ -6626,10 +6626,10 @@ if ((Status = GetVHDFooter (szParentVHDPath,
                             NULL,
                             0)))
     goto Cleanup_Return;
-hVHD = CreateVirtualDisk (szVHDPath,
-                          (uint32)(NtoHll(ParentFooter.CurrentSize)/BytesPerSector),
-                          NtoHl(ParentDynamic.BlockSize),
-                          FALSE);
+hVHD = sim_CreateVirtualDisk (szVHDPath,
+                              (uint32)(NtoHll(ParentFooter.CurrentSize)/BytesPerSector),
+                              NtoHl(ParentDynamic.BlockSize),
+                              FALSE);
 if (!hVHD) {
     Status = errno;
     goto Cleanup_Return;
@@ -6772,7 +6772,7 @@ return hVHD;
 
 static FILE *sim_vhd_disk_create (const char *szVHDPath, t_offset desiredsize)
 {
-return (FILE *)CreateVirtualDisk (szVHDPath, (uint32)(desiredsize/512), 0, (sim_switches & SWMASK ('X')));
+return (FILE *)sim_CreateVirtualDisk (szVHDPath, (uint32)(desiredsize/512), 0, (sim_switches & SWMASK ('X')));
 }
 
 static FILE *sim_vhd_disk_create_diff (const char *szVHDPath, const char *szParentVHDPath)
