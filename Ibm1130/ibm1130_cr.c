@@ -1620,7 +1620,7 @@ static t_stat cr_attach (UNIT *uptr, CONST char *iptr)
             *c++ = 0;                               /* term arg at space or closing quote */
 
         list_arg[list_nargs] = list_save[list_nargs];   /* set pointer to permanent storage location */
-        strlcpy(list_arg[list_nargs], arg, sizeof *list_arg[list_nargs]);  /* store copy */
+        strlcpy(list_arg[list_nargs], arg, sizeof list_save[list_nargs]);  /* store copy */
     }
     list_arg[list_nargs] = NULL;                    /* NULL terminate the end of the argument list */
 
