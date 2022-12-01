@@ -4493,7 +4493,7 @@ strlcpy (argline, cptr, arg_size);
 cp = argline + (arg_size / 2);
 strlcpy (cp, cptr, arg_size / 2);
 argv[0] = argline;                  /* argv[0] points to unparsed arguments */
-argv[argc + 1] = NULL;              /* make sure the argument list always ends with a NULL */
+argv[argc] = NULL;                  /* make sure the argument list always ends with a NULL */
 while (*cp) {
     while (sim_isspace (*cp))       /* skip blanks */
         cp++;
@@ -16870,6 +16870,10 @@ static struct parse_arg_function_test {
     const char *input;
     struct arg_test_result result;
     } parse_arg_function_tests[] = {
+        {"",
+                 {1, {"", NULL}}},
+        {"1",
+                 {2, {"", "1", NULL}}},
         {"1 2 3 4",
                  {5, {"", "1", "2", "3", "4", NULL}}},
         {"'1 2 3 4'",  
