@@ -2634,7 +2634,9 @@ $(BIN)scelbi$(EXE) : ${SCELBI} ${SIM}
 	$(MAKEIT) OPTS="$(SCELBI_OPT)"
 
 
-tx-0 : ${TX0} ${SIM}
+tx-0 : $(BIN)tx-0$(EXE)
+
+$(BIN)tx-0$(EXE) : ${TX0} ${SIM}
 	$(MAKEIT) OPTS="$(TX0_OPT)"
 
 
