@@ -1007,6 +1007,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
     NETWORK_OPT = $(NETWORK_CCDEFS)
   endif
   ifneq (binexists,$(shell if ${TEST} -e BIN/buildtools; then echo binexists; fi))
+    export MKDIRBIN
     MKDIRBIN = @mkdir -p BIN/buildtools
   endif
   ifeq (commit-id-exists,$(shell if ${TEST} -e .git-commit-id; then echo commit-id-exists; fi))
@@ -1119,7 +1120,7 @@ else
   OS_CCDEFS += -fms-extensions $(PTHREADS_CCDEFS)
   OS_LDFLAGS += -lm -lwsock32 -lwinmm $(PTHREADS_LDFLAGS)
   EXE = .exe
-  ifneq (clean,${MAKECMDGOALS})
+  ifeq (,$(findstring clean,${MAKECMDGOALS}))
     ifneq (buildtoolsexists,$(shell if exist BIN\buildtools (echo buildtoolsexists) else (mkdir BIN\buildtools)))
       MKDIRBIN=
     endif
@@ -1452,7 +1453,7 @@ DISPLAYD = ${SIMHD}/display
 
 SCSI = ${SIMHD}/sim_scsi.c
 
-export BIN = BIN/
+BIN = BIN/
 # The recursive logic needs a GNU make at least v4
 ifneq (,$(shell which gmake 2>/dev/null))
   override MAKE = $(shell which gmake 2>/dev/null)
@@ -2279,168 +2280,252 @@ MAKEFLAGS += --no-print-directory
 # Individual builds
 #
 
-pdp1 : $(PDP1) $(SIM)
+pdp1 : $(BIN)pdp1$(EXE)
+
+$(BIN)pdp1$(EXE) : $(PDP1) $(SIM)
 	$(MAKEIT) OPTS="$(PDP1_OPT)"
 
 
-pdp4 : $(PDP18B) $(SIM)
+pdp4 : $(BIN)pdp4$(EXE)
+
+$(BIN)pdp4$(EXE) : $(PDP18B) $(SIM)
 	$(MAKEIT) OPTS="$(PDP4_OPT)"
 
 
-pdp7 : $(PDP18B) ${PDP18BD}/pdp18b_dpy.c ${DISPLAYL} ${DISPLAY340} $(SIM)
+pdp7 : $(BIN)pdp7$(EXE)
+
+$(BIN)pdp7$(EXE) : $(PDP18B) ${PDP18BD}/pdp18b_dpy.c ${DISPLAYL} ${DISPLAY340} $(SIM)
 	$(MAKEIT) OPTS="$(PDP7_OPT)"
 
 
-pdp8 : ${PDP8} ${SIM}
+pdp8 : $(BIN)pdp8$(EXE)
+
+$(BIN)pdp8$(EXE) : ${PDP8} ${SIM}
 	$(MAKEIT) OPTS="$(PDP8_OPT)"
 
 
-pdp9 : ${PDP18B} ${SIM}
+pdp9 : $(BIN)pdp9$(EXE)
+
+$(BIN)pdp9$(EXE) : ${PDP18B} ${SIM}
 	$(MAKEIT) OPTS="$(PDP9_OPT)"
 
 
-pdp15 : ${PDP18B} ${SIM}
+pdp15 : $(BIN)pdp15$(EXE)
+
+$(BIN)pdp15$(EXE) : ${PDP18B} ${SIM}
 	$(MAKEIT) OPTS="$(PDP15_OPT)"
 
 
-pdp10 : ${PDP10} ${SIM}
+pdp10 : $(BIN)pdp10$(EXE)
+
+$(BIN)pdp10$(EXE) : ${PDP10} ${SIM}
 	$(MAKEIT) OPTS="$(PDP10_OPT)"
 
 
-imlac : ${IMLAC} ${SIM}
+imlac : $(BIN)imlac$(EXE)
+
+$(BIN)imlac$(EXE) : ${IMLAC} ${SIM}
 	$(MAKEIT) OPTS="$(IMLAC_OPT)"
 
 
-tt2500 : ${TT2500} ${SIM}
+tt2500 : $(BIN)tt2500$(EXE)
+
+$(BIN)tt2500$(EXE) : ${TT2500} ${SIM}
 	$(MAKEIT) OPTS="$(TT2500_OPT)"
 
 
-pdp11 : ${PDP11} ${SIM} ${BUILD_ROMS}
+pdp11 : $(BIN)pdp11$(EXE)
+
+$(BIN)pdp11$(EXE) : ${PDP11} ${SIM} ${BUILD_ROMS}
 	$(MAKEIT) OPTS="$(PDP11_OPT)"
 
 
-uc15 : ${UC15} ${SIM}
+uc15 : $(BIN)uc15$(EXE)
+
+$(BIN)uc15$(EXE) : ${UC15} ${SIM}
 	$(MAKEIT) OPTS="$(UC15_OPT)"
 
 
 microvax3900 : vax
 
-vax : ${VAX} ${SIM} ${BUILD_ROMS}
+vax : $(BIN)vax$(EXE)
+
+$(BIN)vax$(EXE) : ${VAX} ${SIM} ${BUILD_ROMS}
 	$(MAKEIT) OPTS="$(VAX_OPT)" TEST_NAME=vax-diag ALTNAME=microvax3900
 
 
-microvax2000 : ${VAX410} ${SIM} ${SCSI} ${BUILD_ROMS}
+microvax2000 : $(BIN)microvax2000$(EXE)
+
+$(BIN)microvax2000$(EXE) : ${VAX410} ${SIM} ${SCSI} ${BUILD_ROMS}
 	$(MAKEIT) OPTS="$(VAX410_OPT)" TEST_NAME=vax-diag
 
 
-infoserver100 : ${VAX420} ${SCSI} ${SIM} ${BUILD_ROMS}
+infoserver100 : $(BIN)infoserver100$(EXE)
+
+$(BIN)infoserver100$(EXE) : ${VAX420} ${SCSI} ${SIM} ${BUILD_ROMS}
 	$(MAKEIT) OPTS="$(VAX411_OPT)" TEST_NAME=vax-diag
 
 
-infoserver150vxt : ${VAX420} ${SCSI} ${SIM} ${BUILD_ROMS}
+infoserver150vxt : $(BIN)infoserver150vxt$(EXE)
+
+$(BIN)infoserver150vxt$(EXE) : ${VAX420} ${SCSI} ${SIM} ${BUILD_ROMS}
 	$(MAKEIT) OPTS="$(VAX412_OPT)" TEST_NAME=vax-diag
 
 
-microvax3100 : ${VAX420} ${SCSI} ${SIM} ${BUILD_ROMS}
+microvax3100 : $(BIN)microvax3100$(EXE)
+
+$(BIN)microvax3100$(EXE) : ${VAX420} ${SCSI} ${SIM} ${BUILD_ROMS}
 	$(MAKEIT) OPTS="$(VAX41A_OPT)" TEST_NAME=vax-diag
 
 
-microvax3100e : ${VAX420} ${SCSI} ${SIM} ${BUILD_ROMS}
+microvax3100e : $(BIN)microvax3100e$(EXE)
+
+$(BIN)microvax3100e$(EXE) : ${VAX420} ${SCSI} ${SIM} ${BUILD_ROMS}
 	$(MAKEIT) OPTS="$(VAX41D_OPT)" TEST_NAME=vax-diag
 
 
-vaxstation3100m30 : ${VAX420} ${SCSI} ${SIM} ${BUILD_ROMS}
+vaxstation3100m30 : $(BIN)vaxstation3100m30$(EXE)
+
+$(BIN)vaxstation3100m30$(EXE) : ${VAX420} ${SCSI} ${SIM} ${BUILD_ROMS}
 	$(MAKEIT) OPTS="$(VAX42A_OPT)" TEST_NAME=vax-diag
 
 
-vaxstation3100m38 : ${VAX420} ${SCSI} ${SIM} ${BUILD_ROMS}
+vaxstation3100m38 : $(BIN)vaxstation3100m38$(EXE)
+
+$(BIN)vaxstation3100m38$(EXE) : ${VAX420} ${SCSI} ${SIM} ${BUILD_ROMS}
 	$(MAKEIT) OPTS="$(VAX42B_OPT)" TEST_NAME=vax-diag
 
 
-vaxstation3100m76 : ${VAX43} ${SCSI} ${SIM} ${BUILD_ROMS}
+vaxstation3100m76 : $(BIN)vaxstation3100m76$(EXE)
+
+$(BIN)vaxstation3100m76$(EXE) : ${VAX43} ${SCSI} ${SIM} ${BUILD_ROMS}
 	$(MAKEIT) OPTS="$(VAX43_OPT)" TEST_NAME=vax-diag
 
 
-vaxstation4000m60 : ${VAX440} ${SCSI} ${SIM} ${BUILD_ROMS}
+vaxstation4000m60 : $(BIN)vaxstation4000m60$(EXE)
+
+$(BIN)vaxstation4000m60$(EXE) : ${VAX440} ${SCSI} ${SIM} ${BUILD_ROMS}
 	$(MAKEIT) OPTS="$(VAX46_OPT)" TEST_NAME=vax-diag
 
 
-microvax3100m80 : ${VAX440} ${SCSI} ${SIM} ${BUILD_ROMS}
+microvax3100m80 : $(BIN)microvax3100m80$(EXE)
+
+$(BIN)microvax3100m80$(EXE) : ${VAX440} ${SCSI} ${SIM} ${BUILD_ROMS}
 	$(MAKEIT) OPTS="$(VAX47_OPT)" TEST_NAME=vax-diag
 
 
-vaxstation4000vlc : ${VAX440} ${SCSI} ${SIM} ${BUILD_ROMS}
+vaxstation4000vlc : $(BIN)vaxstation4000vlc$(EXE)
+
+$(BIN)vaxstation4000vlc$(EXE) : ${VAX440} ${SCSI} ${SIM} ${BUILD_ROMS}
 	$(MAKEIT) OPTS="$(VAX48_OPT)" TEST_NAME=vax-diag
 
 
-infoserver1000 : ${IS1000} ${SCSI} ${SIM} ${BUILD_ROMS}
+infoserver1000 : $(BIN)infoserver1000$(EXE)
+
+$(BIN)infoserver1000$(EXE) : ${IS1000} ${SCSI} ${SIM} ${BUILD_ROMS}
 	$(MAKEIT) OPTS="$(IS1000_OPT)" TEST_NAME=vax-diag
 
 
-microvax1 : ${VAX610} ${SIM} ${BUILD_ROMS}
+microvax1 : $(BIN)microvax1$(EXE)
+
+$(BIN)microvax1$(EXE) : ${VAX610} ${SIM} ${BUILD_ROMS}
 	$(MAKEIT) OPTS="$(VAX610_OPT)" TEST_NAME=vax-diag
 
 
-rtvax1000 : ${VAX630} ${SIM} ${BUILD_ROMS}
+rtvax1000 : $(BIN)rtvax1000$(EXE)
+
+$(BIN)rtvax1000$(EXE) : ${VAX630} ${SIM} ${BUILD_ROMS}
 	$(MAKEIT) OPTS="$(VAX620_OPT)" TEST_NAME=vax-diag
 
 
-microvax2 : ${VAX630} ${SIM} ${BUILD_ROMS}
+microvax2 : $(BIN)microvax2$(EXE)
+
+$(BIN)microvax2$(EXE) : ${VAX630} ${SIM} ${BUILD_ROMS}
 	$(MAKEIT) OPTS="$(VAX630_OPT)" TEST_NAME=vax-diag
 
 
-vax730 : ${VAX730} ${SIM} ${BUILD_ROMS}
+vax730 : $(BIN)vax730$(EXE)
+
+$(BIN)vax730$(EXE) : ${VAX730} ${SIM} ${BUILD_ROMS}
 	$(MAKEIT) OPTS="$(VAX730_OPT)" TEST_NAME=vax-diag
 
 
-vax750 : ${VAX750} ${SIM} ${BUILD_ROMS}
+vax750 : $(BIN)vax750$(EXE)
+
+$(BIN)vax750$(EXE) : ${VAX750} ${SIM} ${BUILD_ROMS}
 	$(MAKEIT) OPTS="$(VAX750_OPT)" TEST_NAME=vax-diag
 
 
-vax780 : ${VAX780} ${SIM} ${BUILD_ROMS}
+vax780 : $(BIN)vax780$(EXE)
+
+$(BIN)vax780$(EXE) : ${VAX780} ${SIM} ${BUILD_ROMS}
 	$(MAKEIT) OPTS="$(VAX780_OPT)" TEST_NAME=vax-diag
 
 
-vax8200 : ${VAX8200} ${SIM} ${BUILD_ROMS}
+vax8200 : $(BIN)vax8200$(EXE)
+
+$(BIN)vax8200$(EXE) : ${VAX8200} ${SIM} ${BUILD_ROMS}
 	$(MAKEIT) OPTS="$(VAX8200_OPT)" TEST_NAME=vax-diag
 
 
-vax8600 : ${VAX8600} ${SIM} ${BUILD_ROMS}
+vax8600 : $(BIN)vax8600$(EXE)
+
+$(BIN)vax8600$(EXE) : ${VAX8600} ${SIM} ${BUILD_ROMS}
 	$(MAKEIT) OPTS="$(VAX8600_OPT)" TEST_NAME=vax-diag
 
 
-nova : ${NOVA} ${SIM}
+nova : $(BIN)nova$(EXE)
+
+$(BIN)nova$(EXE) : ${NOVA} ${SIM}
 	$(MAKEIT) OPTS="$(NOVA_OPT)"
 
 
-eclipse : ${ECLIPSE} ${SIM}
+eclipse : $(BIN)eclipse$(EXE)
+
+$(BIN)eclipse$(EXE) : ${ECLIPSE} ${SIM}
 	$(MAKEIT) OPTS="$(ECLIPSE_OPT)"
 
 
-h316 : ${H316} ${SIM}
+h316 : $(BIN)h316$(EXE)
+
+$(BIN)h316$(EXE) : ${H316} ${SIM}
 	$(MAKEIT) OPTS="$(H316_OPT)"
 
 
-hp2100 : ${HP2100} ${SIM}
+hp2100 : $(BIN)hp2100$(EXE)
+
+$(BIN)hp2100$(EXE) : ${HP2100} ${SIM}
 	$(MAKEIT) OPTS="$(HP2100_OPT)" NOCPP=1
 
-hp3000 : ${HP3000} ${SIM}
+
+hp3000 : $(BIN)hp3000$(EXE)
+
+$(BIN)hp3000$(EXE) : ${HP3000} ${SIM}
 	$(MAKEIT) OPTS="$(HP3000_OPT)" NOCPP=1
 
-i1401 : ${I1401} ${SIM}
+
+i1401 : $(BIN)i1401$(EXE)
+
+$(BIN)i1401$(EXE) : ${I1401} ${SIM}
 	$(MAKEIT) OPTS="$(I1401_OPT)"
 
 
-i1620 : ${I1620} ${SIM}
+i1620 : $(BIN)i1620$(EXE)
+
+$(BIN)i1620$(EXE) : ${I1620} ${SIM}
 	$(MAKEIT) OPTS="$(I1620_OPT)"
 
 
-i7094 : ${I7094} ${SIM}
+i7094 : $(BIN)i7094$(EXE)
+
+$(BIN)i7094$(EXE) : ${I7094} ${SIM}
 	$(MAKEIT) OPTS="$(I7094_OPT)"
 
 
-ibm1130 : ${IBM1130} $(SIM)
-	$(MAKEIT) OPTS="$(IBM1130_OPT)" NOCPP=1
+ibm1130 : $(BIN)ibm1130$(EXE)
+
+#$(BIN)ibm1130$(EXE) : ${IBM1130} $(SIM)
+#	$(MAKEIT) OPTS="$(IBM1130_OPT)" NOCPP=1
 
 ${BIN}ibm1130${EXE} : ${IBM1130}
 ifneq (1,${CPP_BUILD}${CPP_FORCE})
@@ -2459,63 +2544,93 @@ else
 	$(info ibm1130 can not be built using C++)
 endif
 
-s3 : ${S3} ${SIM}
+s3 : $(BIN)s3$(EXE)
+
+$(BIN)s3$(EXE) : ${S3} ${SIM}
 	$(MAKEIT) OPTS="$(S3_OPT)"
 
 
-sel32: ${SEL32} ${SIM}
+sel32 : $(BIN)sel32$(EXE)
+
+$(BIN)sel32$(EXE) : ${SEL32} ${SIM}
 	$(MAKEIT) OPTS="$(SEL32_OPT)"
 
 
-altair : ${ALTAIR} ${SIM}
+altair : $(BIN)altair$(EXE)
+
+$(BIN)altair$(EXE) : ${ALTAIR} ${SIM}
 	$(MAKEIT) OPTS="$(ALTAIR_OPT)"
 
 
-altairz80 : ${ALTAIRZ80} ${SIM}
+altairz80 : $(BIN)altairz80$(EXE)
+
+$(BIN)altairz80$(EXE) : ${ALTAIRZ80} ${SIM}
 	$(MAKEIT) OPTS="$(ALTAIRZ80_OPT)"
 
 
-gri : ${GRI} ${SIM}
+gri : $(BIN)gri$(EXE)
+
+$(BIN)gri$(EXE) : ${GRI} ${SIM}
 	$(MAKEIT) OPTS="$(GRI_OPT)"
 
 
-lgp : ${LGP} ${SIM}
+lgp : $(BIN)lgp$(EXE)
+
+$(BIN)lgp$(EXE) : ${LGP} ${SIM}
 	$(MAKEIT) OPTS="$(LGP_OPT)"
 
 
-id16 : ${ID16} ${SIM}
+id16 : $(BIN)id16$(EXE)
+
+$(BIN)id16$(EXE) : ${ID16} ${SIM}
 	$(MAKEIT) OPTS="$(ID16_OPT)"
 
 
-id32 : ${ID32} ${SIM}
+id32 : $(BIN)id32$(EXE)
+
+$(BIN)id32$(EXE) : ${ID32} ${SIM}
 	$(MAKEIT) OPTS="$(ID32_OPT)"
 
 
-sds : ${SDS} ${SIM}
+sds : $(BIN)sds$(EXE)
+
+$(BIN)sds$(EXE) : ${SDS} ${SIM}
 	$(MAKEIT) OPTS="$(SDS_OPT)"
 
 
-swtp6800mp-a : ${SWTP6800MP-A} ${SIM} ${BUILD_ROMS}
+swtp6800mp-a : $(BIN)swtp6800mp-a$(EXE)
+
+$(BIN)swtp6800mp-a$(EXE) : ${SWTP6800MP-A} ${SIM} ${BUILD_ROMS}
 	$(MAKEIT) OPTS="$(SWTP6800_OPT)"
 
 
-swtp6800mp-a2 : ${SWTP6800MP-A2} ${SIM} ${BUILD_ROMS}
+swtp6800mp-a2 : $(BIN)swtp6800mp-a2$(EXE)
+
+$(BIN)swtp6800mp-a2$(EXE) : ${SWTP6800MP-A2} ${SIM} ${BUILD_ROMS}
 	$(MAKEIT) OPTS="$(SWTP6800_OPT)"
 
 
-intel-mds: ${INTEL_MDS} ${SIM} ${BUILD_ROMS}
+intel-mds : $(BIN)intel-mds$(EXE)
+
+$(BIN)intel-mds$(EXE) : ${INTEL_MDS} ${SIM} ${BUILD_ROMS}
 	$(MAKEIT) OPTS="$(INTEL_MDS_OPT)"
 
 
-ibmpc: ${IBMPC} ${SIM} ${BUILD_ROMS}
+ibmpc : $(BIN)ibmpc$(EXE)
+
+$(BIN)ibmpc$(EXE) : ${IBMPC} ${SIM} ${BUILD_ROMS}
 	$(MAKEIT) OPTS="$(IBMPC_OPT)"
 
 
-ibmpcxt: ${IBMPCXT} ${SIM} ${BUILD_ROMS}
+ibmpcxt : $(BIN)ibmpcxt$(EXE)
+
+$(BIN)ibmpcxt$(EXE) : ${IBMPCXT} ${SIM} ${BUILD_ROMS}
 	$(MAKEIT) OPTS="$(IBMPCXT_OPT)"
 
 
-scelbi: ${SCELBI} ${SIM}
+scelbi : $(BIN)scelbi$(EXE)
+
+$(BIN)scelbi$(EXE) : ${SCELBI} ${SIM}
 	$(MAKEIT) OPTS="$(SCELBI_OPT)"
 
 
@@ -2523,90 +2638,135 @@ tx-0 : ${TX0} ${SIM}
 	$(MAKEIT) OPTS="$(TX0_OPT)"
 
 
-ssem : ${SSEM} ${SIM}
+ssem : $(BIN)ssem$(EXE)
+
+$(BIN)ssem$(EXE) : ${SSEM} ${SIM}
 	$(MAKEIT) OPTS="$(SSEM_OPT)"
 
 
-cdc1700 : ${CDC1700} ${SIM}
+cdc1700 : $(BIN)cdc1700$(EXE)
+
+$(BIN)cdc1700$(EXE) : ${CDC1700} ${SIM}
 	$(MAKEIT) OPTS="$(CDC1700_OPT)"
 
 
-besm6 : ${BESM6} ${SIM}
+besm6 : $(BIN)besm6$(EXE)
+
+$(BIN)besm6$(EXE) : ${BESM6} ${SIM}
 	$(MAKEIT) OPTS="$(BESM6_OPT)" NOCPP=1
 
-sigma : ${SIGMA} ${SIM}
+
+sigma : $(BIN)sigma$(EXE)
+
+$(BIN)sigma$(EXE) : ${SIGMA} ${SIM}
 	$(MAKEIT) OPTS="$(SIGMA_OPT)"
 
 
-alpha : ${ALPHA} ${SIM}
+alpha : $(BIN)alpha$(EXE)
+
+$(BIN)alpha$(EXE) : ${ALPHA} ${SIM}
 	$(MAKEIT) OPTS="$(ALPHA_OPT)"
 
 
-sage : ${SAGE} ${SIM}
+sage : $(BIN)sage$(EXE)
+
+$(BIN)sage$(EXE) : ${SAGE} ${SIM}
 	$(MAKEIT) OPTS="$(SAGE_OPT)"
 
 
-pdq3 : ${PDQ3} ${SIM}
+pdq3 : $(BIN)pdq3$(EXE)
+
+$(BIN)pdq3$(EXE) : ${PDQ3} ${SIM}
 	$(MAKEIT) OPTS="$(PDQ3_OPT)"
 
 
-b5500 : ${B5500} ${SIM} 
+b5500 : $(BIN)b5500$(EXE)
+
+$(BIN)b5500$(EXE) : ${B5500} ${SIM} 
 	$(MAKEIT) OPTS="$(B5500_OPT)"
 
 
-3b2 : ${ATT3B2M400} ${SIM}
+3b2 : $(BIN)3b2$(EXE)
+
+$(BIN)3b2$(EXE) : ${ATT3B2M400} ${SIM}
 	$(MAKEIT) OPTS="$(ATT3B2M400_OPT)" ALTNAME=3b2-400
  
 
-3b2-700 : ${ATT3B2M700} ${SCSI} ${SIM}
+3b2-700 : $(BIN)3b2-700$(EXE)
+
+$(BIN)3b2-700$(EXE) : ${ATT3B2M700} ${SCSI} ${SIM}
 	$(MAKEIT) OPTS="$(ATT3B2M700_OPT)"
 
 
-i7090 : ${I7090} ${SIM} 
+i7090 : $(BIN)i7090$(EXE)
+
+$(BIN)i7090$(EXE) : ${I7090} ${SIM} 
 	$(MAKEIT) OPTS="$(I7090_OPT)"
 
 
-i7080 : ${I7080} ${SIM} 
+i7080 : $(BIN)i7080$(EXE)
+
+$(BIN)i7080$(EXE) : ${I7080} ${SIM} 
 	$(MAKEIT) OPTS="$(I7080_OPT)"
 
 
-i7070 : ${I7070} ${SIM} 
+i7070 : $(BIN)i7070$(EXE)
+
+$(BIN)i7070$(EXE) : ${I7070} ${SIM} 
 	$(MAKEIT) OPTS="$(I7070_OPT)"
 
 
-i7010 : ${I7010} ${SIM} 
+i7010 : $(BIN)i7010$(EXE)
+
+$(BIN)i7010$(EXE) : ${I7010} ${SIM} 
 	$(MAKEIT) OPTS="$(I7010_OPT)"
 
 
-i704 : ${I704} ${SIM} 
+i704 : $(BIN)i704$(EXE)
+
+$(BIN)i704$(EXE) : ${I704} ${SIM} 
 	$(MAKEIT) OPTS="$(I704_OPT)"
 
 
-i701 : ${I701} ${SIM} 
+i701 : $(BIN)i701$(EXE)
+
+$(BIN)i701$(EXE) : ${I701} ${SIM} 
 	$(MAKEIT) OPTS="$(I701_OPT)"
 
 
-i650 : ${I650} ${SIM} 
+i650 : $(BIN)i650$(EXE)
+
+$(BIN)i650$(EXE) : ${I650} ${SIM} 
 	$(MAKEIT) OPTS="$(I650_OPT)"
 
 
-pdp6 : ${PDP6} ${SIM}
+pdp6 : $(BIN)pdp6$(EXE)
+
+$(BIN)pdp6$(EXE) : ${PDP6} ${SIM}
 	$(MAKEIT) OPTS="$(PDP6_OPT)"
 
 
-pdp10-ka : ${KA10} ${SIM}
+pdp10-ka : $(BIN)pdp10-ka$(EXE)
+
+$(BIN)pdp10-ka$(EXE) : ${KA10} ${SIM}
 	$(MAKEIT) OPTS="$(KA10_OPT)"
 
 
-pdp10-ki : ${KI10} ${SIM}
+pdp10-ki : $(BIN)pdp10-ki$(EXE)
+
+$(BIN)pdp10-ki$(EXE) : ${KI10} ${SIM}
 	$(MAKEIT) OPTS="$(KI10_OPT)"
 
 
-pdp10-kl : ${KL10} ${SIM}
+pdp10-kl : $(BIN)pdp10-kl$(EXE)
+
+$(BIN)pdp10-kl$(EXE) : ${KL10} ${SIM}
 	$(MAKEIT) OPTS="$(KL10_OPT)"
 
 
-pdp10-ks : ${KS10} ${SIM}
+pdp10-ks : $(BIN)pdp10-ks$(EXE)
+
+$(BIN)pdp10-ks$(EXE) : ${KS10} ${SIM}
 	$(MAKEIT) OPTS="$(KS10_OPT)"
 
 
@@ -2659,10 +2819,12 @@ else # end of primary make recipies
 
   find_test = RegisterSanityCheck $(abspath $(wildcard $(1)/tests/$(2)_test.ini)) </dev/null
 
-  TARGETNAME = $(basename $(TARGET))
+  TARGETNAME = $(basename $(notdir $(TARGET)))
+  BIN = $(dir $(TARGET))
+  EXE = $(suffix $(TARGET))
   BLDDIR = $(BIN)$(shell uname)-build/$(TARGETNAME)
   OBJS = $(addsuffix .o,$(addprefix $(BLDDIR)/,$(basename $(notdir $(DEPS)))))
-
+  
   $(shell mkdir -p $(BLDDIR))
   $(file >$(BLDDIR)/NEWLINE.file,)
   $(file >>$(BLDDIR)/NEWLINE.file,)
@@ -2671,7 +2833,7 @@ else # end of primary make recipies
   MAKE_INFO = $(foreach VAR,CC OPTS DEPS LDFLAGS DIRS BUILD_SEPARATE,$(VAR)=$($(VAR))$(NEWLINE))
   ifneq ($(MAKE_INFO),$(file <$(BLDDIR)/Make.info)$(NEWLINE))
     # Different or no prior options, so start from scratch
-    $(shell rm -rf $(BLDDIR)/* $(BIN)/$(TARGETNAME)$(EXE))
+    $(shell rm -rf $(BLDDIR)/* $(TARGET))
     $(file >$(BLDDIR)/Make.info,$(MAKE_INFO))
   endif
 
@@ -2735,26 +2897,26 @@ endif
 endif
 
 
-    ${TARGETNAME} : $(BIN)$(TARGETNAME)$(EXE)
-
     ifeq (,$(TEST_NAME))
       override TEST_NAME = $(TARGETNAME)
     endif
 
     ifneq (,$(BUILD_SEPARATE))
 # Multiple Separate compiles for each input
-$(BIN)$(TARGETNAME)$(EXE): $(OBJS)
+$(TARGET): $(OBJS)
+	$(MKDIRBIN)
 	${CC} $(OBJS) ${OPTS} -o $@ ${LDFLAGS}
     else
 # Single Compile and Link of all inputs
-$(BIN)$(TARGETNAME)$(EXE): $(DEPS)
+$(TARGET): $(DEPS)
+	$(MKDIRBIN)
 	${CC} $(DEPS) ${OPTS} -o $@ ${LDFLAGS}
     endif
     ifneq (,$(ALTNAME))
       ifeq (${WIN32},)
-	cp ${BIN}$(TARGETNAME)${EXE} ${BIN}$(ALTNAME)${EXE}
+	cp $(TARGET) $(@D)/$(ALTNAME)${EXE}
       else
-	copy $(@D)\$(TARGETNAME)${EXE} $(@D)\$(ALTNAME)${EXE}
+	copy $(TARGET) $(@D)\$(ALTNAME)${EXE}
       endif
     endif
     ifneq (,$(call find_test,$(word 1,$(DIRS)),$(TEST_NAME)))
