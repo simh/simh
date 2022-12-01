@@ -8270,7 +8270,7 @@ static void fix_writelock_mtab (DEVICE *dptr)
 {
 MTAB *mtab;
 
-for (mtab = dptr->modifiers; (mtab != NULL) && (mtab->mstring != NULL); ++mtab) {
+for (mtab = dptr->modifiers; (mtab != NULL) && ((mtab->mstring != NULL) || (mtab->pstring != NULL)); ++mtab) {
     if (mtab->disp == &show_writelock)
         mtab->pstring = "WRITEENABLED";
     }
