@@ -107,6 +107,9 @@ Internal routines:
 #include <pthread.h>
 #endif
 
+static t_bool sim_disk_check_attached_container (const char *filename, UNIT **auptr);
+
+
 /* Newly created SIMH (and possibly RAW) disk containers       */
 /* will have this data as the last 512 bytes of the container  */
 /* It will not be considered part of the data in the container */
@@ -3121,6 +3124,7 @@ FILE *(*create_function)(const char *filename, t_offset desiredsize) = NULL;
 t_stat (*storage_function)(FILE *file, uint32 *sector_size, uint32 *removable, uint32 *is_cdrom) = NULL;
 t_bool created = FALSE, copied = FALSE, autosized = FALSE;
 t_bool auto_format = FALSE;
+UNIT *auptr;
 DRVTYP *size_settable_drive_type = NULL;
 t_offset container_size, filesystem_size, current_unit_size;
 size_t tmp_size = 1;
@@ -3178,6 +3182,8 @@ if (sim_switches & SWMASK ('D')) {                      /* create difference dis
     cptr = get_glyph_nc (cptr, gbuf, 0);                /* get spec */
     if (*cptr == 0)                                     /* must be more */
         return SCPE_2FARG;
+    if (sim_disk_check_attached_container (gbuf, &auptr))
+        return sim_messagef (SCPE_ALATT, "'%s' is already attach to %s\n", gbuf, sim_uname (auptr));
     vhd = sim_vhd_disk_create_diff (gbuf, cptr);
     if (vhd) {
         sim_vhd_disk_close (vhd);
@@ -3376,6 +3382,8 @@ else {
     }
 if ((uptr->drvtyp != NULL) && (uptr->drvtyp->flags & DRVFL_RO))
     sim_switches |= SWMASK ('R');
+if (sim_disk_check_attached_container (cptr, &auptr))
+    return sim_messagef (SCPE_ALATT, "'%s' is already attach to %s\n", cptr, sim_uname (auptr));
 
 switch (DK_GET_FMT (uptr)) {                            /* case on format */
     case DKUF_F_AUTO:                                   /* SIMH format */
@@ -7346,7 +7354,7 @@ typedef struct {
     int32 flag;
     } DISK_INFO_CTX;
 
-static t_bool sim_disk_check_attached_container (const char *filename)
+static t_bool sim_disk_check_attached_container (const char *filename, UNIT **auptr)
 {
 DEVICE *dptr;
 UNIT *uptr;
@@ -7355,11 +7363,13 @@ struct stat filestat;
 char *fullname;
 
 errno = 0;
+if (auptr != NULL)
+    *auptr = NULL;
 if (sim_stat (filename, &filestat))
-    return TRUE;
+    return FALSE;
 fullname = sim_filepath_parts (filename, "f");
 if (fullname == NULL)
-    return TRUE;                                        /* can't expand path assume attached */
+    return FALSE;                                        /* can't expand path assume attached */
 
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru dev */
     if (0 == (dptr->flags & DEV_DISK))
@@ -7381,6 +7391,8 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru dev */
             if (sim_stat (fullpath, &statb)) {
                 free (fullpath);
                 free (fullname);
+                if (auptr != NULL)
+                    *auptr = uptr;
                 return TRUE;                            /* can't stat assume attached */
                 }
             free (fullpath);
@@ -7395,6 +7407,8 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru dev */
                 (statb.st_ctime != filestat.st_ctime))
                 continue;
             free (fullname);
+            if (auptr != NULL)
+                *auptr = uptr;
             return TRUE;                                /* file currently attached */
             }
         }
@@ -7421,7 +7435,7 @@ sprintf (FullPath, "%s%s", directory, filename);
 if (info->flag) {        /* zap disk type */
     struct stat statb;
 
-    if (sim_disk_check_attached_container (FullPath)) {
+    if (sim_disk_check_attached_container (FullPath, NULL)) {
         info->stat = sim_messagef (SCPE_ALATT, "Cannot ZAP an attached disk container: %s\n", FullPath);
         return;
         }
