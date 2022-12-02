@@ -889,7 +889,7 @@ if (uptr->FNC >= RLCS_READ) {                           /* read (no hdr)? */
     sim_disk_data_trace (uptr, (uint8 *)rlxb, da/RL_NUMWD, sectsread*RL_NUMWD*sizeof(*rlxb), "sim_disk_rdsect", RLDEB_DAT & dptr->dctrl, RLDEB_OPS);
     if ((t = Map_WriteW (ma, wc << 1, rlxb))) {         /* store buffer */
         rlcs = rlcs | RLCS_ERR | RLCS_NXM;              /* nxm */
-        wc = wc - t;                                    /* adjust wc */
+        wc = wc - (t >> 1);                             /* adjust wc */
         }
     }                                               /* end read */
 
@@ -897,7 +897,7 @@ else
 if (uptr->FNC == RLCS_WRITE) {                          /* write? */
     if ((t = Map_ReadW (ma, wc << 1, rlxb))) {          /* fetch buffer */
         rlcs = rlcs | RLCS_ERR | RLCS_NXM;              /* nxm */
-        wc = wc - t;                                    /* adj xfer lnt */
+        wc = wc - (t >> 1);                             /* adj xfer lnt */
         }
     if (wc) {                                           /* any xfer? */
         awc = (wc + (RL_NUMWD - 1)) & ~(RL_NUMWD - 1);  /* clr to */

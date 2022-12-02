@@ -718,7 +718,7 @@ if (wc && (err == 0)) {                                 /* seek ok? */
         else {                                          /* normal store */
             if ((t = MAP_WRW (ma, wc << 1, rkxb))) {    /* store buf */
                 rker = rker | RKER_NXM;                 /* NXM? set flag */
-                wc = wc - t;                            /* adj wd cnt */
+                wc = wc - (t >> 1);                     /* adj wd cnt */
                 }
             }
         break;                                          /* end read */
@@ -735,7 +735,7 @@ if (wc && (err == 0)) {                                 /* seek ok? */
         else {                                          /* normal fetch */
             if ((t = MAP_RDW (ma, wc << 1, rkxb))) {  /* get buf */
                 rker = rker | RKER_NXM;                 /* NXM? set flg */
-                wc = wc - t;                            /* adj wd cnt */
+                wc = wc - (t >> 1);                     /* adj wd cnt */
                 }
             }
         if (wc) {                                       /* any xfer? */
@@ -785,6 +785,7 @@ if ((uptr->FUNC == RKCS_READ) && (rkcs & RKCS_FMT))     /* read format? */
 else da = da + wc + (RK_NUMWD - 1);                     /* count by words */
 track = (da / RK_NUMWD) / RK_NUMSC;
 sect = (da / RK_NUMWD) % RK_NUMSC;
+uptr->CYL = track / RK_NUMSF;
 rkda = (rkda & RKDA_DRIVE) | (track << RKDA_V_TRACK) | (sect << RKDA_V_SECT);
 rk_set_done (0);
 
