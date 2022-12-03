@@ -1,7 +1,7 @@
 # SIMH v4.0 - 19-01 Current
 
 [![Coverity Scan Build Status](https://scan.coverity.com/projects/11982/badge.svg)](https://scan.coverity.com/projects/simh)
-[![CI Build Status](https://travis-ci.org/simh/simh.svg)](https://github.com/simh/simh/actions)
+[![Github CI Build Status](https://github.com/simh/simh/actions/workflows/build.yml/badge.svg)](https://github.com/simh/simh/actions/workflows/build.yml)
 [![AppVeyor](https://ci.appveyor.com/api/projects/status/github/simh/simh)](https://ci.appveyor.com/project/simh/simh/history)
 
 ## Table of Contents:
