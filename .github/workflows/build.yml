@@ -7,7 +7,7 @@ defaults:
     shell: bash
 
 jobs:
-  cmake-unix:
+  make-unix:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -34,7 +34,7 @@ jobs:
           SIM: ${{matrix.simulators}}
         run: make LTO=1 OPTIMIZE=-O3 $SIM
 
-  cmake-vs2022xp:
+  make-vs2022xp:
     name: VS 2022 XP-compatible 
     runs-on: ${{ matrix.os }}
 
@@ -60,3 +60,16 @@ jobs:
       - name: vs2022-xp build
         shell: cmd
         run: build_vstudio.bat
+        
+      - uses: actions/upload-artifact@v3
+      - name: Generate and save Zip XP Runnable binaries
+        shell: pwsh
+        run: |
+            $id_line = Select-String -Path '$pwd\Visual Studio Projects\.git-commit-id.h' -Pattern 'SIM_GIT_COMMIT_ID'
+            $id_name_pos = $id_line.line.IndexOf("SIM_GIT_COMMIT_ID")
+            $id = $id_line.Line.SubString($id_name_pos + 18, 8)
+            $datetime = Get-Date -Format "yyyy-mm-dd_hh-mm-ss"
+            $zipfile = "simh-4.0-Current--$datetime-$id.zip"
+            $zippath = "$pwd\NT\$zipfile"
+            Compress-Archive -Path "$pwd\NT\Win32-Release\*.exe" -DestinationPath "$zippath"
+        path: "$zippath"
