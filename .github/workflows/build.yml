@@ -73,4 +73,8 @@ jobs:
             $zippath = "$pwd\NT\$zipfile"
             Compress-Archive -Path "$pwd\NT\Win32-Release\*.exe" -DestinationPath "$zippath"
             echo "ZIPPATH=$zippath" | Out-File -Append -Encoding ASCII -FilePath $Env:GITHUB_ENV
-        path: ${{ env.ZIPPATH }}
+
+      - uses: actions/upload-artifact@v3
+        with: 
+          name: Save Artifact ${{ env.ZIPPATH }}
+          path: ${{ env.ZIPPATH }}
