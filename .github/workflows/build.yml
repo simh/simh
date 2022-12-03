@@ -64,7 +64,7 @@ jobs:
       - name: Generate and save Zip XP Runnable binaries
         shell: pwsh
         run: |
-            $id_line = Select-String -Path '$pwd\Visual Studio Projects\.git-commit-id.h' -Pattern 'SIM_GIT_COMMIT_ID'
+            $id_line = Select-String -Path "$pwd\Visual Studio Projects\.git-commit-id.h" -Pattern 'SIM_GIT_COMMIT_ID'
             $id_name_pos = $id_line.line.IndexOf("SIM_GIT_COMMIT_ID")
             $id = $id_line.Line.SubString($id_name_pos + 18, 8)
             $datetime = Get-Date -Format "yyyy-mm-dd_hh-mm-ss"
