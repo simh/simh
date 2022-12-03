@@ -61,7 +61,6 @@ jobs:
         shell: cmd
         run: build_vstudio.bat
         
-      - uses: actions/upload-artifact@v3
       - name: Generate and save Zip XP Runnable binaries
         shell: pwsh
         run: |
