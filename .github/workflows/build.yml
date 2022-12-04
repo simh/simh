@@ -59,7 +59,7 @@ jobs:
 
       - name: vs2022-xp build and save XP runnable binaries in a Zip file
         shell: cmd
-        run: ""Visual Studio Projects\build_simulators.cmd""
+        run: 'Visual Studio Projects\build_simulators.cmd'
         
       - uses: actions/upload-artifact@v3
         with: 
