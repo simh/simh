@@ -29,4 +29,7 @@ set _ZipName=simh-%_SIM_MAJOR%.%_SIM_MINOR%%_SIM_PATCH%%_SIM_VERSION_MODE%--%D_Y
 set _ZipPath=BIN\NT\%_ZipName%
 echo Creating Zip File: %_ZipPath%
 Powershell -NoLogo -Command Compress-Archive -Force -Path "BIN\NT\Win32-Release\*.exe" -DestinationPath "%_ZipPath%"
+dir %_ZipPath%
+set
 echo ZIPPATH=%_ZipPath% >> %GITHUM_ENV%
+echo Done.
