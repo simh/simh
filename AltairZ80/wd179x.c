@@ -191,8 +191,16 @@ static const char* wd179x_description(DEVICE *dptr);
 uint8 floorlog2(unsigned int n);
 static uint8 computeSectorSize(const WD179X_DRIVE_INFO *pDrive);
 static uint8 testMode(const WD179X_DRIVE_INFO *pDrive);
+static t_stat wd179x_sectRead(WD179X_DRIVE_INFO* pDrive, uint8 Cyl, uint8 Head,
+    uint8 Sector, uint8* buf, uint32 buflen, uint32* flags, uint32* readlen);
+static t_stat wd179x_sectWrite(WD179X_DRIVE_INFO* pDrive, uint8 Cyl, uint8 Head,
+    uint8 Sector, uint8* buf, uint32 buflen, uint32* flags, uint32* readlen);
+static uint8 Do1793Command(uint8 cCommand);
+static t_stat wd179x_trackWrite(WD179X_DRIVE_INFO* pDrive, uint8 Cyl,
+    uint8 Head, uint8 fillbyte, uint32* flags);
 
-WD179X_INFO wd179x_info_data = { { 0x0, 0, 0x30, 4 }, 1793 };
+
+WD179X_INFO wd179x_info_data = { { 0x0, 0, 0x30, 4 }, 1793, 0, 0 };
 WD179X_INFO *wd179x_info = &wd179x_info_data;
 WD179X_INFO_PUB *wd179x_infop = (WD179X_INFO_PUB *)&wd179x_info_data;
 
@@ -284,6 +292,14 @@ DEVICE wd179x_dev = {
     &wd179x_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
     wd179x_dt, NULL, NULL, NULL, NULL, NULL, &wd179x_description
 };
+
+/* Maximum number of sectors per track for format */
+static const uint8 max_sectors_per_track[2][7] = {
+    /* 128, 256, 512, 1024, 2048, 4096, 8192 */
+    {   26,  15,  8,   4,    2,    1,    0  }, /* Single-density table */
+    {   26,  26, 15,   8,    4,    2,    1  }  /* Double-density table */
+};
+
 
 /* Unit service routine */
 /* Used to generate INDEX pulses in response to a FORCE_INTR command */
@@ -398,18 +414,37 @@ t_stat wd179x_attach(UNIT *uptr, CONST char *cptr)
     if (uptr->capac > 0) {
         char *rtn = fgets(header, 4, uptr->fileref);
         if ((rtn != NULL) && strncmp(header, "IMD", 3)) {
-            sim_printf("WD179X: Only IMD disk images are supported\n");
-            wd179x_info->drive[i].uptr = NULL;
-            return SCPE_OPENERR;
+            /* Not an IMD, so assume DSK image type. */
+            uptr->u3 = IMAGE_TYPE_DSK;
+            uptr->capac = sim_fsize(uptr->fileref);
+
+            switch (uptr->capac) {
+                case WD179X_CAPACITY_SSSD:
+                    sim_debug(VERBOSE_MSG, &wd179x_dev, "WD179X[%d]: 8\" SSSD image attached.\n", i);
+                    wd179x_info->drive[i].nheads = 1;
+                    break;
+                default:
+                    sim_debug(ERROR_MSG, &wd179x_dev, "WD179X[%d]: %d-length disks images are not supported.\n",
+                        i, uptr->capac);
+                return SCPE_OPENERR;
+                    break;
+            }
         }
     } else {
-        /* create a disk image file in IMD format. */
-        if (diskCreate(uptr->fileref, "$Id: wd179x.c 1999 2008-07-22 04:25:28Z hharte $") != SCPE_OK) {
-            sim_printf("WD179X: Failed to create IMD disk.\n");
-            wd179x_info->drive[i].uptr = NULL;
-            return SCPE_OPENERR;
+        char* file_extension = strrchr(uptr->filename, '.');
+        if ((file_extension != NULL) && (!sim_strcasecmp(file_extension, ".IMD"))) {
+            /* create a disk image file in IMD format. */
+            if (diskCreate(uptr->fileref, "$Id: wd179x.c 1999 2008-07-22 04:25:28Z hharte $") != SCPE_OK) {
+                sim_printf("WD179X: Failed to create IMD disk.\n");
+                wd179x_info->drive[i].uptr = NULL;
+                return SCPE_OPENERR;
+            }
+            uptr->capac = sim_fsize(uptr->fileref);
+        } else {
+            sim_printf("WD179X: Creating DSK image.\n");
+            uptr->u3 = IMAGE_TYPE_DSK;
+            uptr->capac = WD179X_CAPACITY_SSSD;
         }
-        uptr->capac = sim_fsize(uptr->fileref);
     }
 
     sim_debug(VERBOSE_MSG, &wd179x_dev, "WD179X[%d]: attached to '%s', type=%s, len=%d\n", i, cptr,
@@ -433,7 +468,7 @@ t_stat wd179x_attach(UNIT *uptr, CONST char *cptr)
         }
 
         /* Set the correct number of sides for this disk image. */
-        wd179x_info->drive[i].nheads = (uint8)imdGetSides(wd179x_info->drive[i].imd);
+        wd179x_info->drive[i].nheads = imdGetSides(wd179x_info->drive[i].imd);
 
     } else {
         wd179x_info->drive[i].imd = NULL;
@@ -460,13 +495,13 @@ t_stat wd179x_detach(UNIT *uptr)
     }
 
     sim_debug(VERBOSE_MSG, &wd179x_dev, "Detach WD179X%d\n", i);
-    r = diskClose(&wd179x_info->drive[i].imd);
+    if (uptr->u3 == IMAGE_TYPE_IMD) {
+        diskClose(&wd179x_info->drive[i].imd);
+    }
     wd179x_info->drive[i].ready = 0;
-    if (r != SCPE_OK)
-        return r;
 
     r = detach_unit(uptr);  /* detach unit */
-        return r;
+    return r;
 }
 
 
@@ -514,11 +549,19 @@ uint8 floorlog2(unsigned int n)
 }
 
 static uint8 computeSectorSize(const WD179X_DRIVE_INFO *pDrive) {
-    return pDrive->track < MAX_CYL ? floorlog2(pDrive->imd->track[pDrive->track][wd179x_info->fdc_head].sectsize) - 7 : 0xF8;
+    if (pDrive->uptr->u3 == IMAGE_TYPE_IMD) {
+        return pDrive->track < MAX_CYL ? floorlog2(pDrive->imd->track[pDrive->track][wd179x_info->fdc_head].sectsize) - 7 : 0xF8;
+    }
+
+    return(0);  /* Hard coded to 128-byte sectors */
 }
 
 static uint8 testMode(const WD179X_DRIVE_INFO *pDrive) {
-    return pDrive->track < MAX_CYL ? IMD_MODE_MFM(pDrive->imd->track[pDrive->track][wd179x_info->fdc_head].mode) != (wd179x_info->ddens) : 0;
+    if (pDrive->uptr->u3 == IMAGE_TYPE_IMD) {
+        return pDrive->track < MAX_CYL ? IMD_MODE_MFM(pDrive->imd->track[pDrive->track][wd179x_info->fdc_head].mode) != (wd179x_info->ddens) : 0;
+    }
+
+    return 0;
 }
 
 uint8 WD179X_Read(const uint32 Addr)
@@ -582,7 +625,7 @@ uint8 WD179X_Read(const uint32 Addr)
                     wd179x_info->fdc_dataindex++;
                     if (wd179x_info->fdc_dataindex == wd179x_info->fdc_datacount) {
                         if (wd179x_info->fdc_multiple == FALSE) {
-                            wd179x_info->fdc_status &= ~(WD179X_STAT_DRQ | WD179X_STAT_BUSY);       /* Clear DRQ, BUSY */
+                            wd179x_info->fdc_status &= ~(WD179X_STAT_DRQ | WD179X_STAT_BUSY); /* Clear DRQ, BUSY */
                             wd179x_info->drq = 0;
                             wd179x_info->intrq = 1;
                             wd179x_info->fdc_read = FALSE;
@@ -591,16 +634,24 @@ uint8 WD179X_Read(const uint32 Addr)
 
                             /* Compute Sector Size */
                             wd179x_info->fdc_sec_len = computeSectorSize(pDrive);
-                            if ((wd179x_info->fdc_sec_len == 0xF8) || (wd179x_info->fdc_sec_len > WD179X_MAX_SEC_LEN)) { /* Error calculating N or N too large */
-                                sim_debug(ERROR_MSG, &wd179x_dev, "WD179X[%d]: " ADDRESS_FORMAT " Invalid sector size!\n", wd179x_info->sel_drive, PCX);
+                            if ((wd179x_info->fdc_sec_len == 0xF8) || (wd179x_info->fdc_sec_len > WD179X_MAX_SEC_LEN)) {
+                                /* Error calculating N or N too large */
+                                sim_debug(ERROR_MSG, &wd179x_dev, "WD179X[%d]: " ADDRESS_FORMAT " Invalid sector size!\n",
+                                    wd179x_info->sel_drive, PCX);
                                 wd179x_info->fdc_sec_len = 0;
                                 return cData;
                             }
 
                             wd179x_info->fdc_sector ++;
-                            sim_debug(RD_DATA_MSG, &wd179x_dev, "WD179X[%d]: " ADDRESS_FORMAT " MULTI_READ_REC, T:%2d/S:%d/N:%2d, %s, len=%d\n", wd179x_info->sel_drive, PCX, pDrive->track, wd179x_info->fdc_head, wd179x_info->fdc_sector, wd179x_info->ddens ? "DD" : "SD", WD179X_SECTOR_LEN_BYTES);
+                            sim_debug(RD_DATA_MSG, &wd179x_dev, "WD179X[%d]: " ADDRESS_FORMAT " MULTI_READ_REC, T:%2d/S:%d/N:%2d, %s, len=%d\n",
+                                wd179x_info->sel_drive, PCX, pDrive->track, wd179x_info->fdc_head,
+                                wd179x_info->fdc_sector, wd179x_info->ddens ? "DD" : "SD",
+                                WD179X_SECTOR_LEN_BYTES);
 
-                            status = sectRead(pDrive->imd,
+                            if (pDrive->uptr->fileref == NULL) {
+                                sim_printf(".fileref is NULL!\n");
+                            } else {
+                                status = wd179x_sectRead(pDrive,
                                 pDrive->track,
                                 wd179x_info->fdc_head,
                                 wd179x_info->fdc_sector,
@@ -608,22 +659,6 @@ uint8 WD179X_Read(const uint32 Addr)
                                 WD179X_SECTOR_LEN_BYTES,
                                 &flags,
                                 &readlen);
-
-                            if (status == SCPE_OK) {
-                                wd179x_info->fdc_status = (WD179X_STAT_DRQ | WD179X_STAT_BUSY);     /* Set DRQ, BUSY */
-                                wd179x_info->drq = 1;
-                                wd179x_info->intrq = 0;
-                                wd179x_info->fdc_datacount = WD179X_SECTOR_LEN_BYTES;
-                                wd179x_info->fdc_dataindex = 0;
-                                wd179x_info->fdc_read = TRUE;
-                                wd179x_info->fdc_read_addr = FALSE;
-                            } else {
-                                wd179x_info->fdc_status = 0; /* Clear DRQ, BUSY */
-                                wd179x_info->fdc_status |= WD179X_STAT_NOT_FOUND;
-                                wd179x_info->drq = 0;
-                                wd179x_info->intrq = 1;
-                                wd179x_info->fdc_read = FALSE;
-                                wd179x_info->fdc_read_addr = FALSE;
                             }
                         }
                     }
@@ -635,6 +670,198 @@ uint8 WD179X_Read(const uint32 Addr)
     return (cData);
 }
 
+uint8 WD179X_Write(const uint32 Addr, uint8 cData)
+{
+    WD179X_DRIVE_INFO* pDrive;
+    uint32 flags = 0;
+    uint32 writelen;
+
+    if (wd179x_info->sel_drive >= WD179X_MAX_DRIVES) {
+        return 0xFF;
+    }
+
+    pDrive = &wd179x_info->drive[wd179x_info->sel_drive];
+
+    if (pDrive->uptr == NULL) {
+        return 0xFF;
+    }
+
+    switch (Addr & 0x3) {
+    case WD179X_STATUS:
+        sim_debug(STATUS_MSG, &wd179x_dev, "WD179X: " ADDRESS_FORMAT
+            " WR CMD   = 0x%02x\n", PCX, cData);
+        wd179x_info->fdc_read = FALSE;
+        wd179x_info->fdc_write = FALSE;
+        wd179x_info->fdc_write_track = FALSE;
+        wd179x_info->fdc_datacount = 0;
+        wd179x_info->fdc_dataindex = 0;
+        if (wd179x_info->intenable) {
+            vectorInterrupt |= (1 << wd179x_info->intvector);
+            dataBus[wd179x_info->intvector] = wd179x_info->intvector * 2;
+        }
+
+        Do1793Command(cData);
+        break;
+    case WD179X_TRACK:
+        sim_debug(STATUS_MSG, &wd179x_dev, "WD179X: " ADDRESS_FORMAT
+            " WR TRACK = 0x%02x\n", PCX, cData);
+        pDrive->track = cData;
+        break;
+    case WD179X_SECTOR:     /* Sector Register */
+        sim_debug(STATUS_MSG, &wd179x_dev, "WD179X: " ADDRESS_FORMAT
+            " WR SECT  = 0x%02x\n", PCX, cData);
+        wd179x_info->fdc_sector = cData;
+        break;
+    case WD179X_DATA:
+        sim_debug(VERBOSE_MSG, &wd179x_dev, "WD179X: " ADDRESS_FORMAT
+            " WR DATA  = 0x%02x\n", PCX, cData);
+        if (wd179x_info->fdc_write == TRUE) {
+            if (wd179x_info->fdc_dataindex < wd179x_info->fdc_datacount) {
+                sdata.raw[wd179x_info->fdc_dataindex] = cData;
+
+                wd179x_info->fdc_dataindex++;
+                if (wd179x_info->fdc_dataindex == wd179x_info->fdc_datacount) {
+                    wd179x_info->fdc_status &= ~(WD179X_STAT_DRQ | WD179X_STAT_BUSY); /* Clear DRQ, BUSY */
+                    wd179x_info->drq = 0;
+                    wd179x_info->intrq = 1;
+                    if (wd179x_info->intenable) {
+                        vectorInterrupt |= (1 << wd179x_info->intvector);
+                        dataBus[wd179x_info->intvector] = wd179x_info->intvector * 2;
+                    }
+
+                    sim_debug(WR_DATA_MSG, &wd179x_dev, "WD179X[%d]: " ADDRESS_FORMAT
+                        " Writing sector, T:%2d/S:%d/N:%2d, Len=%d\n", wd179x_info->sel_drive,
+                        PCX, pDrive->track, wd179x_info->fdc_head, wd179x_info->fdc_sector,
+                        WD179X_SECTOR_LEN_BYTES);
+
+                    wd179x_sectWrite(pDrive,
+                        pDrive->track,
+                        wd179x_info->fdc_head,
+                        wd179x_info->fdc_sector,
+                        sdata.raw,
+                        WD179X_SECTOR_LEN_BYTES,
+                        &flags,
+                        &writelen);
+
+                    wd179x_info->fdc_write = FALSE;
+                }
+            }
+        }
+
+        if (wd179x_info->fdc_write_track == TRUE) {
+            if (wd179x_info->fdc_fmt_state == FMT_GAP1) {
+                if (cData != 0xFC) {
+                    wd179x_info->fdc_gap[0]++;
+                }
+                else {
+                    sim_debug(VERBOSE_MSG, &wd179x_dev, "WD179X: " ADDRESS_FORMAT
+                        " FMT GAP1 Length = %d\n", PCX, wd179x_info->fdc_gap[0]);
+                    wd179x_info->fdc_gap[1] = 0;
+                    wd179x_info->fdc_fmt_state = FMT_GAP2;
+                }
+            } else if (wd179x_info->fdc_fmt_state == FMT_GAP2) {
+                if (cData != 0xFE) {
+                    wd179x_info->fdc_gap[1]++;
+                }
+                else {
+                    sim_debug(VERBOSE_MSG, &wd179x_dev, "WD179X: " ADDRESS_FORMAT
+                        " FMT GAP2 Length = %d\n", PCX, wd179x_info->fdc_gap[1]);
+                    wd179x_info->fdc_gap[2] = 0;
+                    wd179x_info->fdc_fmt_state = FMT_HEADER;
+                    wd179x_info->fdc_header_index = 0;
+                }
+            } else if (wd179x_info->fdc_fmt_state == FMT_HEADER) {
+                if (wd179x_info->fdc_header_index == 5) {
+                    wd179x_info->fdc_gap[2] = 0;
+                    wd179x_info->fdc_fmt_state = FMT_GAP3;
+                } else {
+                    sim_debug(VERBOSE_MSG, &wd179x_dev, "WD179X: " ADDRESS_FORMAT
+                        " HEADER[%d]=%02x\n", PCX, wd179x_info->fdc_header_index, cData);
+                    switch (wd179x_info->fdc_header_index) {
+                    case 0:
+                        pDrive->track = cData;
+                        break;
+                    case 1:
+                        wd179x_info->fdc_head = cData;
+                        break;
+                    case 2:
+                        wd179x_info->fdc_sector = cData;
+                        break;
+                    case 3:
+                    case 4:
+                        break;
+                    }
+                    wd179x_info->fdc_header_index++;
+                }
+            } else if (wd179x_info->fdc_fmt_state == FMT_GAP3) {
+                if (cData != 0xFB) {
+                    wd179x_info->fdc_gap[2]++;
+                }
+                else {
+                    sim_debug(VERBOSE_MSG, &wd179x_dev, "WD179X: " ADDRESS_FORMAT
+                        " FMT GAP3 Length = %d\n", PCX, wd179x_info->fdc_gap[2]);
+                    wd179x_info->fdc_fmt_state = FMT_DATA;
+                    wd179x_info->fdc_dataindex = 0;
+                }
+            } else if (wd179x_info->fdc_fmt_state == FMT_DATA) { /* data bytes */
+                if (cData != 0xF7) {
+                    sdata.raw[wd179x_info->fdc_dataindex] = cData;
+                    wd179x_info->fdc_dataindex++;
+                }
+                else {
+                    wd179x_info->fdc_sec_len = floorlog2(wd179x_info->fdc_dataindex) - 7;
+                    if ((wd179x_info->fdc_sec_len == 0xF8) || (wd179x_info->fdc_sec_len > WD179X_MAX_SEC_LEN)) { /* Error calculating N or N too large */
+                        sim_debug(ERROR_MSG, &wd179x_dev, "WD179X[%d]: " ADDRESS_FORMAT
+                            " Invalid sector size!\n", wd179x_info->sel_drive, PCX);
+                        wd179x_info->fdc_sec_len = 0;
+                    }
+                    if (wd179x_info->fdc_fmt_sector_count >= WD179X_MAX_SECTOR) {
+                        sim_debug(ERROR_MSG, &wd179x_dev, "WD179X: " ADDRESS_FORMAT
+                            " Illegal sector count\n", PCX);
+                        wd179x_info->fdc_fmt_sector_count = 0;
+                    }
+                    wd179x_info->fdc_sectormap[wd179x_info->fdc_fmt_sector_count] = wd179x_info->fdc_sector;
+                    wd179x_info->fdc_fmt_sector_count++;
+                    sim_debug(VERBOSE_MSG, &wd179x_dev, "WD179X: " ADDRESS_FORMAT
+                        " FMT Data Length = %d\n", PCX, wd179x_info->fdc_dataindex);
+
+                    sim_debug(FMT_MSG, &wd179x_dev, "WD179X: " ADDRESS_FORMAT
+                        " FORMAT T:%2d/H:%d/N:%2d=%d/L=%d[%d] Fill=0x%02x\n", PCX,
+                        pDrive->track, wd179x_info->fdc_head,
+                        wd179x_info->fdc_fmt_sector_count,
+                        wd179x_info->fdc_sectormap[wd179x_info->fdc_fmt_sector_count - 1],
+                        wd179x_info->fdc_dataindex, wd179x_info->fdc_sec_len, sdata.raw[0]);
+
+                    wd179x_info->fdc_gap[1] = 0;
+                    wd179x_info->fdc_fmt_state = FMT_GAP2;
+
+                    if (wd179x_info->fdc_fmt_sector_count == max_sectors_per_track[wd179x_info->ddens & 1][wd179x_info->fdc_sec_len]) {
+                        wd179x_trackWrite(pDrive,
+                            pDrive->track,
+                            wd179x_info->fdc_head,
+                            sdata.raw[0],
+                            &flags);
+
+                        wd179x_info->fdc_status &= ~(WD179X_STAT_BUSY | WD179X_STAT_LOST_DATA);     /* Clear BUSY, LOST_DATA */
+                        wd179x_info->drq = 0;
+                        wd179x_info->intrq = 1;
+                        if (wd179x_info->intenable) {
+                            vectorInterrupt |= (1 << wd179x_info->intvector);
+                            dataBus[wd179x_info->intvector] = wd179x_info->intvector * 2;
+                        }
+
+                        /* Recalculate disk size */
+                        pDrive->uptr->capac = sim_fsize(pDrive->uptr->fileref);
+                    }
+                }
+            }
+        }
+
+        wd179x_info->fdc_data = cData;
+        break;
+    }
+    return 0;
+}
 
 /*
  * Command processing happens in three stages:
@@ -791,7 +1018,7 @@ static uint8 Do1793Command(uint8 cCommand)
             if ((wd179x_info->fdc_sec_len == 0xF8) || (wd179x_info->fdc_sec_len > WD179X_MAX_SEC_LEN)) { /* Error calculating N or N too large */
                 sim_debug(ERROR_MSG, &wd179x_dev, "WD179X[%d]: " ADDRESS_FORMAT
                           " Invalid sector size!\n", wd179x_info->sel_drive, PCX);
-                wd179x_info->fdc_status |= WD179X_STAT_NOT_FOUND;       /* Sector not found */
+                wd179x_info->fdc_status |= WD179X_STAT_NOT_FOUND; /* Sector not found */
                 wd179x_info->fdc_status &= ~WD179X_STAT_BUSY;
                 wd179x_info->intrq = 1;
                 wd179x_info->drq = 0;
@@ -808,12 +1035,12 @@ static uint8 Do1793Command(uint8 cCommand)
                       wd179x_info->ddens ? "DD" : "SD", WD179X_SECTOR_LEN_BYTES);
 
             if (testMode(pDrive)) {
-                wd179x_info->fdc_status |= WD179X_STAT_NOT_FOUND;       /* Sector not found */
+                wd179x_info->fdc_status |= WD179X_STAT_NOT_FOUND; /* Sector not found */
                 wd179x_info->fdc_status &= ~WD179X_STAT_BUSY;
                 wd179x_info->intrq = 1;
                 wd179x_info->drq = 0;
             } else {
-                status = sectRead(pDrive->imd,
+                status = wd179x_sectRead(pDrive,
                     pDrive->track,
                     wd179x_info->fdc_head,
                     wd179x_info->fdc_sector,
@@ -821,25 +1048,6 @@ static uint8 Do1793Command(uint8 cCommand)
                     WD179X_SECTOR_LEN_BYTES,
                     &flags,
                     &readlen);
-
-                    if (status == SCPE_OK) {
-                        wd179x_info->fdc_status |= (WD179X_STAT_DRQ);       /* Set DRQ */
-                        wd179x_info->drq = 1;
-                        wd179x_info->fdc_datacount = WD179X_SECTOR_LEN_BYTES;
-                        wd179x_info->fdc_dataindex = 0;
-                        wd179x_info->fdc_write = FALSE;
-                        wd179x_info->fdc_write_track = FALSE;
-                        wd179x_info->fdc_read = TRUE;
-                        wd179x_info->fdc_read_addr = FALSE;
-                    } else {
-                        wd179x_info->fdc_status = 0; /* Clear DRQ, BUSY */
-                        wd179x_info->fdc_status |= WD179X_STAT_NOT_FOUND;
-                        wd179x_info->fdc_status &= ~WD179X_STAT_BUSY;
-                        wd179x_info->drq = 0;
-                        wd179x_info->intrq = 1;
-                        wd179x_info->fdc_read = FALSE;
-                        wd179x_info->fdc_read_addr = FALSE;
-                    }
             }
             break;
         case WD179X_WRITE_RECS:
@@ -887,7 +1095,10 @@ static uint8 Do1793Command(uint8 cCommand)
             }
 
             if (testMode(pDrive)) {
-                wd179x_info->fdc_status = WD179X_STAT_NOT_FOUND;        /* Sector not found */
+                wd179x_info->fdc_status = WD179X_STAT_NOT_FOUND; /* Sector not found */
+                wd179x_info->intrq = 1;
+            } else if ((pDrive->uptr->u3 == IMAGE_TYPE_DSK) && (wd179x_info->ddens == 1) && (wd179x_info->fdc_sec_len == 0)) {
+                wd179x_info->fdc_status = WD179X_STAT_NOT_FOUND; /* Sector not found */
                 wd179x_info->intrq = 1;
             } else {
                 wd179x_info->fdc_status = (WD179X_STAT_DRQ | WD179X_STAT_BUSY);     /* Set DRQ, BUSY */
@@ -937,7 +1148,7 @@ static uint8 Do1793Command(uint8 cCommand)
             sim_debug(CMD_MSG, &wd179x_dev, "WD179X[%d]: " ADDRESS_FORMAT
                       " CMD=FORCE_INTR\n", wd179x_info->sel_drive, PCX);
             if ((cCommand & 0x0F) == 0) { /* I0-I3 == 0, no intr, but clear BUSY and terminate command */
-                wd179x_info->fdc_status &= ~(WD179X_STAT_DRQ | WD179X_STAT_BUSY);       /* Clear DRQ, BUSY */
+                wd179x_info->fdc_status &= ~(WD179X_STAT_DRQ | WD179X_STAT_BUSY); /* Clear DRQ, BUSY */
                 wd179x_info->drq = 0;
                 wd179x_info->fdc_write = FALSE;
                 wd179x_info->fdc_read = FALSE;
@@ -954,7 +1165,11 @@ static uint8 Do1793Command(uint8 cCommand)
                 if (cCommand & 0x04) {
                     wd179x_info->index_pulse_wait = TRUE;
                     if (wd179x_info->sel_drive < WD179X_MAX_DRIVES) {
-                        sim_activate (wd179x_unit, ((wd179x_info->drive[wd179x_info->sel_drive].imd->ntracks % 77) == 0) ? CROMFDC_8IN_ROT : CROMFDC_5IN_ROT); /* Generate INDEX pulse */
+                        if (pDrive->uptr->u3 == IMAGE_TYPE_IMD) {
+                            sim_activate (wd179x_unit, ((wd179x_info->drive[wd179x_info->sel_drive].imd->ntracks % 77) == 0) ? CROMFDC_8IN_ROT : CROMFDC_5IN_ROT); /* Generate INDEX pulse */
+                        } else {
+                            sim_activate(wd179x_unit, CROMFDC_8IN_ROT); /* Generate INDEX pulse */
+                        }
                     }
                 } else {
                     wd179x_info->intrq = 1;
@@ -986,15 +1201,17 @@ static uint8 Do1793Command(uint8 cCommand)
             if (wd179x_info->verify) { /* Verify the selected track/head is ok. */
                 sim_debug(SEEK_MSG, &wd179x_dev, "WD179X[%d]: " ADDRESS_FORMAT
                           " Verify ", wd179x_info->sel_drive, PCX);
-                if (sectSeek(pDrive->imd, pDrive->track, wd179x_info->fdc_head) != SCPE_OK) {
-                    sim_debug(SEEK_MSG, &wd179x_dev, "FAILED\n");
-                    wd179x_info->fdc_status |= WD179X_STAT_NOT_FOUND;
-                } else  if (testMode(pDrive)) {
-                    wd179x_info->fdc_status |= WD179X_STAT_NOT_FOUND;       /* Sector not found */
-                    sim_debug(SEEK_MSG, &wd179x_dev, "NOT FOUND\n");
-                } else {
-                    sim_debug(SEEK_MSG, &wd179x_dev, "Ok\n");
-                }
+                if (pDrive->uptr->u3 == IMAGE_TYPE_IMD) {
+                    if (sectSeek(pDrive->imd, pDrive->track, wd179x_info->fdc_head) != SCPE_OK) {
+	                    sim_debug(SEEK_MSG, &wd179x_dev, "FAILED\n");
+	                    wd179x_info->fdc_status |= WD179X_STAT_NOT_FOUND; /* Sector not found */
+                    } else  if (testMode(pDrive)) {
+	                    wd179x_info->fdc_status |= WD179X_STAT_NOT_FOUND; /* Sector not found */
+	                    sim_debug(SEEK_MSG, &wd179x_dev, "NOT FOUND\n");
+                    } else {
+	                    sim_debug(SEEK_MSG, &wd179x_dev, "Ok\n");
+                    }
+	            }
             }
 
             if (pDrive->track == 0) {
@@ -1029,207 +1246,231 @@ static uint8 Do1793Command(uint8 cCommand)
     return result;
 }
 
-/* Maximum number of sectors per track for format */
-uint8 max_sectors_per_track[2][7] = {
-    /* 128, 256, 512, 1024, 2048, 4096, 8192 */
-    {   26,  15,  8,   4,    2,    1,    0  }, /* Single-density table */
-    {   26,  26, 15,   8,    4,    2,    1  }  /* Double-density table */
-};
-
-uint8 WD179X_Write(const uint32 Addr, uint8 cData)
+static t_stat wd179x_sectRead(WD179X_DRIVE_INFO* pDrive,
+    uint8 Cyl,
+    uint8 Head,
+    uint8 Sector,
+    uint8* buf,
+    uint32 buflen,
+    uint32* flags,
+    uint32* readlen)
 {
-    WD179X_DRIVE_INFO    *pDrive;
-    uint32 flags = 0;
-    uint32 writelen;
+    int status = SCPE_OK;
 
-    if (wd179x_info->sel_drive >= WD179X_MAX_DRIVES) {
-        return 0xFF;
+    if (pDrive->uptr->fileref == NULL) {
+        sim_printf(".fileref is NULL!\n");
+        status = SCPE_IOERR;
+        goto done;
     }
 
-    pDrive = &wd179x_info->drive[wd179x_info->sel_drive];
-
-    if (pDrive->uptr == NULL) {
-        return 0xFF;
+    if (buflen < WD179X_SECTOR_LEN_BYTES) {
+        status = SCPE_IOERR;
+        goto done;
     }
 
-    switch(Addr & 0x3) {
-        case WD179X_STATUS:
-            sim_debug(STATUS_MSG, &wd179x_dev, "WD179X: " ADDRESS_FORMAT
-                      " WR CMD   = 0x%02x\n", PCX, cData);
-            wd179x_info->fdc_read = FALSE;
-            wd179x_info->fdc_write = FALSE;
-            wd179x_info->fdc_write_track = FALSE;
-            wd179x_info->fdc_datacount = 0;
-            wd179x_info->fdc_dataindex = 0;
-            if (wd179x_info->intenable) {
-                vectorInterrupt |= (1 << wd179x_info->intvector);
-                dataBus[wd179x_info->intvector] = wd179x_info->intvector*2;
+    switch ((pDrive->uptr)->u3)
+    {
+    case IMAGE_TYPE_IMD:
+        status = sectRead(pDrive->imd,
+            Cyl,
+            Head,
+            Sector,
+            buf,
+            WD179X_SECTOR_LEN_BYTES,
+            flags,
+            readlen);
+        break;
+    case IMAGE_TYPE_DSK:
+    {
+        uint32 sec_offset;
+        uint32 rtn;
+
+        /* For DSK images, density information is not encoded in the file format,
+            * so enforce that 128-byte sectors are single-density. */
+        if ((wd179x_info->ddens == 1) && (wd179x_info->fdc_sec_len == 0)) {
+            status = SCPE_IOERR;
+            break;
+        }
+        sec_offset = (26 * 128 * Cyl) + ((Sector - 1) * 128);
+
+        if (sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET) == 0) {
+            rtn = sim_fread(sdata.raw, 1, WD179X_SECTOR_LEN_BYTES,
+                (pDrive->uptr)->fileref);
+            if (rtn != (WD179X_SECTOR_LEN_BYTES)) {
+                sim_debug(ERROR_MSG, &wd179x_dev, "WD179x[%d]: " ADDRESS_FORMAT
+                    " READ: sim_fread error.\n", wd179x_info->sel_drive, PCX);
+                status = SCPE_IOERR;
+            }
+        } else {
+            sim_debug(ERROR_MSG, &wd179x_dev, "WD179x[%d]: " ADDRESS_FORMAT
+                " READ: sim_fseek error.\n", wd179x_info->sel_drive, PCX);
+            status = SCPE_IOERR;
+        }
+        break;
+    }
+    default:
+        sim_debug(ERROR_MSG, &wd179x_dev, "WD179x[%d]: Unsupported image type 0x%02x.\n",
+            wd179x_info->sel_drive, pDrive->uptr->u3);
+        break;
+    }
+
+done:
+    if (status == SCPE_OK) {
+        wd179x_info->fdc_status = (WD179X_STAT_DRQ | WD179X_STAT_BUSY); /* Set DRQ, BUSY */
+        wd179x_info->drq = 1;
+        wd179x_info->intrq = 0;
+        wd179x_info->fdc_datacount = WD179X_SECTOR_LEN_BYTES;
+        wd179x_info->fdc_dataindex = 0;
+        wd179x_info->fdc_read = TRUE;
+        wd179x_info->fdc_read_addr = FALSE;
+    } else {
+        wd179x_info->fdc_status = 0; /* Clear DRQ, BUSY */
+        wd179x_info->fdc_status |= WD179X_STAT_NOT_FOUND;
+        wd179x_info->drq = 0;
+        wd179x_info->intrq = 1;
+        wd179x_info->fdc_read = FALSE;
+        wd179x_info->fdc_read_addr = FALSE;
+    }
+
+    return(SCPE_OK);
+}
+
+static t_stat wd179x_sectWrite(WD179X_DRIVE_INFO* pDrive,
+    uint8 Cyl,
+    uint8 Head,
+    uint8 Sector,
+    uint8* buf,
+    uint32 buflen,
+    uint32* flags,
+    uint32* readlen)
+{
+    int status = SCPE_OK;
+
+    if (pDrive->uptr->fileref == NULL) {
+        sim_printf(".fileref is NULL!\n");
+        return (SCPE_IOERR);
+    }
+
+    if (buflen < WD179X_SECTOR_LEN_BYTES) {
+        return (SCPE_IERR);
+    }
+
+    switch ((pDrive->uptr)->u3)
+    {
+        case IMAGE_TYPE_IMD:
+            status = sectWrite(pDrive->imd,
+                Cyl,
+                Head,
+                Sector,
+                buf,
+                WD179X_SECTOR_LEN_BYTES,
+                flags,
+                (uint32 *)readlen);
+            break;
+        case IMAGE_TYPE_DSK:
+        {
+            uint32 sec_offset;
+            uint32 rtn;
+
+            /* For DSK images, density information is not encoded in the file format,
+                * so enforce that 128-byte sectors are single-density. */
+            if ((wd179x_info->ddens == 1) && (wd179x_info->fdc_sec_len == 0)) {
+                status = SCPE_IOERR;
+                break;
             }
 
-            Do1793Command(cData);
-            break;
-        case WD179X_TRACK:
-            sim_debug(STATUS_MSG, &wd179x_dev, "WD179X: " ADDRESS_FORMAT
-                      " WR TRACK = 0x%02x\n", PCX, cData);
-                pDrive->track = cData;
-            break;
-        case WD179X_SECTOR:     /* Sector Register */
-            sim_debug(STATUS_MSG, &wd179x_dev, "WD179X: " ADDRESS_FORMAT
-                      " WR SECT  = 0x%02x\n", PCX, cData);
-                wd179x_info->fdc_sector = cData;
-            break;
-        case WD179X_DATA:
-            sim_debug(VERBOSE_MSG, &wd179x_dev, "WD179X: " ADDRESS_FORMAT
-                      " WR DATA  = 0x%02x\n", PCX, cData);
-            if (wd179x_info->fdc_write == TRUE) {
-                if (wd179x_info->fdc_dataindex < wd179x_info->fdc_datacount) {
-                    sdata.raw[wd179x_info->fdc_dataindex] = cData;
+            sec_offset = (26 * 128 * Cyl) + ((Sector - 1) * 128);
 
-                    wd179x_info->fdc_dataindex++;
-                    if (wd179x_info->fdc_dataindex == wd179x_info->fdc_datacount) {
-                        wd179x_info->fdc_status &= ~(WD179X_STAT_DRQ | WD179X_STAT_BUSY);       /* Clear DRQ, BUSY */
-                        wd179x_info->drq = 0;
-                        wd179x_info->intrq = 1;
-                        if (wd179x_info->intenable) {
-                            vectorInterrupt |= (1 << wd179x_info->intvector);
-                            dataBus[wd179x_info->intvector] = wd179x_info->intvector*2;
-                        }
-
-                    sim_debug(WR_DATA_MSG, &wd179x_dev, "WD179X[%d]: " ADDRESS_FORMAT
-                              " Writing sector, T:%2d/S:%d/N:%2d, Len=%d\n", wd179x_info->sel_drive, PCX, pDrive->track, wd179x_info->fdc_head, wd179x_info->fdc_sector, WD179X_SECTOR_LEN_BYTES);
-
-                    sectWrite(pDrive->imd,
-                        pDrive->track,
-                        wd179x_info->fdc_head,
-                        wd179x_info->fdc_sector,
-                        sdata.raw,
-                        WD179X_SECTOR_LEN_BYTES,
-                        &flags,
-                        &writelen);
-
-                    wd179x_info->fdc_write = FALSE;
-                    }
+            if (sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET) == 0) {
+                rtn = sim_fwrite(sdata.raw, 1, WD179X_SECTOR_LEN_BYTES,
+                    (pDrive->uptr)->fileref);
+                if (rtn != (WD179X_SECTOR_LEN_BYTES)) {
+                    sim_debug(ERROR_MSG, &wd179x_dev, "WD179x[%d]: " ADDRESS_FORMAT
+                        " WRITE: sim_fread error.\n", wd179x_info->sel_drive, PCX);
                 }
             }
-
-            if (wd179x_info->fdc_write_track == TRUE) {
-                    if (wd179x_info->fdc_fmt_state == FMT_GAP1) {
-                        if (cData != 0xFC) {
-                            wd179x_info->fdc_gap[0]++;
-                        } else {
-                            sim_debug(VERBOSE_MSG, &wd179x_dev, "WD179X: " ADDRESS_FORMAT
-                                      " FMT GAP1 Length = %d\n", PCX, wd179x_info->fdc_gap[0]);
-                            wd179x_info->fdc_gap[1] = 0;
-                            wd179x_info->fdc_fmt_state = FMT_GAP2;
-                        }
-                    } else if (wd179x_info->fdc_fmt_state == FMT_GAP2) {
-                        if (cData != 0xFE) {
-                            wd179x_info->fdc_gap[1]++;
-                        } else {
-                            sim_debug(VERBOSE_MSG, &wd179x_dev, "WD179X: " ADDRESS_FORMAT
-                                      " FMT GAP2 Length = %d\n", PCX, wd179x_info->fdc_gap[1]);
-                            wd179x_info->fdc_gap[2] = 0;
-                            wd179x_info->fdc_fmt_state = FMT_HEADER;
-                            wd179x_info->fdc_header_index = 0;
-                        }
-                    } else if (wd179x_info->fdc_fmt_state == FMT_HEADER) {
-                        if (wd179x_info->fdc_header_index == 5) {
-                            wd179x_info->fdc_gap[2] = 0;
-                            wd179x_info->fdc_fmt_state = FMT_GAP3;
-                        } else {
-                            sim_debug(VERBOSE_MSG, &wd179x_dev, "WD179X: " ADDRESS_FORMAT
-                                      " HEADER[%d]=%02x\n", PCX, wd179x_info->fdc_header_index, cData);
-                            switch(wd179x_info->fdc_header_index) {
-                            case 0:
-                                pDrive->track = cData;
-                                break;
-                            case 1:
-                                wd179x_info->fdc_head = cData;
-                                break;
-                            case 2:
-                                wd179x_info->fdc_sector = cData;
-                                break;
-                            case 3:
-                                if (cData != 0x00) {
-                                }
-                                break;
-                            case 4:
-                                if (cData != 0xF7) {
-                                }
-                                break;
-                            }
-                            wd179x_info->fdc_header_index++;
-                        }
-                    } else if (wd179x_info->fdc_fmt_state == FMT_GAP3) {
-                        if (cData != 0xFB) {
-                            wd179x_info->fdc_gap[2]++;
-                        } else {
-                            sim_debug(VERBOSE_MSG, &wd179x_dev, "WD179X: " ADDRESS_FORMAT
-                                      " FMT GAP3 Length = %d\n", PCX, wd179x_info->fdc_gap[2]);
-                            wd179x_info->fdc_fmt_state = FMT_DATA;
-                            wd179x_info->fdc_dataindex = 0;
-                        }
-                    } else if (wd179x_info->fdc_fmt_state == FMT_DATA) { /* data bytes */
-                        if (cData != 0xF7) {
-                            sdata.raw[wd179x_info->fdc_dataindex] = cData;
-                            wd179x_info->fdc_dataindex++;
-                        } else {
-                            wd179x_info->fdc_sec_len = floorlog2(wd179x_info->fdc_dataindex) - 7;
-                            if ((wd179x_info->fdc_sec_len == 0xF8) || (wd179x_info->fdc_sec_len > WD179X_MAX_SEC_LEN)) { /* Error calculating N or N too large */
-                                sim_debug(ERROR_MSG, &wd179x_dev, "WD179X[%d]: " ADDRESS_FORMAT
-                                          " Invalid sector size!\n", wd179x_info->sel_drive, PCX);
-                                wd179x_info->fdc_sec_len = 0;
-                            }
-                            if (wd179x_info->fdc_fmt_sector_count >= WD179X_MAX_SECTOR) {
-                                sim_debug(ERROR_MSG, &wd179x_dev, "WD179X: " ADDRESS_FORMAT
-                                          " Illegal sector count\n", PCX);
-                                wd179x_info->fdc_fmt_sector_count = 0;
-                            }
-                            wd179x_info->fdc_sectormap[wd179x_info->fdc_fmt_sector_count] = wd179x_info->fdc_sector;
-                            wd179x_info->fdc_fmt_sector_count++;
-                            sim_debug(VERBOSE_MSG, &wd179x_dev, "WD179X: " ADDRESS_FORMAT
-                                      " FMT Data Length = %d\n", PCX, wd179x_info->fdc_dataindex);
-
-                            sim_debug(FMT_MSG, &wd179x_dev, "WD179X: " ADDRESS_FORMAT
-                                      " FORMAT T:%2d/H:%d/N:%2d=%d/L=%d[%d] Fill=0x%02x\n", PCX,
-                                      pDrive->track, wd179x_info->fdc_head,
-                                      wd179x_info->fdc_fmt_sector_count,
-                                      wd179x_info->fdc_sectormap[wd179x_info->fdc_fmt_sector_count - 1],
-                                      wd179x_info->fdc_dataindex, wd179x_info->fdc_sec_len, sdata.raw[0]);
-
-                            wd179x_info->fdc_gap[1] = 0;
-                            wd179x_info->fdc_fmt_state = FMT_GAP2;
-
-                            if (wd179x_info->fdc_fmt_sector_count == max_sectors_per_track[wd179x_info->ddens & 1][wd179x_info->fdc_sec_len]) {
-                                trackWrite(pDrive->imd,
-                                           pDrive->track,
-                                           wd179x_info->fdc_head,
-                                           wd179x_info->fdc_fmt_sector_count,
-                                           WD179X_SECTOR_LEN_BYTES,
-                                           wd179x_info->fdc_sectormap,
-                                           wd179x_info->ddens ? 3 : 0, /* data mode */
-                                           sdata.raw[0],
-                                           &flags);
-
-                                wd179x_info->fdc_status &= ~(WD179X_STAT_BUSY | WD179X_STAT_LOST_DATA);     /* Clear BUSY, LOST_DATA */
-                                wd179x_info->drq = 0;
-                                wd179x_info->intrq = 1;
-                                if (wd179x_info->intenable) {
-                                    vectorInterrupt |= (1 << wd179x_info->intvector);
-                                    dataBus[wd179x_info->intvector] = wd179x_info->intvector*2;
-                                }
-
-                                /* Recalculate disk size */
-                                pDrive->uptr->capac = sim_fsize(pDrive->uptr->fileref);
-                            }
-                        }
-                    }
+            else {
+                sim_debug(ERROR_MSG, &wd179x_dev, "WD179x[%d]: " ADDRESS_FORMAT
+                    " WRITE: sim_fseek error.\n", wd179x_info->sel_drive, PCX);
             }
-
-            wd179x_info->fdc_data = cData;
+            break;
+        }
+        default:
+            sim_debug(ERROR_MSG, &wd179x_dev, "WD179x[%d]: Unsupported image type 0x%02x.\n", wd179x_info->sel_drive, pDrive->uptr->u3);
             break;
     }
 
-    return 0;
+    return (SCPE_OK);
+}
+
+static t_stat wd179x_trackWrite(WD179X_DRIVE_INFO* pDrive,
+    uint8 Cyl,
+    uint8 Head,
+    uint8 fillbyte,
+    uint32* flags)
+{
+    int status = SCPE_OK;
+
+    if (pDrive->uptr->fileref == NULL) {
+        sim_printf(".fileref is NULL!\n");
+    }
+    else {
+        switch ((pDrive->uptr)->u3)
+        {
+        case IMAGE_TYPE_IMD:
+            status = trackWrite(pDrive->imd,
+                Cyl,
+                Head,
+                wd179x_info->fdc_fmt_sector_count,
+                WD179X_SECTOR_LEN_BYTES,
+                wd179x_info->fdc_sectormap,
+                wd179x_info->ddens ? 3 : 0, /* data mode */
+                fillbyte,
+                flags);
+            break;
+        case IMAGE_TYPE_DSK:
+        {
+            uint32 sec_offset;
+            uint32 rtn;
+            uint8 Sector;
+            uint16 i;
+            uint8 Fillbuf[128] = { 0 };
+
+            /* For DSK images, density information is not encoded in the file format,
+             * so enforce that 128-byte sectors are single-density. */
+            if ((wd179x_info->ddens == 1) && (wd179x_info->fdc_sec_len == 0)) {
+                status = SCPE_IOERR;
+                break;
+            }
+
+            for (i = 0; i < 128; i++) {
+                Fillbuf[i] = fillbyte;
+            }
+
+            for (Sector = 0; Sector < wd179x_info->fdc_fmt_sector_count; Sector++) {
+                sec_offset = (26 * 128 * Cyl) + (128 * Sector);
+
+                if (sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET) == 0) {
+                    rtn = sim_fwrite(Fillbuf, 1, WD179X_SECTOR_LEN_BYTES,
+                        (pDrive->uptr)->fileref);
+                    if (rtn != (WD179X_SECTOR_LEN_BYTES)) {
+                        sim_debug(ERROR_MSG, &wd179x_dev, "WD179x[%d]: " ADDRESS_FORMAT
+                            " FORMAT_TRACK: sim_fread error.\n", wd179x_info->sel_drive, PCX);
+                    }
+                }
+                else {
+                    sim_debug(ERROR_MSG, &wd179x_dev, "WD179x[%d]: " ADDRESS_FORMAT
+                        " FORMAT_TRACK: sim_fseek error.\n", wd179x_info->sel_drive, PCX);
+                }
+            }
+            break;
+        }
+        default:
+            sim_debug(ERROR_MSG, &wd179x_dev, "WD179x[%d]: FORMAT_TRACK: Unsupported image type 0x%02x.\n", wd179x_info->sel_drive, pDrive->uptr->u3);
+            break;
+        }
+    }
+
+    return(SCPE_OK);
 }
 
