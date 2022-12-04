@@ -2,7 +2,7 @@
 :: Build Release simulators with Visual Studio and save the binaries 
 :: in a Zip file.
 ::
-pushd ~p0
+pushd "%~p0"
 cd ..
 :: First build all the simulators
 call build_vstudio.bat
