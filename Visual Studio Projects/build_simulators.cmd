@@ -31,5 +31,6 @@ echo Creating Zip File: %_ZipPath%
 Powershell -NoLogo -Command Compress-Archive -Force -Path "BIN\NT\Win32-Release\*.exe" -DestinationPath "%_ZipPath%"
 dir %_ZipPath%
 set
-echo ZIPPATH=%_ZipPath% >> %GITHUM_ENV%
+echo ZIPPATH=%_ZipPath% >> %GITHUB_ENV%
 echo Done.
+exit 0
