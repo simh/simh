@@ -266,10 +266,10 @@
 				>
 			</File>
 			<Filter
-				Name="WinEditLine"
+				Name="wineditline"
 				>
 				<File
-					RelativePath="..\..\windows-build\WinEditLine\src\editline.c"
+					RelativePath="..\..\windows-build\wineditline\src\editline.c"
 					>
 					<FileConfiguration
 						Name="Debug|Win32"
@@ -289,7 +289,7 @@
 					</FileConfiguration>
 				</File>
 				<File
-					RelativePath="..\..\windows-build\WinEditLine\src\fn_complete.c"
+					RelativePath="..\..\windows-build\wineditline\src\fn_complete.c"
 					>
 					<FileConfiguration
 						Name="Debug|Win32"
@@ -309,7 +309,7 @@
 					</FileConfiguration>
 				</File>
 				<File
-					RelativePath="..\..\windows-build\WinEditLine\src\history.c"
+					RelativePath="..\..\windows-build\wineditline\src\history.c"
 					>
 					<FileConfiguration
 						Name="Debug|Win32"
