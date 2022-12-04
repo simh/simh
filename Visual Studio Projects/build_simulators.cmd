@@ -4,11 +4,11 @@
 ::
 pushd ~p0
 cd ..
-# First build all the simulators
+:: First build all the simulators
 call build_vstudio.bat
 if errorlevel 1 goto Done
 cd "Visual Studio Projects"
-# determine the zip file name
+:: determine the zip file name
 for /F "usebackq tokens=2" %%i in (`findstr /C:SIM_GIT_COMMIT_ID .git-commit-id`) do set GIT_COMMIT_ID=%%i
 for /F "usebackq tokens=2" %%i in (`findstr /C:SIM_GIT_COMMIT_TIME .git-commit-id`) do set GIT_COMMIT_TIME=%%i
 for /F "tokens=1 delims=-T" %%i in ("%GIT_COMMIT_TIME%") do set D_YYYY=%%i
