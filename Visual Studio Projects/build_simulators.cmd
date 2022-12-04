@@ -26,11 +26,9 @@ for /F "usebackq tokens=3" %%i in (`findstr/C:"#define SIM_PATCH" sim_rev.h`) do
 for /F "usebackq tokens=3" %%i in (`findstr/C:"#define SIM_VERSION_MODE" sim_rev.h`) do set _SIM_VERSION_MODE=-%%~i
 if "%_SIM_PATCH%" equ "-0" set _SIM_PATCH=
 set _ZipName=simh-%_SIM_MAJOR%.%_SIM_MINOR%%_SIM_PATCH%%_SIM_VERSION_MODE%--%D_YYYY%-%D_MM%-%D_DD%-%GIT_COMMIT_ID:~0,8%.zip
-set _ZipPath=BIN\NT\%_ZipName%
-echo Creating Zip File: %_ZipPath%
-Powershell -NoLogo -Command Compress-Archive -Force -Path "BIN\NT\Win32-Release\*.exe" -DestinationPath "%_ZipPath%"
+echo Creating Zip File: %_ZipName%
+Powershell -NoLogo -Command Compress-Archive -Force -Path "BIN\NT\Win32-Release\*.exe" -DestinationPath "%_ZipName%"
 dir %_ZipPath%
-set
-echo ZIPPATH=%_ZipPath% >> %GITHUB_ENV%
+echo ZIPPATH=%_ZipName% >> %GITHUB_ENV%
 echo Done.
 exit 0
