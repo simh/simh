@@ -1,4 +1,4 @@
-@echo on
+@echo off
 :: Rebuild all of SIMH simulators using Visual Studio
 ::
 :: If this procedure is not invoked from a Developer command prompt
