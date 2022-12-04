@@ -259,15 +259,16 @@ DPKG_SDL       = 6
 DPKG_PNG       = 7
 DPKG_ZLIB      = 8
 DPKG_SDL_TTF   = 9
+DPKG_GMAKE     = 10
 ifneq (3,${SIM_MAJOR})
-  # Platform Pkg Names  COMPILER PCAP          VDE            PCRE         EDITLINE      SDL         PNG          ZLIB       SDL_TTF
-  PKGS_SRC_HOMEBREW   = -        -             vde            pcre         libedit       sdl2        libpng       zlib       sdl2_ttf
-  PKGS_SRC_MACPORTS   = -        -             vde2           pcre         libedit       libsdl2     libpng       zlib       libsdl2_ttf
-  PKGS_SRC_APT        = gcc      libpcap-dev   libvdeplug-dev libpcre3-dev libedit-dev   libsdl2-dev libpng-dev   -          libsdl2-ttf-dev
-  PKGS_SRC_YUM        = gcc      libpcap-devel -              pcre-devel   libedit-devel SDL2-devel  libpng-devel zlib-devel SDL2_ttf-devel
-  PKGS_SRC_PKGSRC     = -        -             -              pcre         editline      SDL2        png          zlib       SDL2_ttf
-  PKGS_SRC_PKGBSD     = -        -             -              pcre         libedit       sdl2        png          -          sdl2_ttf
-  PKGS_SRC_PKGADD     = -        -             -              pcre         -             sdl2        png          -          sdl2-ttf
+  # Platform Pkg Names  COMPILER PCAP          VDE            PCRE         EDITLINE      SDL         PNG          ZLIB       SDL_TTF         GMAKE
+  PKGS_SRC_HOMEBREW   = -        -             vde            pcre         libedit       sdl2        libpng       zlib       sdl2_ttf        make
+  PKGS_SRC_MACPORTS   = -        -             vde2           pcre         libedit       libsdl2     libpng       zlib       libsdl2_ttf     gmake
+  PKGS_SRC_APT        = gcc      libpcap-dev   libvdeplug-dev libpcre3-dev libedit-dev   libsdl2-dev libpng-dev   -          libsdl2-ttf-dev -
+  PKGS_SRC_YUM        = gcc      libpcap-devel -              pcre-devel   libedit-devel SDL2-devel  libpng-devel zlib-devel SDL2_ttf-devel  -
+  PKGS_SRC_PKGSRC     = -        -             -              pcre         editline      SDL2        png          zlib       SDL2_ttf        -
+  PKGS_SRC_PKGBSD     = -        -             -              pcre         libedit       sdl2        png          -          sdl2_ttf        -
+  PKGS_SRC_PKGADD     = -        -             -              pcre         -             sdl2        png          -          sdl2-ttf        -
   ifneq (0,$(TESTS))
     ifneq (,${TEST_ARG})
       export TEST_ARG
@@ -280,14 +281,14 @@ ifneq (3,${SIM_MAJOR})
   endif
 else
   # simh v3 has minimal external dependencies
-  # Platform Pkg Names  COMPILER PCAP          VDE            PCRE         EDITLINE      SDL         PNG          ZLIB       SDL_TTF
-  PKGS_SRC_HOMEBREW   = -        -             vde            -            libedit       -           -            -          -
-  PKGS_SRC_MACPORTS   = -        -             vde2           -            libedit       -           -            -          -
-  PKGS_SRC_APT        = gcc      libpcap-dev   libvdeplug-dev -            libedit-dev   -           -            -          -
-  PKGS_SRC_YUM        = gcc      libpcap-devel -              -            libedit-devel -           -            -          -
-  PKGS_SRC_PKGSRC     = -        -             -              -            editline      -           -            -          -
-  PKGS_SRC_PKGBSD     = -        -             -              -            libedit       -           -            -          -
-  PKGS_SRC_PKGADD     = -        -             -              -            -             -           -            -          -
+  # Platform Pkg Names  COMPILER PCAP          VDE            PCRE         EDITLINE      SDL         PNG          ZLIB       SDL_TTF   GMAKE
+  PKGS_SRC_HOMEBREW   = -        -             vde            -            libedit       -           -            -          -         -
+  PKGS_SRC_MACPORTS   = -        -             vde2           -            libedit       -           -            -          -         -
+  PKGS_SRC_APT        = gcc      libpcap-dev   libvdeplug-dev -            libedit-dev   -           -            -          -         -
+  PKGS_SRC_YUM        = gcc      libpcap-devel -              -            libedit-devel -           -            -          -         -
+  PKGS_SRC_PKGSRC     = -        -             -              -            editline      -           -            -          -         -
+  PKGS_SRC_PKGBSD     = -        -             -              -            libedit       -           -            -          -         -
+  PKGS_SRC_PKGADD     = -        -             -              -            -             -           -            -          -         -
 endif
 ifeq (${WIN32},)  #*nix Environments (&& cygwin)
   ifeq (${GCC},)
@@ -679,6 +680,15 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
     endif
   else
     NEEDED_PKGS += DPKG_EDITLINE
+  endif
+  # The recursive logic needs a GNU make at least v4 when building with 
+  # separate compiles
+  ifneq (,$(shell which gmake 2>/dev/null))
+    override MAKE = $(shell which gmake 2>/dev/null)
+  endif
+  GNUMakeVERSION = $(shell ($(MAKE) --version | grep 'GNU Make' | awk '{ print $$3 }'))
+  ifneq (,$(and $(findstring 3.,$(GNUMakeVERSION)),$(BUILD_SEPARATE)))
+    NEEDED_PKGS += DPKG_GMAKE
   endif
   # Find available ncurses library.
   ifneq (,$(call find_include,ncurses))
@@ -1239,6 +1249,10 @@ else
     CFLAGS_I = -DHAVE_NTDDDISK_H
   endif
 endif # Win32 (via MinGW)
+ifeq (clean,$(strip ${MAKECMDGOALS}))
+  # a simple clean has no dependencies 
+  NEEDED_PKGS =
+endif
 USEFUL_PACKAGES = $(filter-out -,$(foreach word,$(NEEDED_PKGS),$(word $($(word)),$(PKGS_SRC_$(strip $(PKG_MGR))))))
 USEFUL_PLURAL =  $(if $(word 2,$(USEFUL_PACKAGES)),s,)
 USEFUL_MULTIPLE_HIST = $(if $(word 2,$(USEFUL_PACKAGES)),were,was)
@@ -1454,10 +1468,11 @@ DISPLAYD = ${SIMHD}/display
 SCSI = ${SIMHD}/sim_scsi.c
 
 BIN = BIN/
-# The recursive logic needs a GNU make at least v4
+# The recursive logic needs a GNU make at least v4 when building with 
+# separate compiles
 ifneq (,$(shell which gmake 2>/dev/null))
   override MAKE = $(shell which gmake 2>/dev/null)
-  endif
+endif
 GNUMakeVERSION = $(shell ($(MAKE) --version | grep 'GNU Make' | awk '{ print $$3 }'))
 ifneq (,$(and $(findstring 3.,$(GNUMakeVERSION)),$(BUILD_SEPARATE)))
   ifeq (HOMEBREW,$(PKG_MGR))
