@@ -39,43 +39,52 @@
  *                                                                       *
  *************************************************************************/
 
-/*#define DBG_MSG */
 #include "altairz80_defs.h"
 #include "sim_defs.h"   /* simulator definitions */
 #include "wd179x.h"
 
-#ifdef DBG_MSG
-#define DBG_PRINT(args) sim_printf args
-#else
-#define DBG_PRINT(args)
-#endif
+#define DEV_NAME    "ADCS6"
 
 /* Debug flags */
 #define ERROR_MSG   (1 << 0)
 #define DRIVE_MSG   (1 << 1)
-#define VERBOSE_MSG (1 << 2)
+#define CTC_MSG     (1 << 2)
 #define DMA_MSG     (1 << 3)
+#define PIO_MSG     (1 << 4)
+#define BANK_MSG    (1 << 5)
+#define UART_MSG    (1 << 6)
+#define VERBOSE_MSG (1 << 7)
 
-#define ADCS6_MAX_DRIVES    4
+#define ADCS6_MAX_UNITS    8
 #define ADCS6_ROM_SIZE      (2 * 1024)
 #define ADCS6_ADDR_MASK     (ADCS6_ROM_SIZE - 1)
+
+#define ADCS6_S7_DEFAULT_VALUE  0
 
 typedef struct {
     PNP_INFO    pnp;    /* Plug and Play */
     uint32 dma_addr;    /* DMA Transfer Address */
     uint8 rom_disabled; /* TRUE if ROM has been disabled */
+    uint8   rom_type;       /* Select ADC or Digitex ROM. */
+    uint8   j7;             /* 7-position jumper block J7 */
     uint8 head_sel;
     uint8 autowait;
     uint8 rtc;
     uint8 imask;        /* Interrupt Mask Register */
     uint8 ipend;        /* Interrupt Pending Register */
     uint8 s100_addr_u;  /* A23:16 of S-100 bus */
+    uint8   mctrl0;         /* MCTRL0 Register */
+    uint8   mctrl1;         /* MCTRL1 Register */
+    uint8   ctc_ccw[4];     /* Z80-CTC Channel Control Word */
+    uint8   ctc_tc_follows[4];  /* Set if TC write is expected to follow CCW write */
+    uint8   ctc_tc[4];      /* Z80-CTC Time Constant */
+    uint8   ctc_count[4];   /* Z80-CTC current count */
+    uint8   ctc_vec;        /* Z80-CTC Interrupt Vector */
+    uint16  ctc_vec_table;  /* Z80-CTC Interrupt Vector table */
+    uint8   dma;            /* Z80-DMA I/O register */
 } ADCS6_INFO;
 
 extern WD179X_INFO_PUB *wd179x_infop;
-
-static ADCS6_INFO adcs6_info_data = { { 0xF000, ADCS6_ROM_SIZE, 0x3, 2 } };
-static ADCS6_INFO *adcs6_info = &adcs6_info_data;
 
 extern t_stat set_membase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
@@ -83,14 +92,16 @@ extern t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
                                int32 (*routine)(const int32, const int32, const int32), const char* name, uint8 unmap);
+extern void setBankSelect(const int32 b);
+extern uint8 GetBYTEWrapper(const uint32 Addr);
 
 static t_stat adcs6_svc (UNIT *uptr);
+static t_stat adcs6_ctc_svc(UNIT* uptr);
 
-extern uint32 PCX;      /* external view of PC  */
-
-#define UNIT_V_ADCS6_ROM        (UNIT_V_UF + 2) /* boot ROM enabled                         */
-#define UNIT_ADCS6_ROM          (1 << UNIT_V_ADCS6_ROM)
-#define ADCS6_CAPACITY          (77*2*16*256)   /* Default Micropolis Disk Capacity         */
+extern uint32 PCX;                              /* external view of PC  */
+extern int32  IR_S;                             /* Z80 Interrupt/Refresh register */
+extern int32  timerInterruptHandler;            /* SIO timer address of interrupt handling routine */
+#define ADCS6_CAPACITY          (77*1*26*128)   /* Default SSSD Disk Capacity         */
 
 #define MOTOR_TO_LIMIT          128
 
@@ -100,13 +111,19 @@ static t_stat adcs6_attach(UNIT *uptr, CONST char *cptr);
 static t_stat adcs6_detach(UNIT *uptr);
 
 static int32 adcs6_dma(const int32 port, const int32 io, const int32 data);
-static int32 adcs6_timer(const int32 port, const int32 io, const int32 data);
+static int32 adcs6_pio(const int32 port, const int32 io, const int32 data);
+static int32 adcs6_ctc(const int32 port, const int32 io, const int32 data);
 static int32 adcs6_control(const int32 port, const int32 io, const int32 data);
 static int32 adcs6_banksel(const int32 port, const int32 io, const int32 data);
+static int32 ccs2719(const int32 port, const int32 io, const int32 data);
 static int32 adcs6rom(const int32 port, const int32 io, const int32 data);
+static t_stat adcs6_dev_set_rom(UNIT* uptr, int32 value, CONST char* cptr, void* desc);
+static t_stat adcs6_dev_show_rom(FILE* st, UNIT* uptr, int32 val, CONST void* desc);
 static const char* adcs6_description(DEVICE *dptr);
 
-static int32 dipswitch      = 0x00;     /* 5-position DIP switch on 64FDC card */
+/* Boot ROM selection */
+#define ADCS6_ROM_ADC       0           /* ADC Monitor v3.6 */
+#define ADCS6_ROM_DIGITEX   1           /* Digitex Monitor v3.6 */
 
 /* Disk Control/Flags Register, 0x34 (IN) */
 #define ADCS6_FLAG_DRQ      (1 << 7)    /* DRQ (All controllers) */
@@ -153,7 +170,37 @@ static int32 dipswitch      = 0x00;     /* 5-position DIP switch on 64FDC card *
 #define ADCS6_TIMER4_RST        0xF7        /* RST30 - 0xF7 */
 #define ADCS6_TIMER5_RST        0xFF        /* RST38 - 0xFF */
 
+/* ADC Super Six I/O Ports */
+#define ADCS6_PIO               0x04
+#define ADCS6_CTC0              0x08
+#define ADCS6_CTC1              (ADCS6_CTC0 + 1)
+#define ADCS6_CTC2              (ADCS6_CTC0 + 2)
+#define ADCS6_CTC3              (ADCS6_CTC0 + 3)
+#define ADCS6_DMA               0x10
+#define ADCS6_CTRL              0x14
+#define ADCS6_EXTADR            0x15
+#define ADCS6_MCTRL0            0x16
+#define ADCS6_MCTRL1            0x17
+#define ADCS6_SET_BAUD          0x18
+#define CCS2719                 0x20
+#define B810_RAM                0x45
+
+/* Memory Control Bits */
+#define MCTRL_BANK_MASK         (0x0F)
+#define MCTRL_MAP_MASK          (0x70)
+#define MCTRL_ROM_DISABLE       (1 << 5)    /* Set = Disable ROM */
+#define MCTRL_POJ_ENABLED       (1 << 6)    /* Power-on Jump Enabled */
+#define MCTRL_PARITY_ENABLED    (1 << 7)    /* Parity Check Enabled */
+
+
 #define RST_OPCODE_TO_VECTOR(x) (x & 0x38)
+
+/* Z80-CTC Bit Definitions */
+#define CTC_CCW_BIT             (1 << 0)
+#define CTC_TC_FOLLOWS          (1 << 2)
+
+static ADCS6_INFO adcs6_info_data = { { 0xF000, ADCS6_ROM_SIZE, 0x3, 2 }, 0, FALSE, ADCS6_ROM_ADC, ADCS6_S7_DEFAULT_VALUE };
+static ADCS6_INFO* adcs6_info = &adcs6_info_data;
 
 /* The ADCS6 does not really have RAM associated with it, but for ease of integration with the
  * SIMH/AltairZ80 Resource Mapping Scheme, rather than Map and Unmap the ROM, simply implement our
@@ -161,69 +208,254 @@ static int32 dipswitch      = 0x00;     /* 5-position DIP switch on 64FDC card *
  */
 static uint8 adcs6ram[ADCS6_ROM_SIZE];
 
+#define ADCS6_WAIT  16
+#define ADCS6_UDATA(act,fl,wait,u4,name) NULL,act,NULL,NULL,NULL,NULL,0,0,(fl),0,(0),0,NULL,0,0,wait,0,u4,0,0,NULL,NULL,0,0,0,NULL,0,0,NULL,0,name
+
 static UNIT adcs6_unit[] = {
-    { UDATA (&adcs6_svc, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE + UNIT_ADCS6_ROM, ADCS6_CAPACITY), 1024 },
+    { UDATA (&adcs6_svc, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, ADCS6_CAPACITY), 1024 },
     { UDATA (&adcs6_svc, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, ADCS6_CAPACITY) },
     { UDATA (&adcs6_svc, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, ADCS6_CAPACITY) },
-    { UDATA (&adcs6_svc, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, ADCS6_CAPACITY) }
+    { UDATA (&adcs6_svc, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, ADCS6_CAPACITY) },
+    { ADCS6_UDATA(&adcs6_ctc_svc,   UNIT_DISABLE,                ADCS6_WAIT, 4, "ADCS6_CTC0") },  /* CTC0 */
+    { ADCS6_UDATA(&adcs6_ctc_svc,   UNIT_DISABLE,                ADCS6_WAIT, 5, "ADCS6_CTC1") },  /* CTC1 */
+    { ADCS6_UDATA(&adcs6_ctc_svc,   UNIT_DISABLE,                ADCS6_WAIT, 6, "ADCS6_CTC2") },  /* CTC2 */
+    { ADCS6_UDATA(&adcs6_ctc_svc,   UNIT_DISABLE,                ADCS6_WAIT, 7, "ADCS6_CTC3") },  /* CTC3 */
 };
 
 static REG adcs6_reg[] = {
-    { HRDATAD (J7,           dipswitch,             8, "5-position DIP switch on 64FDC card"), },
+    { HRDATAD (EXTADR,      adcs6_info_data.s100_addr_u,    8, "S-100 A23:16"), },
+    { HRDATAD (J7,          adcs6_info_data.j7,      8, "Jumper Block J7 on the ADC Super 6"), },
+    { HRDATAD (MCTRL0,      adcs6_info_data.mctrl0,         8, "MCTRL0 Register"),          },
+    { FLDATAD (BANK0EN,     adcs6_info_data.mctrl0,         0, "Memory Bank 0 Enable"),     },
+    { FLDATAD (BANK1EN,     adcs6_info_data.mctrl0,         1, "Memory Bank 1 Enable"),     },
+    { FLDATAD (BANK2EN,     adcs6_info_data.mctrl0,         2, "Memory Bank 2 Enable"),     },
+    { FLDATAD (BANK3EN,     adcs6_info_data.mctrl0,         3, "Memory Bank 3 Enable"),     },
+    { FLDATAD (PROMDIS,     adcs6_info_data.mctrl0,         5, "PROM Disable"),             },
+    { HRDATAD (MCTRL1,      adcs6_info_data.mctrl1,         8, "MCTRL1 Register"),          },
+    { FLDATAD (BANK4EN,     adcs6_info_data.mctrl1,         0, "Memory Bank 4 Enable"),     },
+    { FLDATAD (BANK5EN,     adcs6_info_data.mctrl1,         1, "Memory Bank 5 Enable"),     },
+    { FLDATAD (BANK6EN,     adcs6_info_data.mctrl1,         2, "Memory Bank 6 Enable"),     },
+    { FLDATAD (BANK7EN,     adcs6_info_data.mctrl1,         3, "Memory Bank 7 Enable"),     },
+    { FLDATAD (BANKMAP,     adcs6_info_data.mctrl1,         7, "Bank 4-7 Map"),             },
+    { HRDATAD (CTC0CCW,     adcs6_info_data.ctc_ccw[0],     8, "CTC0 Channel Control Word"),},
+    { HRDATAD (CTC1CCW,     adcs6_info_data.ctc_ccw[1],     8, "CTC1 Channel Control Word"),},
+    { HRDATAD (CTC2CCW,     adcs6_info_data.ctc_ccw[2],     8, "CTC2 Channel Control Word"),},
+    { HRDATAD (CTC3CCW,     adcs6_info_data.ctc_ccw[3],     8, "CTC3 Channel Control Word"),},
+    { HRDATAD (CTC0TC,      adcs6_info_data.ctc_tc[0],      8, "CTC0 Time Constant"),       },
+    { HRDATAD (CTC1TC,      adcs6_info_data.ctc_tc[1],      8, "CTC1 Time Constant"),       },
+    { HRDATAD (CTC2TC,      adcs6_info_data.ctc_tc[2],      8, "CTC2 Time Constant"),       },
+    { HRDATAD (CTC3TC,      adcs6_info_data.ctc_tc[3],      8, "CTC3 Time Constant"),       },
+    { HRDATAD (CTC0CNT,     adcs6_info_data.ctc_count[0],   8, "CTC0 Count"),               },
+    { HRDATAD (CTC1CNT,     adcs6_info_data.ctc_count[1],   8, "CTC1 Count"),               },
+    { HRDATAD (CTC2CNT,     adcs6_info_data.ctc_count[2],   8, "CTC2 Count"),               },
+    { HRDATAD (CTC3CNT,     adcs6_info_data.ctc_count[3],   8, "CTC3 Count"),               },
+    { HRDATAD (CTCVEC,      adcs6_info_data.ctc_vec,        8, "CTC  Interrupt Vector"),    },
+    { HRDATAD (CTCVECTABLE, adcs6_info_data.ctc_vec_table, 16, "CTC  Interrupt Vector Table"),},
+    { HRDATAD (DMA,         adcs6_info_data.dma,            8, "DMA register"),             },
     { NULL }
 };
 
-#define ADCS6_NAME  "ADC Super-Six"
+#define ADCS6_NAME  "ADC Super-Six Single-Board Computer"
 
 static const char* adcs6_description(DEVICE *dptr) {
     return ADCS6_NAME;
 }
+t_stat adcs6_show_vectable(FILE* st, UNIT* uptr, int32 val, CONST void* desc);
 
 static MTAB adcs6_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,                  "MEMBASE",  "MEMBASE",
         &set_membase, &show_membase, NULL, "Sets disk controller memory base address"   },
     { MTAB_XTD|MTAB_VDV,    0,                  "IOBASE",   "IOBASE",
         &set_iobase, &show_iobase, NULL, "Sets disk controller I/O base address"        },
-    /* quiet, no warning messages       */
-    { UNIT_ADCS6_ROM,      0,                   "NOROM",    "NOROM",
-        NULL, NULL, NULL, "Disables boot ROM for unit " ADCS6_NAME "n"                  },
-    { UNIT_ADCS6_ROM,      UNIT_ADCS6_ROM,      "ROM",      "ROM",
-        NULL, NULL, NULL, "Enables boot ROM for unit " ADCS6_NAME "n"                   },
+    { MTAB_XTD | MTAB_VDV | MTAB_VALR,    0,    "ROM",      "ROM",
+        &adcs6_dev_set_rom, & adcs6_dev_show_rom, NULL, "Set boot ROM [ADC|DIGITEX]"    },
+    { MTAB_XTD | MTAB_VDV,  0,                  NULL,       "VECTABLE",
+        NULL, &adcs6_show_vectable, NULL, "Show Z80 Mode 2 Interrupt Vector Table"            },
     { 0 }
 };
 
 /* Debug Flags */
 static DEBTAB adcs6_dt[] = {
     { "ERROR",      ERROR_MSG,      "Error messages"    },
+    { "BANK",       BANK_MSG,       "Memory Control messages" },
     { "DRIVE",      DRIVE_MSG,      "Drive messages"    },
     { "VERBOSE",    VERBOSE_MSG,    "Verbose messages"  },
+    { "CTC",        CTC_MSG,        "CTC messages"      },
     { "DMA",        DMA_MSG,        "DMA messages"      },
+    { "PIO",        PIO_MSG,        "PIO messages"      },
+    { "UART",       UART_MSG,       "UART messages"     },
     { NULL,         0                                   }
 };
 
 DEVICE adcs6_dev = {
     "ADCS6", adcs6_unit, adcs6_reg, adcs6_mod,
-    ADCS6_MAX_DRIVES, 10, 31, 1, ADCS6_MAX_DRIVES, ADCS6_MAX_DRIVES,
-    NULL, NULL, &adcs6_reset,
-    &adcs6_boot, &adcs6_attach, &adcs6_detach,
-    &adcs6_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
-    adcs6_dt, NULL, NULL, NULL, NULL, NULL, &adcs6_description
+    ADCS6_MAX_UNITS,   /* # units */
+    10,                 /* address radix */
+    31,                 /* address width */
+    1,                  /* address increment */
+    8,                  /* data radix */
+    8,                  /* data width */
+    NULL,               /* examine routine */
+    NULL,               /* deposit routine */
+    &adcs6_reset,       /* Reset routine */
+    &adcs6_boot,        /* boot routine */
+    &adcs6_attach,      /* attach routine */
+    &adcs6_detach,      /* detach routine */
+    &adcs6_info_data,   /* context */
+    (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
+    adcs6_dt, NULL, NULL, NULL, NULL, NULL,
+    &adcs6_description
 };
 
-/* This is the DIGITEX Monitor version 1.2.A -- 10/06/83
+/* Monitor ROMs for ADC and DIGITEX. */
+static uint8 adcs6_rom[2][ADCS6_ROM_SIZE] = {
+    /*  > ADVANCED DIGITAL CORP.
+     *    Monitor Version 3.6
+     *    January - 1984
  *
  * MONITOR COMMANDS :
- * B               = LOAD DISK BOOT LOADER
- * DSSSS,QQQQ      = DUMP MEMORY IN HEX FROM S TO Q
- * FSSSS,QQQQ,BB   = FILL MEMORY FROM S TO Q WITH B
- * GAAAA           = GO TO ADDRESS A
- * IPP             = INPUT FROM PORT P
- * LAAAA           = LOAD MEMORY STARTING AT A
- * MSSSS,QQQQ,DDDD = MOVE STARTING AT S TO Q TO ADDR. D
- * OPP,DD          = OUTPUT DATA D TO PORT P
- * ESC WILL TERMINATE ANY COMMAND
+     *  B               = Load disk boot loader
+     *  C               = Load disk boot loader from cartriage
+     *  DSSSS,QQQQ      = Dump memory in hex from S to Q
+     *  FSSSS,QQQQ,BB   = Fill memory from S to Q with B
+     *  GAAAA           = Go to address A
+     *  IPP             = Input from port P
+     *  LAAAA           = Load memory starting at A
+     *  MSSSS,QQQQ,DDDD = Move starting at S to Q to Addr. D
+     *  OPP,DD          = Output data D to port P
+     *  ESC will terminate any command
  */
-static uint8 adcs6_rom[ADCS6_ROM_SIZE] = {
+    {
+    0xC3, 0x3C, 0xF0, 0xC3, 0xAF, 0xF0, 0xC3, 0xC1, 0xF0, 0xC3, 0xBA, 0xF0, 0xC3, 0xD4, 0xF0, 0xC3,
+    0xEC, 0xF0, 0xC3, 0xFB, 0xF0, 0xC3, 0x11, 0xF1, 0xC3, 0x1F, 0xF1, 0xC3, 0x16, 0xF1, 0xC3, 0x2D,
+    0xF1, 0xC3, 0x38, 0xF1, 0xC3, 0x55, 0xF1, 0xC3, 0x82, 0xF1, 0xC3, 0xAC, 0xF1, 0xC3, 0x05, 0xF2,
+    0xC3, 0x0B, 0xF4, 0xC3, 0x67, 0xF3, 0xC3, 0x99, 0xF2, 0xC3, 0xAB, 0xF2, 0xDB, 0x15, 0xE6, 0x7F,
+    0xD3, 0x18, 0x3E, 0x4F, 0xD3, 0x16, 0x3E, 0x20, 0x32, 0x05, 0xEE, 0xAF, 0x32, 0x01, 0xEE, 0x31,
+    0x64, 0xEE, 0x21, 0x65, 0xF0, 0x01, 0x01, 0x08, 0xED, 0xB3, 0x21, 0x6D, 0xF0, 0x01, 0x03, 0x08,
+    0xED, 0xB3, 0xC3, 0x75, 0xF0, 0x18, 0x04, 0x44, 0x03, 0xC1, 0x05, 0xEA, 0x00, 0x18, 0x04, 0x44,
+    0x03, 0xC1, 0x05, 0xEA, 0x00, 0x21, 0x19, 0xF4, 0xCD, 0xEC, 0xF0, 0x21, 0x37, 0xF4, 0xCD, 0xEC,
+    0xF0, 0xC3, 0xBD, 0xF2, 0x31, 0x64, 0xEE, 0x21, 0xB3, 0xF4, 0xCD, 0xEC, 0xF0, 0xCD, 0xD4, 0xF0,
+    0x47, 0x21, 0x4D, 0xF7, 0x7E, 0xFE, 0xFF, 0x28, 0x08, 0xB8, 0x28, 0x0D, 0x23, 0x23, 0x23, 0x18,
+    0xF3, 0x21, 0xB8, 0xF4, 0xCD, 0xEC, 0xF0, 0x18, 0xDB, 0x23, 0x5E, 0x23, 0x56, 0xEB, 0xE9, 0xF5,
+    0xDB, 0x01, 0xE6, 0x04, 0x28, 0xFA, 0xF1, 0xD3, 0x00, 0xC9, 0xDB, 0x01, 0xE6, 0x01, 0xC8, 0x18,
+    0x06, 0xDB, 0x01, 0xE6, 0x01, 0x28, 0xFA, 0xDB, 0x00, 0xE6, 0x7F, 0xFE, 0x61, 0xD8, 0xFE, 0x7B,
+    0xD0, 0xE6, 0x5F, 0xC9, 0x3E, 0xFF, 0x32, 0x00, 0xEE, 0xCD, 0xC1, 0xF0, 0xF5, 0x3A, 0x00, 0xEE,
+    0xA7, 0x20, 0x02, 0xF1, 0xC9, 0xF1, 0xFE, 0x20, 0xD4, 0xAF, 0xF0, 0xC9, 0xF5, 0xE5, 0x7E, 0xB7,
+    0x28, 0x06, 0xCD, 0xAF, 0xF0, 0x23, 0x18, 0xF6, 0xE1, 0xF1, 0xC9, 0xE5, 0x21, 0x7A, 0xF5, 0xCD,
+    0xEC, 0xF0, 0xE1, 0xC9, 0xCD, 0xBA, 0xF0, 0xFE, 0x1B, 0xCA, 0x84, 0xF0, 0xFE, 0x08, 0xD0, 0x18,
+    0xF3, 0xF5, 0x3E, 0x20, 0x18, 0x12, 0xF5, 0x0F, 0x0F, 0x0F, 0x0F, 0xCD, 0x1F, 0xF1, 0xF1, 0xF5,
+    0xE6, 0x0F, 0xC6, 0x90, 0x27, 0xCE, 0x40, 0x27, 0xCD, 0xAF, 0xF0, 0xF1, 0xC9, 0xF5, 0x7C, 0xCD,
+    0x16, 0xF1, 0x7D, 0xCD, 0x16, 0xF1, 0xF1, 0xC9, 0xCD, 0xD4, 0xF0, 0xFE, 0x2C, 0xC8, 0xFE, 0x20,
+    0xC8, 0xFE, 0x30, 0xD8, 0xFE, 0x3A, 0xDA, 0x52, 0xF1, 0xFE, 0x41, 0xD8, 0xFE, 0x47, 0x3F, 0xD8,
+    0xD6, 0x07, 0xD6, 0x30, 0xC9, 0xC5, 0xD5, 0x0E, 0x00, 0x1E, 0x00, 0xCD, 0x38, 0xF1, 0x30, 0x0E,
+    0xFE, 0x0D, 0x37, 0x20, 0x1A, 0x7B, 0xB7, 0x20, 0x15, 0x37, 0x3E, 0x0D, 0x18, 0x11, 0xFE, 0x10,
+    0x30, 0x0C, 0x1C, 0x47, 0x79, 0x87, 0x87, 0x87, 0x87, 0x80, 0x4F, 0xC3, 0x5B, 0xF1, 0x79, 0xD1,
+    0xC1, 0xC9, 0xD5, 0x21, 0x00, 0x00, 0x37, 0x3F, 0xF5, 0xCD, 0x38, 0xF1, 0x30, 0x0D, 0xFE, 0x0D,
+    0x20, 0x05, 0xCD, 0x11, 0xF1, 0x18, 0x12, 0xF1, 0x37, 0xD1, 0xC9, 0xFE, 0x10, 0x30, 0x0A, 0x29,
+    0x29, 0x29, 0x29, 0x5F, 0x16, 0x00, 0x19, 0x18, 0xE0, 0xF1, 0xD1, 0xC9, 0x77, 0xBE, 0xC8, 0xE5,
+    0x21, 0xC9, 0xF4, 0xCD, 0xEC, 0xF0, 0xE1, 0xCD, 0x2D, 0xF1, 0xC3, 0x84, 0xF0, 0xCD, 0x82, 0xF1,
+    0xD2, 0xC9, 0xF1, 0x21, 0xC3, 0xF4, 0xC3, 0xA4, 0xF0, 0x22, 0x02, 0xEE, 0xCD, 0xFB, 0xF0, 0x2A,
+    0x02, 0xEE, 0xCD, 0x2D, 0xF1, 0xCD, 0x11, 0xF1, 0x7E, 0xCD, 0x16, 0xF1, 0xCD, 0x11, 0xF1, 0xCD,
+    0x55, 0xF1, 0xDA, 0xEF, 0xF1, 0xCD, 0xAC, 0xF1, 0x2A, 0x02, 0xEE, 0x23, 0xC3, 0xC9, 0xF1, 0xFE,
+    0x0D, 0xCA, 0x84, 0xF0, 0xFE, 0x20, 0xCA, 0xE8, 0xF1, 0xFE, 0x2D, 0xC2, 0xC3, 0xF1, 0x2A, 0x02,
+    0xEE, 0x2B, 0xC3, 0xC9, 0xF1, 0xF5, 0x7A, 0x2F, 0x57, 0x7B, 0x2F, 0x5F, 0x13, 0xF1, 0xC9, 0xCD,
+    0x89, 0xF2, 0xCD, 0x89, 0xF2, 0xCD, 0x05, 0xF2, 0xCD, 0xFB, 0xF0, 0xCD, 0x2D, 0xF1, 0xCD, 0x11,
+    0xF1, 0xCD, 0x11, 0xF1, 0x7E, 0xCD, 0x16, 0xF1, 0xCD, 0x4A, 0xF2, 0xCD, 0x91, 0xF2, 0xFE, 0x13,
+    0xCC, 0x04, 0xF1, 0x7D, 0xE6, 0x0F, 0xCA, 0x18, 0xF2, 0xC3, 0x21, 0xF2, 0xCD, 0x89, 0xF2, 0xEB,
+    0xE9, 0x21, 0x7D, 0xF5, 0xCD, 0xEC, 0xF0, 0xC3, 0x84, 0xF0, 0xE5, 0x19, 0xDA, 0x84, 0xF0, 0xE1,
+    0x23, 0xC9, 0xCD, 0x89, 0xF2, 0xD5, 0xCD, 0x89, 0xF2, 0xCD, 0x89, 0xF2, 0xEB, 0xE3, 0xCD, 0x05,
+    0xF2, 0x7E, 0xE3, 0xCD, 0xAC, 0xF1, 0x23, 0xE3, 0xCD, 0x4A, 0xF2, 0xCD, 0x91, 0xF2, 0xC3, 0x61,
+    0xF2, 0xCD, 0x89, 0xF2, 0xCD, 0x89, 0xF2, 0xCD, 0x05, 0xF2, 0xCD, 0x55, 0xF1, 0xDA, 0xC3, 0xF1,
+    0xCD, 0xAC, 0xF1, 0xCD, 0x4A, 0xF2, 0xC3, 0x80, 0xF2, 0xCD, 0x82, 0xF1, 0xDA, 0xC3, 0xF1, 0xEB,
+    0xC9, 0xCD, 0xBA, 0xF0, 0xB7, 0xC2, 0x84, 0xF0, 0xC9, 0xCD, 0x55, 0xF1, 0xDA, 0xC3, 0xF1, 0x4F,
+    0xED, 0x78, 0xCD, 0xFB, 0xF0, 0xCD, 0x16, 0xF1, 0xC3, 0x84, 0xF0, 0xCD, 0x55, 0xF1, 0xDA, 0xC3,
+    0xF1, 0x4F, 0xCD, 0x55, 0xF1, 0xDA, 0xC3, 0xF1, 0xED, 0x79, 0xC3, 0x84, 0xF0, 0xCD, 0x91, 0xF2,
+    0xCD, 0xD4, 0xF2, 0xCD, 0x83, 0xF3, 0xCD, 0x91, 0xF2, 0xCD, 0x13, 0xF3, 0xD4, 0x3A, 0xF3, 0xCD,
+    0x9F, 0xF3, 0x18, 0xF2, 0xAF, 0xD3, 0x14, 0xCD, 0x13, 0xF3, 0xDA, 0xE2, 0xF2, 0x21, 0xE2, 0xF2,
+    0x18, 0x1A, 0x3E, 0x08, 0xD3, 0x14, 0xCD, 0x13, 0xF3, 0xDA, 0xF1, 0xF2, 0x21, 0xF1, 0xF2, 0x18,
+    0x0B, 0x3E, 0x38, 0xD3, 0x14, 0xCD, 0x13, 0xF3, 0xD8, 0x21, 0x60, 0xF3, 0x3E, 0x0F, 0xD3, 0x0C,
+    0xCD, 0x0B, 0xF3, 0xDB, 0x14, 0xDB, 0x0C, 0xE6, 0x18, 0xC8, 0xE9, 0x3E, 0x03, 0xE3, 0xE3, 0x3D,
+    0x20, 0xFB, 0xC9, 0xDB, 0x0C, 0x17, 0xD8, 0x21, 0xE8, 0x03, 0xDB, 0x0C, 0xE6, 0x02, 0x28, 0x07,
+    0x2B, 0x7D, 0xB4, 0x20, 0xF5, 0x37, 0xC9, 0x06, 0x0A, 0x21, 0x80, 0x3E, 0xDB, 0x0C, 0xE6, 0x02,
+    0xC0, 0x2B, 0x7D, 0xB4, 0x20, 0xF6, 0x10, 0xF1, 0x37, 0xC9, 0x3E, 0xFF, 0x32, 0x01, 0xEE, 0x3E,
+    0x01, 0xD3, 0x0E, 0x3E, 0x8C, 0xD3, 0x0C, 0x21, 0x00, 0x00, 0x0E, 0x0F, 0xDB, 0x14, 0xB7, 0xF2,
+    0x57, 0xF3, 0xED, 0xA2, 0xC3, 0x4C, 0xF3, 0xCD, 0x0B, 0xF3, 0xDB, 0x0C, 0xB7, 0xCA, 0x00, 0x00,
+    0xF5, 0x3A, 0x01, 0xEE, 0xB7, 0x28, 0x0D, 0x21, 0x1E, 0xF5, 0xCD, 0xEC, 0xF0, 0xF1, 0xCD, 0x16,
+    0xF1, 0xC3, 0x84, 0xF0, 0xF1, 0x21, 0x3A, 0xF5, 0xCD, 0xEC, 0xF0, 0x3E, 0xFF, 0x32, 0x01, 0xEE,
+    0xC3, 0x84, 0xF0, 0xAF, 0xD3, 0xE3, 0xD3, 0xE4, 0xD3, 0xE5, 0x3C, 0xD3, 0xE2, 0xDB, 0xE3, 0x47,
+    0xDB, 0xE4, 0xB0, 0x47, 0xDB, 0xE5, 0xB0, 0x32, 0x04, 0xEE, 0x3E, 0x1E, 0xD3, 0xE7, 0xC9, 0x3A,
+    0x04, 0xEE, 0xB7, 0xC0, 0xDB, 0xE7, 0xE6, 0x50, 0xFE, 0x50, 0xC0, 0xDB, 0xE7, 0xB7, 0xF8, 0x3A,
+    0x05, 0xEE, 0xD3, 0xE6, 0xD3, 0xE6, 0x06, 0x00, 0xCD, 0x0B, 0xF3, 0xCD, 0x0B, 0xF3, 0xCD, 0x0B,
+    0xF3, 0x10, 0xF5, 0x21, 0x00, 0x00, 0x01, 0xE0, 0x80, 0x3E, 0x20, 0xD3, 0xE7, 0xCD, 0xF6, 0xF3,
+    0x20, 0x05, 0xED, 0xB2, 0xC3, 0x00, 0x00, 0x3A, 0x05, 0xEE, 0xFE, 0x20, 0x28, 0x0A, 0xFE, 0x02,
+    0x20, 0x29, 0xAF, 0x32, 0x05, 0xEE, 0x18, 0x05, 0x3E, 0x02, 0x32, 0x05, 0xEE, 0xCD, 0xF2, 0xF3,
+    0x18, 0xBD, 0x3E, 0x1F, 0xD3, 0xE7, 0xDB, 0xE7, 0xCB, 0x7F, 0x20, 0xFA, 0xCD, 0x0B, 0xF3, 0xCD,
+    0x0B, 0xF3, 0xDB, 0xE7, 0xCB, 0x67, 0x28, 0xEE, 0xCB, 0x47, 0xC9, 0x21, 0x5A, 0xF5, 0xCD, 0xEC,
+    0xF0, 0xDB, 0xE1, 0xCD, 0x16, 0xF1, 0xC3, 0x84, 0xF0, 0x0D, 0x0A, 0x20, 0x3E, 0x20, 0x41, 0x44,
+    0x56, 0x41, 0x4E, 0x43, 0x45, 0x44, 0x20, 0x44, 0x49, 0x47, 0x49, 0x54, 0x41, 0x4C, 0x20, 0x43,
+    0x4F, 0x52, 0x50, 0x2E, 0x0D, 0x0A, 0x00, 0x20, 0x20, 0x20, 0x4D, 0x6F, 0x6E, 0x69, 0x74, 0x6F,
+    0x72, 0x20, 0x56, 0x65, 0x72, 0x73, 0x69, 0x6F, 0x6E, 0x20, 0x33, 0x2E, 0x36, 0x0D, 0x0A, 0x20,
+    0x20, 0x20, 0x4A, 0x61, 0x6E, 0x75, 0x61, 0x72, 0x79, 0x20, 0x2D, 0x20, 0x31, 0x39, 0x38, 0x34,
+    0x0D, 0x0A, 0x20, 0x20, 0x20, 0x50, 0x72, 0x65, 0x73, 0x73, 0x20, 0x22, 0x48, 0x22, 0x20, 0x66,
+    0x6F, 0x72, 0x20, 0x68, 0x65, 0x6C, 0x70, 0x0D, 0x0A, 0x41, 0x74, 0x74, 0x65, 0x6D, 0x70, 0x74,
+    0x69, 0x6E, 0x67, 0x20, 0x74, 0x6F, 0x20, 0x62, 0x6F, 0x6F, 0x74, 0x2E, 0x2E, 0x2E, 0x2E, 0x2E,
+    0x2E, 0x2E, 0x0D, 0x0A, 0x50, 0x72, 0x65, 0x73, 0x73, 0x20, 0x61, 0x6E, 0x79, 0x20, 0x6B, 0x65,
+    0x79, 0x20, 0x74, 0x6F, 0x20, 0x61, 0x62, 0x6F, 0x72, 0x74, 0x20, 0x62, 0x6F, 0x6F, 0x74, 0x2E,
+    0x0D, 0x0A, 0x00, 0x0D, 0x0A, 0x20, 0x3E, 0x00, 0x20, 0x55, 0x4E, 0x44, 0x45, 0x46, 0x49, 0x4E,
+    0x45, 0x44, 0x00, 0x20, 0x3F, 0x3F, 0x3F, 0x3F, 0x00, 0x0D, 0x0D, 0x0A, 0x4D, 0x45, 0x4D, 0x4F,
+    0x52, 0x59, 0x20, 0x57, 0x52, 0x49, 0x54, 0x45, 0x20, 0x45, 0x52, 0x52, 0x4F, 0x52, 0x20, 0x41,
+    0x54, 0x20, 0x00, 0x45, 0x52, 0x52, 0x4F, 0x52, 0x00, 0x20, 0x50, 0x41, 0x55, 0x53, 0x45, 0x00,
+    0x3F, 0x20, 0x00, 0x20, 0x41, 0x42, 0x4F, 0x52, 0x54, 0x45, 0x44, 0x00, 0x53, 0x54, 0x41, 0x52,
+    0x54, 0x49, 0x4E, 0x47, 0x20, 0x41, 0x44, 0x44, 0x52, 0x45, 0x53, 0x53, 0x3A, 0x00, 0x45, 0x4E,
+    0x44, 0x49, 0x4E, 0x47, 0x20, 0x41, 0x44, 0x44, 0x52, 0x45, 0x53, 0x53, 0x3A, 0x00, 0x0D, 0x0A,
+    0x46, 0x44, 0x43, 0x20, 0x43, 0x4F, 0x4C, 0x44, 0x20, 0x42, 0x4F, 0x4F, 0x54, 0x20, 0x45, 0x52,
+    0x52, 0x4F, 0x52, 0x20, 0x43, 0x4F, 0x44, 0x45, 0x20, 0x00, 0x0D, 0x0A, 0x49, 0x4E, 0x53, 0x45,
+    0x52, 0x54, 0x20, 0x44, 0x49, 0x53, 0x4B, 0x20, 0x26, 0x20, 0x50, 0x52, 0x45, 0x53, 0x53, 0x20,
+    0x42, 0x20, 0x54, 0x4F, 0x20, 0x42, 0x4F, 0x4F, 0x54, 0x00, 0x0D, 0x0A, 0x48, 0x44, 0x43, 0x31,
+    0x30, 0x30, 0x31, 0x20, 0x43, 0x4F, 0x4C, 0x44, 0x20, 0x42, 0x4F, 0x4F, 0x54, 0x20, 0x45, 0x52,
+    0x52, 0x4F, 0x52, 0x20, 0x43, 0x4F, 0x44, 0x45, 0x20, 0x00, 0x0D, 0x0A, 0x00, 0x0D, 0x0A, 0x4D,
+    0x4F, 0x4E, 0x49, 0x54, 0x4F, 0x52, 0x20, 0x43, 0x4F, 0x4D, 0x4D, 0x41, 0x4E, 0x44, 0x53, 0x20,
+    0x3A, 0x0D, 0x0A, 0x42, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+    0x20, 0x20, 0x20, 0x3D, 0x20, 0x4C, 0x6F, 0x61, 0x64, 0x20, 0x64, 0x69, 0x73, 0x6B, 0x20, 0x62,
+    0x6F, 0x6F, 0x74, 0x20, 0x6C, 0x6F, 0x61, 0x64, 0x65, 0x72, 0x0D, 0x0A, 0x43, 0x20, 0x20, 0x20,
+    0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x3D, 0x20, 0x4C, 0x6F,
+    0x61, 0x64, 0x20, 0x64, 0x69, 0x73, 0x6B, 0x20, 0x62, 0x6F, 0x6F, 0x74, 0x20, 0x6C, 0x6F, 0x61,
+    0x64, 0x65, 0x72, 0x20, 0x66, 0x72, 0x6F, 0x6D, 0x20, 0x63, 0x61, 0x72, 0x74, 0x72, 0x69, 0x61,
+    0x67, 0x65, 0x0D, 0x0A, 0x44, 0x53, 0x53, 0x53, 0x53, 0x2C, 0x51, 0x51, 0x51, 0x51, 0x20, 0x20,
+    0x20, 0x20, 0x20, 0x20, 0x3D, 0x20, 0x44, 0x75, 0x6D, 0x70, 0x20, 0x6D, 0x65, 0x6D, 0x6F, 0x72,
+    0x79, 0x20, 0x69, 0x6E, 0x20, 0x68, 0x65, 0x78, 0x20, 0x66, 0x72, 0x6F, 0x6D, 0x20, 0x53, 0x20,
+    0x74, 0x6F, 0x20, 0x51, 0x0D, 0x0A, 0x46, 0x53, 0x53, 0x53, 0x53, 0x2C, 0x51, 0x51, 0x51, 0x51,
+    0x2C, 0x42, 0x42, 0x20, 0x20, 0x20, 0x3D, 0x20, 0x46, 0x69, 0x6C, 0x6C, 0x20, 0x6D, 0x65, 0x6D,
+    0x6F, 0x72, 0x79, 0x20, 0x66, 0x72, 0x6F, 0x6D, 0x20, 0x53, 0x20, 0x74, 0x6F, 0x20, 0x51, 0x20,
+    0x77, 0x69, 0x74, 0x68, 0x20, 0x42, 0x0D, 0x0A, 0x47, 0x41, 0x41, 0x41, 0x41, 0x20, 0x20, 0x20,
+    0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x3D, 0x20, 0x47, 0x6F, 0x20, 0x74, 0x6F, 0x20,
+    0x61, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x20, 0x41, 0x0D, 0x0A, 0x49, 0x50, 0x50, 0x20, 0x20,
+    0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x3D, 0x20, 0x49, 0x6E, 0x70,
+    0x75, 0x74, 0x20, 0x66, 0x72, 0x6F, 0x6D, 0x20, 0x70, 0x6F, 0x72, 0x74, 0x20, 0x50, 0x0D, 0x0A,
+    0x4C, 0x41, 0x41, 0x41, 0x41, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+    0x3D, 0x20, 0x4C, 0x6F, 0x61, 0x64, 0x20, 0x6D, 0x65, 0x6D, 0x6F, 0x72, 0x79, 0x20, 0x73, 0x74,
+    0x61, 0x72, 0x74, 0x69, 0x6E, 0x67, 0x20, 0x61, 0x74, 0x20, 0x41, 0x0D, 0x0A, 0x4D, 0x53, 0x53,
+    0x53, 0x53, 0x2C, 0x51, 0x51, 0x51, 0x51, 0x2C, 0x44, 0x44, 0x44, 0x44, 0x20, 0x3D, 0x20, 0x4D,
+    0x6F, 0x76, 0x65, 0x20, 0x73, 0x74, 0x61, 0x72, 0x74, 0x69, 0x6E, 0x67, 0x20, 0x61, 0x74, 0x20,
+    0x53, 0x20, 0x74, 0x6F, 0x20, 0x51, 0x20, 0x74, 0x6F, 0x20, 0x41, 0x64, 0x64, 0x72, 0x2E, 0x20,
+    0x44, 0x0D, 0x0A, 0x4F, 0x50, 0x50, 0x2C, 0x44, 0x44, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+    0x20, 0x20, 0x20, 0x3D, 0x20, 0x4F, 0x75, 0x74, 0x70, 0x75, 0x74, 0x20, 0x64, 0x61, 0x74, 0x61,
+    0x20, 0x44, 0x20, 0x74, 0x6F, 0x20, 0x70, 0x6F, 0x72, 0x74, 0x20, 0x50, 0x0D, 0x0A, 0x45, 0x53,
+    0x43, 0x20, 0x77, 0x69, 0x6C, 0x6C, 0x20, 0x74, 0x65, 0x72, 0x6D, 0x69, 0x6E, 0x61, 0x74, 0x65,
+    0x20, 0x61, 0x6E, 0x79, 0x20, 0x63, 0x6F, 0x6D, 0x6D, 0x61, 0x6E, 0x64, 0x00, 0x4C, 0xBD, 0xF1,
+    0x0D, 0x84, 0xF0, 0x2E, 0xCC, 0xF1, 0x2D, 0xFE, 0xF1, 0x44, 0x0F, 0xF2, 0x49, 0x99, 0xF2, 0x4F,
+    0xAB, 0xF2, 0x46, 0x71, 0xF2, 0x47, 0x3C, 0xF2, 0x4D, 0x52, 0xF2, 0x48, 0x41, 0xF2, 0x42, 0xBD,
+    0xF2, 0x43, 0xE2, 0xF3, 0xFF, 0x51, 0x20, 0x74, 0x6F, 0x20, 0x41, 0x64, 0x64, 0x72, 0x2E, 0x20,
+    0xC3, 0x3C, 0xF0, 0xC3, 0xAF, 0xF0, 0xC3, 0xC1, 0xF0, 0xC3, 0xBA, 0xF0, 0xC3, 0xD4, 0xF0, 0xC3,
+    0xEC, 0xF0, 0xC3, 0xFB, 0xF0, 0xC3, 0x11, 0xF1, 0xC3, 0x1F, 0xF1, 0xC3, 0x16, 0xF1, 0xC3, 0x2D,
+    0xF1, 0xC3, 0x38, 0xF1, 0xC3, 0x55, 0xF1, 0xC3, 0x82, 0xF1, 0xC3, 0xAC, 0xF1, 0xC3, 0x05, 0xF2,
+    0xC3, 0x0B, 0xF4, 0xC3, 0x67, 0xF3, 0xC3, 0x99, 0xF2, 0xC3, 0xAB, 0xF2, 0xDB, 0x15, 0xE6, 0x7F,
+    0xD3, 0x18, 0x3E, 0x4F, 0xD3, 0x16, 0x3E, 0x20, 0x32, 0x05, 0xEE, 0xAF, 0x32, 0x01, 0xEE, 0x31,
+    0x64, 0xEE, 0x21, 0x65, 0xF0, 0x01, 0x01, 0x08, 0xED, 0xB3, 0x21, 0x6D, 0xF0, 0x01, 0x03, 0x08,
+    0xED, 0xB3, 0xC3, 0x75, 0xF0, 0x18, 0x04, 0x44, 0x03, 0xC1, 0x05, 0xEA, 0x00, 0x18, 0x04, 0x44,
+    0x03, 0xC1, 0x05, 0xEA, 0x00, 0x21, 0x19, 0xF4, 0xCD, 0xEC, 0xF0, 0x21, 0x37, 0xF4, 0xCD, 0xEC
+    },
+    { /* DIGITEX Monitor version 1.2.A -- 10/06/83 */
     0xC3, 0x3C, 0xF0, 0xC3, 0xA4, 0xF0, 0xC3, 0xB6, 0xF0, 0xC3, 0xAF, 0xF0, 0xC3, 0xC9, 0xF0, 0xC3,
     0xE1, 0xF0, 0xC3, 0xF0, 0xF0, 0xC3, 0x06, 0xF1, 0xC3, 0x14, 0xF1, 0xC3, 0x0B, 0xF1, 0xC3, 0x22,
     0xF1, 0xC3, 0x2D, 0xF1, 0xC3, 0x4A, 0xF1, 0xC3, 0x77, 0xF1, 0xC3, 0xA1, 0xF1, 0xC3, 0xFA, 0xF1,
@@ -352,16 +584,8 @@ static uint8 adcs6_rom[ADCS6_ROM_SIZE] = {
     0x02, 0x87, 0x02, 0x8B, 0x02, 0x8F, 0x02, 0x92, 0x02, 0x98, 0x02, 0x9B, 0x02, 0x9E, 0x02, 0xA1,
     0x02, 0xA4, 0x02, 0xA8, 0x02, 0xAB, 0x02, 0xB0, 0x02, 0xB3, 0x02, 0xB6, 0x02, 0xB9, 0x02, 0xBC,
     0x02, 0xBF, 0x02, 0xC2, 0x02, 0x26, 0x03, 0x42, 0x03, 0x54, 0x03, 0x57, 0x03, 0x5B, 0x03, 0x00
+    }
 };
-
-/* returns TRUE iff there exists a disk with VERBOSE */
-static int32 adcs6_hasProperty(uint32 property) {
-    int32 i;
-    for (i = 0; i < ADCS6_MAX_DRIVES; i++)
-        if (adcs6_dev.units[i].flags & property)
-            return TRUE;
-    return FALSE;
-}
 
 static uint8 motor_timeout = 0;
 
@@ -373,7 +597,7 @@ static t_stat adcs6_svc (UNIT *uptr)
         motor_timeout ++;
         if(motor_timeout == MOTOR_TO_LIMIT) {
             adcs6_info->head_sel = 0;
-            sim_debug(DRIVE_MSG, &adcs6_dev, "ADCS6: Motor OFF\n");
+            sim_debug(DRIVE_MSG, &adcs6_dev, DEV_NAME ": Motor OFF\n");
         }
     }
 
@@ -387,74 +611,121 @@ static t_stat adcs6_svc (UNIT *uptr)
     return SCPE_OK;
 }
 
+/* CTC Unit service routine
+ * Unit 4-7 = CRC0-3
+ */
+static t_stat adcs6_ctc_svc(UNIT* uptr)
+{
+    uint8 ctc_index = (uint8)(uptr->u4 - 4);
+
+    switch (ctc_index & 0x03) {
+    case 0:
+        sim_debug(CTC_MSG, &adcs6_dev, ADDRESS_FORMAT " CTC%d expired.\n", PCX, ctc_index);
+        break;
+    case 1:
+        sim_debug(CTC_MSG, &adcs6_dev, ADDRESS_FORMAT " CTC%d expired, generate interrupt, reactivate after %d.\n", PCX, ctc_index, adcs6_info->ctc_tc[0] * adcs6_info->ctc_tc[1]);
+        break;
+    default:
+        sim_debug(CTC_MSG, &adcs6_dev, ADDRESS_FORMAT " CTC%d expired.\n", PCX, ctc_index);
+        break;
+    }
+
+    return SCPE_OK;
+}
+
 
 /* Reset routine */
 static t_stat adcs6_reset(DEVICE *dptr)
 {
     PNP_INFO *pnp = (PNP_INFO *)dptr->ctxt;
+    int i;
 
     if(dptr->flags & DEV_DIS) { /* Disconnect ROM and I/O Ports */
-        if (adcs6_hasProperty(UNIT_ADCS6_ROM)) {
+        if (adcs6_info->rom_disabled == FALSE) {
             sim_map_resource(pnp->mem_base, pnp->mem_size, RESOURCE_TYPE_MEMORY, &adcs6rom, "adcs6rom", TRUE);
         }
         /* Unmap I/O Ports (0x3-4,0x5-9,0x34,0x40 */
-        sim_map_resource(0x10, 4, RESOURCE_TYPE_IO, &adcs6_dma, "adcs6_dma", TRUE);
-        sim_map_resource(0x04, 8, RESOURCE_TYPE_IO, &adcs6_timer, "adcs6_timer", TRUE);
-        sim_map_resource(0x14, 1, RESOURCE_TYPE_IO, &adcs6_control, "adcs6_control", TRUE);
-        sim_map_resource(0x15, 7, RESOURCE_TYPE_IO, &adcs6_banksel, "adcs6_banksel", TRUE);
+        sim_map_resource(ADCS6_DMA, 1, RESOURCE_TYPE_IO, &adcs6_dma, "adcs6_dma", TRUE);
+        sim_map_resource(ADCS6_PIO, 4, RESOURCE_TYPE_IO, &adcs6_pio, "adcs6_pio", TRUE);
+        sim_map_resource(ADCS6_CTC0, 4, RESOURCE_TYPE_IO, &adcs6_ctc, "adcs6_ctc", TRUE);
+        sim_map_resource(ADCS6_CTRL, 1, RESOURCE_TYPE_IO, &adcs6_control, "adcs6_control", TRUE);
+        sim_map_resource(ADCS6_EXTADR, 7, RESOURCE_TYPE_IO, &adcs6_banksel, "adcs6_banksel", TRUE);
+        sim_map_resource(CCS2719, 16, RESOURCE_TYPE_IO, &ccs2719, "ccs2719", TRUE);
     } else {
         /* Connect ADCS6 ROM at base address */
-        if (adcs6_hasProperty(UNIT_ADCS6_ROM)) {
-            sim_debug(VERBOSE_MSG, &adcs6_dev, "ADCS6: ROM Enabled.\n");
+        if (adcs6_info->rom_disabled == FALSE) {
+            sim_debug(VERBOSE_MSG, &adcs6_dev, DEV_NAME ": ROM Enabled.\n");
             if(sim_map_resource(pnp->mem_base, pnp->mem_size, RESOURCE_TYPE_MEMORY, &adcs6rom, "adcs6rom", FALSE) != 0) {
                 sim_printf("%s: error mapping MEM resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
                 return SCPE_ARG;
             }
-            adcs6_info->rom_disabled = FALSE;
         } else {
-            sim_debug(VERBOSE_MSG, &adcs6_dev, "ADCS6: ROM Disabled.\n");
-            adcs6_info->rom_disabled = TRUE;
+            sim_debug(VERBOSE_MSG, &adcs6_dev, DEV_NAME ": ROM Disabled.\n");
         }
 
         /* Connect ADCS6 FDC Synchronization / Drive / Density Register */
-        if(sim_map_resource(0x14, 0x01, RESOURCE_TYPE_IO, &adcs6_control, "adcs6_control", FALSE) != 0) {
+        if(sim_map_resource(ADCS6_CTRL, 0x01, RESOURCE_TYPE_IO, &adcs6_control, "adcs6_control", FALSE) != 0) {
             sim_printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
             return SCPE_ARG;
         }
-/*#define ADCS6 */
-#ifdef ADCS6
+
+#define ADCS6
+#ifdef ADCS6    /* Do not connect these, they conflict with AltairZ80's R and W commands. */
         /* Connect ADCS6 Interrupt, and Aux Disk Registers */
 
-        if(sim_map_resource(0x10, 0x04, RESOURCE_TYPE_IO, &adcs6_dma, "adcs6_dma", FALSE) != 0) {
-            sim_printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
-            return SCPE_ARG;
-        }
-
-        /* Connect ADCS6 Timer Registers */
-        if(sim_map_resource(0x04, 0x08, RESOURCE_TYPE_IO, &adcs6_timer, "adcs6_timer", FALSE) != 0) {
+        if(sim_map_resource(ADCS6_DMA, 0x01, RESOURCE_TYPE_IO, &adcs6_dma, "adcs6_dma", FALSE) != 0) {
             sim_printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
             return SCPE_ARG;
         }
 #endif
-        /* Connect ADCS6 Memory Management / Bank Select Register */
-        if(sim_map_resource(0x15, 0x7, RESOURCE_TYPE_IO, &adcs6_banksel, "adcs6_banksel", FALSE) != 0) {
+        /* Connect ADCS6 PIO Registers */
+        if (sim_map_resource(ADCS6_PIO, 0x08, RESOURCE_TYPE_IO, &adcs6_pio, "adcs6_pio", FALSE) != 0) {
             sim_printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
             return SCPE_ARG;
         }
+
+        /* Connect ADCS6 CTC Registers */
+        if(sim_map_resource(ADCS6_CTC0, 0x04, RESOURCE_TYPE_IO, &adcs6_ctc, "adcs6_ctc", FALSE) != 0) {
+            sim_printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
+            return SCPE_ARG;
+        }
+
+        /* Connect ADCS6 Memory Management / Bank Select Register */
+        if(sim_map_resource(ADCS6_EXTADR, 0x7, RESOURCE_TYPE_IO, &adcs6_banksel, "adcs6_banksel", FALSE) != 0) {
+            sim_printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
+            return SCPE_ARG;
+        }
+
+        /* Connect CCS-2719 2 SIO / 2 PIO Card */
+        if (sim_map_resource(CCS2719, 16, RESOURCE_TYPE_IO, &ccs2719, "ccs2719", FALSE) != 0) {
+            sim_printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
+            return SCPE_ARG;
+        }
+
+        for (i = 0; i < ADCS6_MAX_UNITS; i++) {
+            adcs6_unit[i].u4 = i;
+        }
+
+        /* Reset memory control registers */
+        adcs6_info->mctrl0 = 0;
+        adcs6_info->mctrl1 = 0;
+
+        adcs6_info->j7 &= 0x7F;
+        adcs6_info->j7 |= (wd179x_get_nheads() == 1) ? 0x80 : 0;
+        adcs6_info->rom_disabled = FALSE;
+
     }
 
-/*  sim_activate (adcs6_unit, adcs6_unit->wait); */ /* requeue! */
     return SCPE_OK;
 }
 
 static t_stat adcs6_boot(int32 unitno, DEVICE *dptr)
 {
-    DBG_PRINT(("Booting ADCS6 Controller\n"));
+    sim_debug(VERBOSE_MSG, &adcs6_dev, "Booting ADCS6 Controller\n");
 
-    /* Re-enable the ROM in case it was disabled */
     adcs6_info->rom_disabled = FALSE;
 
-    /* Set the PC to 0, and go. */
+    /* Set the PC to F000H, and go. */
     *((int32 *) sim_PC->loc) = 0xF000;
     return SCPE_OK;
 }
@@ -462,8 +733,11 @@ static t_stat adcs6_boot(int32 unitno, DEVICE *dptr)
 /* Attach routine */
 static t_stat adcs6_attach(UNIT *uptr, CONST char *cptr)
 {
-    t_stat r;
+    t_stat r = SCPE_IERR;
+
+    if (uptr->u4 < 4) {
     r = wd179x_attach(uptr, cptr);
+    }
 
     return r;
 }
@@ -471,31 +745,84 @@ static t_stat adcs6_attach(UNIT *uptr, CONST char *cptr)
 /* Detach routine */
 static t_stat adcs6_detach(UNIT *uptr)
 {
-    t_stat r;
+    t_stat r = SCPE_IERR;
 
+    if (uptr->u4 < 4) {
     r = wd179x_detach(uptr);
+    }
 
     return r;
 }
 
 static int32 adcs6rom(const int32 Addr, const int32 write, const int32 data)
 {
-/*  DBG_PRINT(("ADCS6: ROM %s, Addr %04x\n", write ? "WR" : "RD", Addr)); */
     if(write) {
         if(adcs6_info->rom_disabled == FALSE) {
-            sim_debug(ERROR_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+            sim_debug(ERROR_MSG, &adcs6_dev, DEV_NAME ": " ADDRESS_FORMAT
                       " Cannot write to ROM.\n", PCX);
         } else {
-            adcs6ram[Addr & ADCS6_ADDR_MASK] = data;
+            adcs6ram[Addr & ADCS6_ADDR_MASK] = (uint8)data;
         }
         return 0;
     } else {
         if(adcs6_info->rom_disabled == FALSE) {
-            return(adcs6_rom[Addr & ADCS6_ADDR_MASK]);
+            return(adcs6_rom[adcs6_info->rom_type][Addr & ADCS6_ADDR_MASK]);
         } else {
             return(adcs6ram[Addr & ADCS6_ADDR_MASK]);
         }
     }
+}
+
+/* Set ROM to ADC or DIGITEX */
+static t_stat adcs6_dev_set_rom(UNIT* uptr, int32 value, CONST char* cptr, void* desc)
+{
+    if (cptr == NULL)
+        return SCPE_ARG;
+
+    if (!sim_strncasecmp(cptr, "ADC", 3)) {
+        sim_printf("ADC ROM selected.\n");
+        adcs6_info->rom_type = ADCS6_ROM_ADC;
+    } else if (!sim_strncasecmp(cptr, "DIGITEX", 7)) {
+        sim_printf("DIGITEX ROM selected.\n");
+        adcs6_info->rom_type = ADCS6_ROM_DIGITEX;
+    } else {
+        sim_printf("Invalid ROM type selected, defaulting to ADC. Valid values are ADC, DIGITEX\n");
+        adcs6_info->rom_type = ADCS6_ROM_ADC;
+    }
+
+    return SCPE_OK;
+}
+
+char* adcs6_rom_type_str[] = {
+    "ADC",
+    "DIGITEX"
+};
+
+/* Show current ROM selection */
+static t_stat adcs6_dev_show_rom(FILE* st, UNIT* uptr, int32 val, CONST void* desc)
+{
+    fprintf(st, "ROM=%s", adcs6_rom_type_str[adcs6_info->rom_type]);
+
+    return SCPE_OK;
+}
+
+t_stat adcs6_show_vectable(FILE* st, UNIT* uptr, int32 val, CONST void* desc)
+{
+    uint8 i;
+    int32 vectable = (IR_S & 0xFF00);
+    int32 vector;
+
+    if (uptr == NULL) {
+        return SCPE_IERR;
+    }
+
+    fprintf(st, "Vector table @0x%04x\n--------------------\n", vectable);
+
+    for (i = 0; i < 64; i++) {
+        vector = (GetBYTEWrapper(vectable + (i * 2) + 1) << 8) | GetBYTEWrapper(vectable + (i * 2));
+        if (vector != 0) fprintf(st, "%02d @0x%04x=0x%04x\n", i, vectable + (i * 2), vector);
+    }
+    return SCPE_OK;
 }
 
 /* Disk Control/Flags Register, 0x14 */
@@ -503,7 +830,13 @@ static int32 adcs6_control(const int32 port, const int32 io, const int32 data)
 {
     int32 result = 0;
     if(io) { /* I/O Write */
+
+        /* Disk drive select bits 1:0 */
         wd179x_infop->sel_drive = data & 0x03;
+
+        /* Set J7[7] currently selected drive number of sides */
+        adcs6_info->j7 &= 0x7F;
+        adcs6_info->j7 |= (wd179x_get_nheads() == 1) ? 0x80 : 0;
 
         if(data & ADCS6_CTRL_MINI) {
             wd179x_infop->drivetype = 5;
@@ -530,7 +863,7 @@ static int32 adcs6_control(const int32 port, const int32 io, const int32 data)
             adcs6_info->autowait = 0;
         }
 
-        sim_debug(DRIVE_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+        sim_debug(DRIVE_MSG, &adcs6_dev, DEV_NAME ": " ADDRESS_FORMAT
                   " WR CTRL: sel_drive=%d, drivetype=%d, head_sel=%d, dens=%d, aw=%d\n",
                   PCX, wd179x_infop->sel_drive,
                   wd179x_infop->drivetype, adcs6_info->head_sel,
@@ -539,6 +872,9 @@ static int32 adcs6_control(const int32 port, const int32 io, const int32 data)
         result = wd179x_infop->drq ? 0xFF : 0;
         if (wd179x_infop->intrq)
             result &= 0x7F;
+
+        sim_debug(DRIVE_MSG, &adcs6_dev, DEV_NAME ": " ADDRESS_FORMAT
+            " RD DISK STATUS: sel_drive=%d: Status=0x%02x\n", PCX, wd179x_infop->sel_drive, result);
     }
 
     return result;
@@ -549,114 +885,209 @@ static int32 adcs6_dma(const int32 port, const int32 io, const int32 data)
 {
     int32 result = 0xff;
     if(io) { /* I/O Write */
-        sim_debug(DMA_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+        sim_debug(DMA_MSG, &adcs6_dev, DEV_NAME ": " ADDRESS_FORMAT
                   " WR DMA: 0x%02x\n", PCX, data & 0xFF);
+        adcs6_info->dma = (uint8)data;
     } else { /* I/O Read */
         result = 0xFF;
-        sim_debug(DMA_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+        sim_debug(DMA_MSG, &adcs6_dev, DEV_NAME ": " ADDRESS_FORMAT
                   " RD DMA: 0x%02x\n", PCX, result);
     }
     return result;
 }
 
-/* ADC Super-Six PIO and CTC ports */
-static int32 adcs6_timer(const int32 port, const int32 io, const int32 data)
+/* ADC Super-Six PIO ports */
+static int32 adcs6_pio(const int32 port, const int32 io, const int32 data)
 {
     static int32 result = 0xFF;
     if(io) { /* Write */
         switch(port) {
         case 0x04:
-            sim_debug(VERBOSE_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+            sim_debug(PIO_MSG, &adcs6_dev, ADDRESS_FORMAT
                       " WR PIOA DATA=0x%02x\n", PCX, data);
             break;
         case 0x05:
-            sim_debug(VERBOSE_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+            sim_debug(PIO_MSG, &adcs6_dev, ADDRESS_FORMAT
                       " WR PIOB DATA=0x%02x\n", PCX, data);
             break;
         case 0x06:
-            sim_debug(VERBOSE_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+            sim_debug(PIO_MSG, &adcs6_dev, ADDRESS_FORMAT
                       " WR PIOA CTRL=0x%02x\n", PCX, data);
             break;
         case 0x07:
-            sim_debug(VERBOSE_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+            sim_debug(PIO_MSG, &adcs6_dev, ADDRESS_FORMAT
                       " WR PIOB CTRL=0x%02x\n", PCX, data);
             break;
-        case 0x08:
-        case 0x09:
-        case 0x0A:
-        case 0x0B:
-            sim_debug(VERBOSE_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
-                      " WR CTC%d: 0x%02x\n", PCX, port - 8, data);
-            break;
         default:
-            sim_debug(ERROR_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+            sim_debug(ERROR_MSG, &adcs6_dev, ADDRESS_FORMAT
                       " WR Unhandled Port: 0x%02x=0x%02x\n", PCX, port, data);
             break;
         }
-    } else { /* Read */
-        result = 0xFF;
+    }
+    else { /* Read */
+        result = 0x00;
         switch(port) {
         case 0x04:
-            sim_debug(VERBOSE_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+            sim_debug(PIO_MSG, &adcs6_dev, ADDRESS_FORMAT
                       " RD PIOA DATA=0x%02x\n", PCX, result);
             break;
         case 0x05:
-            sim_debug(VERBOSE_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+            sim_debug(PIO_MSG, &adcs6_dev, ADDRESS_FORMAT
                       " RD PIOB DATA=0x%02x\n", PCX, result);
             break;
         case 0x06:
-            sim_debug(VERBOSE_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+            sim_debug(PIO_MSG, &adcs6_dev, ADDRESS_FORMAT
                       " RD PIOA CTRL=0x%02x\n", PCX, result);
             break;
         case 0x07:
-            sim_debug(VERBOSE_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+            sim_debug(PIO_MSG, &adcs6_dev, ADDRESS_FORMAT
                       " RD PIOB CTRL=0x%02x\n", PCX, result);
             break;
-        case 0x08:
-        case 0x09:
-        case 0x0A:
-        case 0x0B:
-            sim_debug(VERBOSE_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
-                      " RD CTC%d: 0x%02x\n", PCX, port - 8, data);
-            break;
         default:
-            sim_debug(ERROR_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
-                      " RD Unhandled Port: 0x%02x=0x%02x\n", PCX, port, data);
+            sim_debug(ERROR_MSG, &adcs6_dev, ADDRESS_FORMAT
+                " RD Unhandled Port: 0x%02x=0x%02x\n", PCX, port, result);
             break;
         }
     }
     return result;
 }
 
-/* 64FDC Bank Select (Write Disables boot ROM) */
+static uint8 testresult = 0;
+
+/* ADC Super-Six CTC ports */
+
+/* The Z80-CTC on the Super Six has CLK/4 going to the CTC0 CLK/TRIG pin.
+ * The ZC/TO0 pin goes to the CTC1 CLK/TRIG pin.
+ */
+static int32 adcs6_ctc(const int32 port, const int32 io, const int32 data)
+{
+    static int32 result = 0xFF;
+    uint8 ctc_channel = port & 0x03;
+
+    if(io) { /* Write */
+        switch(port) {
+        case ADCS6_CTC0:
+        case ADCS6_CTC1:
+        case ADCS6_CTC2:
+        case ADCS6_CTC3:
+            if (adcs6_info->ctc_tc_follows[ctc_channel]) { /* If expecting TC write */
+                adcs6_info->ctc_tc[ctc_channel] = (uint8)data;
+                adcs6_info->ctc_count[ctc_channel] = (uint8)data;
+                adcs6_info->ctc_tc_follows[ctc_channel] = 0;
+                sim_debug(CTC_MSG, &adcs6_dev, ADDRESS_FORMAT
+                    " WR CTC%d  TC=0x%02x\n", PCX, ctc_channel, data);
+
+            } else { /* Not expecting TC, write CCW or Vector */
+                if (data & CTC_CCW_BIT) {
+                    adcs6_info->ctc_ccw[ctc_channel] = (uint8)data;
+                    adcs6_info->ctc_tc_follows[ctc_channel] = (uint8)(data & CTC_TC_FOLLOWS);
+                    sim_debug(CTC_MSG, &adcs6_dev, ADDRESS_FORMAT
+                        " WR CTC%d CCW=0x%02x: [%s%s%s%s%s%s]\n", PCX, ctc_channel, data,
+                        data & 0x80 ? "INT_EN, " : "",
+                        data & 0x40 ? "COUNTER, " : "TIMER, ",
+                        data & 0x40 ? "" : (data & 0x20 ? "PRESCALE=256, " : "PRESCALE=16, "),
+                        data & 0x10 ? "RISING EDGE, " : "FALLING EDGE, ",
+                        data & 0x08 ? "PULSE TRIGGER" : "AUTO TRIGGER",
+                        data & 0x02 ? ", CHANNEL RESET" : "");
+
+                    if (/*((data & 0x02) == 0) && */ ctc_channel == 1) {   /* CTC0 TRIG is connected to the 1.5MHz clock */
+                        sim_debug(CTC_MSG, &adcs6_dev, ADDRESS_FORMAT
+                            " WR CTC%d  activate after %d\n", PCX, ctc_channel, (adcs6_info->ctc_tc[0] * adcs6_info->ctc_tc[1]));
+                        sim_activate_after(&adcs6_unit[ctc_channel + 4], 100 + (adcs6_info->ctc_tc[0] * adcs6_info->ctc_tc[1]));
+                    }
+                } else {
+                    int i;
+                    adcs6_info->ctc_vec = (uint8)data;
+                    adcs6_info->ctc_vec_table = (IR_S & 0xFF00) | adcs6_info->ctc_vec;
+                    sim_debug(CTC_MSG, &adcs6_dev, ADDRESS_FORMAT
+                        " WR CTC%d VEC=0x%02x, table: 0x%04x\n", PCX, ctc_channel, adcs6_info->ctc_vec, adcs6_info->ctc_vec_table);
+                    for (i = 0; i < 4; i++) {
+                        sim_debug(CTC_MSG, &adcs6_dev,
+                            " CTC%d handler=0x%04x\n", i, GetBYTEWrapper((adcs6_info->ctc_vec_table) + i*2) | (GetBYTEWrapper((adcs6_info->ctc_vec_table) + i*2 + 1) << 8));
+                    }
+                    /* Set CTC1 timer interrupt handler in AltairZ80 SIO */
+                    timerInterruptHandler = GetBYTEWrapper((adcs6_info->ctc_vec_table) + 2) | (GetBYTEWrapper((adcs6_info->ctc_vec_table) + 3) << 8);
+                }
+            }
+            break;
+        default:
+            sim_debug(ERROR_MSG, &adcs6_dev, ADDRESS_FORMAT
+                      " WR Unhandled Port: 0x%02x=0x%02x\n", PCX, port, data);
+            break;
+        }
+    } else { /* Read */
+
+        result = adcs6_info->ctc_count[ctc_channel];
+        switch(port) {
+        case ADCS6_CTC0:
+        case ADCS6_CTC1:
+        case ADCS6_CTC2:
+        case ADCS6_CTC3:
+            result = testresult;
+            sim_debug(CTC_MSG, &adcs6_dev, ADDRESS_FORMAT
+                      " RD CTC%d: 0x%02x\n", PCX, ctc_channel, result);
+            break;
+        default:
+            sim_debug(ERROR_MSG, &adcs6_dev, ADDRESS_FORMAT
+                      " RD Unhandled Port: 0x%02x=0x%02x\n", PCX, port, result);
+            break;
+        }
+    }
+    return result;
+}
+
+/* ADC Super-Six Memory Control ports 0x15-0x1B */
 static int32 adcs6_banksel(const int32 port, const int32 io, const int32 data)
 {
     int32 result;
+    uint8 cpm3_bank = 0;
+
     if(io) {    /* Write */
         switch(port) {
-        case 0x15:
+        case ADCS6_EXTADR:
             adcs6_info->s100_addr_u = data & 0xFF;
-            sim_debug(VERBOSE_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+            sim_debug(BANK_MSG, &adcs6_dev, DEV_NAME ": " ADDRESS_FORMAT
                       " WR S100 A[23:16]=0x%02x\n", PCX, data);
             break;
-        case 0x16:
-            sim_debug(VERBOSE_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
-                      " WR MCTRL0: 0x%02x\n", PCX, data);
-            adcs6_info->rom_disabled = (data & 0x20) ? TRUE : FALSE; /* Unmap Boot ROM */
+        case ADCS6_MCTRL0:
+            sim_debug(BANK_MSG, &adcs6_dev, DEV_NAME ": " ADDRESS_FORMAT
+                      " WR MCTRL0: 0x%02x: BANK_EN[3:0]=%x, ROM=%s, POJ=%s, Parity Check=%s\n", PCX, data,
+                      data & MCTRL_BANK_MASK,
+                      (data & MCTRL_ROM_DISABLE) ? "Disabled" : "Enabled",
+                      (data & MCTRL_POJ_ENABLED) ? "Enabled" : "Disabled",
+                      (data & MCTRL_PARITY_ENABLED) ? "Enabled" : "Disabled");
+            adcs6_info->rom_disabled = (data & MCTRL_ROM_DISABLE) ? TRUE : FALSE; /* Unmap Boot ROM */
+            adcs6_info->mctrl0 = (uint8)data;
             break;
-        case 0x17:
-            sim_debug(VERBOSE_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
-                      " WR MCTRL1: 0x%02x\n", PCX, data);
+        case ADCS6_MCTRL1:
+            switch (data) {
+            case 0x00:
+                cpm3_bank = 0;
+                break;
+            case 0x07:
+                cpm3_bank = 1;
+                break;
+            case 0x18:
+                cpm3_bank = 2;
+                break;
+            }
+            sim_debug(BANK_MSG, &adcs6_dev, DEV_NAME ": " ADDRESS_FORMAT
+                      " WR MCTRL1: 0x%02x: CP/M3 Bank: %d, BANK_EN[7:4]=%x, Map=%x\n", PCX, data,
+                      cpm3_bank,
+                      data & MCTRL_BANK_MASK,
+                      (data & MCTRL_MAP_MASK) >> 4);
+            adcs6_info->mctrl1 = (uint8)data;
+            setBankSelect(cpm3_bank);
             break;
-        case 0x18:
+        case ADCS6_SET_BAUD:
         case 0x19:
         case 0x1A:
         case 0x1B:
-            sim_debug(VERBOSE_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+            sim_debug(UART_MSG, &adcs6_dev, DEV_NAME ": " ADDRESS_FORMAT
                       " WR BAUD RATE=0x%02x\n", PCX, data);
             break;
         default:
-            sim_debug(ERROR_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+            sim_debug(ERROR_MSG, &adcs6_dev, DEV_NAME ": " ADDRESS_FORMAT
                       " WR Unhandled Port: 0x%02x=0x%02x\n", PCX, port, data);
             break;
         }
@@ -664,25 +1095,52 @@ static int32 adcs6_banksel(const int32 port, const int32 io, const int32 data)
     } else {    /* Read */
         result = 0xFF;
         switch(port) {
-        case 0x15:
+        case ADCS6_EXTADR:
             /* These are the Jumpers at J7.
              * Bit 7=0 = double-sided disk, bit 7=1 = single sided.
              * Bit 6=0 = use on-board RAM, Bit 6=1 = use S-100 RAM cards.
              * Bit 5:0 = "Baud Rate"
              */
-            result = dipswitch;
-            sim_debug(VERBOSE_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
-                      " RD BAUD RATE=0x%02x\n", PCX, result);
+            result = adcs6_info->j7;
+
+            sim_debug(UART_MSG, &adcs6_dev, DEV_NAME ": " ADDRESS_FORMAT
+                      " RD BAUD RATE=0x%02x, Drive %d %s-sided\n", PCX, result & 0x7f,
+                      wd179x_infop->sel_drive, (adcs6_info->j7 & 0x80) ? "Single" : "Double");
             break;
-        case 0x16:
-        case 0x17:
-        case 0x18:
+        case ADCS6_MCTRL0:
+        case ADCS6_MCTRL1:
+        case ADCS6_SET_BAUD:
         case 0x19:
         case 0x1A:
         case 0x1B:
         default:
-            sim_debug(ERROR_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+            sim_debug(ERROR_MSG, &adcs6_dev, DEV_NAME ": " ADDRESS_FORMAT
                       " RD attempt from write-only 0x%02x=0x%02x\n", PCX, port, result);
+            break;
+        }
+    }
+    return result;
+}
+
+/* CCS-2719 SIO / PIO Card 0x20-0x2F */
+static int32 ccs2719(const int32 port, const int32 io, const int32 data)
+{
+    int32 result;
+    if (io) {    /* Write */
+        switch (port) {
+        default:
+            sim_debug(UART_MSG, &adcs6_dev, DEV_NAME ": " ADDRESS_FORMAT
+                " WR Unhandled CCS2719 Port: 0x%02x=0x%02x\n", PCX, port, data);
+            break;
+        }
+        result = 0;
+    }
+    else {    /* Read */
+        result = 0xFF;
+        switch (port) {
+        default:
+            sim_debug(UART_MSG, &adcs6_dev, DEV_NAME ": " ADDRESS_FORMAT
+                " RD Unhandled CCS2719 Port: 0x%02x=0x%02x\n", PCX, port, result);
             break;
         }
     }
