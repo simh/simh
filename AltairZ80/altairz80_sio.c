@@ -303,6 +303,7 @@ static int32 warnUnassignedPort     = 0;        /* display a warning message if 
 /* PTR/PTP port assignments (read only)                                                                         */
 static int32 ptpptrStatusPort       = 0x12;     /* default status port for PTP/PTR device                       */
 static int32 ptpptrDataPort         = 0x13;     /* default data port for PTP/PTR device                         */
+       int32 kbdIrqPort             = 0;        /* Keyboard Interrupt port number.                              */
 
 static TMLN TerminalLines[TERMINALS] = {        /* four terminals   */
     { 0 }
@@ -345,6 +346,8 @@ static REG sio_reg[] = {
                "BOOL to determine whether a keyboard interrupt is pending"), REG_RO         },
     { HRDATAD (KEYBDH,   keyboardInterruptHandler,   16,
                "Address of keyboard interrupt handler")                                     },
+    { HRDATAD(KBDIRQPORT,   kbdIrqPort, 8,
+               "Port number of keyboardInterrupt SIO status register."),                    },
     { NULL }
 };
 
@@ -1145,8 +1148,17 @@ static t_stat sio_dev_set_interruptoff(UNIT *uptr, int32 value, CONST char *cptr
 }
 
 static t_stat sio_svc(UNIT *uptr) {
-    if (sio0s(0, 0, 0) & KBD_HAS_CHAR)
+    int32 sio_status;
+    int32 ch;
+    const SIO_PORT_INFO spi = lookupPortInfo(kbdIrqPort, &ch);
+    ASSURE(spi.port == kbdIrqPort);
+
+    sio_status = sio0s(kbdIrqPort, 0, 0);
+
+    if (sio_status & spi.sio_can_read) {
         keyboardInterrupt = TRUE;
+    }
+
     if (sio_unit.flags & UNIT_SIO_INTERRUPT)
         sim_activate(&sio_unit, sio_unit.wait);             /* activate unit    */
     return SCPE_OK;
