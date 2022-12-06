@@ -410,14 +410,17 @@ typedef struct {
 #define CSR_BUSY        (1u << CSR_V_BUSY)
 #define CSR_ERR         (1u << CSR_V_ERR)
 
-/* Trap masks, descending priority order, following J-11
-   An interrupt summary bit is kept with traps, to minimize overhead
+/* Trap masks, descending priority order. Rules:
+
+   - Aborts are mutually exclusive, no more than one per instrution.
+   - Aborts must be higher priority than traps. Because MME can be
+     either an abort or a trap, it is lower priority than NXM.
 */
 
 #define TRAP_V_RED      0                               /* red stk abort  4 */
 #define TRAP_V_ODD      1                               /* odd address    4 */
-#define TRAP_V_MME      2                               /* mem mgt      250 */
-#define TRAP_V_NXM      3                               /* nx memory      4 */
+#define TRAP_V_NXM      2                               /* nx memory      4 */
+#define TRAP_V_MME      3                               /* mem mgt      250 */
 #define TRAP_V_PAR      4                               /* parity err   114 */
 #define TRAP_V_PRV      5                               /* priv inst      4 */
 #define TRAP_V_ILL      6                               /* illegal inst  10 */
