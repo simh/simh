@@ -2843,7 +2843,7 @@ return ret_val;
 
 static t_stat store_disk_footer (UNIT *uptr, const char *dtype);
 
-static t_stat get_disk_footer (UNIT *uptr)
+static t_stat get_disk_footer (UNIT *uptr, struct disk_context **pctx)
 {
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 struct simh_disk_footer *f = (struct simh_disk_footer *)calloc (1, sizeof (*f));
@@ -2853,6 +2853,8 @@ uint32 bytesread;
 
 if (f == NULL)
     return SCPE_MEM;
+if (pctx != NULL)
+    *pctx = ctx;
 sim_debug_unit (ctx->dbit, uptr, "get_disk_footer(%s)\n", sim_uname (uptr));
 switch (DK_GET_FMT (uptr)) {                            /* case on format */
     case DKUF_F_STD:                                    /* SIMH format */
@@ -2924,7 +2926,7 @@ if (f) {
                 }
             if ((NtoHl (f->SectorSize) != 512) &&
                 (f->FooterVersion == 0)) {
-                /* remove early version original footer for non 512 byte sector containers */
+                /* remove and rebuild early version original footer for non 512 byte sector containers */
                 char *filename = strdup (uptr->filename);
                 int32 saved_switches = sim_switches;
                 uint32 saved_flags;
@@ -2932,15 +2934,18 @@ if (f) {
                 uptr->flags |= UNIT_ATT;            /* mark as attached so detach works */
                 sim_disk_detach (uptr);
                 saved_flags = uptr->flags;
-                sim_switches |= SWMASK ('Q');
+                sim_switches |= SWMASK ('Q');       /* silently */
+                sim_switches |= SWMASK ('Z');       /* stripping trailing 0's */
                 sim_disk_info_cmd (1, filename);    /* remove existing metadata */
                 uptr->flags &= ~DKUF_NOAUTOSIZE;    /* enable autosize on unit */
                 uptr->dptr->attach (uptr, filename);/* attach in autosize mode */
-                uptr->flags &= ~UNIT_ATT;           /* mark as unattached now */
+                uptr->flags &= ~UNIT_ATT;           /* mark as unattached for now */
                 uptr->flags |= (saved_flags & DKUF_NOAUTOSIZE); /* restore autosize setting */
                 sim_switches = saved_switches;
-                ctx = (struct disk_context *)uptr->disk_ctx;
-                *f = *ctx->footer;                      /* get updated footer */
+                ctx = (struct disk_context *)uptr->disk_ctx;/* attach repopulates the context */
+                if (pctx != NULL)
+                    *pctx = ctx;
+                *f = *ctx->footer;                      /* copy updated footer */
                 free (filename);
                 }
             }
@@ -3503,7 +3508,7 @@ else {                                                  /* normal */
             }
         }                                               /* end if null */
     }                                                   /* end else */
-(void)get_disk_footer (uptr);
+(void)get_disk_footer (uptr, &ctx);
 if ((DK_GET_FMT (uptr) == DKUF_F_VHD) || (ctx->footer)) {
     uint32 container_sector_size = 0, container_xfer_encode_size = 0, container_sectors = 0;
     char created_name[64];
@@ -3517,7 +3522,7 @@ if ((DK_GET_FMT (uptr) == DKUF_F_VHD) || (ctx->footer)) {
         }
     if ((DK_GET_FMT (uptr) == DKUF_F_VHD) && created && dtype) {
         sim_vhd_disk_set_dtype (uptr->fileref, dtype, ctx->sector_size, ctx->xfer_encode_size, uptr->drvtyp->MediaId);
-        (void)get_disk_footer (uptr);
+        (void)get_disk_footer (uptr, &ctx);
         container_dtype = (char *)ctx->footer->DriveType;
         }
     if (dtype) {
@@ -3762,7 +3767,7 @@ if (sim_switches & SWMASK ('K')) {
     uptr->dynflags |= UNIT_DISK_CHK;
     }
 
-if (get_disk_footer (uptr) != SCPE_OK) {
+if (get_disk_footer (uptr, &ctx) != SCPE_OK) {
     sim_disk_detach (uptr);
     return SCPE_OPENERR;
     }
@@ -7553,7 +7558,7 @@ if (info->flag == 0) {  /* DISKINFO */
         uptr->filename = strdup (FullPath);
         uptr->fileref = container;
         uptr->flags |= UNIT_ATT | UNIT_RO;
-        get_disk_footer (uptr);
+        get_disk_footer (uptr, NULL);
         f = ctx->footer;
         if (f) {
             t_offset highwater_sector = (f->SectorSize == 0) ? (t_offset)-1 : ((((t_offset)NtoHl (f->Highwater[0])) << 32) | ((t_offset)NtoHl (f->Highwater[1]))) / NtoHl(f->SectorSize);
@@ -7582,7 +7587,7 @@ if (info->flag == 0) {  /* DISKINFO */
             ctx->xfer_encode_size = NtoHl (f->ElementEncodingSize);
             }
         else {
-            sim_printf ("Container Info for '%s' unavailable\n", sim_relative_path (uptr->filename));
+            sim_printf ("Container Info metadata for '%s' unavailable\n", sim_relative_path (uptr->filename));
             sim_printf ("Container Size: %s bytes\n", sim_fmt_numeric ((double)container_size));
             info->stat = SCPE_ARG|SCPE_NOMESSAGE;
             ctx->sector_size = 512;
