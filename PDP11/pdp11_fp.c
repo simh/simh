@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   10-Dec-22    RMS     Fixed bug in FUIV operation (James Fehlinger)
    21-Aug-22    RMS     Restored MMR1 operation for 11/44, 11/45-70 (Walter Mueller)
    24-Mar-15    RMS     MMR1 does not track register changes (Johnny Billquist)
    20-Apr-13    RMS     MMR1 does not track PC changes (Johnny Billquist)
@@ -87,12 +88,19 @@
                         accessed;  if the operand is 32b or 64b, these
                         are the high order 16b of the operand.
 
-   The FP11 cannot update MMR1 on specifier changes, because the
-   quantity field is too narrow for +8 or -8. Instead, the simulator
-   records changes to be made and only commits them at instruction
-   completion. Instructions that can overwrite a general register
-   (STFPS, STST, STEXP, STCFi in mode 0) need not check for conflicts;
-   in mode 0, no general register changes occur in the specifier flow.
+   The J11 cannot update MMR1 on specifier changes, because the
+   quantity field is too narrow for +8 or -8. However, the 11/44 and
+   11/70 can. So the simulator treats the two cases differently.
+   On the J11, the simulator records changes to be made and only
+   commits them at instruction. On all other systems, changes occur
+   as they happen and are recorded in MMR1. However, all systems
+   update the general registers on floating point exceptions. Thus,
+   when an exception occurs, the simulator in most cases cannot 
+   abort but must let the instruction "run to completion." For
+   undefined variable and divide by zero, this means skipping
+   the actual processing logic.
+
+
 */
 
 #include "pdp11_defs.h"
@@ -538,7 +546,7 @@ switch ((IR >> 8) & 017) {                              /* decode IR<11:8> */
 
     case 003:                                           /* MODf */
         if (ReadFP (&fsrc, GeteaFP (dstspec, lenf), dstspec, lenf)) {
-        F_LOAD (qdouble, FR[ac], fac);
+            F_LOAD (qdouble, FR[ac], fac);
             newV = modfp11 (&fac, &fsrc, &modfrac);
             F_STORE (qdouble, fac, FR[ac | 1]);
             F_STORE (qdouble, modfrac, FR[ac]);
@@ -805,7 +813,6 @@ else {
 if ((GET_SIGN (fptr->h) != 0) &&                    /* undef variable? */
     (GET_EXP (fptr->h) == 0) &&
     !fpnotrap (FEC_UNDFV)) {                        /* trap enabled? */
-        fp_change = 0;                              /* J11, no reg changes */
         return FALSE;                               /* NOP instruction */
     }
 return TRUE;
