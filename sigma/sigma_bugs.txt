@@ -127,6 +127,7 @@
 121. COC: Transmit long space is 0x6, and stop transmit is 0xE.
 122. COC: Received break generates a data-in channel transaction with a flag bit set
      in the line number.
+123. DP: dp_inv_adr error must set a TDV visible flag (i.e., PGE) before UEND.
 
 Diagnostic Notes
 ----------------
