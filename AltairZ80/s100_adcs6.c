@@ -209,22 +209,21 @@ static ADCS6_INFO* adcs6_info = &adcs6_info_data;
 static uint8 adcs6ram[ADCS6_ROM_SIZE];
 
 #define ADCS6_WAIT  16
-#define ADCS6_UDATA(act,fl,wait,u4,name) NULL,act,NULL,NULL,NULL,NULL,0,0,(fl),0,(0),0,NULL,0,0,wait,0,u4,0,0,NULL,NULL,0,0,0,NULL,0,0,NULL,0,name
 
 static UNIT adcs6_unit[] = {
     { UDATA (&adcs6_svc, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, ADCS6_CAPACITY), 1024 },
     { UDATA (&adcs6_svc, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, ADCS6_CAPACITY) },
     { UDATA (&adcs6_svc, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, ADCS6_CAPACITY) },
     { UDATA (&adcs6_svc, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, ADCS6_CAPACITY) },
-    { ADCS6_UDATA(&adcs6_ctc_svc,   UNIT_DISABLE,                ADCS6_WAIT, 4, "ADCS6_CTC0") },  /* CTC0 */
-    { ADCS6_UDATA(&adcs6_ctc_svc,   UNIT_DISABLE,                ADCS6_WAIT, 5, "ADCS6_CTC1") },  /* CTC1 */
-    { ADCS6_UDATA(&adcs6_ctc_svc,   UNIT_DISABLE,                ADCS6_WAIT, 6, "ADCS6_CTC2") },  /* CTC2 */
-    { ADCS6_UDATA(&adcs6_ctc_svc,   UNIT_DISABLE,                ADCS6_WAIT, 7, "ADCS6_CTC3") },  /* CTC3 */
+    { UDATA (&adcs6_ctc_svc, UNIT_DISABLE, 0) },  /* CTC0 */
+    { UDATA (&adcs6_ctc_svc, UNIT_DISABLE, 0) },  /* CTC1 */
+    { UDATA (&adcs6_ctc_svc, UNIT_DISABLE, 0) },  /* CTC2 */
+    { UDATA (&adcs6_ctc_svc, UNIT_DISABLE, 0) },  /* CTC3 */
 };
 
 static REG adcs6_reg[] = {
     { HRDATAD (EXTADR,      adcs6_info_data.s100_addr_u,    8, "S-100 A23:16"), },
-    { HRDATAD (J7,          adcs6_info_data.j7,      8, "Jumper Block J7 on the ADC Super 6"), },
+    { HRDATAD (J7,          adcs6_info_data.j7,             8, "Jumper Block J7 on the ADC Super 6"), },
     { HRDATAD (MCTRL0,      adcs6_info_data.mctrl0,         8, "MCTRL0 Register"),          },
     { FLDATAD (BANK0EN,     adcs6_info_data.mctrl0,         0, "Memory Bank 0 Enable"),     },
     { FLDATAD (BANK1EN,     adcs6_info_data.mctrl0,         1, "Memory Bank 1 Enable"),     },
@@ -705,6 +704,19 @@ static t_stat adcs6_reset(DEVICE *dptr)
         for (i = 0; i < ADCS6_MAX_UNITS; i++) {
             adcs6_unit[i].u4 = i;
         }
+
+        adcs6_unit[4].u4 = 4;
+        adcs6_unit[4].uname = "ADCS6_CTC0";
+        adcs6_unit[4].wait = ADCS6_WAIT;
+        adcs6_unit[5].u4 = 5;
+        adcs6_unit[5].uname = "ADCS6_CTC1";
+        adcs6_unit[5].wait = ADCS6_WAIT;
+        adcs6_unit[6].u4 = 6;
+        adcs6_unit[6].uname = "ADCS6_CTC2";
+        adcs6_unit[6].wait = ADCS6_WAIT;
+        adcs6_unit[7].u4 = 7;
+        adcs6_unit[7].uname = "ADCS6_CTC3";
+        adcs6_unit[7].wait = ADCS6_WAIT;
 
         /* Reset memory control registers */
         adcs6_info->mctrl0 = 0;
