@@ -48,9 +48,9 @@
 
 ## WHAT'S NEW since the Open SIMH fork
 
-All Simulator updates on Open SIMH will be present in this repository, and any changes to the master branch code in this repository authored by anyone except Mark Pizzolato may be posted as pull requestss on the Open simh repo.
+All Simulator updates on Open SIMH will be present in this repository, and any changes to the master branch code in this repository authored by anyone except Mark Pizzolato may be posted as pull requests on the Open simh repo.
 
-### Mark Pizzolato's changes not present in the Open SIMH repo:
+### Mark Pizzolato's changes only present in the simh/simh repo and not present in the Open SIMH repo:
 
 #### Visible changes to SCP (the simulator framework or command execution environment)
 
@@ -78,11 +78,11 @@ All Simulator updates on Open SIMH will be present in this repository, and any c
 - Support for building simulators without built-in boot or ROM code when building with DONT_USE_INTERNAL_ROM is defined, but to automatically and transparently fetch the needed ROM or other boot code when it is needed.  This is possibly useful for systems which don't want to distribute simulators with build-in binary code which may have unknown copyright status.
 - Reasonable output produced for all simulators from HELP BOOT.
 - Fix occasional hang of IBM1130 simulator while building with Visual Studio.
-- Building with the simh makefile can optionally compile each source file separately and store the compiled result.   This approach lends itself to quicker building for folks who are developing new simulators or new simulator modules.  This was requested and discussed in #697.
+- Building with the simh makefile can optionally compile each source file separately and store the compiled result.   This approach lends itself to quicker building for folks who are developing new simulators or new simulator modules.  This was requested and discussed in #697.  Invoking make with BUILD_SEPARATE=1 on the make command line or as an exported environment variable will achieve separate compiles.  Invoking make with QUIET=1 on the make command line or as an exported environment variable will summary output of activities being performed instead of full compiler commands.
 - TAPE and SCSI libraries have been extended to fully support partial record reads of fixed sized records which may contain multiple records in recorded data.  Images of this type are common for QIC tape archives generally available on bitsavers and elsewhere.  Attach time checking on simulated QIC tape devices reports possible problems that may occur.
 - Github CI Actions builds of all simulators for Linux, macOS and Windows platforms.
 
-#### Changes to the PDP-11 and VAX simulators
+#### Changes to the PDP-11 and VAX simulators also not in the Open SIMH repo
 
 - All VAXen: Correct HELP CPU to properly describe model specific LOAD options for ROM and NVRAM.
 - Add 2.11 BSD and NetBSD file system recognizers.
@@ -98,9 +98,7 @@ All Simulator updates on Open SIMH will be present in this repository, and any c
 - HELP CPU shows supported breakpoint types.
 - Add device support for DL11-C/DL11-D/DL11-E/DLV11-J in addition to the original KL11/DL11-A/DL11-B/DL11-E/DL11-F support.  These new devices have different bus address ranges and can coexist with the original DL devices.  The new devices are DLCJI and DLCJO and are managed identically to the original DLI and DLO devices.
 
-### Updates to the Unibus DUP & Qbus DPV device by Trevor Warwick
-
-Support for Phase V DECnet connections on VAX Unibus and Qbus systems and the addition of support for the DPV11 for Qbus VAX systems.
+### All relevant changes in the simh v3.12-3 release have been merged into this repo
 
 ### Bill Beech has made significant enhancements and bug fixes to the SWTP simulators along with a new disk controller from Roberto Sancho Villa
 
@@ -164,6 +162,10 @@ Support for Phase V DECnet connections on VAX Unibus and Qbus systems and the ad
 #### IBM 650 simulator from Roberto Sancho Villa
 
 #### Jim Bevier has implemented a SEL32 simulator.
+
+#### Updates to the Unibus DUP & Qbus DPV device by Trevor Warwick
+
+Support for Phase V DECnet connections on VAX Unibus and Qbus systems and the addition of support for the DPV11 for Qbus VAX systems.
 
 ### New Host Platform support - HP-UX and AIX
 
@@ -596,13 +598,13 @@ functionality.
 
 The HomeBrew package manager can be used to provide these packages:
 
-    $ brew install vde pcre libedit sdl2 libpng zlib sdl2_ttf
+    $ brew install vde pcre libedit sdl2 libpng zlib sdl2_ttf make
 
 OR
 
 The MacPorts package manager is available to provide these external packages.  Once MacPorts is installed, this commands will install the required dependent packages:
 
-    # port install vde2 pcre libedit libsdl2 libpng zlib libsdl2_ttf
+    # port install vde2 pcre libedit libsdl2 libpng zlib libsdl2_ttf gmake
 
 ###### Linux - Dependencies
 
@@ -610,27 +612,27 @@ Different Linux distributions have different package management systems:
 
 Ubuntu/Debian:
 
-    # apt-get install libpcap-dev libpcre3-dev vde2 libsdl2-dev libsdl2_ttf-dev libedit-dev
+    # apt-get install gcc libpcap-dev libvdeplug-dev libpcre3-dev libedit-dev libsdl2-dev libpng-dev libsdl2_ttf-dev
 
 Fedora/RedHat:
 
-    # yum install libpcap-dev libvdeplug-dev libpcre3-dev libedit-dev libsdl2-dev libpng-dev libsdl2-ttf-dev
+    # yum install gcc libpcap-devel libpcre3-dev libedit-devel SDL2-devel libpng-devel zlib-devel SDL2_ttf-devel
 
 ###### NetBSD - Dependencies
 
-    # pkgin install pcre editline SDL2 png SDL2_ttf
+    # pkgin install pcre editline SDL2 png zlib SDL2_ttf gmake
 
 ###### FreeBSD - Dependencies
 
-    # pkg install libedit sdl2 png sdl2_ttf
+    # pkg install pcre libedit sdl2 png sdl2_ttf gmake
 
 ###### OpenBSD - Dependencies
 
-    # pkg install sdl2 png sdl2-ttf
+    # pkg_add pcre sdl2 png sdl2-ttf gmake
 
 #### Windows
 
-Compiling on windows is supported with recent versions of Microsoft Visual Studio (Standard or Express) and using GCC via the MinGW32 environment.  Things may also work under Cygwin, but that is not the preferred windows environment.  Not all features will be available as well as with either Visual Studio or MinGW32.
+Compiling on windows is supported with recent versions of Microsoft Visual Studio (Standard or Express) and deprecated using GCC via the MinGW32 environment.  Things may also work under Cygwin, but that is not the preferred windows environment.  Not all features will be available when building with MinGW32 or Cygwin.
 
 ##### Required related files
 The file https://github.com/simh/simh/blob/master/Visual%20Studio%20Projects/0ReadMe_Projects.txt
