@@ -77,6 +77,12 @@
 # an exported environment variable) and separate objects will be
 # built and linked into the resulting simulator.
 #
+# The default make output will show the details of each compile 
+# and link command executed.  GNU make can be invoked with QUIET=1
+# on the command line (or defined as an exported environment 
+# variable) a summary of the executed command will be displayed
+# in the make output.
+#
 # Default test execution will produce summary output.  Detailed
 # test output can be produced if GNU make is invoked with 
 # TEST_ARG=-v on the command line.
@@ -154,6 +160,15 @@ ifeq ($(WIN32),)
 else
   SIM_MAJOR=$(shell for /F "tokens=3" %%i in ('findstr /c:"SIM_MAJOR" sim_rev.h') do echo %%i)
 endif
+# Assure that only BUILD_SEPARATE=1 will cause separate compiles
+ifneq (1,$(BUILD_SEPARATE))
+  override BUILD_SEPARATE=
+endif
+export BUILD_SEPARATE
+ifneq (1,$(QUIET))
+  override QUIET=
+endif
+export QUIET
 BUILD_SINGLE := ${MAKECMDGOALS} $(BLANK_SUFFIX)
 BUILD_MULTIPLE_VERB = is
 MAKECMDGOALS_DESCRIPTION = the $(MAKECMDGOALS) simulator
@@ -266,9 +281,9 @@ ifneq (3,${SIM_MAJOR})
   PKGS_SRC_MACPORTS   = -        -             vde2           pcre         libedit       libsdl2     libpng       zlib       libsdl2_ttf     gmake
   PKGS_SRC_APT        = gcc      libpcap-dev   libvdeplug-dev libpcre3-dev libedit-dev   libsdl2-dev libpng-dev   -          libsdl2-ttf-dev -
   PKGS_SRC_YUM        = gcc      libpcap-devel -              pcre-devel   libedit-devel SDL2-devel  libpng-devel zlib-devel SDL2_ttf-devel  -
-  PKGS_SRC_PKGSRC     = -        -             -              pcre         editline      SDL2        png          zlib       SDL2_ttf        -
-  PKGS_SRC_PKGBSD     = -        -             -              pcre         libedit       sdl2        png          -          sdl2_ttf        -
-  PKGS_SRC_PKGADD     = -        -             -              pcre         -             sdl2        png          -          sdl2-ttf        -
+  PKGS_SRC_PKGSRC     = -        -             -              pcre         editline      SDL2        png          zlib       SDL2_ttf        gmake
+  PKGS_SRC_PKGBSD     = -        -             -              pcre         libedit       sdl2        png          -          sdl2_ttf        gmake
+  PKGS_SRC_PKGADD     = -        -             -              pcre         -             sdl2        png          -          sdl2-ttf        gmake
   ifneq (0,$(TESTS))
     ifneq (,${TEST_ARG})
       export TEST_ARG
@@ -2815,6 +2830,10 @@ else # end of primary make recipies
     $(error *** ERROR ***  Missing build options.)
   endif
 
+  ifeq (1,$(QUIET))
+    CC := @$(CC)
+  endif
+
   # Extract potential source code directories from the -I specifiers in the options
 
   space = $(empty) $(empty)
@@ -2861,55 +2880,94 @@ else # end of primary make recipies
 
 $(BLDDIR)/%.o : $(word 1,$(DIRS))/%.c
 	@mkdir -p $(dir $@)
+  ifeq (1,$(QUIET))
+	@echo Compiling $< into $@
+  endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : $(word 1,$(DIRS))/*/%.c
 	@mkdir -p $(dir $@)
+  ifeq (1,$(QUIET))
+	@echo Compiling $< into $@
+  endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : $(word 1,$(DIRS))/*/*/%.c
 	@mkdir -p $(dir $@)
+  ifeq (1,$(QUIET))
+	@echo Compiling $< into $@
+  endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : display/%.c
 	@mkdir -p $(dir $@)
+  ifeq (1,$(QUIET))
+	@echo Compiling $< into $@
+  endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : slirp/%.c
 	@mkdir -p $(dir $@)
+  ifeq (1,$(QUIET))
+	@echo Compiling $< into $@
+  endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : slirp_glue/%.c
 	@mkdir -p $(dir $@)
+  ifeq (1,$(QUIET))
+	@echo Compiling $< into $@
+  endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : %.c
 	@mkdir -p $(dir $@)
+  ifeq (1,$(QUIET))
+	@echo Compiling $< into $@
+  endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 ifneq (,$(word 2,$(DIRS)))
 $(BLDDIR)/%.o : $(word 2,$(DIRS))/%.c
 	@mkdir -p $(dir $@)
+  ifeq (1,$(QUIET))
+	@echo Compiling $< into $@
+  endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : $(word 2,$(DIRS))/*/%.c
 	@mkdir -p $(dir $@)
+  ifeq (1,$(QUIET))
+	@echo Compiling $< into $@
+  endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : $(word 2,$(DIRS))/*/*/%.c
 	@mkdir -p $(dir $@)
+  ifeq (1,$(QUIET))
+	@echo Compiling $< into $@
+  endif
 	$(CC) -c $< -o $@ ${OPTS}
 ifneq (,$(word 3,$(DIRS)))
 $(BLDDIR)/%.o : $(word 3,$(DIRS))/%.c
 	@mkdir -p $(dir $@)
+  ifeq (1,$(QUIET))
+	@echo Compiling $< into $@
+  endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : $(word 3,$(DIRS))/*/%.c
 	@mkdir -p $(dir $@)
+  ifeq (1,$(QUIET))
+	@echo Compiling $< into $@
+  endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : $(word 3,$(DIRS))/*/*/%.c
 	@mkdir -p $(dir $@)
+  ifeq (1,$(QUIET))
+	@echo Compiling $< into $@
+  endif
 	$(CC) -c $< -o $@ ${OPTS}
 endif
 endif
@@ -2923,11 +2981,17 @@ endif
 # Multiple Separate compiles for each input
 $(TARGET): $(OBJS)
 	$(MKDIRBIN)
+  ifeq (1,$(QUIET))
+	@echo Linking $(TARGET)
+  endif
 	${CC} $(OBJS) ${OPTS} -o $@ ${LDFLAGS}
     else
 # Single Compile and Link of all inputs
 $(TARGET): $(DEPS)
 	$(MKDIRBIN)
+  ifeq (1,$(QUIET))
+	@echo Compile and Linking $(DEPS) into $(TARGET)
+  endif
 	${CC} $(DEPS) ${OPTS} -o $@ ${LDFLAGS}
     endif
     ifneq (,$(ALTNAME))
