@@ -2910,6 +2910,8 @@ if (*argv[0]) {                                         /* sim name arg? */
         np = strrchr (nbuf, ']');                       /* VMS path separator */
     if (np != NULL)
         setenv ("SIM_BIN_NAME", np+1, 1);               /* Publish simulator binary name */
+    else
+        setenv ("SIM_BIN_NAME", nbuf, 1);               /* Publish simulator binary name */
     setenv ("SIM_BIN_PATH", argv[0], 1);
     }
 
