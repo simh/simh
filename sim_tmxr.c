@@ -3264,16 +3264,17 @@ while (*tptr) {
         if (logfiletmpl[0]) {
             strlcpy(mp->logfiletmpl, logfiletmpl, sizeof(mp->logfiletmpl));
             for (i = 0; i < mp->lines; i++) {
+                char gbuf[CBUFSIZE];
+
                 lp = mp->ldsc + i;
                 sim_close_logfile (&lp->txlogref);
-                lp->txlog = NULL;
-                lp->txlogname = (char *)realloc(lp->txlogname, CBUFSIZE);
-                lp->txlogname[CBUFSIZE-1] = '\0';
+                free (lp->txlogname);
+                lp->txlogname = NULL;
                 if (mp->lines > 1)
-                    snprintf(lp->txlogname, CBUFSIZE-1, "%s_%d", mp->logfiletmpl, i);
+                    snprintf(gbuf, sizeof (gbuf), "%s_%d", mp->logfiletmpl, i);
                 else
-                    strlcpy (lp->txlogname, mp->logfiletmpl, CBUFSIZE);
-                r = sim_open_logfile (lp->txlogname, TRUE, &lp->txlog, &lp->txlogref);
+                    strlcpy (gbuf, mp->logfiletmpl, sizeof (gbuf));
+                r = tmxr_set_log (lp->o_uptr, i, gbuf, mp);
                 if (r != SCPE_OK) {
                     free (lp->txlogname);
                     lp->txlogname = NULL;
@@ -5468,6 +5469,7 @@ t_stat tmxr_set_log (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 TMXR *mp = (TMXR *) desc;
 TMLN *lp;
 t_stat r;
+int32 nbytes, boffset;
 
 if (cptr == NULL)                                       /* no file name? */
     return SCPE_2FARG;
@@ -5487,6 +5489,31 @@ if ((r != SCPE_OK) || (lp->txlog == NULL)) {            /* error? */
     }
 if (mp->uptr)                                           /* attached?, then update attach string */
     lp->mp->uptr->filename = tmxr_mux_attach_string (lp->mp->uptr->filename, lp->mp);
+/* If we've got pending buffered data, write it to the log now */
+if (lp->txcnt > lp->txbsz) {
+    boffset = (lp->txbpi + 1) % lp->txbsz;
+    nbytes = lp->txbsz;                                 /* avail buffered bytes */
+    }
+else {
+    boffset = 0;
+    nbytes = lp->txbpi;
+    }
+while (nbytes) {                                        /* >0? write */
+    int32 sbytes;
+
+    if (boffset < lp->txbpi)                            /* no wrap? */
+        sbytes = fwrite (&(lp->txb[boffset]), 1, nbytes, lp->txlog);/* write all data */
+    else
+        sbytes = fwrite (&(lp->txb[boffset]), 1, lp->txbsz - boffset, lp->txlog);/* write to end buf */
+    if (sbytes >= 0) {                                  /* ok? */
+        boffset += sbytes;                              /* update remove ptr */
+        if (boffset >= lp->txbsz)                       /* wrap? */
+            boffset = 0;
+        nbytes -= sbytes;                               /* update remaining count */
+        }
+    else
+        break;                                          
+    }
 return SCPE_OK;
 }
 
