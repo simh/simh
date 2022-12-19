@@ -115,7 +115,7 @@
 #
 #   make GCC=cppcheck CC_OUTSPEC= LDFLAGS= CFLAGS_G="--enable=all --template=gcc" CC_STD=--std=c99
 #
-ifeq (0,$(MAKELEVEL))	# recursive individual build logic is end of this makefile
+ifeq (0,$(MAKELEVEL))	# recursive individual target build logic is end of this makefile
 #
 # CC Command (and platform available options).  (Poor man's autoconf)
 #
@@ -132,11 +132,6 @@ ifneq (,${GREP_OPTIONS})
   $(info unset the GREP_OPTIONS environment variable to use this makefile)
   $(error 1)
 endif
-ifeq (old,$(shell gmake --version /dev/null 2>&1 | grep 'GNU Make' | awk '{ if ($$3 < "3.81") {print "old"} }'))
-  GMAKE_VERSION = $(shell gmake --version /dev/null 2>&1 | grep 'GNU Make' | awk '{ print $$3 }')
-  $(warning *** Warning *** GNU Make Version $(GMAKE_VERSION) is too old to)
-  $(warning *** Warning *** fully process this makefile)
-endif
 ifneq ($(findstring Windows,${OS}),)
   $(info *** Warning *** Compiling simh simulators with MinGW or cygwin is deprecated and)
   $(info *** Warning *** may not complete successfully or produce working simulators.  If)
@@ -145,15 +140,33 @@ ifneq ($(findstring Windows,${OS}),)
   $(info *** Warning *** compilers which provide fully functional simulator capabilities.)
   ifeq ($(findstring .exe,${SHELL}),.exe)
     # MinGW
-    WIN32 := 1
+    export WIN32 := 1
     # Tests don't run under MinGW
-    TESTS := 0
+    export TESTS := 0
+    export RM = del /f /q
+    export MKDIR = mkdir
+    export OSTYPE = MinGW
+    ifneq (,$(strip $(shell $(MAKE) --version 2>NUL)))
+      GNUMake=$(strip $(shell $(MAKE) --version | findstr /C:"GNU Make"))
+      export GNUMakeVERSION=$(strip $(shell for /F "tokens=3" %%i in ("$(GNUMake)") do echo %%i))
+    else
+      # Nothing useful returned from MinGW GNU Make 3.82.90, make sure to set this version
+      export GNUMakeVERSION=3.82.90
+    endif
   else # Msys or cygwin
     ifeq (MINGW,$(findstring MINGW,$(shell uname)))
       $(info *** This makefile can not be used with the Msys bash shell)
       $(error Use build_mingw.bat ${MAKECMDGOALS} from a Windows command prompt)
     endif
   endif
+else
+  export GNUMakeVERSION = $(shell ($(MAKE) --version | grep 'GNU Make' | awk '{ print $$3 }'))
+  ifeq (old,$(shell gmake --version /dev/null 2>&1 | grep 'GNU Make' | awk '{ if ($$3 < "3.81") {print "old"} }'))
+    $(warning *** Warning *** GNU Make Version $(GNUMakeVERSION) is too old to)
+    $(warning *** Warning *** fully process this makefile)
+  endif
+  export MKDIR = mkdir -p
+  export OSTYPE = $(shell uname)
 endif
 ifeq ($(WIN32),)
   SIM_MAJOR=$(shell grep SIM_MAJOR sim_rev.h | awk '{ print $$3 }')
@@ -242,26 +255,28 @@ endif
 find_exe = $(abspath $(strip $(firstword $(foreach dir,$(strip $(subst :, ,${PATH})),$(wildcard $(dir)/$(1))))))
 find_lib = $(firstword $(abspath $(strip $(firstword $(foreach dir,$(strip ${LIBPATH}),$(foreach ext,$(strip ${LIBEXT}),$(wildcard $(dir)/lib$(1).$(ext))))))))
 find_include = $(abspath $(strip $(firstword $(foreach dir,$(strip ${INCPATH}),$(wildcard $(dir)/$(1).h)))))
-ifeq (/usr/local/bin/brew,$(shell which brew 2>/dev/null))
-  PKG_MGR = HOMEBREW
-else
-  ifeq (/opt/local/bin/port,$(shell which port 2>/dev/null))
-    PKG_MGR = MACPORTS
+ifeq (Darwin,$(OSTYPE))
+  ifeq (/usr/local/bin/brew,$(shell which brew 2>/dev/null))
+    PKG_MGR = HOMEBREW
+  else
+    ifeq (/opt/local/bin/port,$(shell which port 2>/dev/null))
+      PKG_MGR = MACPORTS
+    endif
   endif
 endif
-ifneq (,$(and $(findstring Linux,$(shell uname)),$(call find_exe,apt-get)))
+ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,apt-get)))
   PKG_MGR = APT
 endif
-ifneq (,$(and $(findstring Linux,$(shell uname)),$(call find_exe,yum)))
+ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,yum)))
   PKG_MGR = YUM
 endif
-ifneq (,$(and $(findstring NetBSD,$(shell uname)),$(call find_exe,pkgin)))
+ifneq (,$(and $(findstring NetBSD,$(OSTYPE)),$(call find_exe,pkgin)))
   PKG_MGR = PKGSRC
 endif
-ifneq (,$(and $(findstring FreeBSD,$(shell uname)),$(call find_exe,pkg)))
+ifneq (,$(and $(findstring FreeBSD,$(OSTYPE)),$(call find_exe,pkg)))
   PKG_MGR = PKGBSD
 endif
-ifneq (,$(and $(findstring OpenBSD,$(shell uname)),$(call find_exe,pkg_add)))
+ifneq (,$(and $(findstring OpenBSD,$(OSTYPE)),$(call find_exe,pkg_add)))
   PKG_MGR = PKGADD
 endif
 # Dependent packages
@@ -318,7 +333,6 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
       GCC = gcc
     endif
   endif
-  OSTYPE = $(shell uname)
   # OSNAME is used in messages to indicate the source of libpcap components
   OSNAME = $(OSTYPE)
   ifeq (SunOS,$(OSTYPE))
@@ -403,19 +417,24 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
       $(error building using a git repository, but git is not available)
     endif
     ifeq (commit-id-exists,$(shell if ${TEST} -e .git-commit-id; then echo commit-id-exists; fi))
-      CURRENT_GIT_COMMIT_ID=$(strip $(shell grep 'SIM_GIT_COMMIT_ID' .git-commit-id | awk '{ print $$2 }'))
+      CURRENT_FULL_GIT_COMMIT_ID=$(strip $(shell grep 'SIM_GIT_COMMIT_ID' .git-commit-id | awk '{ print $$2 }'))
+      CURRENT_GIT_COMMIT_ID=$(word 1,$(subst +, , $(CURRENT_FULL_GIT_COMMIT_ID)))
       ACTUAL_GIT_COMMIT_ID=$(strip $(shell git log -1 --pretty="%H"))
       ifneq ($(CURRENT_GIT_COMMIT_ID),$(ACTUAL_GIT_COMMIT_ID))
-        NEED_COMMIT_ID = need-commit-id
+        NEED_COMMIT_ID = need-commit-id$(shell touch scp.c)
         # make sure that the invalidly formatted .git-commit-id file wasn't generated
         # by legacy git hooks which need to be removed.
-        $(shell rm -f .git/hooks/post-checkout .git/hooks/post-commit .git/hooks/post-merge)
+        $(shell $(RM) .git/hooks/post-checkout .git/hooks/post-commit .git/hooks/post-merge)
       endif
     else
-      NEED_COMMIT_ID = need-commit-id
+      NEED_COMMIT_ID = need-commit-id$(shell touch scp.c)
     endif
     ifneq (,$(shell git update-index --refresh --))
-      GIT_EXTRA_FILES=+uncommitted-changes
+      ifeq (,$(findstring +uncommitted-changes,$(CURRENT_FULL_GIT_COMMIT_ID)))
+        GIT_EXTRA_FILES=+uncommitted-changes$(shell touch scp.c)
+      else
+        GIT_EXTRA_FILES=+uncommitted-changes
+      endif
     endif
     ifneq (,$(or $(NEED_COMMIT_ID),$(GIT_EXTRA_FILES)))
       isodate=$(shell git log -1 --pretty="%ai"|sed -e 's/ /T/'|sed -e 's/ //')
@@ -701,7 +720,6 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
   ifneq (,$(shell which gmake 2>/dev/null))
     override MAKE = $(shell which gmake 2>/dev/null)
   endif
-  GNUMakeVERSION = $(shell ($(MAKE) --version | grep 'GNU Make' | awk '{ print $$3 }'))
   ifneq (,$(and $(findstring 3.,$(GNUMakeVERSION)),$(BUILD_SEPARATE)))
     NEEDED_PKGS += DPKG_GMAKE
   endif
@@ -1033,7 +1051,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
   endif
   ifneq (binexists,$(shell if ${TEST} -e BIN/buildtools; then echo binexists; fi))
     export MKDIRBIN
-    MKDIRBIN = @mkdir -p BIN/buildtools
+    MKDIRBIN = @$(MKDIR) BIN/buildtools
   endif
   ifeq (commit-id-exists,$(shell if ${TEST} -e .git-commit-id; then echo commit-id-exists; fi))
     GIT_COMMIT_ID=$(shell grep 'SIM_GIT_COMMIT_ID' .git-commit-id | awk '{ print $$2 }')
@@ -1159,13 +1177,17 @@ else
       $(error building using a git repository, but git is not available)
     endif
     ifeq (commit-id-exists,$(shell if exist .git-commit-id echo commit-id-exists))
-      CURRENT_GIT_COMMIT_ID=$(shell for /F "tokens=2" %%i in ("$(shell findstr /C:"SIM_GIT_COMMIT_ID" .git-commit-id)") do echo %%i)
-      ifneq (, $(shell git update-index --refresh --))
-        ACTUAL_GIT_COMMIT_EXTRAS=+uncommitted-changes
-      endif
-      ACTUAL_GIT_COMMIT_ID=$(strip $(shell git log -1 --pretty=%H))$(ACTUAL_GIT_COMMIT_EXTRAS)
+      CURRENT_FULL_GIT_COMMIT_ID=$(shell for /F "tokens=2" %%i in ("$(shell findstr /C:"SIM_GIT_COMMIT_ID" .git-commit-id)") do echo %%i)
+      CURRENT_GIT_COMMIT_ID=$(word 1,$(subst +, , $(CURRENT_FULL_GIT_COMMIT_ID)))
+      ACTUAL_GIT_COMMIT_ID=$(strip $(shell git log -1 --pretty=%H))
       ifneq ($(CURRENT_GIT_COMMIT_ID),$(ACTUAL_GIT_COMMIT_ID))
-        NEED_COMMIT_ID = need-commit-id
+        ifeq (,$(strip $(findstring scp.c,$(shell git diff --name-only))))
+          # scp.c hasn't changed, so we want to touch it to force it to recompile
+          # but touch isn't part of MinGW, so we do some git monkey business
+          NEED_COMMIT_ID = need-commit-id$(file >> scp.c,)$(shell git restore scp.c)
+        else
+          NEED_COMMIT_ID = need-commit-id
+        endif
         # make sure that the invalidly formatted .git-commit-id file wasn't generated
         # by legacy git hooks which need to be removed.
         $(shell if exist .git\hooks\post-checkout del .git\hooks\post-checkout)
@@ -1173,17 +1195,28 @@ else
         $(shell if exist .git\hooks\post-merge    del .git\hooks\post-merge)
       endif
     else
-      NEED_COMMIT_ID = need-commit-id
-    endif
-    ifeq (need-commit-id,$(NEED_COMMIT_ID))
-      ifneq (, $(shell git update-index --refresh --))
-        ACTUAL_GIT_COMMIT_EXTRAS=+uncommitted-changes
+      ifeq (,$(strip $(findstring scp.c,$(shell git diff --name-only))))
+        NEED_COMMIT_ID = need-commit-id$(file >> scp.c,)$(shell git restore scp.c)
+      else
+        NEED_COMMIT_ID = need-commit-id
       endif
-      ACTUAL_GIT_COMMIT_ID=$(strip $(shell git log -1 --pretty=%H))$(ACTUAL_GIT_COMMIT_EXTRAS)
-      isodate=$(shell git log -1 --pretty=%ai)
-      commit_time=$(word 1,$(isodate))T$(word 2,$(isodate))$(word 3,$(isodate))
-      $(shell echo SIM_GIT_COMMIT_ID $(ACTUAL_GIT_COMMIT_ID)>.git-commit-id)
-      $(shell echo SIM_GIT_COMMIT_TIME $(commit_time)>>.git-commit-id)
+    endif
+    ifneq (,$(shell git update-index --refresh --))
+      ifeq (,$(findstring +uncommitted-changes,$(CURRENT_FULL_GIT_COMMIT_ID)))
+        ifeq (,$(strip $(findstring scp.c,$(shell git diff --name-only))))
+          GIT_EXTRA_FILES=+uncommitted-changes$(file >> scp.c,)$(shell git restore scp.c)
+        else
+          GIT_EXTRA_FILES=+uncommitted-changes
+        endif
+      else
+        GIT_EXTRA_FILES=+uncommitted-changes
+      endif
+    endif
+    ifneq (,$(or $(NEED_COMMIT_ID),$(GIT_EXTRA_FILES)))
+      isodatetime=$(shell git log -1 --pretty=%ai)
+      isodate=$(word 1,$(isodatetime))T$(word 2,$(isodatetime))$(word 3,$(isodatetime))
+      $(shell echo SIM_GIT_COMMIT_ID $(ACTUAL_GIT_COMMIT_ID)$(GIT_EXTRA_FILES)>.git-commit-id)
+      $(shell echo SIM_GIT_COMMIT_TIME $(isodate)>>.git-commit-id)
     endif
   endif
   ifneq (,$(shell if exist .git-commit-id echo git-commit-id))
@@ -1488,7 +1521,6 @@ BIN = BIN/
 ifneq (,$(shell which gmake 2>/dev/null))
   override MAKE = $(shell which gmake 2>/dev/null)
 endif
-GNUMakeVERSION = $(shell ($(MAKE) --version | grep 'GNU Make' | awk '{ print $$3 }'))
 ifneq (,$(and $(findstring 3.,$(GNUMakeVERSION)),$(BUILD_SEPARATE)))
   ifeq (HOMEBREW,$(PKG_MGR))
     $(info *** You can't build with separate compiles using version $(GNUMakeVERSION))
@@ -2291,9 +2323,9 @@ experimental : ${EXPERIMENTAL}
 
 clean :
 ifeq (${WIN32},)
-	${RM} -rf ${BIN}
+	-${RM} -rf ${BIN}
 else
-	if exist $(BIN) rmdir /s /q BIN
+	-if exist $(BIN) rmdir /s /q BIN
 endif
 
 ${BUILD_ROMS} : 
@@ -2853,25 +2885,31 @@ else # end of primary make recipies
   D7=$(foreach include,$(D6),$(word 1,$(subst ^,$(space),$(include))))
   DIRS = $(D7)
 
+  ifneq ($(WIN32),)
+    pathfix = $(subst /,\,$(1))
+  else
+    pathfix = $(1)
+  endif
 
-  find_test = RegisterSanityCheck $(abspath $(wildcard $(1)/tests/$(2)_test.ini)) </dev/null
+  find_test = $(if $(findstring 0,$(TESTS)),, RegisterSanityCheck $(abspath $(wildcard $(1)/tests/$(2)_test.ini)) </dev/null)
 
   TARGETNAME = $(basename $(notdir $(TARGET)))
   BIN = $(dir $(TARGET))
   EXE = $(suffix $(TARGET))
-  BLDDIR = $(BIN)$(shell uname)-build/$(TARGETNAME)
+  BLDDIR = $(BIN)$(OSTYPE)-build/$(TARGETNAME)
   OBJS = $(addsuffix .o,$(addprefix $(BLDDIR)/,$(basename $(notdir $(DEPS)))))
-  
-  $(shell mkdir -p $(BLDDIR))
-  $(file >$(BLDDIR)/NEWLINE.file,)
-  $(file >>$(BLDDIR)/NEWLINE.file,)
-  NEWLINE = $(file <$(BLDDIR)/NEWLINE.file)
-  $(shell rm -f $(BLDDIR)/NEWLINE.file)
-  MAKE_INFO = $(foreach VAR,CC OPTS DEPS LDFLAGS DIRS BUILD_SEPARATE,$(VAR)=$($(VAR))$(NEWLINE))
-  ifneq ($(MAKE_INFO),$(file <$(BLDDIR)/Make.info)$(NEWLINE))
-    # Different or no prior options, so start from scratch
-    $(shell rm -rf $(BLDDIR)/* $(TARGET))
-    $(file >$(BLDDIR)/Make.info,$(MAKE_INFO))
+  $(shell $(MKDIR) $(call pathfix,$(BLDDIR)))
+  ifeq (,$(findstring 3.,$(GNUMakeVERSION)))
+    $(file >$(BLDDIR)/NEWLINE.file,)
+    $(file >>$(BLDDIR)/NEWLINE.file,)
+    NEWLINE = $(file < $(call pathfix,$(BLDDIR)/NEWLINE.file))
+    $(shell $(RM) $(call pathfix,$(BLDDIR)/NEWLINE.file))
+    MAKE_INFO = $(foreach VAR,CC OPTS DEPS LDFLAGS DIRS BUILD_SEPARATE,$(VAR)=$($(VAR))$(NEWLINE))
+    ifneq ($(MAKE_INFO),$(file <$(call pathfix,$(BLDDIR)/Make.info))$(NEWLINE))
+      # Different or no prior options, so start from scratch
+      $(shell $(RM) $(call pathfix,$(BLDDIR)/*) $(call pathfix,$(wildcard $(TARGET))))
+      $(file >$(BLDDIR)/Make.info,$(MAKE_INFO))
+    endif
   endif
 
   ifneq (,$(and $(CPP_BUILD),$(NOCPP)))
@@ -2879,49 +2917,49 @@ else # end of primary make recipies
   else
 
 $(BLDDIR)/%.o : $(word 1,$(DIRS))/%.c
-	@mkdir -p $(dir $@)
+	-@$(MKDIR) $(call pathfix,$(dir $@))
   ifeq (1,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : $(word 1,$(DIRS))/*/%.c
-	@mkdir -p $(dir $@)
+	-@$(MKDIR) $(call pathfix,$(dir $@))
   ifeq (1,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : $(word 1,$(DIRS))/*/*/%.c
-	@mkdir -p $(dir $@)
+	-@$(MKDIR) $(call pathfix,$(dir $@))
   ifeq (1,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : display/%.c
-	@mkdir -p $(dir $@)
+	-@$(MKDIR) $(call pathfix,$(dir $@))
   ifeq (1,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : slirp/%.c
-	@mkdir -p $(dir $@)
+	-@$(MKDIR) $(call pathfix,$(dir $@))
   ifeq (1,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : slirp_glue/%.c
-	@mkdir -p $(dir $@)
+	-@$(MKDIR) $(call pathfix,$(dir $@))
   ifeq (1,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : %.c
-	@mkdir -p $(dir $@)
+	-@$(MKDIR) $(call pathfix,$(dir $@))
   ifeq (1,$(QUIET))
 	@echo Compiling $< into $@
   endif
@@ -2929,42 +2967,42 @@ $(BLDDIR)/%.o : %.c
 
 ifneq (,$(word 2,$(DIRS)))
 $(BLDDIR)/%.o : $(word 2,$(DIRS))/%.c
-	@mkdir -p $(dir $@)
+	-@$(MKDIR) $(call pathfix,$(dir $@))
   ifeq (1,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : $(word 2,$(DIRS))/*/%.c
-	@mkdir -p $(dir $@)
+	@$(MKDIR) $(call pathfix,$(dir $@))
   ifeq (1,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : $(word 2,$(DIRS))/*/*/%.c
-	@mkdir -p $(dir $@)
+	@$(MKDIR) $(call pathfix,$(dir $@))
   ifeq (1,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
 ifneq (,$(word 3,$(DIRS)))
 $(BLDDIR)/%.o : $(word 3,$(DIRS))/%.c
-	@mkdir -p $(dir $@)
+	@$(MKDIR) $(call pathfix,$(dir $@))
   ifeq (1,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : $(word 3,$(DIRS))/*/%.c
-	@mkdir -p $(dir $@)
+	@$(MKDIR) $(call pathfix,$(dir $@))
   ifeq (1,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : $(word 3,$(DIRS))/*/*/%.c
-	@mkdir -p $(dir $@)
+	@$(MKDIR) $(call pathfix,$(dir $@))
   ifeq (1,$(QUIET))
 	@echo Compiling $< into $@
   endif
