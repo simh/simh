@@ -5489,30 +5489,35 @@ if ((r != SCPE_OK) || (lp->txlog == NULL)) {            /* error? */
     }
 if (mp->uptr)                                           /* attached?, then update attach string */
     lp->mp->uptr->filename = tmxr_mux_attach_string (lp->mp->uptr->filename, lp->mp);
-/* If we've got pending buffered data, write it to the log now */
-if (lp->txcnt > lp->txbsz) {
-    boffset = (lp->txbpi + 1) % lp->txbsz;
-    nbytes = lp->txbsz;                                 /* avail buffered bytes */
+if (lp->conn) { /* If we're connected, flush the buffer out now */
+    while (tmxr_send_buffered_data (lp) > 0)
+        sim_os_ms_sleep (10);
     }
 else {
-    boffset = 0;
-    nbytes = lp->txbpi;
-    }
-while (nbytes) {                                        /* >0? write */
-    int32 sbytes;
-
-    if (boffset < lp->txbpi)                            /* no wrap? */
-        sbytes = fwrite (&(lp->txb[boffset]), 1, nbytes, lp->txlog);/* write all data */
-    else
-        sbytes = fwrite (&(lp->txb[boffset]), 1, lp->txbsz - boffset, lp->txlog);/* write to end buf */
-    if (sbytes >= 0) {                                  /* ok? */
-        boffset += sbytes;                              /* update remove ptr */
-        if (boffset >= lp->txbsz)                       /* wrap? */
-            boffset = 0;
-        nbytes -= sbytes;                               /* update remaining count */
+    if (lp->txcnt > lp->txbsz) {
+        boffset = (lp->txbpi + 1) % lp->txbsz;
+        nbytes = lp->txbsz;                             /* avail buffered bytes */
         }
-    else
-        break;                                          
+    else {
+        boffset = 0;
+        nbytes = lp->txbpi;
+        }
+    while (nbytes) {                                    /* >0? write */
+        int32 sbytes;
+
+        if (boffset < lp->txbpi)                        /* no wrap? */
+            sbytes = fwrite (&(lp->txb[boffset]), 1, nbytes, lp->txlog);/* write all data */
+        else
+            sbytes = fwrite (&(lp->txb[boffset]), 1, lp->txbsz - boffset, lp->txlog);/* write to end buf */
+        if (sbytes >= 0) {                              /* ok? */
+            boffset += sbytes;                          /* update remove ptr */
+            if (boffset >= lp->txbsz)                   /* wrap? */
+                boffset = 0;
+            nbytes -= sbytes;                           /* update remaining count */
+            }
+        else
+            break;                                          
+        }
     }
 return SCPE_OK;
 }
