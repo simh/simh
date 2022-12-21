@@ -161,7 +161,7 @@ ifneq ($(findstring Windows,${OS}),)
   endif
 else
   export GNUMakeVERSION = $(shell ($(MAKE) --version | grep 'GNU Make' | awk '{ print $$3 }'))
-  ifeq (old,$(shell gmake --version /dev/null 2>&1 | grep 'GNU Make' | awk '{ if ($$3 < "3.81") {print "old"} }'))
+  ifeq (old,$(shell $(MAKE) --version /dev/null 2>&1 | grep 'GNU Make' | awk '{ if ($$3 < "3.81") {print "old"} }'))
     $(warning *** Warning *** GNU Make Version $(GNUMakeVERSION) is too old to)
     $(warning *** Warning *** fully process this makefile)
   endif
@@ -1319,12 +1319,18 @@ ifneq (,$(USEFUL_PACKAGES))
   $(info )
   $(info Do you want to install $(USEFUL_MULTIPLE) package$(USEFUL_PLURAL) before building $(MAKECMDGOALS_DESCRIPTION)?)
 endif
+ifneq (,$(BUILD_SEPARATE))
+  EXTRAS:=BUILD_SEPARATE=$(BUILD_SEPARATE)
+endif
+ifneq (,$(QUIET))
+  EXTRAS+= QUIET=$(QUIET)
+endif
 ifneq (,$(and $(findstring HOMEBREW,$(PKG_MGR)),$(USEFUL_PACKAGES)))
   ifeq (,$(shell bash -c 'read -p "[Enter Y or N, Default is Y] " answer; echo $$answer' | grep -i n))
     BREW_RESULT = $(shell brew install $(USEFUL_PACKAGES) 1>&2)
     $(info $(BREW_RESULT))
     $(info *** rerunning this make to perform your desired build...)
-    MAKE_RESULT = $(shell $(MAKE) $(MAKECMDGOALS) 1>&2)
+    MAKE_RESULT = $(shell $(MAKE) $(MAKECMDGOALS) $(EXTRAS) 1>&2)
     $(error Done: $(MAKE_RESULT))
   endif
 else
@@ -1332,7 +1338,7 @@ else
     ifeq (,$(shell $(SHELL) -c 'read -p "[Enter Y or N, Default is Y] " answer; echo $$answer' | grep -i n))
       $(info Enter:    $$ sudo port install $(USEFUL_PACKAGES))
       $(info when that completes)
-      $(info re-enter: $$ $(MAKE) $(MAKECMDGOALS))
+      $(info re-enter: $$ $(MAKE) $(MAKECMDGOALS) $(EXTRAS))
       $(error )
     endif
   endif
@@ -1341,7 +1347,7 @@ ifneq (,$(and $(findstring APT,$(PKG_MGR)),$(USEFUL_PACKAGES)))
   ifeq (,$(shell $(SHELL) -c 'read -p "[Enter Y or N, Default is Y] " answer; echo $$answer' | grep -i n))
     $(info Enter:    $$ sudo apt-get install $(USEFUL_PACKAGES))
     $(info when that completes)
-    $(info re-enter: $$ $(MAKE) $(MAKECMDGOALS))
+    $(info re-enter: $$ $(MAKE) $(MAKECMDGOALS) $(EXTRAS))
     $(error )
   endif
 endif
@@ -1349,7 +1355,7 @@ ifneq (,$(and $(findstring YUM,$(PKG_MGR)),$(USEFUL_PACKAGES)))
   ifeq (,$(shell $(SHELL) -c 'read -p "[Enter Y or N, Default is Y] " answer; echo $$answer' | grep -i n))
     $(info Enter:    $$ sudo yum install $(USEFUL_PACKAGES))
     $(info when that completes)
-    $(info re-enter: $$ $(MAKE) $(MAKECMDGOALS))
+    $(info re-enter: $$ $(MAKE) $(MAKECMDGOALS) $(EXTRAS))
     $(error )
   endif
 endif
@@ -1361,7 +1367,7 @@ ifneq (,$(and $(findstring PKGSRC,$(PKG_MGR)),$(USEFUL_PACKAGES)))
     $(info Enter:    $(hash) pkgin install $(USEFUL_PACKAGES))
     $(info when that completes)
     $(info Enter:    $(hash) exit)
-    $(info re-enter: $$ $(MAKE) $(MAKECMDGOALS))
+    $(info re-enter: $$ $(MAKE) $(MAKECMDGOALS) $(EXTRAS))
     $(error )
   endif
 endif
@@ -1373,7 +1379,7 @@ ifneq (,$(and $(findstring PKGBSD,$(PKG_MGR)),$(USEFUL_PACKAGES)))
     $(info Enter:    $(hash) pkg install $(USEFUL_PACKAGES))
     $(info when that completes)
     $(info Enter:    $(hash) exit)
-    $(info re-enter: $$ $(MAKE) $(MAKECMDGOALS))
+    $(info re-enter: $$ $(MAKE) $(MAKECMDGOALS) $(EXTRAS))
     $(error )
   endif
 endif
@@ -1386,7 +1392,7 @@ ifneq (,$(and $(findstring PKGADD,$(PKG_MGR)),$(USEFUL_PACKAGES)))
     $(info Enter:    $(hash) pkg_add $(USEFUL_PACKAGES))
     $(info when that completes)
     $(info Enter:    $(hash) exit)
-    $(info re-enter: $$ $(MAKE) $(MAKECMDGOALS))
+    $(info re-enter: $$ $(MAKE) $(MAKECMDGOALS) $(EXTRAS))
     $(error )
   endif
 endif
