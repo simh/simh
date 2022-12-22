@@ -81,6 +81,7 @@ All Simulator updates on Open SIMH will be present in this repository, and any c
 - Building with the simh makefile can optionally compile each source file separately and store the compiled result.   This approach lends itself to quicker building for folks who are developing new simulators or new simulator modules.  This was requested and discussed in #697.  Invoking make with BUILD_SEPARATE=1 on the make command line or as an exported environment variable will achieve separate compiles.  Invoking make with QUIET=1 on the make command line or as an exported environment variable will summary output of activities being performed instead of full compiler commands.
 - TAPE and SCSI libraries have been extended to fully support partial record reads of fixed sized records which may contain multiple records in recorded data.  Images of this type are common for QIC tape archives generally available on bitsavers and elsewhere.  Attach time checking on simulated QIC tape devices reports possible problems that may occur.
 - Github CI Actions builds of all simulators for Linux, macOS and Windows platforms.
+- All the available simulator defined environment variables are documented in the help and sim_doc document file.
 
 #### Changes to the PDP-11 and VAX simulators also not in the Open SIMH repo
 
@@ -531,6 +532,23 @@ Built In variables %DATE%, %TIME%, %DATETIME%, %LDATE%, %LTIME%, %CTIME%, %DATE_
           %SIM_VERBOSE%       The Verify/Verbose mode of the current Do command file
           %SIM_QUIET%         The Quiet mode of the current Do command file
           %SIM_MESSAGE%       The message display status of the current Do command file
+          %SIM_NAME%          The name of the current simulator
+          %SIM_BIN_NAME%      The program name of the current simulator
+          %SIM_BIN_PATH%      The program path that invoked the current simulator
+          %SIM_OSTYPE%        The Operating System running the current simulator
+          %SIM_RUNTIME%       The Number of simulated instructions or cycles performed
+          %SIM_RUNTIME_UNITS% The units of the SIM_RUNTIME value
+          %SIM_REGEX_TYPE%    The regular expression type available
+          %SIM_MAJOR%         The major portion of the simh version
+          %SIM_MINOR%         The minor portion of the simh version
+          %SIM_PATCH%         The patch portion of the simh version
+          %SIM_DELTA%         The delta portion of the simh version
+          %SIM_VM_RELEASE%    An optional VM specific release version
+          %SIM_VERSION_MODE%  The release mode (Current, Alpha, Beta)
+          %SIM_GIT_COMMIT_ID% The git commit id of the current build
+          %SIM_GIT_COMMIT_TIME%  The git commit time of the current build
+          %SIM_RUNLIMIT%      The current execution limit defined
+          %SIM_RUNLIMIT_UNITS% The units of the SIM_RUNLIMIT value (instructions, cycles or time)
           
    Environment variable lookups are done first with the precise name between 
    the % characters and if that fails, then the name between the % characters
