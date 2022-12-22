@@ -6998,10 +6998,16 @@ if (flag) {
         char tarversion[PATH_MAX+1] = "";
         char curlversion[PATH_MAX+1] = "";
         FILE *f;
+        char *c;
+        const char *run_context = "";
 #if defined(SIM_BUILD_OS_VERSION)
         char buildosversion[2*PATH_MAX+1] = S_xstr(SIM_BUILD_OS_VERSION);
+
+        /* compress multiple spaces to one */
+        c = buildosversion;
+        while ((c = strstr (c, "  ")))
+            memmove (c, c+1, strlen (c));
 #endif
-        
         if ((f = popen ("uname -a | sed 's/,//g'", "r"))) {
             memset (osversion, 0, sizeof (osversion));
             do {
@@ -7011,11 +7017,17 @@ if (flag) {
                 } while (osversion[0] == '\0');
             pclose (f);
             }
+        /* compress multiple spaces to one */
+        c = osversion;
+        while ((c = strstr (c, "  ")))
+            memmove (c, c+1, strlen (c));
 #if defined(SIM_BUILD_OS_VERSION)
-        if (strcmp(osversion, buildosversion) != 0)
-            fprintf (st, "\n        Building OS: %s", buildosversion);
+        if (strcmp(osversion, buildosversion) != 0) {
+            fprintf (st, "\n        Built on OS: %s", buildosversion);
+            run_context = "Running on ";
+            }
 #endif
-        fprintf (st, "\n        Running OS: %s", osversion);
+        fprintf (st, "\n        %sOS: %s", run_context, osversion);
         if ((f = popen ("uname", "r"))) {
             memset (os_type, 0, sizeof (os_type));
             do {
