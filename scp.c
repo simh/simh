@@ -7930,19 +7930,21 @@ if (*cptr == 0) {                                       /* no argument? */
     return ssh_break_one (st, flg, lo, 0, aptr);
     }
 while (*cptr) {
+    const char *ocptr = cptr;
+
     cptr = get_glyph (cptr, gbuf, ',');
     tptr = get_range (dptr, gbuf, &lo, &hi, dptr->aradix, max, 0);
     if (tptr == NULL)
-        return sim_messagef (SCPE_ARG, "Invalid address specifier: %s\n", gbuf);
+        return sim_messagef (SCPE_ARG, "Invalid breakpoint address specifier: %s\n", ocptr);
     if (*tptr == '[') {
         cnt = (int32) strtotv (tptr + 1, &t1ptr, 10);
         if ((tptr == t1ptr) || (*t1ptr != ']') || (flg != SSH_ST))
-            return sim_messagef (SCPE_ARG, "Invalid repeat count specifier: %s\n", tptr + 1);
+            return sim_messagef (SCPE_ARG, "Invalid breakpoint repeat count specifier: %s\n", tptr + 1);
         tptr = t1ptr + 1;
         }
     else cnt = 0;
     if (*tptr != 0)
-        return sim_messagef (SCPE_ARG, "Unexpected argument: %s\n", tptr);
+        return sim_messagef (SCPE_ARG, "Unexpected breakpoint argument: %s\n", tptr);
     if ((lo == 0) && (hi == max)) {
         if (flg == SSH_CL)
             sim_brk_clrall (sim_switches);
