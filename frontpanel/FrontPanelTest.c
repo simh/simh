@@ -75,12 +75,7 @@ printw ("%s", buf);
 }
 #endif /* HAVE_NCURSES */
 #endif
-const char *sim_path = 
-#if defined(_WIN32)
-            "vax.exe";
-#else
-            "vax";
-#endif
+char *sim_path;
 
 const char *sim_config = 
             "VAX-PANEL.ini";
@@ -668,9 +663,18 @@ int
 main (int argc, char **argv)
 {
 int was_halted = 1, i;
+char *c;
 
 if ((argc > 1) && ((!strcmp("-d", argv[1])) || (!strcmp("-D", argv[1])) || (!strcmp("-debug", argv[1]))))
     debug = 1;
+
+sim_path = strcpy ((char *)malloc (strlen (argv[0]) + 10), argv[0]);
+c = strrchr (sim_path, '/');
+if (c == NULL)
+    c = strrchr (sim_path, '\\');
+strcpy (c + 1, "vax");
+
+
 
 if (panel_setup())
     goto Done;

@@ -217,7 +217,7 @@ ifneq (,$(findstring pdp7,${MAKECMDGOALS}))
   VIDEO_USEFUL = true
 endif
 # building the pdp11, any pdp10, any 3b2, or any vax simulator could use networking support
-ifneq (,$(findstring pdp11,${MAKECMDGOALS})$(findstring pdp10,${MAKECMDGOALS})$(findstring vax,${MAKECMDGOALS})$(findstring infoserver,${MAKECMDGOALS})$(findstring 3b2,${MAKECMDGOALS})$(findstring all,${MAKECMDGOALS}))
+ifneq (,$(findstring pdp11,${MAKECMDGOALS})$(findstring pdp10,${MAKECMDGOALS})$(findstring vax,${MAKECMDGOALS})$(findstring frontpaneltest,${MAKECMDGOALS})$(findstring infoserver,${MAKECMDGOALS})$(findstring 3b2,${MAKECMDGOALS})$(findstring all,${MAKECMDGOALS}))
   NETWORK_USEFUL = true
   ifneq (,$(findstring all,${MAKECMDGOALS}))
     BUILD_MULTIPLE = s
@@ -2844,12 +2844,13 @@ $(BIN)pdp10-ks$(EXE) : ${KS10} ${SIM}
 
 # Front Panel API Demo/Test program
 
-frontpaneltest : ${BIN}frontpaneltest${EXE}
+frontpaneltest : ${BIN}frontpaneltest${EXE} ${BIN}vax${EXE} 
 
 ${BIN}frontpaneltest${EXE} : frontpanel/FrontPanelTest.c sim_sock.c sim_frontpanel.c
 	#cmake:ignore-target
-	${MKDIRBIN}
-	${CC} frontpanel/FrontPanelTest.c sim_sock.c sim_frontpanel.c ${CC_OUTSPEC} ${LDFLAGS} ${OS_CURSES_DEFS}
+	$(MAKEIT) OPTS="$(OS_CURSES_DEFS)" TESTS=0
+#	${MKDIRBIN}
+#	${CC} frontpanel/FrontPanelTest.c sim_sock.c sim_frontpanel.c ${CC_OUTSPEC} ${LDFLAGS} ${OS_CURSES_DEFS}
 
 else # end of primary make recipies
 
