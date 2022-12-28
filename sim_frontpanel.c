@@ -80,6 +80,26 @@ tp->tv_sec = (long)(now/10000000);
 tp->tv_nsec = (now%10000000)*100;
 return 0;
 }
+
+static const char *GetErrorText (DWORD dwError)
+{
+static __declspec (thread) char szMsgBuffer[2048];
+DWORD dwStatus;
+
+dwStatus = FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM|
+                          FORMAT_MESSAGE_IGNORE_INSERTS,     //  __in      DWORD dwFlags,
+                          NULL,                              //  __in_opt  LPCVOID lpSource,
+                          dwError,                           //  __in      DWORD dwMessageId,
+                          0,                                 //  __in      DWORD dwLanguageId,
+                          szMsgBuffer,                       //  __out     LPTSTR lpBuffer,
+                          2048,                              //  __in      DWORD nSize,
+                          NULL);                             //  __in_opt  va_list *Arguments
+if (0 == dwStatus)
+    _snprintf(szMsgBuffer, sizeof(szMsgBuffer), "Error Code: %d", dwError);
+while (isspace(szMsgBuffer[strlen(szMsgBuffer)-1]))
+    szMsgBuffer[strlen(szMsgBuffer)-1] = '\0';
+return szMsgBuffer;
+}
 #else /* NOT _WIN32 */
 #include <unistd.h>
 #define msleep(n) usleep(1000*n)
@@ -860,7 +880,7 @@ if (!simulator_panel) {
         p->dwProcessId = ProcessInfo.dwProcessId;
         }
     else { /* Creation Problem */
-        sim_panel_set_error (NULL, "CreateProcess Error: %d", GetLastError());
+        sim_panel_set_error (NULL, "CreateProcess Error: %d", GetErrorText(GetLastError()));
         goto Error_Return;
         }
 #else
@@ -1068,13 +1088,15 @@ if (panel) {
         /* Now close the socket which should stop a pending read that hasn't completed */
         sim_close_sock (sock);
         pthread_join (panel->io_thread, NULL);
+
+        if ((panel->Debug) && (panel->parent == NULL))
+            pthread_join (panel->debugflush_thread, NULL);
+        /* panel mutexes and condition variables are only initialize after a successful socket open */
+        pthread_mutex_destroy (&panel->io_lock);
+        pthread_mutex_destroy (&panel->io_send_lock);
+        pthread_mutex_destroy (&panel->io_command_lock);
+        pthread_cond_destroy (&panel->io_done);
         }
-    if ((panel->Debug) && (panel->parent == NULL))
-        pthread_join (panel->debugflush_thread, NULL);
-    pthread_mutex_destroy (&panel->io_lock);
-    pthread_mutex_destroy (&panel->io_send_lock);
-    pthread_mutex_destroy (&panel->io_command_lock);
-    pthread_cond_destroy (&panel->io_done);
 #if defined(_WIN32)
     if (panel->hProcess) {
         GenerateConsoleCtrlEvent (CTRL_BREAK_EVENT, panel->dwProcessId);
@@ -1082,6 +1104,7 @@ if (panel) {
         TerminateProcess (panel->hProcess, 0);
         WaitForSingleObject (panel->hProcess, INFINITE);
         CloseHandle (panel->hProcess);
+        panel->hProcess = NULL;
         }
 #else
     if (panel->pidProcess) {
@@ -1094,6 +1117,7 @@ if (panel) {
                 kill (panel->pidProcess, SIGKILL);
             }
         waitpid (panel->pidProcess, &status, 0);
+        panel->pidProcess = 0;
         }
 #endif
     free (panel->path);

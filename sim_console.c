@@ -927,8 +927,8 @@ if (sim_vm_post != NULL)                        /* optionally let the simulator 
     (*sim_vm_post) (TRUE);                      /* something might have changed */
 if (!sim_processing_event) {
     sim_ttrun ();                               /* set console mode */
-    sim_cancel (rem_con_data_unit);             /* force immediate activation of sim_rem_con_data_svc */
-    sim_activate (rem_con_data_unit, -1);
+    sim_cancel (rem_con_data_unit);             /* force immediate activation of sim_rem_con_data_svc with the */
+    sim_activate (rem_con_data_unit, -1);       /* special case delay (-1) which forces it to the head of the queue */
     }
 sim_switches = saved_switches;                  /* restore original switches */
 }

@@ -12438,6 +12438,15 @@ UPDATE_SIM_TIME;                                        /* update sim time */
 
 sim_debug (SIM_DBG_ACTIVATE, &sim_scp_dev, "Activating %s delay=%d\n", sim_uname (uptr), event_time);
 
+/* event_time being -1 is a special case which specifically pushes the */
+/* specified unit at the head of the event queue */
+if (event_time == -1) {
+    uptr->time = 0;
+    uptr->next = sim_clock_queue;
+    sim_clock_queue = uptr;
+    sim_interval = 0;
+    return SCPE_OK;
+    }
 prvptr = NULL;
 accum = 0;
 for (cptr = sim_clock_queue; cptr != QUEUE_LIST_END; cptr = cptr->next) {
