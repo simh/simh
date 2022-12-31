@@ -150,6 +150,41 @@ and
                      The accumulated value will range from 0 thru the 
                      the sample_depth specified when calling 
                      sim_panel_set_sampling_parameters().
+
+    Notes:    There are two categories of REGisters in simulators:
+           1) Many simulators contain every interesting simh REGisters
+              in single variables and use those variables directly 
+              throughout the simulator as needed by the system being 
+              simulated.
+           2) Some simulators have some of their REGisters in a single 
+              variable, but during instruction execution, the actual 
+              contents of that REGister is split into possibly multiple
+              pieces which are assembled into the single variable when
+              the simulator stops instruction execution and split apart
+              again when simulation starts executing instructions again.
+              An example of this case is the PSL on the VAX simulator.  
+              In the VAX architecture, the PSL register contains the 
+              condition code information which is a field in the PSL.
+              For efficiency sake, while sim_instr() is executing 
+              instructions, the condition code is stored a separate 
+              variable CC.  Whenever sim_instr() exits, the pieces
+              that comprise this register are put together into the
+              PSL variable.  This allows the PSL register to be examined
+              and/or deposited to directly from SCP as needed. The PDP11
+              simulator handles its PSW in a similar way breaking it
+              into pieces during sim_instr() execution and reassembling
+              it upon exit.
+
+              Therefore, if every REGister that an application that 
+              uses the sim_frontpanel register APIs is always stored
+              in single variables (case 1 above), then front panel 
+              access to registers can be most efficient if, at 
+              initialization time, the simulator calls the 
+              sim_set_stable_registers_state() API.
+              Having called this API allows the internals of the 
+              frontpanel access activities to be significantly more 
+              efficient.
+
  */
 
 int
