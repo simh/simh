@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   31-Dec-22    RMS     Floating loads are src,dst (nickd4)
    23-May-18    RMS     Changed UC15 simulator name
    14-Mar-16    RMS     Added UC15 support
    02-Sep-13    RMS     Added third Massbus, RS03/RS04
@@ -346,6 +347,9 @@ return SCPE_CSUM;
 #define I_V_CCC         14                              /* CC clear */
 #define I_V_CCS         15                              /* CC set */
 #define I_V_SOPR        16                              /* operand, reg */
+#define I_V_FOPA        17                              /* flt operand, fac */
+#define I_V_SOPA        18                              /* operand, fac */
+#define I_V_SMDA        19                              /* moded int op, fac */
 #define I_NPN           (I_V_NPN << I_V_CL)
 #define I_REG           (I_V_REG << I_V_CL)
 #define I_3B            (I_V_3B << I_V_CL)
@@ -363,13 +367,17 @@ return SCPE_CSUM;
 #define I_CCC           (I_V_CCC << I_V_CL)
 #define I_CCS           (I_V_CCS << I_V_CL)
 #define I_SOPR          (I_V_SOPR << I_V_CL)
+#define I_FOPA          (I_V_FOPA << I_V_CL)
+#define I_SOPA          (I_V_SOPA << I_V_CL)
+#define I_SMDA          (I_V_SMDA << I_V_CL)
 
 static const int32 masks[] = {
 0177777, 0177770, 0177700, 0177770,
 0177700+I_D, 0177400+I_D, 0177700, 0177400,
 0177400, 0177000, 0177000, 0177400,
 0177400+I_D+I_L, 0170000, 0177777, 0177777,
-0177000
+0177700+I_D, 0177400+I_D, 0177700, 0177400,
+0177000, 0177700+I_D, 0177400, 0177400+I_D+I_L
 };
 
 static const char *opcode[] = {
@@ -497,16 +505,16 @@ static const int32 opc_val[] = {
 0170100+I_SOP, 0170200+I_SOP, 0170300+I_SOP,
 0170400+I_FOP, 0170400+I_FOP+I_D, 0170500+I_FOP, 0170500+I_FOP+I_D,
 0170600+I_FOP, 0170600+I_FOP+I_D, 0170700+I_FOP, 0170700+I_FOP+I_D,
-0171000+I_AFOP, 0171000+I_AFOP+I_D, 0171400+I_AFOP, 0171400+I_AFOP+I_D,
-0172000+I_AFOP, 0172000+I_AFOP+I_D, 0172400+I_AFOP, 0172400+I_AFOP+I_D, 
-0173000+I_AFOP, 0173000+I_AFOP+I_D, 0173400+I_AFOP, 0173400+I_AFOP+I_D,
-0174000+I_AFOP, 0174000+I_AFOP+I_D, 0174400+I_AFOP, 0174400+I_AFOP+I_D,
+0171000+I_FOPA, 0171000+I_FOPA+I_D, 0171400+I_FOPA, 0171400+I_FOPA+I_D,
+0172000+I_FOPA, 0172000+I_FOPA+I_D, 0172400+I_FOPA, 0172400+I_FOPA+I_D, 
+0173000+I_FOPA, 0173000+I_FOPA+I_D, 0173400+I_FOPA, 0173400+I_FOPA+I_D,
+0174000+I_AFOP, 0174000+I_AFOP+I_D, 0174400+I_FOPA, 0174400+I_FOPA+I_D,
 0175000+I_ASOP,
 0175400+I_ASMD, 0175400+I_ASMD+I_D, 0175400+I_ASMD+I_L, 0175400+I_ASMD+I_D+I_L, 
 0176000+I_AFOP, 0176000+I_AFOP+I_D,
-0176400+I_ASOP, 
-0177000+I_ASMD, 0177000+I_ASMD+I_D, 0177000+I_ASMD+I_L, 0177000+I_ASMD+I_D+I_L, 
-0177400+I_AFOP, 0177400+I_AFOP+I_D,
+0176400+I_SOPA, 
+0177000+I_SMDA, 0177000+I_SMDA+I_D, 0177000+I_SMDA+I_L, 0177000+I_SMDA+I_D+I_L, 
+0177400+I_FOPA, 0177400+I_FOPA+I_D,
 -1
 };
 
@@ -748,6 +756,18 @@ for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
             fprintf (of, ",");
             wd2 = fprint_spec (of, addr - wd1 - wd1, dstm,
                 val[1 - wd1], cflag, TRUE);
+            break;
+ 
+        case I_V_FOPA:                                  /* fopa */
+            fprintf (of, "%s ", opcode[i]);
+            wd1 = fprint_spec (of, addr, dstm, val[1], cflag, FALSE);
+            fprintf (of, ",%s", fname[fac]);
+            break;
+ 
+        case I_V_SOPA: case I_V_SMDA:                   /* sopa, smda */
+            fprintf (of, "%s ", opcode[i]);
+            wd1 = fprint_spec (of, addr, dstm, val[1], cflag, TRUE);
+            fprintf (of, ",%s", fname[fac]);
             break;
             }                                           /* end case */
         return ((wd1 + wd2) * 2) - 1;
@@ -1137,6 +1157,20 @@ switch (j) {                                            /* case on class */
                 return SCPE_ARG;
             val[0] = val[0] | (opc_val[i] & 0177777);
             }
+        break;
+
+    case I_V_FOPA: case I_V_SOPA: case I_V_SMDA:        /* (s)fop, fac */
+        cptr = get_glyph (cptr, gbuf, ',');             /* get glyph */
+        if ((n1 = get_spec (gbuf, addr, 0, &spec, &val[1], cflag, 
+            (j == I_V_SOPA) || (j == I_V_SMDA))) > 0)
+            return SCPE_ARG;
+        val[0] = val[0] | spec;
+        cptr = get_glyph (cptr, gbuf, 0);               /* get glyph */
+        if ((reg = get_reg (gbuf, fname, 0)) < 0)
+            return SCPE_ARG;
+        if (reg > 3)
+            return SCPE_ARG;
+        val[0] = val[0] | (reg << 6);
         break;
 
     default:
