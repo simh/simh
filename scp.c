@@ -1350,6 +1350,8 @@ static const char simh_help1[] =
       "+SET CONSOLE TELNET=UNBUFFERED\n"
       "++++++++                     disables console telnet buffering\n"
       "+SET CONSOLE NOTELNET        disable console telnet\n"
+      "+SET CONSOLE TELNET=CONNECT  open a window running a telnet session\n"
+      "++++++++                     to the simulator console\n"
       "+SET CONSOLE SERIAL=serialport[;config]\n"
       "++++++++                     specify console serial port and optionally\n"
       "++++++++                     the port config (i.e. ;9600-8n1)\n"
@@ -2821,7 +2823,6 @@ static SHTAB show_unit_tab[] = {
 
 
 #if defined(_WIN32) || defined(__hpux)
-static
 int setenv(const char *envname, const char *envval, int overwrite)
 {
 char *envstr = (char *)malloc(strlen(envname)+strlen(envval)+2);

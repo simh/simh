@@ -229,15 +229,8 @@ if ((f = fopen (sim_config, "w"))) {
     fprintf (f, "set cpu 64\n");
     fprintf (f, "set console telnet=buffered\n");
     fprintf (f, "set console -u telnet=1927\n");
-    /* Start a terminal emulator for the console port */
-#if defined(_WIN32)
-    fprintf (f, "set env PATH=%%PATH%%;%%ProgramFiles%%\\PuTTY;%%ProgramFiles(x86)%%\\PuTTY\n");
-    fprintf (f, "! start PuTTY telnet://localhost:1927\n");
-#elif defined(__linux) || defined(__linux__)
-    fprintf (f, "! nohup xterm -e 'telnet localhost 1927' &\n");
-#elif defined(__APPLE__)
-    fprintf (f, "! osascript -e 'tell application \"Terminal\" to do script \"telnet localhost 1927; exit\"'\n");
-#endif
+    fprintf (f, "# Start a terminal emulator for the console port\n");
+    fprintf (f, "set console telnet=connect\n");
     fclose (f);
     }
 

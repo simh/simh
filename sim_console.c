@@ -142,6 +142,10 @@
 #define MIN(a,b)  (((a) <= (b)) ? (a) : (b))
 #endif
 
+#if defined(_WIN32) || defined(__hpux)
+int setenv(const char *envname, const char *envval, int overwrite);
+#endif
+
 /* Forward Declaraations of Platform specific routines */
 
 static t_stat sim_os_poll_kbd (void);
@@ -152,6 +156,7 @@ static t_stat sim_os_ttrun (void);
 static t_stat sim_os_ttcmd (void);
 static t_stat sim_os_ttclose (void);
 static t_bool sim_os_fd_isatty (int fd);
+static t_stat sim_os_connect_telnet (int port);
 
 static t_stat sim_set_rem_telnet (int32 flag, CONST char *cptr);
 static t_stat sim_set_rem_bufsize (int32 flag, CONST char *cptr);
@@ -373,6 +378,7 @@ static CTAB set_con_telnet_tab[] = {
     { "BUFFERED", &sim_set_cons_buff, 0 },
     { "NOBUFFERED", &sim_set_cons_unbuff, 0 },
     { "UNBUFFERED", &sim_set_cons_unbuff, 0 },
+    { "CONNECT", &sim_set_cons_connect, 0 },
     { NULL, NULL, 0 }
     };
 
@@ -2604,6 +2610,16 @@ else
 return SCPE_OK;
 }
 
+/* Start telnet session/window to console */
+
+t_stat sim_set_cons_connect (int32 flg, CONST char *cptr)
+{
+if (sim_con_tmxr.port == NULL)
+    return sim_messagef (SCPE_ARG, "Console not listening for telnet connections\n");
+return sim_os_connect_telnet (atoi (sim_con_tmxr.port));
+}
+
+
 /* Set console Debug Mode */
 
 t_stat sim_set_cons_debug (int32 flg, CONST char *cptr)
@@ -3464,6 +3480,12 @@ if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL))
 return SCPE_OK;
 }
 
+static t_stat sim_os_connect_telnet (int port)
+{
+return SCPE_NOFNC;
+}
+
+
 /* Win32 routines */
 
 #elif defined (_WIN32)
@@ -3732,6 +3754,30 @@ if (c != 0177) {
         }
     }
 return SCPE_OK;
+}
+
+static t_stat sim_os_connect_telnet (int port)
+{
+char gbuf[CBUFSIZE];
+const char *program = sim_get_tool_path ("PuTTY");
+
+if (program[0] != '\0') {
+    snprintf (gbuf, sizeof (gbuf), "start PuTTY telnet://localhost:%d", port);
+    return spawn_cmd (0, gbuf);
+    }
+snprintf (gbuf, sizeof (gbuf), "%s;%s\\PuTTY;%s\\PuTTY", getenv ("PATH"), getenv ("ProgramFiles"), getenv ("ProgramFiles(x86)"));
+setenv("PATH", gbuf, 1);
+program = sim_get_tool_path ("PuTTY");
+if (program[0] != '\0') {
+    snprintf (gbuf, sizeof (gbuf), "start PuTTY telnet://localhost:%d", port);
+    return spawn_cmd (0, gbuf);
+    }
+program = sim_get_tool_path ("telnet");
+if (program[0] != '\0') {
+    snprintf (gbuf, sizeof (gbuf), "start telnet localhost:%d", port);
+    return spawn_cmd (0, gbuf);
+    }
+return sim_messagef (SCPE_NOFNC, "Can't find a telnet program to connect to the console in a window\n");
 }
 
 /* OS/2 routines, from Bruce Ray and Holger Veit */
@@ -4010,6 +4056,12 @@ if (c != 0177) {
 return SCPE_OK;
 }
 
+static t_stat sim_os_connect_telnet (int port)
+{
+return SCPE_NOFNC;
+}
+
+
 /* BSD UNIX routines */
 
 #elif defined (BSDTTY)
@@ -4160,6 +4212,11 @@ char c;
 c = out;
 write (1, &c, 1);
 return SCPE_OK;
+}
+
+static t_stat sim_os_connect_telnet (int port)
+{
+return SCPE_NOFNC;
 }
 
 /* POSIX UNIX routines, from Leendert Van Doorn */
@@ -4334,6 +4391,38 @@ char c;
 c = out;
 if (write (1, &c, 1)) {};
 return SCPE_OK;
+}
+
+static t_stat sim_os_connect_telnet (int port)
+{
+char gbuf[CBUFSIZE];
+const char *program = sim_get_tool_path ("osascript");
+
+if (program[0] != '\0') {
+    snprintf (gbuf, sizeof (gbuf), "osascript -e 'tell application \"Terminal\" to do script \"telnet localhost %d; exit\"'", port);
+    return spawn_cmd (0, gbuf);
+    }
+program = sim_get_tool_path ("putty");
+if (program[0] != '\0') {
+    snprintf (gbuf, sizeof (gbuf), "nohup putty telnet://localhost:%d' 2>/dev/null&", port);
+    return spawn_cmd (0, gbuf);
+    }
+program = sim_get_tool_path ("gnome-terminal");
+if (program[0] != '\0') {
+    snprintf (gbuf, sizeof (gbuf), "nohup gnome-terminal -- telnet localhost %d' 2>/dev/null&", port);
+    return spawn_cmd (0, gbuf);
+    }
+program = sim_get_tool_path ("uxterm");
+if (program[0] != '\0') {
+    snprintf (gbuf, sizeof (gbuf), "nohup uxterm -e 'telnet localhost %d' 2>/dev/null&", port);
+    return spawn_cmd (0, gbuf);
+    }
+program = sim_get_tool_path ("xterm");
+if (program[0] != '\0') {
+    snprintf (gbuf, sizeof (gbuf), "nohup xterm -e 'telnet localhost %d' 2>/dev/null&", port);
+    return spawn_cmd (0, gbuf);
+    }
+return sim_messagef (SCPE_NOFNC, "Can't find a telnet program to connect to the console in a window\n");
 }
 
 #endif

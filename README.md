@@ -82,6 +82,7 @@ All Simulator updates on Open SIMH will be present in this repository, and any c
 - TAPE and SCSI libraries have been extended to fully support partial record reads of fixed sized records which may contain multiple records in recorded data.  Images of this type are common for QIC tape archives generally available on bitsavers and elsewhere.  Attach time checking on simulated QIC tape devices reports possible problems that may occur.
 - Github CI Actions builds of all simulators for Linux, macOS and Windows platforms.
 - All the available simulator defined environment variables are documented in the help and sim_doc document file.
+- SET CONSOLE TELNET=CONNECT will start a telnet session to the simulator console in a separate window.
 
 #### Changes to the PDP-11 and VAX simulators also not in the Open SIMH repo
 

@@ -88,6 +88,7 @@ t_stat sim_set_cons_buff (int32 flg, CONST char *cptr);
 t_stat sim_set_cons_unbuff (int32 flg, CONST char *cptr);
 t_stat sim_set_cons_log (int32 flg, CONST char *cptr);
 t_stat sim_set_cons_nolog (int32 flg, CONST char *cptr);
+t_stat sim_set_cons_connect (int32 flg, CONST char *cptr);
 t_stat sim_set_deboff (int32 flag, CONST char *cptr);
 t_stat sim_set_cons_expect (int32 flg, CONST char *cptr);
 t_stat sim_set_cons_noexpect (int32 flg, CONST char *cptr);
