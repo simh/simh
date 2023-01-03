@@ -416,10 +416,22 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
     ifeq (,$(GIT_PATH))
       $(error building using a git repository, but git is not available)
     endif
+  endif
+  ifeq (got-repo,$(shell if ${TEST} -e ./.got; then echo got-repo; fi))
+    GIT_PATH=$(strip $(shell which git))
+    ifeq (,$(GIT_PATH))
+      $(error building using a got repository, but git is not available)
+    endif
+    ifeq (,$(file <.got/repository))
+      $(error building using a got repository, but git repository is not available)
+    endif
+    REPO_PATH=-C $(file <.got/repository)
+  endif
+  ifneq (,GIT_PATH)
     ifeq (commit-id-exists,$(shell if ${TEST} -e .git-commit-id; then echo commit-id-exists; fi))
       CURRENT_FULL_GIT_COMMIT_ID=$(strip $(shell grep 'SIM_GIT_COMMIT_ID' .git-commit-id | awk '{ print $$2 }'))
       CURRENT_GIT_COMMIT_ID=$(word 1,$(subst +, , $(CURRENT_FULL_GIT_COMMIT_ID)))
-      ACTUAL_GIT_COMMIT_ID=$(strip $(shell git log -1 --pretty="%H"))
+      ACTUAL_GIT_COMMIT_ID=$(strip $(shell git $(REPO_PATH) log -1 --pretty="%H"))
       ifneq ($(CURRENT_GIT_COMMIT_ID),$(ACTUAL_GIT_COMMIT_ID))
         NEED_COMMIT_ID = need-commit-id$(shell touch scp.c)
         # make sure that the invalidly formatted .git-commit-id file wasn't generated
@@ -429,7 +441,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
     else
       NEED_COMMIT_ID = need-commit-id$(shell touch scp.c)
     endif
-    ifneq (,$(shell git update-index --refresh --))
+    ifneq (,$(if $(REPO_PATH),$(shell got status -S ?),$(shell git update-index --refresh --)))
       ifeq (,$(findstring +uncommitted-changes,$(CURRENT_FULL_GIT_COMMIT_ID)))
         GIT_EXTRA_FILES=+uncommitted-changes$(shell touch scp.c)
       else
@@ -437,8 +449,8 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
       endif
     endif
     ifneq (,$(or $(NEED_COMMIT_ID),$(GIT_EXTRA_FILES)))
-      isodate=$(shell git log -1 --pretty="%ai"|sed -e 's/ /T/'|sed -e 's/ //')
-      $(shell git log -1 --pretty="SIM_GIT_COMMIT_ID %H$(GIT_EXTRA_FILES)%nSIM_GIT_COMMIT_TIME $(isodate)" >.git-commit-id)
+      isodate=$(shell git $(REPO_PATH) log -1 --pretty="%ai"|sed -e 's/ /T/'|sed -e 's/ //')
+      $(shell git $(REPO_PATH) log -1 --pretty="SIM_GIT_COMMIT_ID %H$(GIT_EXTRA_FILES)%nSIM_GIT_COMMIT_TIME $(isodate)" >.git-commit-id)
     endif
   endif
   SIM_BUILD_OS_VERSION= -DSIM_BUILD_OS_VERSION="$(shell uname -a|sed 's/,//g')"
@@ -1063,7 +1075,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
     else
       ifeq (git-submodule,$(if $(shell cd .. ; git rev-parse --git-dir 2>/dev/null),git-submodule))
         GIT_COMMIT_ID=$(shell cd .. ; git submodule status | grep " $(notdir $(realpath .)) " | awk '{ print $$1 }')
-        GIT_COMMIT_TIME=$(shell git --git-dir=$(realpath .)/.git log $(GIT_COMMIT_ID) -1 --pretty="%aI")
+        GIT_COMMIT_TIME=$(shell git $(REPO_PATH) --git-dir=$(realpath .)/.git log $(GIT_COMMIT_ID) -1 --pretty="%aI")
       else
         $(info *** Error ***)
         $(info *** Error *** The simh git commit id can not be determined.)
@@ -1179,12 +1191,12 @@ else
     ifeq (commit-id-exists,$(shell if exist .git-commit-id echo commit-id-exists))
       CURRENT_FULL_GIT_COMMIT_ID=$(shell for /F "tokens=2" %%i in ("$(shell findstr /C:"SIM_GIT_COMMIT_ID" .git-commit-id)") do echo %%i)
       CURRENT_GIT_COMMIT_ID=$(word 1,$(subst +, , $(CURRENT_FULL_GIT_COMMIT_ID)))
-      ACTUAL_GIT_COMMIT_ID=$(strip $(shell git log -1 --pretty=%H))
+      ACTUAL_GIT_COMMIT_ID=$(strip $(shell $(REPO_PATH) git log -1 --pretty=%H))
       ifneq ($(CURRENT_GIT_COMMIT_ID),$(ACTUAL_GIT_COMMIT_ID))
-        ifeq (,$(strip $(findstring scp.c,$(shell git diff --name-only))))
+        ifeq (,$(strip $(findstring scp.c,$(shell git $(REPO_PATH) diff --name-only))))
           # scp.c hasn't changed, so we want to touch it to force it to recompile
           # but touch isn't part of MinGW, so we do some git monkey business
-          NEED_COMMIT_ID = need-commit-id$(file >> scp.c,)$(shell git restore scp.c)
+          NEED_COMMIT_ID = need-commit-id$(file >> scp.c,)$(shell git $(REPO_PATH) restore scp.c)
         else
           NEED_COMMIT_ID = need-commit-id
         endif
@@ -1195,16 +1207,16 @@ else
         $(shell if exist .git\hooks\post-merge    del .git\hooks\post-merge)
       endif
     else
-      ifeq (,$(strip $(findstring scp.c,$(shell git diff --name-only))))
-        NEED_COMMIT_ID = need-commit-id$(file >> scp.c,)$(shell git restore scp.c)
+      ifeq (,$(strip $(findstring scp.c,$(shell git $(REPO_PATH) diff --name-only))))
+        NEED_COMMIT_ID = need-commit-id$(file >> scp.c,)$(shell git $(REPO_PATH) restore scp.c)
       else
         NEED_COMMIT_ID = need-commit-id
       endif
     endif
-    ifneq (,$(shell git update-index --refresh --))
+    ifneq (,$(shell git $(REPO_PATH) update-index --refresh --))
       ifeq (,$(findstring +uncommitted-changes,$(CURRENT_FULL_GIT_COMMIT_ID)))
-        ifeq (,$(strip $(findstring scp.c,$(shell git diff --name-only))))
-          GIT_EXTRA_FILES=+uncommitted-changes$(file >> scp.c,)$(shell git restore scp.c)
+        ifeq (,$(strip $(findstring scp.c,$(shell git $(REPO_PATH) diff --name-only))))
+          GIT_EXTRA_FILES=+uncommitted-changes$(file >> scp.c,)$(shell git $(REPO_PATH) restore scp.c)
         else
           GIT_EXTRA_FILES=+uncommitted-changes
         endif
@@ -1213,7 +1225,7 @@ else
       endif
     endif
     ifneq (,$(or $(NEED_COMMIT_ID),$(GIT_EXTRA_FILES)))
-      isodatetime=$(shell git log -1 --pretty=%ai)
+      isodatetime=$(shell git $(REPO_PATH) log -1 --pretty=%ai)
       isodate=$(word 1,$(isodatetime))T$(word 2,$(isodatetime))$(word 3,$(isodatetime))
       $(shell echo SIM_GIT_COMMIT_ID $(ACTUAL_GIT_COMMIT_ID)$(GIT_EXTRA_FILES)>.git-commit-id)
       $(shell echo SIM_GIT_COMMIT_TIME $(isodate)>>.git-commit-id)
