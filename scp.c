@@ -5386,7 +5386,7 @@ else {
             if (*gptr == '[') {                             /* subscript? */
                 if (rptr->depth <= 1)                       /* array register? */
                     return SCPE_ARG;
-                idx = (uint32) strtotv (++gptr, &tptr, 10); /* convert index */
+                idx = (uint32) strtotv (++gptr, &tptr, 0);  /* convert index */
                 if ((gptr == tptr) || (*tptr++ != ']'))
                     return SCPE_ARG;
                 gptr = tptr;                                /* update */
@@ -5561,7 +5561,7 @@ delay = get_default_env_parameter (dev_name, "SIM_SEND_DELAY", SEND_DEFAULT_DELA
 after = get_default_env_parameter (dev_name, "SIM_SEND_AFTER", delay);
 while (*cptr) {
     if ((!strncmp(gbuf, "DELAY=", 6)) && (gbuf[6])) {
-        delay = (uint32)get_uint (&gbuf[6], 10, 2000000000, &r);
+        delay = (uint32)get_uint (&gbuf[6], 0, 2000000000, &r);
         if (r != SCPE_OK)
             return sim_messagef (SCPE_ARG, "Invalid Delay Value: %s\n", &gbuf[6]);
         cptr = tptr;
@@ -5572,7 +5572,7 @@ while (*cptr) {
         continue;
         }
     if ((!strncmp(gbuf, "AFTER=", 6)) && (gbuf[6])) {
-        after = (uint32)get_uint (&gbuf[6], 10, 2000000000, &r);
+        after = (uint32)get_uint (&gbuf[6], 0, 2000000000, &r);
         if (r != SCPE_OK)
             return sim_messagef (SCPE_ARG, "Invalid After Value: %s\n", &gbuf[6]);
         cptr = tptr;
@@ -7970,7 +7970,7 @@ while (*cptr) {
     if (tptr == NULL)
         return sim_messagef (SCPE_ARG, "Invalid breakpoint address specifier: %s\n", ocptr);
     if (*tptr == '[') {
-        cnt = (int32) strtotv (tptr + 1, &t1ptr, 10);
+        cnt = (int32) strtotv (tptr + 1, &t1ptr, 0);
         if ((tptr == t1ptr) || (*t1ptr != ']') || (flg != SSH_ST))
             return sim_messagef (SCPE_ARG, "Invalid breakpoint repeat count specifier: %s\n", tptr + 1);
         tptr = t1ptr + 1;
@@ -8075,7 +8075,7 @@ if (0 == flag) {
     }
 
 cptr = get_glyph (cptr, gbuf, 0);               /* get next glyph */
-num = (int32) get_uint (gbuf, 10, INT_MAX, &r);
+num = (int32) get_uint (gbuf, 0, INT_MAX, &r);
 if ((r != SCPE_OK) || (num == 0))               /* error? */
     return sim_messagef (SCPE_ARG, "Invalid argument: %s\n", gbuf);
 cptr = get_glyph (cptr, gbuf, 0);               /* get next glyph */
@@ -9563,7 +9563,7 @@ else if ((flag == RU_STEP) ||
         cptr = get_glyph (cptr, gbuf, 0);               /* get next glyph */
         if (*cptr != 0)                                 /* should be end */
             return SCPE_2MARG;
-        sim_step = (int32) get_uint (gbuf, 10, INT_MAX, &r);
+        sim_step = (int32) get_uint (gbuf, 0, INT_MAX, &r);
         if ((r != SCPE_OK) || (sim_step <= 0))          /* error? */
             return SCPE_ARG;
         }
@@ -9577,7 +9577,7 @@ else if (flag == RU_NEXT) {                             /* next */
         cptr = get_glyph (cptr, gbuf, 0);               /* get next glyph */
         if (*cptr != 0)                                 /* should be end */
             return SCPE_2MARG;
-        sim_next = (int32) get_uint (gbuf, 10, INT_MAX, &r);
+        sim_next = (int32) get_uint (gbuf, 0, INT_MAX, &r);
         if ((r != SCPE_OK) || (sim_next <= 0))          /* error? */
             return SCPE_ARG;
         }
@@ -11922,7 +11922,7 @@ return ret;
    If the value of radix is zero, the syntax expected is similar 
    to that of integer constants, which is formed by a succession of:
 
-      - An optional sign character (+ or -)
+      - An optional sign character (+ or -) {only for strtotsv}
       - An optional prefix indicating octal or hexadecimal radix 
         ("0" or "0x"/"0X" respectively)
       - A sequence of decimal digits (if no radix prefix was specified) 
@@ -13347,7 +13347,7 @@ if ((cptr == NULL) || (*cptr == 0))
 dev_name = tmxr_expect_line_name (exp);
 after = get_default_env_parameter (dev_name, "SIM_EXPECT_HALTAFTER", 0);
 if (*cptr == '[') {
-    cnt = (int32) strtotv (cptr + 1, &c1ptr, 10);
+    cnt = (int32) strtotv (cptr + 1, &c1ptr, 0);
     if ((cptr == c1ptr) || (*c1ptr != ']') || (cnt <= 0))
         return sim_messagef (SCPE_ARG, "Invalid Repeat count specification\n");
     cnt -= 1;
@@ -13357,7 +13357,7 @@ if (*cptr == '[') {
     }
 tptr = get_glyph (cptr, gbuf, ',');
 if ((!strncmp(gbuf, "HALTAFTER=", 10)) && (gbuf[10])) {
-    after = (uint32)get_uint (&gbuf[10], 10, 2000000000, &r);
+    after = (uint32)get_uint (&gbuf[10], 0, 2000000000, &r);
     if (r != SCPE_OK)
         return sim_messagef (SCPE_ARG, "Invalid Halt After Value: %s\n", &gbuf[10]);
     cptr = tptr;
