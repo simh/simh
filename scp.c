@@ -583,6 +583,7 @@ static t_stat sim_sanity_check_register_declarations (DEVICE **devices);
 static t_stat sim_device_unit_tests (const char *cptr);
 static void fix_writelock_mtab (DEVICE *dptr);
 static t_stat _sim_debug_flush (void);
+static const char *_get_runlimit (void);
 
 /* Global data */
 
@@ -3080,6 +3081,7 @@ if (!sim_quiet) {
     show_version (stdout, NULL, NULL, 0, NULL);
     }
 sim_timer_precalibrate_execution_rate ();
+sim_time = sim_rtime = 0;
 show_version (stdnul, NULL, NULL, 1, NULL);             /* Quietly set SIM_OSTYPE */
 #if defined (HAVE_PCRE_H)
 setenv ("SIM_REGEX_TYPE", "PCRE", 1);                   /* Publish regex type */
@@ -4912,6 +4914,9 @@ if (!ap) {                              /* no environment variable found? */
     else if (!strcmp ("SIM_RUNTIME_UNITS", gbuf)) {
         sprintf (rbuf, "%s", sim_vm_interval_units);
         ap = rbuf;
+        }
+    else if (!strcmp ("SIM_RUNLIMIT_REMAINING", gbuf)) {
+        ap = _get_runlimit ();
         }
     }
 if (ap && fixup_needed) {   /* substring/substituted needed? */
@@ -8136,34 +8141,44 @@ t_stat set_runlimit (int32 flag, CONST char *cptr)
 return runlimit_cmd (flag, cptr);
 }
 
-t_stat show_runlimit (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr)
+static const char *_get_runlimit (void)
 {
+static char msg[CBUFSIZE];
+char msgend[CBUFSIZE] = "";
+
 if (sim_runlimit_enabled) {
     if (sim_runlimit_switches & SWMASK ('T')) {
         if (sim_runlimit_d_initial != sim_runlimit_d) {
-            fprintf (st, "%s initially, ", sim_fmt_secs (sim_runlimit_d_initial / 1000000.0));
+            snprintf (msg, sizeof (msg), "%s initially, ", sim_fmt_secs (sim_runlimit_d_initial / 1000000.0));
             if (sim_is_active (&sim_runlimit_unit))
-                fprintf (st, "and %s remaining\n", sim_fmt_secs (sim_runlimit_d / 1000000.0));
+                snprintf (msgend, sizeof (msgend), "and %s remaining", sim_fmt_secs (sim_runlimit_d / 1000000.0));
             else
-                fprintf (st, "expired now\n");
+                snprintf (msgend, sizeof (msgend), "expired now");
             }
         else
-            fprintf (st, "%s\n", sim_fmt_secs (sim_runlimit_d_initial / 1000000.0));
+            snprintf (msg, sizeof (msg), "%s", sim_fmt_secs (sim_runlimit_d_initial / 1000000.0));
         }
     else {
         if (sim_runlimit_initial != sim_runlimit) {
-            fprintf (st, "%s %s initially, ", sim_fmt_numeric ((double)sim_runlimit_initial), sim_vm_interval_units);
+            snprintf (msg, sizeof (msg), "%s %s initially, ", sim_fmt_numeric ((double)sim_runlimit_initial), sim_vm_interval_units);
             if (sim_is_active (&sim_runlimit_unit))
-                fprintf (st, "and %s %s remaining\n", sim_fmt_numeric ((double)sim_activate_time (&sim_runlimit_unit)), sim_vm_interval_units);
+                snprintf (msgend, sizeof (msgend), "and %s %s remaining", sim_fmt_numeric ((double)sim_activate_time (&sim_runlimit_unit)), sim_vm_interval_units);
             else
-                fprintf (st, "expired now\n");
+                snprintf (msgend, sizeof (msgend), "expired now");
             }
         else
-            fprintf (st, "%s %s\n", sim_fmt_numeric ((double)sim_runlimit_initial), sim_vm_interval_units);
+            snprintf (msg, sizeof (msg), "%s %s\n", sim_fmt_numeric ((double)sim_runlimit_initial), sim_vm_interval_units);
         }
     }
 else
-    fprintf (st, "Run Limit Disabled\n");
+    snprintf (msg, sizeof (msg), "Run Limit Disabled");
+strlcat (msg, msgend, sizeof (msg));
+return msg;
+}
+
+t_stat show_runlimit (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr)
+{
+fprintf (st, "%s\n", _get_runlimit ());
 return SCPE_OK;
 }
 
