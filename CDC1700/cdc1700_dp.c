@@ -249,12 +249,8 @@ IO_DEVICE DPdev = IODEV(NULL, "1738-B", 1738, 3, 0xFF, 0,
 */
 
 UNIT dp_unit[] = {
-  { UDATA(&dp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_854, DP854_SIZE),
-    0, 0, 0, 0, 0, &DPunits[0]
-  },
-  { UDATA(&dp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_854, DP854_SIZE),
-    0, 0, 0, 0, 0, &DPunits[1]
-  },
+  { UDATA(&dp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_854, DP854_SIZE)},
+  { UDATA(&dp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_854, DP854_SIZE)},
 };
 
 REG dp_reg[] = {
@@ -812,6 +808,8 @@ t_stat dp_reset(DEVICE *dptr)
 {
   t_stat r;
 
+  dp_unit[0].up7 = &DPunits[0];
+  dp_unit[1].up7 = &DPunits[1];
   if (IOFWinitialized)
     if ((dptr->flags & DEV_DIS) == 0)
       if ((r = checkReset(dptr, DPdev.iod_equip)) != SCPE_OK)

@@ -594,11 +594,6 @@ struct UNIT {
     void                (*io_flush)(UNIT *up);          /* io flush routine */
     uint32              iostarttime;                    /* I/O start time */
     int32               buf;                            /* buffer */
-    int32               wait;                           /* wait */
-    int32               u3;                             /* device specific */
-    int32               u4;                             /* device specific */
-    int32               u5;                             /* device specific */
-    int32               u6;                             /* device specific */
     void                *up7;                           /* device specific */
     void                *up8;                           /* device specific */
     uint16              us9;                            /* device specific */
@@ -631,6 +626,14 @@ struct UNIT {
     double              a_due_gtime;                    /* due time (in instructions) for timer event */
     double              a_usec_delay;                   /* time delay for timer event */
 #endif
+    /* Everything above here in the UNIT structure is within the scope of the UDATA 
+       macro initializer, if a simulator developer wants to initialize any of these 
+       values, they must be done by explicit code usually in a device reset routine */
+    int32               wait;                           /* wait */
+    int32               u3;                             /* device specific */
+    int32               u4;                             /* device specific */
+    int32               u5;                             /* device specific */
+    int32               u6;                             /* device specific */
     };
 
 /* Unit flags */
@@ -911,7 +914,12 @@ struct MEMFILE {
 
  */
 
-#define UDATA(act,fl,cap) NULL,act,NULL,NULL,NULL,NULL,0,0,(fl),0,(cap),0,NULL,0,0
+#ifdef SIM_ASYNCH_IO
+#define UDATA(act,fl,cap) NULL,act,NULL,NULL,NULL,NULL,0,0,(fl),0,(cap),0,NULL,0,0,NULL,NULL,0,0,NULL,NULL,NULL,0,0,0,NULL,0,NULL,NULL,0,NULL,\
+                          NULL,NULL,NULL,0,NULL,0,0,0,0,0
+#else
+#define UDATA(act,fl,cap) NULL,act,NULL,NULL,NULL,NULL,0,0,(fl),0,(cap),0,NULL,0,0,NULL,NULL,0,0,NULL,NULL,NULL,0,0,0,NULL,0,NULL,NULL,0,NULL
+#endif
 
 /* Register initialization macros.
 
