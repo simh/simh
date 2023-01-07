@@ -6038,6 +6038,8 @@ if (sim_switches & SWMASK ('P')) {
         strlcat (prompt, " ", sizeof (prompt));
     if (sim_rem_cmd_active_line == -1) {
         cptr = read_line_p (prompt, cbuf, sizeof(cbuf), stdin);
+        if (cptr == NULL)
+            printf ("\n");
         if ((cptr == NULL) || (*cptr == 0))
             cptr = deflt;
         else
@@ -10869,6 +10871,8 @@ if (sim_switches & SWMASK ('N'))
 if (sim_rem_cmd_active_line != -1)
     return deflt;
 cptr = read_line_p (ques, cbuf, sizeof(cbuf), stdin);
+if (cptr == NULL)
+    printf ("\n");
 if ((cptr == NULL) || (*cptr == 0))
     return deflt;
 if ((*cptr == 'Y') || (*cptr == 'y'))
@@ -15489,9 +15493,7 @@ while (TRUE) {
         }
 
     if (!cptr) {                            /* EOF, exit help */
-#if !defined(_WIN32)
         printf ("\n");
-#endif
         break;
         }
 
