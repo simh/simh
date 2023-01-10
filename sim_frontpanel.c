@@ -822,8 +822,8 @@ else {
     fclose (fIn);
     fIn = NULL;
     fprintf (fOut, "set remote notelnet\n");
-    if (device_panel_count)
-        fprintf (fOut, "set remote connections=%d\n", (int)device_panel_count+1);
+    if ((device_panel_count != 0) || (debug_file != NULL))
+        fprintf (fOut, "set remote connections=%d\n", (int)(device_panel_count + 1 + ((debug_file != NULL) ? 1 : 0)));
     fprintf (fOut, "set remote -u telnet=%s\n", hostport);
     fprintf (fOut, "set remote master\n");
     fprintf (fOut, "exit\n");
@@ -1430,10 +1430,23 @@ if (usecs_between_callbacks && (0 == panel->usecs_between_callbacks)) { /* Need 
     pthread_cond_destroy (&panel->startup_done);
     }
 if ((usecs_between_callbacks == 0) && panel->usecs_between_callbacks) { /* Need to stop callbacks */
+    OperationalState PriorState = panel->State;                     /* record initial state */
     _panel_debug (panel, DBG_THR, "Shutting down callback thread", NULL, 0);
+
+    if (PriorState == Run) {                                        /* If running? */
+        pthread_mutex_unlock (&panel->io_lock);                     /* allow access */
+        sim_panel_exec_halt (panel);                                /* Stop for Now */
+        pthread_mutex_lock (&panel->io_lock);                       /* acquire access */
+        }
     panel->usecs_between_callbacks = 0;                             /* flag disabled */
     pthread_mutex_unlock (&panel->io_lock);                         /* allow access */
     pthread_join (panel->callback_thread, NULL);                    /* synchronize with thread rundown */
+
+    if (PriorState == Run) {                                        /* If was running? */
+        pthread_mutex_lock (&panel->io_lock);                       /* allow access */
+        sim_panel_exec_halt (panel);                                /* resume running */
+        pthread_mutex_unlock (&panel->io_lock);                     /* acquire access */
+        }
     pthread_mutex_lock (&panel->io_lock);                           /* reacquire access */
     }
 pthread_mutex_unlock (&panel->io_lock);

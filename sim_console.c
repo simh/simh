@@ -633,7 +633,7 @@ for (i=connections=0; i<sim_rem_con_tmxr.lines; i++) {
         continue;
     ++connections;
     if (connections == 1)
-        fprintf (st, "Remote Console Connections:\n");
+        fprintf (st, "\nRemote Console Connections:\n");
     tmxr_fconns (st, rem->lp, i);
     if (rem->read_timeout != sim_rem_read_timeout) {
         if (rem->read_timeout)
@@ -668,6 +668,7 @@ for (i=connections=0; i<sim_rem_con_tmxr.lines; i++) {
         fprintf (st, "\n");
         if (sim_switches & SWMASK ('D'))
             sim_rem_sample_output (st, rem->line);
+            fprintf (st, "\n");
         }
     }
 return SCPE_OK;
