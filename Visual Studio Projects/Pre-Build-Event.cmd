@@ -26,6 +26,15 @@ rem         repository commit id available in an include file during compiles.
 rem
 rem
 
+set _PDB=%~dpn1.pdb
+if exist "%_PDB%" del/q "%_PDB%"
+set _PDB=
+set _ARG=%~1
+set _TARGET=%RANDOM%
+if /i "%_ARG:~-4%" equ ".exe" set _TARGET=%~n1
+if /i "%_ARG:~-4%" equ ".exe" shift /1
+set _ARG=
+
 rem Everything implicitly requires BUILD to also be set to have 
 rem any meaning, it always gets set.
 set _X_BUILD=BUILD
@@ -35,13 +44,6 @@ echo _VC_VER=%_VC_VER%
 echo _MSVC_VER=%_MSVC_VER%
 echo _MSVC_TOOLSET_VER=%_MSVC_TOOLSET_VER%
 echo _MSVC_TOOLSET_DIR=%_MSVC_TOOLSET_DIR%
-
-set _PDB=%~dpn1.pdb
-if exist "%_PDB%" del/q "%_PDB%"
-set _PDB=
-set _ARG=%~1
-if /i "%_ARG:~-4%" equ ".exe" shift /1
-set _ARG=
 
 :_next_arg
 if "%1" == "" goto _done_args
@@ -456,7 +458,7 @@ exit /B 0
 call :WhichInPath cl.exe _VC_CL_
 for /f "tokens=3-10 delims=\" %%a in ("%_VC_CL_%") do call :VCCheck _VC_VER_NUM_ "%%a" "%%b" "%%c" "%%d" "%%e" "%%f" "%%g" "%%h"
 for /f "delims=." %%a in ("%_VC_VER_NUM_%") do set %1=%%a
-set _VC_CL_STDERR_=%TEMP%\cl_stderr%RANDOM%.tmp
+set _VC_CL_STDERR_=%TEMP%\cl_stderr%_TARGET%.tmp
 set VS_UNICODE_OUTPUT=
 "%_VC_CL_%" /? 2>"%_VC_CL_STDERR_%" 1>NUL 
 for /f "usebackq tokens=4-9" %%a in (`findstr Version "%_VC_CL_STDERR_%"`) do call :MSVCCheck _MSVC_VER_NUM_ "%%a" "%%b" "%%c" "%%d" "%%e"
