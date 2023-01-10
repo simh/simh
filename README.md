@@ -83,6 +83,14 @@ All Simulator updates on Open SIMH will be present in this repository, and any c
 - Github CI Actions builds of all simulators for Linux, macOS and Windows platforms.
 - All the available simulator defined environment variables are documented in the help and sim_doc document file.
 - SET CONSOLE TELNET=CONNECT will start a telnet session to the simulator console in a separate window.
+- Support for building on systems with the gameoftrees.org (got) source control system.
+- Frontpanel API improvements, document clarifications and bug fixes.
+- Added a SET CLOCK NOCALIBRATE mode.  
+    NOCALIBRATE mode allows all activity of a simulator run to occur with precisely consistent event timing.  In this mode, every clock tick takes precisely the same number of instructions/cycles.  Likewise, the polling activities for MUX or other poll oriented devices occurs after precisely the same number of instructions/cycles executed.  As a consequence of this mode, no effort to align simulated clock ticks (and simulated access to wall clock time) is made.  
+    
+    This mode will often be useful for running diagnostics which expect a particular relationship between perceived wall clock and instruction times.  It might also be useful for running test scripts which may want to compare output of previous executions to to current execution or to compare execution on arbitrarily different host computers.  
+    
+    In NOCALIBRATE mode, the operator gets to specify the pseudo execution rate along with the base wall clock time that access to pseudo wall clock accesses returns.
 
 #### Changes to the PDP-11 and VAX simulators also not in the Open SIMH repo
 
@@ -99,6 +107,7 @@ All Simulator updates on Open SIMH will be present in this repository, and any c
 - Properly name RQ extended units beyond the initial default units.
 - HELP CPU shows supported breakpoint types.
 - Add device support for DL11-C/DL11-D/DL11-E/DLV11-J in addition to the original KL11/DL11-A/DL11-B/DL11-E/DL11-F support.  These new devices have different bus address ranges and can coexist with the original DL devices.  The new devices are DLCJI and DLCJO and are managed identically to the original DLI and DLO devices.
+- All improvements and fixes to the PDP11 simulator from simh Version 3.12-3 release and beyond.
 
 ### All relevant changes in the simh v3.12-3 release have been merged into this repo
 
@@ -109,7 +118,7 @@ All Simulator updates on Open SIMH will be present in this repository, and any c
 
 ### New Simulators
 
-#### Seth Morabito has implemented a AT&T 3B2 simulator.
+#### Seth Morabito has implemented AT&T 3B2-400 and 3B2-700 simulators.
 
 #### Leonid Broukhis and Serge Vakulenko have implemented a simulator for the Soviet mainframe BESM-6 computer.
 
@@ -147,9 +156,9 @@ All Simulator updates on Open SIMH will be present in this repository, and any c
 
 #### Dave Bryan has implemented an HP-3000 Series III simulator.
 
-#### Updated AltairZ80 simulator from Peter Schorn.
-
 #### Updated HP2100 simulator from Dave Bryan.
+
+#### Updated AltairZ80 simulator from Peter Schorn.
 
 #### Sigma 5, 6 & 7 simulator from Bob Supnik
 
@@ -173,7 +182,7 @@ Support for Phase V DECnet connections on VAX Unibus and Qbus systems and the ad
 
 ### Simulator Front Panel API
 
-The sim_frontpanel API provides a programmatic interface to start and control any simulator without any special additions to the simulator code.
+The sim_frontpanel API provides a programmatic interface to start and control any simulator without any special additions to the simulator code or changes to the SCP framework.
 
 ### New Functionality
 

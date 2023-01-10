@@ -65,17 +65,18 @@
 # then GNU make should be invoked with TESTS=0 on the command 
 # line.
 #
-# The default build will compile all input source files into a
+# The default build will compile all input source files with a
 # single compile and link operation.  This is most optimal when
 # building all simulators or just a single simulator which you 
 # merely plan to run.  If you're developing new code for a 
 # simulator, it is more efficient to compile each source module
 # into it's own object and then to link all the objects into the
 # simulator binary.  This allows only the changed modules to be 
-# compiled instead of all of the input files.  GNU make can be
-# invoked with BUILD_SEPARATE=1 on the command line (or defined as
-# an exported environment variable) and separate objects will be
-# built and linked into the resulting simulator.
+# compiled instead of all of the input files resulting in much
+# quicker builds during active simulator development.  GNU make 
+# can be invoked with BUILD_SEPARATE=1 on the command line (or 
+# defined as an exported environment variable) and separate 
+# objects will be built and linked into the resulting simulator.
 #
 # The default make output will show the details of each compile 
 # and link command executed.  GNU make can be invoked with QUIET=1
@@ -90,9 +91,9 @@
 # simh project support is provided for simulators that are built with 
 # dependent packages provided with the or by the operating system 
 # distribution OR for platforms where that isn't directly available 
-# (OS X/macOS) by packages from specific package management systems (MacPorts 
-# or Homebrew).  Users wanting to build simulators with locally built 
-# dependent packages or packages provided by an unsupported package 
+# (OS X/macOS) by packages from specific package management systems 
+# (HomeBrew or MacPorts).  Users wanting to build simulators with locally 
+# built dependent packages or packages provided by an unsupported package 
 # management system may be able to override where this procedure looks 
 # for include files and/or libraries.  Overrides can be specified by define 
 # exported environment variables or GNU make command line arguments which 
