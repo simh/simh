@@ -311,7 +311,7 @@ while (p && p->Debug && (dbits & p->debug)) {
 
     clock_gettime(CLOCK_REALTIME, &time_now);
     sprintf (timestamp, "%lld.%03d ", (long long)(time_now.tv_sec), (int)(time_now.tv_nsec/1000000));
-    sprintf (threadname, "%s:%s ", p->parent ? p->device_name : "CPU", (pthread_getspecific (panel_thread_id)) ? (char *)pthread_getspecific (panel_thread_id) : ""); 
+    sprintf (threadname, "%s:%s ", p->parent ? p->device_name : "CPU", (pthread_getspecific (panel_thread_id)) ? (const char *)pthread_getspecific (panel_thread_id) : ""); 
     
     obuf[obufsize - 1] = '\0';
     len = vsnprintf (obuf, obufsize - 1, fmt, arglist);
@@ -434,8 +434,6 @@ while (p->sock != INVALID_SOCKET) {
     if (0 == (sleeps++)%flush_interval)
         sim_panel_flush_debug (p);
     }
-pthread_mutex_unlock (&p->io_lock);
-pthread_mutex_lock (&p->io_lock);
 pthread_setspecific (panel_thread_id, NULL);
 p->debugflush_thread_running  = 0;
 pthread_mutex_unlock (&p->io_lock);
@@ -478,11 +476,16 @@ int sent = 0;
 if (p->sock == INVALID_SOCKET)
     return sim_panel_set_error (p, "Invalid Socket for write");
 pthread_mutex_lock (&p->io_send_lock);
-while (len) {
+while ((len > 0) && (p->sock != INVALID_SOCKET)) {
     int bsent = sim_write_sock (p->sock, msg, len);
     if (bsent < 0) {
+        SOCKET sock = p->sock;
+
+        p->sock = INVALID_SOCKET;
+        sim_panel_set_error (NULL, "%s", sim_get_err_sock("Error writing to socket"));
+        sim_close_sock (sock);
         pthread_mutex_unlock (&p->io_send_lock);
-        return sim_panel_set_error (p, "%s", sim_get_err_sock("Error writing to socket"));
+        return -1;
         }
     _panel_debug (p, DBG_XMT, "Sent %d bytes: ", msg, bsent, bsent);
     len -= bsent;
@@ -671,9 +674,10 @@ static void
 _panel_register_panel (PANEL *p)
 {
 if (panel_count == 0)
-    pthread_key_create (&panel_thread_id, free);
+    pthread_key_create (&panel_thread_id, NULL);
 if (!pthread_getspecific (panel_thread_id))
     pthread_setspecific (panel_thread_id, p->device_name ? p->device_name : "PanelCreator");
+
 ++panel_count;
 panels = (PANEL **)realloc (panels, sizeof(*panels)*panel_count);
 panels[panel_count-1] = p;
@@ -1151,7 +1155,7 @@ OperationalState
 sim_panel_get_state (PANEL *panel)
 {
 if (!panel)
-    return Halt;
+    return Error;
 return panel->State;
 }
 
@@ -1444,7 +1448,7 @@ if ((usecs_between_callbacks == 0) && panel->usecs_between_callbacks) { /* Need 
 
     if (PriorState == Run) {                                        /* If was running? */
         pthread_mutex_lock (&panel->io_lock);                       /* allow access */
-        sim_panel_exec_halt (panel);                                /* resume running */
+        sim_panel_exec_run (panel);                                 /* resume running */
         pthread_mutex_unlock (&panel->io_lock);                     /* acquire access */
         }
     pthread_mutex_lock (&panel->io_lock);                           /* reacquire access */
@@ -2172,7 +2176,11 @@ if (!p->parent) {
         int new_data = sim_read_sock (p->sock, &buf[buf_data], sizeof(buf)-(buf_data+1));
 
         if (new_data <= 0) {
+            SOCKET sock = p->sock;
+
             sim_panel_set_error (NULL, "%s after reading %d bytes: %s", sim_get_err_sock("Unexpected socket read"), buf_data, buf);
+            p->sock = INVALID_SOCKET;
+            sim_close_sock (sock);
             _panel_debug (p, DBG_RCV, "%s", NULL, 0, sim_panel_get_error());
             p->State = Error;
             break;
@@ -2612,6 +2620,10 @@ int len;
 if (p) {
     pthread_mutex_lock (&p->io_lock);
     p->State = Error;
+    if (p->io_waiting) {
+        p->io_waiting = 0;
+        pthread_cond_signal (&p->io_done);
+        }
     pthread_mutex_unlock (&p->io_lock);
     }
 if (sim_panel_error_bufsize == 0) {
