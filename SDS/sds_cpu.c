@@ -1550,6 +1550,7 @@ sim_brk_dflt = SWMASK ('E');
 sim_brk_types = SWMASK ('E') | SWMASK ('M') | SWMASK ('N') | SWMASK ('U');
 sim_vm_is_subroutine_call = cpu_is_pc_a_subroutine_call;
 sim_vm_post = cpu_post_cmd;
+sim_set_stable_registers_state ();
 return SCPE_OK;
 }
 
@@ -1787,10 +1788,31 @@ if ((op == MIN && dat == 0) || (dat & SIGN))            /* set clk sync int */
 return SCPE_OK;
 }
 
+/*
+ * This sequence of instructions is a mix that hopefully
+ * represents a resonable instruction set that is a close 
+ * estimate to the normal calibrated result.
+ */
+
+static const char *sds_clock_precalibrate_commands[] = {
+    "100 NOP  100",
+    "101 NOP  200",
+    "102 NOP  300",
+    "103 NOP  400",
+    "104 BRU 100",
+    "105 EOM 02001",
+    "106 WIM 00077",
+    "107 DSC 0",
+    "110 HLT",
+    "111 BRU 100",
+    NULL};
+
+
 /* Clock reset */
 
 t_stat rtc_reset (DEVICE *dptr)
 {
+sim_clock_precalibrate_commands = sds_clock_precalibrate_commands;
 rtc_pie = 0;                                            /* disable pulse */
 rtc_unit.wait = sim_rtcn_init (rtc_unit.wait, TMR_RTC); /* initialize clock calibration */
 sim_activate (&rtc_unit, rtc_unit.wait);                /* activate unit */
