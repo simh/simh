@@ -2873,8 +2873,14 @@ for (tmr=0; tmr<=SIM_NTIMERS; tmr++) {
         }
     }
 
-if (sim_calb_tmr == SIM_NTIMERS)
-    sim_internal_timer_time = sim_activate_time (&SIM_INTERNAL_UNIT) - 1;
+if (sim_calb_tmr == SIM_NTIMERS) {
+    if (!sim_is_active (&SIM_INTERNAL_UNIT))
+        sim_debug (DBG_QUE, &sim_timer_dev, "sim_stop_timer_services() - Unexpected - Internal timer(%d) %s is set but not queued for ticks\n", sim_calb_tmr, sim_uname (&SIM_INTERNAL_UNIT));
+    else {
+        sim_internal_timer_time = sim_activate_time (&SIM_INTERNAL_UNIT) - 1;
+        sim_debug (DBG_QUE, &sim_timer_dev, "sim_stop_timer_services() - Internal timer(%d) %s queued after %d\n", sim_calb_tmr, sim_uname (&SIM_INTERNAL_UNIT), sim_internal_timer_time);
+        }
+    }
 sim_cancel (&SIM_INTERNAL_UNIT);                    /* Make sure Internal Timer is stopped */
 sim_cancel (&sim_timer_units[SIM_NTIMERS]);
 sim_calb_tmr_last = sim_calb_tmr;                   /* Save calibrated timer value for display */
