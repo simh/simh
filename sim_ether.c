@@ -1782,17 +1782,19 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, const char *devname, int set_on)
         "ifconfig %.*s up 2>/dev/null", 
         NULL};
     const char *patterns[] = {
-        "ip link show %.*s 2>/dev/null | grep [0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]",
-        "ip link show %.*s 2>/dev/null | egrep [0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]",
-        "ifconfig %.*s 2>/dev/null | grep [0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]",
-        "ifconfig %.*s 2>/dev/null | egrep [0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]",
+        "ip link show %.*s 2>/dev/null | grep [0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F] 2>/dev/null",
+        "ip link show %.*s 2>/dev/null | egrep [0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F] 2>/dev/null",
+        "ip link show %.*s 2>/dev/null | grep -E [0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F] 2>/dev/null",
+        "ifconfig %.*s 2>/dev/null | grep [0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F] 2>/dev/null",
+        "ifconfig %.*s 2>/dev/null | egrep [0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F] 2>/dev/null",
+        "ifconfig %.*s 2>/dev/null | grep -E [0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F] 2>/dev/null",
         NULL};
 
     memset(command, 0, sizeof(command));
     if (set_on) {
       /* try to force an otherwise unused interface to be turned on */
       for (i=0; turnon[i]; ++i) {
-        snprintf(command, sizeof(command), turnon[i], (int)(sizeof(command) - (2 + strlen(patterns[i]))), devname);
+        snprintf(command, sizeof(command), turnon[i], (int)(sizeof(command) - (2 + strlen(turnon[i]))), devname);
         get_glyph_nc (command, tool, 0);
         if (sim_get_tool_path (tool)[0]) {
           if (NULL != (f = popen(command, "r")))
@@ -1812,7 +1814,7 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, const char *devname, int set_on)
               p1 = strchr(command, ':');
               while (p1) {
                 p2 = strchr(p1+1, ':');
-                if (p2 <= p1+3) {
+                if (p2 <= p1+3) {                                                                                                               
                   unsigned int mac_bytes[6];
                   if (6 == sscanf(p1-2, "%02x:%02x:%02x:%02x:%02x:%02x", &mac_bytes[0], &mac_bytes[1], &mac_bytes[2], &mac_bytes[3], &mac_bytes[4], &mac_bytes[5])) {
                     dev->host_nic_phy_hw_addr[0] = mac_bytes[0];
