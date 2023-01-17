@@ -921,6 +921,7 @@ while (isspace(cbuf[0]))
     memmove (cbuf, cbuf+1, strlen(cbuf+1)+1);   /* skip leading whitespace */
 sim_sub_args (cbuf, sizeof(cbuf), argv);
 cptr = cbuf;
+sim_debug (DBG_CMD, &sim_remote_console, "Processing Command: %s\n", cptr);
 cptr = get_glyph (cptr, gbuf, 0);               /* get command glyph */
 sim_rem_active_command = find_cmd (gbuf);       /* find command */
 
@@ -1865,8 +1866,9 @@ if (sim_rem_cmd_active_line != -1) {
         else
             sim_activate(uptr, steps);                      /* check again after 'steps' instructions */
         }
-    else
+    else {
         return SCPE_REMOTE;                                 /* force sim_instr() to exit to process command */
+        }
     }
 else
     sim_activate_after(uptr, 100000);                       /* check again in 100 milliaeconds */
@@ -1984,17 +1986,25 @@ memset (sim_remote_console.units, 0, sizeof(*sim_remote_console.units)*((2 * lin
 sim_remote_console.numunits = (2 * lines) + REM_CON_BASE_UNITS;
 rem_con_poll_unit->action = &sim_rem_con_poll_svc;/* remote console connection polling unit */
 rem_con_poll_unit->flags |= UNIT_IDLE;
+sim_set_uname (rem_con_poll_unit, "REM-CON-POLL");
 rem_con_data_unit->action = &sim_rem_con_data_svc;/* console data handling unit */
 rem_con_data_unit->flags |= UNIT_IDLE|UNIT_DIS;
+sim_set_uname (rem_con_data_unit, "REM-CON-DATA");
 sim_rem_consoles = (REMOTE *)realloc (sim_rem_consoles, sizeof(*sim_rem_consoles)*lines);
 memset (sim_rem_consoles, 0, sizeof(*sim_rem_consoles)*lines);
 sim_rem_command_buf = (char *)realloc (sim_rem_command_buf, 4*CBUFSIZE+1);
 memset (sim_rem_command_buf, 0, 4*CBUFSIZE+1);
 for (i=0; i<lines; i++) {
+    char uname[32];
+
     rem_con_repeat_units[i].flags = UNIT_DIS;
     rem_con_repeat_units[i].action = &sim_rem_con_repeat_svc;
+    snprintf (uname, sizeof (uname), "%s-REP%d", sim_remote_console.name, i);
+    sim_set_uname (&rem_con_repeat_units[i], uname);
     rem_con_smp_smpl_units[i].flags = UNIT_DIS;
     rem_con_smp_smpl_units[i].action = &sim_rem_con_smp_collect_svc;
+    snprintf (uname, sizeof (uname), "%s-SMP%d", sim_remote_console.name, i);
+    sim_set_uname (&rem_con_repeat_units[i], uname);
     rem = &sim_rem_consoles[i];
     rem->line = i;
     rem->lp = &sim_rem_con_tmxr.ldsc[i];
