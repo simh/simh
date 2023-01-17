@@ -94,6 +94,15 @@ int update_display = 1;
 
 int debug = 0;
 
+/*
+ * Startup sleep is useful when running the simulator in a background 
+ * context.  The sleep allows you to reach into that background process 
+ * and attach a debugger while it is sleeping before things get going 
+ * in all aspects of the simulator's execution.  This will then allow 
+ * full debugging for any simulator activity while also debugging the
+ * front panel.
+ */
+int startup_sleep = 0;
 
 static void
 DisplayCallback (PANEL *panel, unsigned long long sim_time, void *context)
@@ -108,6 +117,8 @@ DisplayRegisters (PANEL *panel, int get_pos, int set_pos)
 char buf1[100], buf2[100], buf3[100], buf4[100];
 static const char *states[] = {"Halt", "Run "};
 
+if (panel == NULL)
+    return;
 buf1[sizeof(buf1)-1] = buf2[sizeof(buf2)-1] = buf3[sizeof(buf3)-1] = buf4[sizeof(buf4)-1] = 0;
 sprintf (buf1, "%4s PC: %08X   SP: %08X   AP: %08X   FP: %08X  @PC: %08X\n", states[sim_panel_get_state (panel)], PC, SP, AP, FP, atPC);
 sprintf (buf2, "PSL: %08X                               Instructions Executed: %lld\n", PSL, simulation_time);
@@ -217,8 +228,10 @@ FILE *f;
 /* Create pseudo config file for a test */
 if ((f = fopen (sim_config, "w"))) {
     if (debug) {
+        if (startup_sleep)
+            fprintf (f, "sleep 20s\n");
         fprintf (f, "set verbose\n");
-        fprintf (f, "set debug -n -a -p simulator.dbg\n");
+        fprintf (f, "set debug -n -a -p -f simulator.dbg\n");
         fprintf (f, "set cpu simhalt\n");
         fprintf (f, "set remote telnet=2226\n");
         fprintf (f, "set rem-con debug=XMT;RCV;MODE;REPEAT;CMD\n");
@@ -658,15 +671,28 @@ main (int argc, char **argv)
 int was_halted = 1, i;
 char *c;
 
-if ((argc > 1) && ((!strcmp("-d", argv[1])) || (!strcmp("-D", argv[1])) || (!strcmp("-debug", argv[1]))))
-    debug = 1;
-
+/* Locate the vax simulator binary */
 sim_path = strcpy ((char *)malloc (strlen (argv[0]) + 10), argv[0]);
 c = strrchr (sim_path, '/');
 if (c == NULL)
     c = strrchr (sim_path, '\\');
-strcpy (c + 1, "vax");
+if (c == NULL)
+    strcpy (sim_path, "vax");
+else
+    strcpy (c + 1, "vax");
 
+/* process potential arguments */
+while (--argc) {
+    ++argv;
+    if ((!strcmp("-d", argv[0])) || (!strcmp("-D", argv[0])) || (!strcmp("-debug", argv[0]))) {
+        debug = 1;
+        continue;
+        }
+    if ((!strcmp("-s", argv[0])) || (!strcmp("-S", argv[0])) || (!strcmp("-sleep", argv[0]))) {
+        startup_sleep = 1;
+        continue;
+        }
+    }
 
 
 if (panel_setup())
