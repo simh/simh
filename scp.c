@@ -2890,7 +2890,7 @@ if (argc > 1) {                                         /* Check for special arg
         --argc;
         }
     }
-if (argc > 1) {                                         /* Check for special argument to invoke register test */
+if (argc > 1) {                                         /* Check for special argument to invoke device unit tests */
     if (sim_strcasecmp (argv[1], "DeviceUnitTests") == 0) {
         device_unit_tests = TRUE;
         /* Remove special argument to avoid confusion later */
@@ -9695,6 +9695,7 @@ do {
         r = sim_instr();
         if (r != SCPE_REMOTE)
             break;
+        UPDATE_SIM_TIME;
         sim_remote_process_command ();                  /* Process the command and resume processing */
         }
     if ((flag != RU_NEXT) ||                            /* done if not doing NEXT */
@@ -12465,7 +12466,7 @@ UPDATE_SIM_TIME;                                        /* update sim time */
 sim_debug (SIM_DBG_ACTIVATE, &sim_scp_dev, "Activating %s delay=%d\n", sim_uname (uptr), event_time);
 
 /* event_time being -1 is a special case which specifically pushes the */
-/* specified unit at the head of the event queue */
+/* specified unit at the head of the event queue to run immediately */
 if (event_time == -1) {
     uptr->time = 0;
     uptr->next = sim_clock_queue;
@@ -14005,6 +14006,8 @@ void _sim_scp_abort (const char *msg, const char *file, int linenum)
 {
 sim_printf ("%s - aborting from %s:%d\n", msg, file, linenum);
 sim_flush_buffered_files ();
+if (sim_deb)
+    fclose (sim_deb);
 abort ();
 }
 
