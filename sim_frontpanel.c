@@ -100,6 +100,9 @@ while (isspace(szMsgBuffer[strlen(szMsgBuffer)-1]))
     szMsgBuffer[strlen(szMsgBuffer)-1] = '\0';
 return szMsgBuffer;
 }
+
+#define SET_THREAD_NAME(name) pthread_setname_np (pthread_self(), name)
+
 #else /* NOT _WIN32 */
 #include <unistd.h>
 #define msleep(n) usleep(1000*n)
@@ -135,6 +138,16 @@ return 0;
 }
 #endif /* defined(NEED_CLOCK_GETTIME) */
 #endif /* !defined(CLOCK_REALTIME) && !defined(__hpux) */
+
+#if (defined(__linux) || defined(__linux__))
+#define SET_THREAD_NAME(name) pthread_setname_np (pthread_self(), name)
+#else
+#if defined(__APPLE__)
+#define SET_THREAD_NAME(name) pthread_setname_np (name)
+#else
+#define SET_THREAD_NAME(name) 
+#endif
+#endif
 
 #endif /* NOT _WIN32 */
 
@@ -420,6 +433,7 @@ int flush_interval = 15;
 int sleeps = 0;
 
 pthread_setspecific (panel_thread_id, "debugflush");
+SET_THREAD_NAME("debugflush");
 
 pthread_mutex_lock (&p->io_lock);
 p->debugflush_thread_running = 1;
@@ -675,8 +689,10 @@ _panel_register_panel (PANEL *p)
 {
 if (panel_count == 0)
     pthread_key_create (&panel_thread_id, NULL);
-if (!pthread_getspecific (panel_thread_id))
+if (!pthread_getspecific (panel_thread_id)) {
     pthread_setspecific (panel_thread_id, p->device_name ? p->device_name : "PanelCreator");
+    SET_THREAD_NAME ("PanelCreator");
+    }
 
 ++panel_count;
 panels = (PANEL **)realloc (panels, sizeof(*panels)*panel_count);
@@ -884,7 +900,7 @@ if (!simulator_panel) {
         p->dwProcessId = ProcessInfo.dwProcessId;
         }
     else { /* Creation Problem */
-        sim_panel_set_error (NULL, "CreateProcess Error: %d", GetErrorText(GetLastError()));
+        sim_panel_set_error (NULL, "CreateProcess Error: %s - %d", cmd, GetErrorText(GetLastError()));
         goto Error_Return;
         }
 #else
@@ -925,9 +941,30 @@ if (p->sock == INVALID_SOCKET) {
     goto Error_Return;
     }
 _panel_debug (p, DBG_XMT|DBG_RCV, "Connected to simulator on %s after %dms", NULL, 0, p->hostport, (int)i*100);
-pthread_mutex_init (&p->io_lock, NULL);
-pthread_mutex_init (&p->io_send_lock, NULL);
-pthread_mutex_init (&p->io_command_lock, NULL);
+if (1) {
+    pthread_mutexattr_t attr;
+    pthread_mutexattr_t *mattr = NULL;
+
+    /*
+     * Error check mutexes are slightly slower, but useful to help 
+     * untangle deadlock situations.  The mutex access APIs used here 
+     * don't check error status since they're presumed to be well 
+     * organized and thus won't encounter deadlocks.  If deadlocks 
+     * occur, then it is easy enough to put OS breakpoints at all 
+     * the error paths through the mutex lock and unlock code to find 
+     * these cases.
+     */
+    if (debug_file) {
+        pthread_mutexattr_init (&attr);
+        pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK);
+        mattr = &attr;
+        }
+    pthread_mutex_init (&p->io_lock, mattr);
+    pthread_mutex_init (&p->io_send_lock, mattr);
+    pthread_mutex_init (&p->io_command_lock, mattr);
+    if (debug_file)
+        pthread_mutexattr_destroy (&attr);
+    }
 pthread_cond_init (&p->io_done, NULL);
 pthread_cond_init (&p->startup_done, NULL);
 if (sizeof(mantra) != _panel_send (p, (char *)mantra, sizeof(mantra))) {
@@ -1445,13 +1482,13 @@ if ((usecs_between_callbacks == 0) && panel->usecs_between_callbacks) { /* Need 
     panel->usecs_between_callbacks = 0;                             /* flag disabled */
     pthread_mutex_unlock (&panel->io_lock);                         /* allow access */
     pthread_join (panel->callback_thread, NULL);                    /* synchronize with thread rundown */
+    pthread_mutex_lock (&panel->io_lock);                           /* reacquire access */
 
     if (PriorState == Run) {                                        /* If was running? */
-        pthread_mutex_lock (&panel->io_lock);                       /* allow access */
+        pthread_mutex_unlock (&panel->io_lock);                     /* allow access */
         sim_panel_exec_run (panel);                                 /* resume running */
-        pthread_mutex_unlock (&panel->io_lock);                     /* acquire access */
+        pthread_mutex_lock (&panel->io_lock);                       /* acquire access */
         }
-    pthread_mutex_lock (&panel->io_lock);                           /* reacquire access */
     }
 pthread_mutex_unlock (&panel->io_lock);
 return 0;
@@ -2070,7 +2107,7 @@ return 0;
    sim_panel_mount
 
         device      the name of a simulator device/unit
-        switches    any switches appropriate for the desire attach
+        switches    any switches appropriate for the desire attach (can be NULL)
         path        the path on the local system to be attached
 
  */
@@ -2093,7 +2130,7 @@ OrigState = panel->State;
 if (OrigState == Run)
     sim_panel_exec_halt (panel);
 do {
-    if (_panel_sendf (panel, &cmd_stat, &response, "ATTACH %s %s %s", switches, device, path)) {
+    if (_panel_sendf (panel, &cmd_stat, &response, "ATTACH %s %s %s", (switches == NULL) ? "" : switches, device, path)) {
         stat = -1;
         break;
         }
@@ -2167,6 +2204,7 @@ pthread_getschedparam (pthread_self(), &sched_policy, &sched_priority);
 ++sched_priority.sched_priority;
 pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
 pthread_setspecific (panel_thread_id, "reader");
+SET_THREAD_NAME ("reader");
 _panel_debug (p, DBG_THR, "Starting", NULL, 0);
 
 buf[buf_data] = '\0';
@@ -2501,6 +2539,7 @@ pthread_getschedparam (pthread_self(), &sched_policy, &sched_priority);
 ++sched_priority.sched_priority;
 pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
 pthread_setspecific (panel_thread_id, "callback");
+SET_THREAD_NAME ("callback");
 _panel_debug (p, DBG_THR, "Starting", NULL, 0);
 
 pthread_mutex_lock (&p->io_lock);
