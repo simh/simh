@@ -174,6 +174,7 @@ static t_stat cpu_ex(t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 static t_stat cpu_dep(t_value val, t_addr addr, UNIT *uptr, int32 sw);
 static t_stat cpu_reset(DEVICE *dptr);
 static t_bool cpu_is_pc_a_subroutine_call (t_addr **ret_addrs);
+static t_stat cpu_hex_load(FILE *fileref, CONST char *cptr, CONST char *fnam, int flag);
 static t_stat sim_instr_mmu(void);
 static uint32 GetBYTE(register uint32 Addr);
 static void PutWORD(register uint32 Addr, const register uint32 Value);
@@ -7244,6 +7245,8 @@ t_stat sim_load(FILE *fileref, CONST char *cptr, CONST char *fnam, int flag) {
     char gbuf[CBUFSIZE];
     if (chiptype == CHIP_TYPE_M68K)
         return sim_load_m68k(fileref, cptr, fnam, flag);
+    if (sim_switches & SWMASK ('H'))
+        return cpu_hex_load(fileref, cptr, fnam, flag);
     if (flag) {
         result = get_range(NULL, cptr, &lo, &hi, 16, ADDRMASKEXTENDED, 0);
         if (result == NULL)
@@ -7298,6 +7301,68 @@ t_stat sim_load(FILE *fileref, CONST char *cptr, CONST char *fnam, int flag) {
             sim_printf("Warning: %d page%s modified.\n", PLURAL(pagesModified));
     }
     return SCPE_OK;
+}
+
+/* cpu_hex_load will load an Intel hex file into RAM.
+   Based on HEX2BIN by Mike Douglas
+   https://deramp.com/downloads/misc_software/hex-binary utilities for the PC/
+*/
+static t_stat cpu_hex_load(FILE *fileref, CONST char *cptr, CONST char *fnam, int flag) {
+    char linebuf[1024], datastr[1024], *bufptr;
+    int32 bytecnt, rectype, databyte, chksum, line = 0, cnt = 0;
+    t_addr addr, org = 0;
+
+    while (!feof(fileref)) {
+        if (fgets(linebuf, sizeof(linebuf), fileref) == NULL)
+            break;
+
+        line++;
+
+        /* Strip EOL characters */
+        if ((bufptr = strchr(linebuf, '\r')) != NULL) {
+            *bufptr = '\0';
+        }
+        if ((bufptr = strchr(linebuf, '\n')) != NULL) {
+            *bufptr = '\0';
+        }
+
+        if (strlen(linebuf) == 0)
+            continue;
+
+        if (sscanf(linebuf, ":%2x%4x%2x%s", &bytecnt, &addr, &rectype, datastr) != 4) {
+            return sim_messagef(SCPE_IERR, "Hex file format error at line %d\n", line);
+        }
+        chksum = bytecnt + (addr >> 8) + (addr & 0xff) + rectype;
+
+        bufptr = datastr;
+
+        if ((rectype == 0) && (bytecnt > 0) && (addr+bytecnt <= MAXMEMORY)) {
+            if (cnt == 0)
+                org = addr;
+
+            do {
+                if (sscanf(bufptr, "%2x", &databyte) != 1) {
+                    return sim_messagef(SCPE_IERR, "Hex file format error at line %d\n", line);
+                }
+                bufptr += 2;
+
+                PutBYTE(addr++, databyte);
+
+                chksum += databyte;
+                cnt++;
+            } while (--bytecnt != 0);
+
+            if (sscanf(bufptr, "%2x", &databyte) != 1) {            /* checksum byte */
+                return sim_messagef(SCPE_IERR, "Hex file format error at line %d\n", line);
+            }
+
+            if (0 != ((chksum+databyte) & 0xff)) {
+                return sim_messagef(SCPE_IERR, "Checksum error at line %d\n   %s\n", line, linebuf);
+            }
+        }
+    }
+
+    return sim_messagef(SCPE_OK, "%d byte%s loaded at %x.\n", PLURAL(cnt), org);
 }
 
 void cpu_raise_interrupt(uint32 irq) {
