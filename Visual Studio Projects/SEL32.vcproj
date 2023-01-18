@@ -7,11 +7,11 @@
 	RootNamespace="SEL32"
 	Keyword="Win32Proj"
 	TargetFrameworkVersion="131072"
-	>  
+	>
 	<Platforms>
 		<Platform
 			Name="Win32"
-		/>  
+		/>
 	</Platforms>
 	<ToolFiles>
 	</ToolFiles>
@@ -22,21 +22,21 @@
 			IntermediateDirectory="..\BIN\NT\Project\simh\$(ProjectName)\$(PlatformName)-$(ConfigurationName)"
 			ConfigurationType="1"
 			CharacterSet="0"
-			>  
+			>
 			<Tool
 				Name="VCPreBuildEventTool"
 				Description="Check for required build dependencies &amp; git commit id"
 				CommandLine="Pre-Build-Event.cmd &quot;$(TargetDir)$(TargetName).exe&quot; LIBPCRE BUILD LIBSDL"
-			/>  
+			/>
 			<Tool
 				Name="VCCustomBuildTool"
-			/>  
+			/>
 			<Tool
 				Name="VCXMLDataGeneratorTool"
-			/>  
+			/>
 			<Tool
 				Name="VCMIDLTool"
-			/>  
+			/>
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
@@ -51,16 +51,16 @@
 				DebugInformationFormat="3"
 				CompileAs="1"
 				ShowIncludes="false"
-			/>  
+			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
-			/>  
+			/>
 			<Tool
 				Name="VCResourceCompilerTool"
-			/>  
+			/>
 			<Tool
 				Name="VCPreLinkEventTool"
-			/>  
+			/>
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions="/fixed:no"
@@ -74,30 +74,30 @@
 				RandomizedBaseAddress="1"
 				DataExecutionPrevention="0"
 				TargetMachine="1"
-			/>  
+			/>
 			<Tool
 				Name="VCALinkTool"
-			/>  
+			/>
 			<Tool
 				Name="VCManifestTool"
-			/>  
+			/>
 			<Tool
 				Name="VCXDCMakeTool"
-			/>  
+			/>
 			<Tool
 				Name="VCBscMakeTool"
-			/>  
+			/>
 			<Tool
 				Name="VCFxCopTool"
-			/>  
+			/>
 			<Tool
 				Name="VCAppVerifierTool"
-			/>  
+			/>
 			<Tool
 				Name="VCPostBuildEventTool"
 				Description="Running Available Tests"
 				CommandLine="Post-Build-Event.cmd SEL32 &quot;$(TargetDir)$(TargetName).exe&quot;"
-			/>  
+			/>
 		</Configuration>
 		<Configuration
 			Name="Release|Win32"
@@ -105,21 +105,21 @@
 			IntermediateDirectory="..\BIN\NT\Project\simh\$(ProjectName)\$(PlatformName)-$(ConfigurationName)"
 			ConfigurationType="1"
 			CharacterSet="0"
-			>  
+			>
 			<Tool
 				Name="VCPreBuildEventTool"
 				Description="Check for required build dependencies &amp; git commit id"
 				CommandLine="Pre-Build-Event.cmd &quot;$(TargetDir)$(TargetName).exe&quot; LIBPCRE BUILD LIBSDL"
-			/>  
+			/>
 			<Tool
 				Name="VCCustomBuildTool"
-			/>  
+			/>
 			<Tool
 				Name="VCXMLDataGeneratorTool"
-			/>  
+			/>
 			<Tool
 				Name="VCMIDLTool"
-			/>  
+			/>
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="2"
@@ -139,16 +139,16 @@
 				WarnAsError="true"
 				DebugInformationFormat="3"
 				CompileAs="1"
-			/>  
+			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
-			/>  
+			/>
 			<Tool
 				Name="VCResourceCompilerTool"
-			/>  
+			/>
 			<Tool
 				Name="VCPreLinkEventTool"
-			/>  
+			/>
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions="/fixed:no"
@@ -165,30 +165,30 @@
 				RandomizedBaseAddress="1"
 				DataExecutionPrevention="0"
 				TargetMachine="1"
-			/>  
+			/>
 			<Tool
 				Name="VCALinkTool"
-			/>  
+			/>
 			<Tool
 				Name="VCManifestTool"
-			/>  
+			/>
 			<Tool
 				Name="VCXDCMakeTool"
-			/>  
+			/>
 			<Tool
 				Name="VCBscMakeTool"
-			/>  
+			/>
 			<Tool
 				Name="VCFxCopTool"
-			/>  
+			/>
 			<Tool
 				Name="VCAppVerifierTool"
-			/>  
+			/>
 			<Tool
 				Name="VCPostBuildEventTool"
 				Description="Running Available Tests"
 				CommandLine="Post-Build-Event.cmd SEL32 &quot;$(TargetDir)$(TargetName).exe&quot;"
-			/>  
+			/>
 		</Configuration>
 	</Configurations>
 	<References>
@@ -197,137 +197,137 @@
 		<Filter
 			Name="Source Files"
 			Filter="cpp;c;cxx;def;odl;idl;hpj;bat;asm"
-			>  
+			>
+			<File
+				RelativePath="..\..\windows-build\pthreads\pthread.c"
+				>
+				<FileConfiguration
+					Name="Debug|Win32"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+						PreprocessorDefinitions="HAVE_CONFIG_H;PTW32_BUILD_INLINED;PTW32_STATIC_LIB;__CLEANUP_C;$(NOINHERIT)"
+						CompileAs="1"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+						WholeProgramOptimization="false"
+						PreprocessorDefinitions="HAVE_CONFIG_H;PTW32_BUILD_INLINED;PTW32_STATIC_LIB;__CLEANUP_C;$(NOINHERIT)"
+						CompileAs="1"
+					/>
+				</FileConfiguration>
+			</File>
 			<File
 				RelativePath="..\scp.c"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\SEL32\sel32_chan.c"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\SEL32\sel32_clk.c"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\SEL32\sel32_com.c"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\SEL32\sel32_con.c"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\SEL32\sel32_cpu.c"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\SEL32\sel32_disk.c"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\SEL32\sel32_ec.c"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\SEL32\sel32_fltpt.c"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\SEL32\sel32_hsdp.c"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\SEL32\sel32_iop.c"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\SEL32\sel32_lpr.c"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\SEL32\sel32_mfp.c"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\SEL32\sel32_mt.c"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\SEL32\sel32_scfi.c"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\SEL32\sel32_scsi.c"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\SEL32\sel32_sys.c"
-				>  
+				>
 			</File>
- 			<File
- 				RelativePath="..\..\windows-build\pthreads\pthread.c"
- 				>
- 				<FileConfiguration
- 					Name="Debug|Win32"
- 					>
- 					<Tool
- 						Name="VCCLCompilerTool"
- 						PreprocessorDefinitions="HAVE_CONFIG_H;PTW32_BUILD_INLINED;PTW32_STATIC_LIB;__CLEANUP_C;$(NOINHERIT)"
- 						CompileAs="1"
- 					/>
- 				</FileConfiguration>
- 				<FileConfiguration
- 					Name="Release|Win32"
- 					>
- 					<Tool
- 						Name="VCCLCompilerTool"
- 						WholeProgramOptimization="false"
- 						PreprocessorDefinitions="HAVE_CONFIG_H;PTW32_BUILD_INLINED;PTW32_STATIC_LIB;__CLEANUP_C;$(NOINHERIT)"
- 						CompileAs="1"
- 					/>
- 				</FileConfiguration>
- 			</File>
 			<File
 				RelativePath="..\sim_console.c"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\sim_disk.c"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\sim_ether.c"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\sim_fio.c"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\sim_serial.c"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\sim_sock.c"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\sim_tape.c"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\sim_timer.c"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\sim_tmxr.c"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\sim_video.c"
-				>  
+				>
 			</File>
 			<Filter
 				Name="slirp"
@@ -561,68 +561,68 @@
 		<Filter
 			Name="Header Files"
 			Filter="h;hpp;hxx;hm;inl;inc"
-			>  
+			>
 			<File
 				RelativePath="..\scp.h"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\SEL32\sel32_defs.h"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\sim_console.h"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\sim_defs.h"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\sim_disk.h"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\sim_ether.h"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\sim_fio.h"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\sim_rev.h"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\sim_serial.h"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\sim_sock.h"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\sim_tape.h"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\sim_timer.h"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\sim_tmxr.h"
-				>  
+				>
 			</File>
 			<File
 				RelativePath="..\sim_video.h"
-				>  
+				>
 			</File>
 		</Filter>
 		<Filter
 			Name="Resource Files"
 			Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe"
-			>  
+			>
 		</Filter>
 	</Files>
 	<Globals>
