@@ -577,8 +577,10 @@ DIB imp_dib = {IMP_DEVNUM, 1, &imp_devio,
 MTAB imp_mod[] = {
     { MTAB_XTD|MTAB_VDV|MTAB_VALR|MTAB_NC, 0, "MAC", "MAC=xx:xx:xx:xx:xx:xx",
       &imp_set_mac, &imp_show_mac, NULL, "MAC address" },
+#if MPX_DEV
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "MPX", "MPX",
       &imp_set_mpx, &imp_show_mpx, NULL, "ITS Interrupt Channel #"},
+#endif
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "IP", "IP=ddd.ddd.ddd.ddd/dd",
       &imp_set_ip, &imp_show_ip, NULL, "IP address" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "GW", "GW=ddd.ddd.ddd.ddd",
@@ -612,13 +614,13 @@ MTAB imp_mod[] = {
       &imp_set_arp, NULL, NULL, "Create a static ARP Entry" },
 #if KS
     {MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "addr", "addr",  &uba_set_addr, uba_show_addr,
-            NULL, "Sets address of CH11" },
+            NULL, "Sets address of IMP11" },
     {MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "vect", "vect",  &uba_set_vect, uba_show_vect,
-            NULL, "Sets vect of CH11" },
+            NULL, "Sets vect of IMP11" },
     {MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "br", "br",  &uba_set_br, uba_show_br,
-            NULL, "Sets br of CH11" },
+            NULL, "Sets br of IMP11" },
     {MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "ctl", "ctl",  &uba_set_ctl, uba_show_ctl,
-            NULL, "Sets uba of CH11" },
+            NULL, "Sets uba of IMP11" },
 #endif
     { 0 }
     };
@@ -1314,10 +1316,10 @@ t_stat imp_eth_srv(UNIT * uptr)
 #else
               imp_data.rbuffer[0] = 0x4;
 #endif
-              imp_data.rbuffer[1] = (ntohl(imp_data.ip) >> 24) & 0xff;
-              imp_data.rbuffer[5] = (ntohl(imp_data.ip) >> 16) & 0xff;
-              imp_data.rbuffer[6] = (ntohl(imp_data.ip) >> 8) & 0xff;
-              imp_data.rbuffer[7] = ntohl(imp_data.ip) & 0xff;
+              imp_data.rbuffer[1] = (ntohl(imp_data.hostip) >> 24) & 0xff;
+              imp_data.rbuffer[5] = (ntohl(imp_data.hostip) >> 16) & 0xff;
+              imp_data.rbuffer[6] = (ntohl(imp_data.hostip) >> 8) & 0xff;
+              imp_data.rbuffer[7] = ntohl(imp_data.hostip) & 0xff;
               imp_unit[0].STATUS |= IMPIB;
               imp_unit[0].IPOS = 0;
               imp_unit[0].ILEN = 12*8;
@@ -1473,12 +1475,12 @@ imp_packet_in(struct imp_device *imp)
                    checksumadjust((uint8 *)&tcp_hdr->chksum,
                               (uint8 *)(&ip_hdr->ip_dst), sizeof(in_addr_T),
                               (uint8 *)(&imp_data.hostip), sizeof(in_addr_T));
-                   if ((ntohs(tcp_hdr->flags) & 0x10) != 0) {
+                   if ((ntohs(tcp_hdr->flags) & TCP_FL_ACK) != 0) {
                        for (n = 0; n < 64; n++) {
                            if (imp->port_map[n].sport == sport &&
                                imp->port_map[n].dport == dport) {
                                /* Check if SYN */
-                               if (ntohs(tcp_hdr->flags) & 02) {
+                               if (ntohs(tcp_hdr->flags) & TCP_FL_SYN) {
                                    imp->port_map[n].sport = 0;
                                    imp->port_map[n].dport = 0;
                                    imp->port_map[n].adj = 0;
@@ -1492,13 +1494,13 @@ imp_packet_in(struct imp_device *imp)
                                        tcp_hdr->ack = new_seq;
                                    }
                                }
-                               if (ntohs(tcp_hdr->flags) & 01)
+                               if (ntohs(tcp_hdr->flags) & TCP_FL_FIN)
                                    imp->port_map[n].cls_tim = 100;
                                break;
                            }
                        }
                     }
-                    /* Check if recieving to FTP */
+                    /* Check if receiving to FTP */
                     if (sport == 21 && strncmp((CONST char *)&tcp_payload[0], "PORT ", 5) == 0) {
                         /* We need to translate the IP address to new port number. */
                         int     l = ntohs(ip_hdr->ip_len) - thl - hl;
@@ -1524,7 +1526,7 @@ imp_packet_in(struct imp_device *imp)
                        port_buffer[nlen] = '\0';
                        memcpy(tcp_payload, port_buffer, nlen);
                        /* Check if we need to update the sequence numbers */
-                       if (nlen != l && (ntohs(tcp_hdr->flags) & 02) == 0) {
+                       if (nlen != l && (ntohs(tcp_hdr->flags) & TCP_FL_SYN) == 0) {
                            int n = -1;
                            /* See if we need to change the sequence number */
                            for (i = 0; i < 64; i++) {
@@ -1585,16 +1587,17 @@ imp_packet_in(struct imp_device *imp)
                             (uint8 *)(&imp_data.hostip), sizeof(in_addr_T));
                ip_hdr->ip_dst = imp_data.hostip;
            }
+
            /* If we are not initializing queue it up for host */
            if (imp_data.init_state >= 6) {
                n = pad + ntohs(ip_hdr->ip_len);
                imp_unit[0].STATUS |= IMPIB;
                imp_unit[0].IPOS = 0;
                imp_unit[0].ILEN = n*8;
-               imp->rbuffer[1] = (ntohl(ip_hdr->ip_src) >> 24) & 0xff;
-               imp->rbuffer[5] = (ntohl(ip_hdr->ip_src) >> 16) & 0xff;
-               imp->rbuffer[6] = (ntohl(ip_hdr->ip_src) >> 8) & 0xff;
-               imp->rbuffer[7] = ntohl(ip_hdr->ip_src) & 0xff;
+               imp->rbuffer[1] = 0;
+               imp->rbuffer[5] = ntohl(ip_hdr->ip_src) & 0xff;
+               imp->rbuffer[6] = (ntohl(ip_hdr->ip_src) >> 16) & 0xff;
+               imp->rbuffer[7] = (ntohl(ip_hdr->ip_src) >> 8) & 0xff;
                imp->rbuffer[10] = (n >> 8) & 0xff;
                imp->rbuffer[11] = n & 0xff;
            }
@@ -1640,7 +1643,7 @@ imp_send_packet (struct imp_device *imp, int len)
        break;
     }
     sim_debug(DEBUG_DETAIL, &imp_dev,
-        "IMP packet H=%x Type=%d ht=%d dh=%d imp=%d lk=%d %d st=%d Len=%d mt=%d\n",
+        "IMP packet H=%x Type=%d ht=%d dh=%d imp=%d lk=%o %d st=%d Len=%d mt=%d\n",
        imp->sbuffer[0],
          imp->sbuffer[3], imp->sbuffer[4], imp->sbuffer[5],
          (imp->sbuffer[6] * 256) + imp->sbuffer[7],
@@ -1730,7 +1733,7 @@ imp_packet_out(struct imp_device *imp, ETH_PACK *packet) {
                if (imp->port_map[i].sport == sport &&
                    imp->port_map[i].dport == dport) {
                    /* Check if SYN */
-                   if (ntohs(tcp_hdr->flags) & 02) {
+                   if (ntohs(tcp_hdr->flags) & TCP_FL_SYN) {
                        imp->port_map[i].sport = 0;
                        imp->port_map[i].dport = 0;
                        imp->port_map[i].adj = 0;
@@ -1744,7 +1747,7 @@ imp_packet_out(struct imp_device *imp, ETH_PACK *packet) {
                            tcp_hdr->seq = new_seq;
                        }
                    }
-                   if (ntohs(tcp_hdr->flags) & 01)
+                   if (ntohs(tcp_hdr->flags) & TCP_FL_FIN)
                        imp->port_map[i].cls_tim = 100;
                    break;
                }
@@ -1772,7 +1775,7 @@ imp_packet_out(struct imp_device *imp, ETH_PACK *packet) {
                port_buffer[nlen] = '\0';
                memcpy(tcp_payload, port_buffer, nlen);
                /* Check if we need to update the sequence numbers */
-               if (nlen != l && (ntohs(tcp_hdr->flags) & 02) == 0) {
+               if (nlen != l && (ntohs(tcp_hdr->flags) & TCP_FL_SYN) == 0) {
                    int n = -1;
                    /* See if we need to change the sequence number */
                    for (i = 0; i < 64; i++) {
@@ -2917,6 +2920,7 @@ int ipv4_inet_aton(const char *str, struct in_addr *inp)
     return 1;
 }
 
+#if MPX_DEV
 t_stat imp_set_mpx (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
     int32 mpx;
@@ -2939,6 +2943,7 @@ t_stat imp_show_mpx (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
    fprintf (st, "MPX=%o", imp_mpx_lvl);
    return SCPE_OK;
 }
+#endif
 
 t_stat imp_show_mac (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
