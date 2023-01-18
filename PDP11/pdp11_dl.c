@@ -728,6 +728,8 @@ if (sim_switches & SWMASK ('P')) {
         dl[ln].lp = &tmxr->ldsc[ln];
         dl[ln].pi_ireq = (idptr == &dli_dev) ? dli_ireq : dlcji_ireq;
         dl[ln].po_ireq = (idptr == &dli_dev) ? &dlo_ireq : &dlcjo_ireq;
+        tmxr_set_line_output_unit (tmxr, ln, &odptr->units[ln]);
+        tmxr_set_line_speed (&tmxr->ldsc[ln], "9600");
         }
     }
 dlx_enbdis (dptr);                                      /* sync enables */

@@ -4532,6 +4532,8 @@ for (j = 1; j < mp->lines; j++)
         break;
 if (j == mp->lines)
     fprintf(st, ", Output Unit: %s", sim_uname (o_uptr));
+else
+    o_uptr = NULL;
 for (j = 1; j < mp->lines; j++)
     if (uptr != mp->ldsc[j].uptr)
         break;
