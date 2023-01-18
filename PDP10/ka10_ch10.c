@@ -105,9 +105,10 @@ static char peer[256];
 int address;
 static uint64 ch10_status;
 static int rx_count;
+static int rx_pos;
 static int tx_count;
-static uint8 rx_buffer[512+100];
-static uint8 tx_buffer[512+100];
+static uint8 rx_buffer[514+100];
+static uint8 tx_buffer[514+100];
 
 TMLN ch10_lines[1] = { {0} };
 TMXR ch10_tmxr = { 1, NULL, 0, ch10_lines};
@@ -226,7 +227,7 @@ t_stat ch10_transmit ()
   int i = CHUDP_HEADER + tx_count;
   uint16 chk;
 
-  if (tx_count > (512 - CHUDP_HEADER)) {
+  if (tx_count > (514 - CHUDP_HEADER)) {
     sim_debug (DBG_PKT, &ch10_dev, "Pack size failed, %d bytes.\n", (int)tx_count);
     ch10_status |= PLE;
     return SCPE_INCOMP;
@@ -243,7 +244,7 @@ t_stat ch10_transmit ()
   len = CHUDP_HEADER + (size_t)tx_count;
   r = tmxr_put_packet_ln (&ch10_lines[0], (const uint8 *)&tx_buffer, len);
   if (r == SCPE_OK) {
-    sim_debug (DBG_PKT, &ch10_dev, "Sent UDP packet, %d bytes.\n", (int)len);
+    sim_debug (DBG_PKT, &ch10_dev, "Sent UDP packet, %d bytes. %04x checksum\n", (int)len, chk);
     tmxr_poll_tx (&ch10_tmxr);
   } else {
     sim_debug (DBG_ERR, &ch10_dev, "Sending UDP failed: %d.\n", r);
@@ -275,11 +276,12 @@ void ch10_receive (void)
     return;
 
   if ((RXD & ch10_status) == 0) {
-    count = (count + 1) & 0776;
-    memcpy (rx_buffer + (512 - count), p, count);
+    count = (count + 1) & 01776;
     rx_count = count;
+    memcpy (rx_buffer, p, rx_count);
+    rx_pos = 0;
     sim_debug (DBG_TRC, &ch10_dev, "Rx count, %d\n", rx_count);
-    ch10_validate (p + CHUDP_HEADER, count - CHUDP_HEADER);
+    ch10_validate (rx_buffer + CHUDP_HEADER, rx_count - CHUDP_HEADER);
     ch10_status |= RXD;
     ch10_lines[0].rcve = FALSE;
     sim_debug (DBG_TRC, &ch10_dev, "Rx off\n");
@@ -296,6 +298,7 @@ void ch10_clear (void)
   ch10_status = TXD;
   rx_count = 0;
   tx_count = 0;
+  rx_pos = 0;
 
   tx_buffer[0] = 1; /* CHUDP header */
   tx_buffer[1] = 1;
@@ -349,7 +352,7 @@ t_stat ch10_devio(uint32 dev, uint64 *data)
         break;
     case DATAO:
         ch10_status &= ~TXD;
-        if (tx_count < 512) {
+        if (tx_count < 514) {
           int i = CHUDP_HEADER + tx_count;
           if (ch10_status & SWAP) {
              tx_buffer[i] = (*data >> 20) & 0xff;
@@ -382,22 +385,23 @@ t_stat ch10_devio(uint32 dev, uint64 *data)
           *data = 0;
           sim_debug (DBG_ERR, &ch10_dev, "Read empty buffer\n");
         } else {
-          int i = 512-rx_count;
           ch10_status &= ~RXD;
           if (ch10_status & SWAP) {
-              *data = ((uint64)(rx_buffer[i]) & 0xff) << 20;
-              *data |= ((uint64)(rx_buffer[i+1]) & 0xff) << 28;
-              *data |= ((uint64)(rx_buffer[i+2]) & 0xff) << 4;
-              *data |= ((uint64)(rx_buffer[i+3]) & 0xff) << 12;
+              *data = ((uint64)(rx_buffer[rx_pos]) & 0xff) << 20;
+              *data |= ((uint64)(rx_buffer[rx_pos+1]) & 0xff) << 28;
+              *data |= ((uint64)(rx_buffer[rx_pos+2]) & 0xff) << 4;
+              *data |= ((uint64)(rx_buffer[rx_pos+3]) & 0xff) << 12;
           } else {
-              *data = ((uint64)(rx_buffer[i]) & 0xff) << 28;
-              *data |= ((uint64)(rx_buffer[i+1]) & 0xff) << 20;
-              *data |= ((uint64)(rx_buffer[i+2]) & 0xff) << 12;
-              *data |= ((uint64)(rx_buffer[i+3]) & 0xff) << 4;
+              *data = ((uint64)(rx_buffer[rx_pos]) & 0xff) << 28;
+              *data |= ((uint64)(rx_buffer[rx_pos+1]) & 0xff) << 20;
+              *data |= ((uint64)(rx_buffer[rx_pos+2]) & 0xff) << 12;
+              *data |= ((uint64)(rx_buffer[rx_pos+3]) & 0xff) << 4;
           }
           rx_count-=4;
           sim_debug (DBG_DAT, &ch10_dev, "Read buffer word %d:%02x %02x %02x %02x %012llo %012llo\n",
-                     rx_count, rx_buffer[i], rx_buffer[i+1], rx_buffer[i+2], rx_buffer[i+3], *data, ch10_status);
+                     rx_count, rx_buffer[rx_pos], rx_buffer[rx_pos+1], rx_buffer[rx_pos+2], rx_buffer[rx_pos+3],
+                     *data, ch10_status);
+          rx_pos+=4;
         }
     }
 
