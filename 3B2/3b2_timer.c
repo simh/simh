@@ -345,8 +345,6 @@ uint32 timer_read(uint32 pa, size_t size)
            of also clearing pending interrupts */
         CSRBIT(CSRCLK, FALSE);
         CPU_CLR_INT(INT_CLOCK);
-        /* Acknowledge a clock tick */
-        sim_rtcn_tick_ack(1, TMR_CLK);
         retval = 0;
         break;
     default:

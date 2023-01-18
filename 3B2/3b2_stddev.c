@@ -388,7 +388,6 @@ static t_stat tod_svc(UNIT *uptr)
     sim_activate_after(uptr, 1000000/CLK_TPS);
     tmr_poll = t;
     tmxr_poll = t;
-    AIO_SET_INTERRUPT_LATENCY(tmr_poll * CLK_TPS);
     return SCPE_OK;
 }
 
