@@ -1926,6 +1926,8 @@ if (flag) {
             sim_set_rem_connections (0, "1");               /* use 1 */
         sim_rem_con_tmxr.buffered = 8192;                   /* Use big enough buffers */
         sim_register_internal_device (&sim_remote_console);
+        sim_rem_con_tmxr.dptr = NULL;                       /* be sure that dptr and uptr are NULL which might */
+        sim_rem_con_tmxr.uptr = NULL;                       /* not be the case if a prior TELNET option was set */
         r = tmxr_attach (&sim_rem_con_tmxr, rem_con_poll_unit, cptr);/* open master socket */
         if (r == SCPE_OK)
             sim_activate_after(rem_con_poll_unit, 1000000);/* check for connection in 1 second */
@@ -1964,7 +1966,7 @@ lines = (int32) get_uint (cptr, 10, MAX_REMOTE_SESSIONS, &r);
 if (r != SCPE_OK)
     return r;
 if (sim_rem_con_tmxr.master)
-    return SCPE_ALATT;
+    return sim_messagef (SCPE_ALATT, "Remote Console Connection Limit must be set before TELNET parameters\n");
 if (sim_rem_con_tmxr.lines) {
     sim_cancel (rem_con_poll_unit);
     sim_cancel (rem_con_data_unit);
@@ -2004,7 +2006,7 @@ for (i=0; i<lines; i++) {
     rem_con_smp_smpl_units[i].flags = UNIT_DIS;
     rem_con_smp_smpl_units[i].action = &sim_rem_con_smp_collect_svc;
     snprintf (uname, sizeof (uname), "%s-SMP%d", sim_remote_console.name, i);
-    sim_set_uname (&rem_con_repeat_units[i], uname);
+    sim_set_uname (&rem_con_smp_smpl_units[i], uname);
     rem = &sim_rem_consoles[i];
     rem->line = i;
     rem->lp = &sim_rem_con_tmxr.ldsc[i];
@@ -2109,7 +2111,7 @@ if (sim_rem_master_mode) {
         if (stat != SCPE_STEP)
             sim_rem_active_command = &allowed_single_remote_cmds[0];/* Dummy */
         else
-            sim_activate_abs (rem_con_data_unit, 0);    /* force step completion processing */
+            sim_activate_abs (rem_con_data_unit, -1);   /* force step completion processing */
         sim_last_cmd_stat = SCPE_BARE_STATUS(stat);     /* make exit status available to remote console */
         }
     sim_rem_master_was_enabled = FALSE;
