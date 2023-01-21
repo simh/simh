@@ -104,9 +104,8 @@
 #define RK_NUMTR        (RK_NUMCY * RK_NUMSF)           /* tracks/drive */
 #define RK_NUMDR        8                               /* drives/controller */
 #define RK_M_NUMDR      07
-#define RK_SIZE         (RK_NUMCY * RK_NUMSF * RK_NUMSC)
+#define RK_SIZE         (RK_NUMCY * RK_NUMSF * RK_NUMSC)/* words/drive */
 #define RK_RSRVSEC      (3 * RK_NUMSF * RK_NUMSC)       /* reserved (unused) disk area */
-                                                        /* words/drive */
 #define RK_CTLI         1                               /* controller int */
 #define RK_SCPI(x)      (2u << (x))                     /* drive int */
 #define RK_MAXFR        (1 << 16)                       /* max transfer */
@@ -286,7 +285,7 @@ BITFIELD *rk_reg_bits[] = {
     rk_ba_bits,
     rk_da_bits,
     NULL,
-    NULL,
+    NULL
     };
 
 /* Debug detail levels */
@@ -316,6 +315,7 @@ int32 last_drv = 0;                                     /* last r/w drive */
 int32 rk_stopioe = 1;                                   /* stop on error */
 int32 rk_swait = 10;                                    /* seek time */
 int32 rk_rwait = 10;                                    /* rotate time */
+static int32 not_impl = 0;                              /* placeholder for unused regs */
 
 const char *rk_regnames[] = {
     "RKDS",
@@ -325,7 +325,7 @@ const char *rk_regnames[] = {
     "RKBA",
     "RKDA",
     "unused",
-    "RKDB",
+    "RKDB"
     };
 
 int32 *rk_regs[] = {
@@ -335,6 +335,8 @@ int32 *rk_regs[] = {
     &rkwc,
     &rkba,
     &rkda,
+    &not_impl,
+    &not_impl
     };
 
 t_stat rk_rd (int32 *data, int32 PA, int32 access);
@@ -742,7 +744,7 @@ if (wc && (err == 0)) {                                 /* seek ok? */
             awc = (wc + (RK_NUMWD - 1)) & ~(RK_NUMWD - 1); /* clr to */
             for (i = wc; i < awc; i++)                  /* end of blk */
                 rkxb[i] = 0;
-            sim_disk_data_trace (uptr, (uint8 *)rkxb, da/RK_NUMWD, awc, "sim_disk_wrsect", RKDEB_DAT & dptr->dctrl, RKDEB_OPS);
+            sim_disk_data_trace (uptr, (uint8 *)rkxb, da/RK_NUMWD, awc*sizeof(*rkxb), "sim_disk_wrsect", RKDEB_DAT & dptr->dctrl, RKDEB_OPS);
             err = sim_disk_wrsect (uptr, da/RK_NUMWD, (uint8 *)rkxb, NULL, awc/RK_NUMWD);
             }
         break;                                          /* end write */
