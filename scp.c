@@ -5952,7 +5952,6 @@ if (cptr && (*cptr != 0))                               /* now eol? */
 if (flag == sim_asynch_enabled)                         /* already set correctly? */
     return SCPE_OK;
 sim_asynch_enabled = flag;
-tmxr_change_async ();
 sim_timer_change_asynch ();
 if (1) {
     uint32 i, j;
@@ -5991,9 +5990,6 @@ if (cptr && (*cptr != 0))
     return SCPE_2MARG;
 #ifdef SIM_ASYNCH_IO
 fprintf (st, "Asynchronous I/O is %sabled, %s\n", (sim_asynch_enabled) ? "en" : "dis", AIO_QUEUE_MODE);
-#if defined(SIM_ASYNCH_MUX)
-fprintf (st, "Asynchronous Multiplexer support is available\n");
-#endif
 #if defined(SIM_ASYNCH_CLOCKS)
 fprintf (st, "Asynchronous Clock is %sabled\n", (sim_asynch_timer) ? "en" : "dis");
 #endif
@@ -6882,9 +6878,6 @@ if (flag) {
         fprintf (st, "\n        RAW disk and CD/DVD ROM support");
 #if defined (SIM_ASYNCH_IO)
     fprintf (st, "\n        Asynchronous I/O support (%s)", AIO_QUEUE_MODE);
-#endif
-#if defined (SIM_ASYNCH_MUX)
-    fprintf (st, "\n        Asynchronous Multiplexer support");
 #endif
 #if defined (SIM_ASYNCH_CLOCKS)
     fprintf (st, "\n        Asynchronous Clock support");
@@ -12382,7 +12375,6 @@ do {
         }
     else
         sim_interval = noqueue_time = NOQUEUE_WAIT;
-    AIO_EVENT_BEGIN(uptr);
     if (uptr->usecs_remaining) {
         sim_debug (SIM_DBG_EVENT, &sim_scp_dev, "Requeueing %s after %.0f usecs\n", sim_uname (uptr), uptr->usecs_remaining);
         reason = sim_timer_activate_after (uptr, uptr->usecs_remaining);
@@ -12394,7 +12386,6 @@ do {
         else
             reason = SCPE_OK;
         }
-    AIO_EVENT_COMPLETE(uptr, reason);
     if (sim_interval_catchup < -1) {
         sim_interval_catchup += sim_clock_queue->time;
         sim_time += sim_clock_queue->time;
@@ -12599,7 +12590,6 @@ if ((uptr->cancel) && uptr->cancel (uptr))
     return SCPE_OK;
 if (uptr->dynflags & UNIT_TMR_UNIT)
     sim_timer_cancel (uptr);
-AIO_CANCEL(uptr);
 AIO_UPDATE_QUEUE;
 if (sim_clock_queue == QUEUE_LIST_END)
     return SCPE_OK;

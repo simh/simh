@@ -616,11 +616,6 @@ struct UNIT {
     UNIT                *a_next;                        /* next asynch active */
     int32               a_event_time;
     ACTIVATE_API        a_activate_call;
-    /* Asynchronous Polling control */
-    /* These fields should only be referenced when holding the sim_tmxr_poll_lock */
-    t_bool              a_polling_now;                  /* polling active flag */
-    int32               a_poll_waiter_count;            /* count of polling threads */
-                                                        /* waiting for this unit */
     /* Asynchronous Timer control */
     double              a_due_time;                     /* due time for timer event */
     double              a_due_gtime;                    /* due time (in instructions) for timer event */
@@ -670,7 +665,7 @@ struct UNIT {
 /* These flags are only set dynamically */
 
 #define UNIT_ATTMULT        0000001         /* Allow multiple attach commands */
-#define UNIT_TM_POLL        0000002         /* TMXR Polling unit */
+#define UNIT_TM_POLL        0000002         /* TMXR Polling unit (connect, transmit or receive) */
 #define UNIT_NO_FIO         0000004         /* fileref is NOT a FILE * */
 #define UNIT_DISK_CHK       0000010         /* disk data debug checking (sim_disk) */
 #define UNIT_TMR_UNIT       0000200         /* Unit registered as a calibrated timer */
@@ -916,7 +911,7 @@ struct MEMFILE {
 
 #ifdef SIM_ASYNCH_IO
 #define UDATA(act,fl,cap) NULL,act,NULL,NULL,NULL,NULL,0,0,(fl),0,(cap),0,NULL,0,0,NULL,NULL,0,0,NULL,NULL,NULL,0,0,0,NULL,0,NULL,NULL,0,NULL,\
-                          NULL,NULL,NULL,0,NULL,0,0,0,0,0
+                          NULL,NULL,NULL,0,NULL,0,0,0
 #else
 #define UDATA(act,fl,cap) NULL,act,NULL,NULL,NULL,NULL,0,0,(fl),0,(cap),0,NULL,0,0,NULL,NULL,0,0,NULL,NULL,NULL,0,0,0,NULL,0,NULL,NULL,0,NULL
 #endif
@@ -1220,35 +1215,6 @@ extern int32 sim_asynch_inst_latency;
 #define AIO_UNLOCK                                                \
     pthread_mutex_unlock(&sim_asynch_lock)
 #define AIO_IS_ACTIVE(uptr) (((uptr)->a_is_active ? (uptr)->a_is_active (uptr) : FALSE) || ((uptr)->a_next))
-#if defined(SIM_ASYNCH_MUX)
-#define AIO_CANCEL(uptr)                                      \
-    if (((uptr)->dynflags & UNIT_TM_POLL) &&                  \
-        !((uptr)->next) && !((uptr)->a_next)) {               \
-        (uptr)->a_polling_now = FALSE;                        \
-        sim_tmxr_poll_count -= (uptr)->a_poll_waiter_count;   \
-        (uptr)->a_poll_waiter_count = 0;                      \
-        }
-#endif /* defined(SIM_ASYNCH_MUX) */
-#if !defined(AIO_CANCEL)
-#define AIO_CANCEL(uptr)
-#endif /* !defined(AIO_CANCEL) */
-#define AIO_EVENT_BEGIN(uptr)                                     \
-    do {                                                          \
-        int __was_poll = uptr->dynflags & UNIT_TM_POLL
-#define AIO_EVENT_COMPLETE(uptr, reason)                          \
-        if (__was_poll) {                                         \
-            pthread_mutex_lock (&sim_tmxr_poll_lock);             \
-            uptr->a_polling_now = FALSE;                          \
-            if (uptr->a_poll_waiter_count) {                      \
-                sim_tmxr_poll_count -= uptr->a_poll_waiter_count; \
-                uptr->a_poll_waiter_count = 0;                    \
-                if (0 == sim_tmxr_poll_count)                     \
-                    pthread_cond_broadcast (&sim_tmxr_poll_cond); \
-                }                                                 \
-            pthread_mutex_unlock (&sim_tmxr_poll_lock);           \
-            }                                                     \
-        AIO_UPDATE_QUEUE;                                         \
-        } while (0)
 
 #if defined(__DECC_VER)
 #include <builtins>
@@ -1388,10 +1354,7 @@ extern int32 sim_asynch_inst_latency;
 #define AIO_LOCK
 #define AIO_UNLOCK
 #define AIO_CLEANUP
-#define AIO_EVENT_BEGIN(uptr)
-#define AIO_EVENT_COMPLETE(uptr, reason)
 #define AIO_IS_ACTIVE(uptr) FALSE
-#define AIO_CANCEL(uptr)
 #define AIO_SET_INTERRUPT_LATENCY(instpersec)
 #define AIO_TLS
 #endif /* SIM_ASYNCH_IO */
