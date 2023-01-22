@@ -44,6 +44,9 @@
 
 #define INST_MAX_BYTES  4                       /* instruction max bytes */
 
+#define IFF1    1                               /* Interrupt flip-flop 1 */
+#define IFF2    2                               /* Interrupt flip-flop 2 */
+
 #define FLAG_C  1
 #define FLAG_N  2
 #define FLAG_P  4
@@ -249,6 +252,7 @@ UNIT cpu_unit = {
         int32 IP_S;                                 /* IP register (8086)                           */
         int32 FLAGS_S;                              /* flags register (8086)                        */
         int32 SR                = 0;                /* switch register                              */
+        uint32 nmiInterrupt     = 0;                /* Non-maskable Interrupt                       */
         uint32 vectorInterrupt  = 0;                /* VI0-7 Vector Interrupt bitfield              */
         uint8 dataBus[MAX_INT_VECTORS];             /* Vector Interrupt data bus value              */
 static  int32 bankSelect        = 0;                /* determines selected memory bank              */
@@ -494,6 +498,8 @@ REG cpu_reg[] = {
     }, /* 87 */
     { DRDATAD(M68KVAR,   m68kvariant,       17, "M68K Type (68000, 68010, etc.)"),
     }, /* 88 */
+    { HRDATAD(NMI,       nmiInterrupt,       1, "NMI Interrupt pseudo register"),
+    }, /* 89 */
     { NULL }
 };
 
@@ -2192,7 +2198,7 @@ static t_stat sim_instr_mmu (void) {
     SP = SP_S;
     IX = IX_S;
     IY = IY_S;
-    specialProcessing = clockFrequency | timerInterrupt | vectorInterrupt | keyboardInterrupt | sim_brk_summ;
+    specialProcessing = clockFrequency | nmiInterrupt | timerInterrupt | vectorInterrupt | keyboardInterrupt | sim_brk_summ;
     tStates = 0;
     if (rtc_avail) {
         startTime = sim_os_msec();
@@ -2214,7 +2220,7 @@ static t_stat sim_instr_mmu (void) {
                 } else /* make sure that sim_os_msec() is not called later */
                     clockFrequency = startTime = tStatesInSlice = 0;
             }
-            specialProcessing = clockFrequency | timerInterrupt | vectorInterrupt | keyboardInterrupt | sim_brk_summ;
+            specialProcessing = clockFrequency | nmiInterrupt | timerInterrupt | vectorInterrupt | keyboardInterrupt | sim_brk_summ;
         }
 
         if (specialProcessing) { /* quick check for special processing */
@@ -2228,11 +2234,28 @@ static t_stat sim_instr_mmu (void) {
                     sim_os_ms_sleep(startTime - now);
             }
 
-            if (timerInterrupt && (IFF_S & 1)) {
+            if (nmiInterrupt) {
+                nmiInterrupt = FALSE;
+                specialProcessing = clockFrequency | sim_brk_summ;
+                IFF_S &= IFF2; /* Clear IFF1 */
+                CHECK_BREAK_TWO_BYTES_EXTENDED(SP - 2, SP - 1, (nmiInterrupt = TRUE, IFF_S |= IFF1));
+                if ((GetBYTE(PC) == HALTINSTRUCTION) && ((cpu_unit.flags & UNIT_CPU_STOPONHALT) == 0)) {
+                    PUSH(PC + 1);
+                    PCQ_ENTRY(PC);
+                }
+                else {
+                    PUSH(PC);
+                    PCQ_ENTRY(PC - 1);
+                }
+                tStates += 11;
+                PC = 0x0066;
+            }
+
+            if (timerInterrupt && (IFF_S & IFF1)) {
                 timerInterrupt = FALSE;
                 specialProcessing = clockFrequency | sim_brk_summ;
                 IFF_S = 0; /* disable interrupts */
-                CHECK_BREAK_TWO_BYTES_EXTENDED(SP - 2, SP - 1, (timerInterrupt = TRUE, IFF_S |= 1));
+                CHECK_BREAK_TWO_BYTES_EXTENDED(SP - 2, SP - 1, (timerInterrupt = TRUE, IFF_S |= (IFF1 | IFF2)));
                 if ((GetBYTE(PC) == HALTINSTRUCTION) && ((cpu_unit.flags & UNIT_CPU_STOPONHALT) == 0)) {
                     PUSH(PC + 1);
                     PCQ_ENTRY(PC);
@@ -2243,7 +2266,7 @@ static t_stat sim_instr_mmu (void) {
                 PC = timerInterruptHandler & ADDRMASK;
             }
 
-            if ((IM_S == 1) && vectorInterrupt && (IFF_S & 1)) {    /* Z80 Interrupt Mode 1 */
+            if ((IM_S == 1) && vectorInterrupt && (IFF_S & IFF1)) {    /* Z80 Interrupt Mode 1 */
                 uint32 tempVectorInterrupt = vectorInterrupt;
                 uint8 intVector = 0;
 
@@ -2256,7 +2279,7 @@ static t_stat sim_instr_mmu (void) {
 
                 specialProcessing = clockFrequency | sim_brk_summ;
                 IFF_S = 0; /* disable interrupts */
-                CHECK_BREAK_TWO_BYTES_EXTENDED(SP - 2, SP - 1, (vectorInterrupt |= (1 << intVector), IFF_S |= 1));
+                CHECK_BREAK_TWO_BYTES_EXTENDED(SP - 2, SP - 1, (vectorInterrupt |= (1 << intVector), IFF_S |= (IFF1 | IFF2)));
                 if ((GetBYTE(PC) == HALTINSTRUCTION) && ((cpu_unit.flags & UNIT_CPU_STOPONHALT) == 0)) {
                     PUSH(PC + 1);
                     PCQ_ENTRY(PC);
@@ -2270,7 +2293,7 @@ static t_stat sim_instr_mmu (void) {
 
                 sim_debug(INT_MSG, &cpu_dev, ADDRESS_FORMAT
                     " INT(mode=1 intVector=%d PC=%04X)\n", PCX, intVector, PC);
-            } else if ((IM_S == 2) && vectorInterrupt && (IFF_S & 1)) {
+            } else if ((IM_S == 2) && vectorInterrupt && (IFF_S & IFF1)) {
                 int32 vector;
                 uint32 tempVectorInterrupt = vectorInterrupt;
                 uint8 intVector = 0;
@@ -2284,7 +2307,7 @@ static t_stat sim_instr_mmu (void) {
 
                 specialProcessing = clockFrequency | sim_brk_summ;
                 IFF_S = 0; /* disable interrupts */
-                CHECK_BREAK_TWO_BYTES_EXTENDED(SP - 2, SP - 1, (vectorInterrupt |= (1 << intVector), IFF_S |= 1));
+                CHECK_BREAK_TWO_BYTES_EXTENDED(SP - 2, SP - 1, (vectorInterrupt |= (1 << intVector), IFF_S |= (IFF1 | IFF2)));
                 if ((GetBYTE(PC) == HALTINSTRUCTION) && ((cpu_unit.flags & UNIT_CPU_STOPONHALT) == 0)) {
                     PUSH(PC + 1);
                     PCQ_ENTRY(PC);
@@ -2301,11 +2324,11 @@ static t_stat sim_instr_mmu (void) {
                     " INT(mode=2 intVector=%d vector=%04X PC=%04X)\n", PCX, intVector, vector, PC);
             }
 
-            if (keyboardInterrupt && (IFF_S & 1)) {
+            if (keyboardInterrupt && (IFF_S & IFF1)) {
                 keyboardInterrupt = FALSE;
                 specialProcessing = clockFrequency | sim_brk_summ;
                 IFF_S = 0; /* disable interrupts */
-                CHECK_BREAK_TWO_BYTES_EXTENDED(SP - 2, SP - 1, (keyboardInterrupt = TRUE, IFF_S |= 1));
+                CHECK_BREAK_TWO_BYTES_EXTENDED(SP - 2, SP - 1, (keyboardInterrupt = TRUE, IFF_S |= (IFF1 | IFF2)));
                 if ((GetBYTE(PC) == HALTINSTRUCTION) && ((cpu_unit.flags & UNIT_CPU_STOPONHALT) == 0)) {
                     PUSH(PC + 1);
                     PCQ_ENTRY(PC);
@@ -2338,7 +2361,7 @@ static t_stat sim_instr_mmu (void) {
            Instruction to execute (ex. RST0-7) is on the data bus
            NOTE: does not support multi-byte instructions such as CALL
         */
-        if ((IM_S == 0) && vectorInterrupt && (IFF_S & 1)) {    /* 8080/Z80 Interrupt Mode 0 */
+        if ((IM_S == 0) && vectorInterrupt && (IFF_S & IFF1)) {    /* 8080/Z80 Interrupt Mode 0 */
             uint32 tempVectorInterrupt = vectorInterrupt;
             uint8 intVector = 0;
 
@@ -5020,7 +5043,7 @@ static t_stat sim_instr_mmu (void) {
 
                     case 0x57:      /* LD A,I */
                         tStates += 9;
-                        AF = (AF & 0x29) | (IR_S & ~0xff) | ((IR_S >> 8) & 0x80) | (((IR_S & ~0xff) == 0) << 6) | ((IFF_S & 2) << 1);
+                        AF = (AF & 0x29) | (IR_S & ~0xff) | ((IR_S >> 8) & 0x80) | (((IR_S & ~0xff) == 0) << 6) | ((IFF_S & IFF2) << 1);
                         break;
 
                     case 0x58:      /* IN E,(C) */
@@ -5061,7 +5084,7 @@ static t_stat sim_instr_mmu (void) {
                     case 0x5f:      /* LD A,R */
                         tStates += 9;
                         AF = (AF & 0x29) | ((IR_S & 0xff) << 8) | (IR_S & 0x80) |
-                            (((IR_S & 0xff) == 0) << 6) | ((IFF_S & 2) << 1);
+                            (((IR_S & 0xff) == 0) << 6) | ((IFF_S & IFF2) << 1);
                         break;
 
                     case 0x60:      /* IN H,(C) */
@@ -5553,7 +5576,7 @@ static t_stat sim_instr_mmu (void) {
 
             case 0xfb:          /* EI */
                 tStates += 4;   /* EI 4 */
-                IFF_S = 3;
+                IFF_S = (IFF1 | IFF2);
                 break;
 
             case 0xfc:              /* CALL M,nnnn */
