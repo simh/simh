@@ -546,6 +546,10 @@ static t_stat m2sio_detach(UNIT *uptr)
 {
     M2SIO_CTX *xptr;
 
+    if (uptr->dptr == NULL) {
+        return SCPE_IERR;
+    }
+
     sim_debug(VERBOSE_MSG, uptr->dptr, "detach.\n");
 
     if (uptr->flags & UNIT_ATT) {
