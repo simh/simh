@@ -484,7 +484,7 @@ REG cpu_reg[] = {
     }, /* 82 */
     { HRDATAD(COMMONLOW,common_low,         1, "If set, use low memory for common area"),
     }, /* 83 */
-    { HRDATAD(VECINT,vectorInterrupt,       2, "Vector Interrupt pseudo register"),
+    { HRDATAD(VECINT,vectorInterrupt,       8, "Vector Interrupt pseudo register"),
     }, /* 84 */
     { BRDATAD (DATABUS, dataBus, 16, 8,     MAX_INT_VECTORS, "Data bus pseudo register"),
         REG_RO + REG_CIRC   }, /* 85 */
