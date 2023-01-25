@@ -413,6 +413,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
     endif
   endif
   ifeq (git-repo,$(shell if ${TEST} -e ./.git; then echo git-repo; fi))
+    GIT_REPO=1
     GIT_PATH=$(strip $(shell which git))
     ifeq (,$(GIT_PATH))
       $(error building using a git repository, but git is not available)
@@ -427,8 +428,9 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
       $(error building using a got repository, but git repository is not available)
     endif
     REPO_PATH=-C $(file <.got/repository)
+    GIT_REPO=1
   endif
-  ifneq (,GIT_PATH)
+  ifneq (,$(and $(GIT_REPO),$(GIT_PATH)))
     ifeq (commit-id-exists,$(shell if ${TEST} -e .git-commit-id; then echo commit-id-exists; fi))
       CURRENT_FULL_GIT_COMMIT_ID=$(strip $(shell grep 'SIM_GIT_COMMIT_ID' .git-commit-id | awk '{ print $$2 }'))
       CURRENT_GIT_COMMIT_ID=$(word 1,$(subst +, , $(CURRENT_FULL_GIT_COMMIT_ID)))
@@ -1070,10 +1072,10 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
     GIT_COMMIT_ID=$(shell grep 'SIM_GIT_COMMIT_ID' .git-commit-id | awk '{ print $$2 }')
     GIT_COMMIT_TIME=$(shell grep 'SIM_GIT_COMMIT_TIME' .git-commit-id | awk '{ print $$2 }')
   else
-    ifeq (,$(shell grep 'define SIM_GIT_COMMIT_ID' sim_rev.h | grep 'Format:'))
-      GIT_COMMIT_ID=$(shell grep 'define SIM_GIT_COMMIT_ID' sim_rev.h | awk '{ print $$3 }')
-      GIT_COMMIT_TIME=$(shell grep 'define SIM_GIT_COMMIT_TIME' sim_rev.h | awk '{ print $$3 }')
-    else
+    ifeq (,$(shell grep 'define SIM_ARCHIVE_GIT_COMMIT_ID' sim_rev.h | grep 'Format:'))
+      GIT_COMMIT_ID=$(shell grep 'define SIM_ARCHIVE_GIT_COMMIT_ID' sim_rev.h | awk '{ print $$3 }')
+      GIT_COMMIT_TIME=$(shell grep 'define SIM_ARCHIVE_GIT_COMMIT_TIME' sim_rev.h | awk '{ print $$3 }')
+     else
       ifeq (git-submodule,$(if $(shell cd .. ; git rev-parse --git-dir 2>/dev/null),git-submodule))
         GIT_COMMIT_ID=$(shell cd .. ; git submodule status | grep " $(notdir $(realpath .)) " | awk '{ print $$1 }')
         GIT_COMMIT_TIME=$(shell git $(REPO_PATH) --git-dir=$(realpath .)/.git log $(GIT_COMMIT_ID) -1 --pretty="%aI")
