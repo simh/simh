@@ -2923,10 +2923,11 @@ else # end of primary make recipies
   OBJS = $(addsuffix .o,$(addprefix $(BLDDIR)/,$(basename $(notdir $(DEPS)))))
   $(shell $(MKDIR) $(call pathfix,$(BLDDIR)))
   ifeq (,$(findstring 3.,$(GNUMakeVERSION)))
-    $(file >$(call pathfix,$(BLDDIR)/NEWLINE.file),)
-    $(file >>$(call pathfix,$(BLDDIR)/NEWLINE.file),)
-    NEWLINE = $(file < $(call pathfix,$(BLDDIR)/NEWLINE.file))
-    $(shell $(RM) $(call pathfix,$(BLDDIR)/NEWLINE.file))
+  define BARLINE
+|
+|
+endef
+    NEWLINE=$(subst |,,$(BARLINE))
     MAKE_INFO = $(foreach VAR,CC OPTS DEPS LDFLAGS DIRS BUILD_SEPARATE,$(VAR)=$($(VAR))$(NEWLINE))
     ifneq ($(MAKE_INFO),$(file <$(call pathfix,$(BLDDIR)/Make.info))$(NEWLINE))
       # Different or no prior options, so start from scratch
