@@ -1075,6 +1075,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
     ifeq (,$(shell grep 'define SIM_ARCHIVE_GIT_COMMIT_ID' sim_rev.h | grep 'Format:'))
       GIT_COMMIT_ID=$(shell grep 'define SIM_ARCHIVE_GIT_COMMIT_ID' sim_rev.h | awk '{ print $$3 }')
       GIT_COMMIT_TIME=$(shell grep 'define SIM_ARCHIVE_GIT_COMMIT_TIME' sim_rev.h | awk '{ print $$3 }')
+      GIT_ARCHIVE_COMMIT_ID=$(empty) $(empty)archive
      else
       ifeq (git-submodule,$(if $(shell cd .. ; git rev-parse --git-dir 2>/dev/null),git-submodule))
         GIT_COMMIT_ID=$(shell cd .. ; git submodule status | grep " $(notdir $(realpath .)) " | awk '{ print $$1 }')
@@ -1501,8 +1502,8 @@ ifneq (clean,${MAKECMDGOALS})
   endif
   ifneq (,$(GIT_COMMIT_ID))
     $(info ***)
-    $(info *** git commit id is $(GIT_COMMIT_ID).)
-    $(info *** git commit time is $(GIT_COMMIT_TIME).)
+    $(info *** git$(GIT_ARCHIVE_COMMIT_ID) commit id is $(GIT_COMMIT_ID).)
+    $(info *** git$(GIT_ARCHIVE_COMMIT_ID) commit time is $(GIT_COMMIT_TIME).)
   endif
   $(info ***)
 endif
@@ -2922,8 +2923,8 @@ else # end of primary make recipies
   OBJS = $(addsuffix .o,$(addprefix $(BLDDIR)/,$(basename $(notdir $(DEPS)))))
   $(shell $(MKDIR) $(call pathfix,$(BLDDIR)))
   ifeq (,$(findstring 3.,$(GNUMakeVERSION)))
-    $(file >$(BLDDIR)/NEWLINE.file,)
-    $(file >>$(BLDDIR)/NEWLINE.file,)
+    $(file >$(call pathfix,$(BLDDIR)/NEWLINE.file),)
+    $(file >>$(call pathfix,$(BLDDIR)/NEWLINE.file),)
     NEWLINE = $(file < $(call pathfix,$(BLDDIR)/NEWLINE.file))
     $(shell $(RM) $(call pathfix,$(BLDDIR)/NEWLINE.file))
     MAKE_INFO = $(foreach VAR,CC OPTS DEPS LDFLAGS DIRS BUILD_SEPARATE,$(VAR)=$($(VAR))$(NEWLINE))
