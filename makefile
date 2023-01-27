@@ -337,9 +337,9 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
   # OSNAME is used in messages to indicate the source of libpcap components
   OSNAME = $(OSTYPE)
   ifeq (SunOS,$(OSTYPE))
-    TEST = /bin/test
+    export TEST = /bin/test
   else
-    TEST = test
+    export TEST = test
   endif
   ifeq (CYGWIN,$(findstring CYGWIN,$(OSTYPE))) # uname returns CYGWIN_NT-n.n-ver
     OSTYPE = cygwin
@@ -2923,13 +2923,13 @@ else # end of primary make recipies
   OBJS = $(addsuffix .o,$(addprefix $(BLDDIR)/,$(basename $(notdir $(DEPS)))))
   $(shell $(MKDIR) $(call pathfix,$(BLDDIR)))
   ifeq (,$(findstring 3.,$(GNUMakeVERSION)))
-  define BARLINE
-|
-|
+  define NEWLINE
+$(empty)
+$(empty)
 endef
-    NEWLINE=$(subst |,,$(BARLINE))
     MAKE_INFO = $(foreach VAR,CC OPTS DEPS LDFLAGS DIRS BUILD_SEPARATE,$(VAR)=$($(VAR))$(NEWLINE))
-    ifneq ($(MAKE_INFO),$(file <$(call pathfix,$(BLDDIR)/Make.info))$(NEWLINE))
+    PRIOR_MAKE_INFO = $(shell if ${TEST} -e $(call pathfix,$(BLDDIR)/Make.info); then cat $(call pathfix,$(BLDDIR)/Make.info); fi)
+    ifneq ($(strip $(subst $(NEWLINE), ,$(MAKE_INFO))),$(strip $(PRIOR_MAKE_INFO)))
       # Different or no prior options, so start from scratch
       $(shell $(RM) $(call pathfix,$(BLDDIR)/*) $(call pathfix,$(wildcard $(TARGET))))
       $(file >$(BLDDIR)/Make.info,$(MAKE_INFO))
