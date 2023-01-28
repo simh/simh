@@ -302,9 +302,15 @@ t_stat mt_devio(uint32 dev, uint64 *data) {
                      break;
 
               case WRITE:
+                     /* Check if write locked? */
                      if ((uptr->flags & MTUF_WLK) != 0) {
                         mt_status |= IDLE_UNIT|ILL_OPR|EOF_FLAG;
                         break;
+                     }
+                     /* Request first word */
+                     if ((dptr->flags & MTDF_TYPEB) == 0) {
+                         mt_status |= DATA_REQUEST;
+                         set_interrupt_mpx(MT_DEVNUM, mt_pia, mt_mpx_lvl);
                      }
                      /* Fall through */
 
@@ -761,10 +767,6 @@ t_stat mt_srv(UNIT * uptr)
              uptr->CPOS = 0;
              uptr->BPOS = 0;
              mt_status |= (uint64)(1) << 18;
-             if ((dptr->flags & MTDF_TYPEB) == 0) {
-                 mt_status |= DATA_REQUEST;
-                 set_interrupt_mpx(MT_DEVNUM, mt_pia, mt_mpx_lvl);
-             }
              break;
          }
          /* Force error if we exceed buffer size */
