@@ -123,9 +123,26 @@ t_addr  AB;                                   /* Memory address buffer */
 t_addr  PC;                                   /* Program counter */
 uint32  IR;                                   /* Instruction register */
 uint64  MI;                                   /* Monitor lights */
+uint8   MI_flag;                              /* Monitor flags */
+uint8   MI_disable;                           /* Monitor flag disable */
 uint32  FLAGS;                                /* Flags */
 uint32  AC;                                   /* Operand accumulator */
 uint64  SW;                                   /* Switch register */
+uint8   RUN;                                  /* Run flag */
+uint8   prog_stop;                            /* Programmed stop */
+#if PIDP10
+uint8   sing_inst_sw;                         /* Execute single inst */
+uint8   examine_sw;                           /* Examine memory */
+uint8   deposit_sw;                           /* Deposit memory */
+uint8   xct_sw;                               /* Execute SW */
+uint8   stop_sw;                              /* Stop simulation */
+uint32  rdrin_dev;                            /* Read in device */
+uint8   IX;                                   /* Index register */
+uint8   IND;                                  /* Indirect flag */
+#endif
+#if PDP6 | KA | KI
+t_addr  AS;                                   /* Address switches */
+#endif
 int     BYF5;                                 /* Flag for second half of LDB/DPB instruction */
 int     uuo_cycle;                            /* Uuo cycle in progress */
 int     SC;                                   /* Shift count */
@@ -138,6 +155,11 @@ int     push_ovf;                             /* Push stack overflow */
 int     mem_prot;                             /* Memory protection flag */
 #endif
 int     nxm_flag;                             /* Non-existant memory flag */
+#if KA | KI
+int     nxm_stop;                             /* Non-existant memory stop flag */
+int     adr_flag;                             /* Address break flag */
+int     adr_cond;                             /* Address condition swiches */
+#endif
 int     clk_flg;                              /* Clock flag */
 int     ov_irq;                               /* Trap overflow */
 int     fov_irq;                              /* Trap floating overflow */
@@ -147,6 +169,7 @@ int     ill_op;                               /* Illegal opcode */
 int     user_io;                              /* User IO flag */
 int     ex_uuo_sync;                          /* Execute a UUO op */
 #endif
+uint16  IOB_PI;                               /* Input bus PI signals */
 uint8   PIR;                                  /* Current priority level */
 uint8   PIH;                                  /* Highest priority */
 uint8   PIE;                                  /* Priority enable mask */
@@ -289,6 +312,7 @@ int     maoff = 0;                            /* Offset for traps */
 uint16  dev_irq[128];                         /* Pending irq by device */
 t_stat  (*dev_tab[128])(uint32 dev, uint64 *data);
 t_addr  (*dev_irqv[128])(uint32 dev, t_addr addr);
+t_stat  cpu_detach(UNIT *uptr);
 t_stat  rtc_srv(UNIT * uptr);
 #if KS
 int32   rtc_tps = 500;
@@ -450,7 +474,12 @@ REG cpu_reg[] = {
     { ORDATAD (PIE, PIE, 8, "Priority Interrupt Enable") },
     { ORDATAD (PIENB, pi_enable, 7, "Enable Priority System") },
     { ORDATAD (SW, SW, 36, "Console SW Register"), REG_FIT},
-    { ORDATAD (MI, MI, 36, "Monitor Display"), REG_FIT},
+    { ORDATAD (MI, MI, 36, "Memory Indicators"), REG_FIT},
+    { FLDATAD (MIFLAG, MI_flag, 0, "Memory indicator flag") },
+    { FLDATAD (MIDISABLE, MI_disable, 0, "Memory indicator disable") },
+#if PDP6 | KA | KI
+    { ORDATAD (AS, AS, 18, "Console AS Register"), REG_FIT},
+#endif
     { FLDATAD (BYF5, BYF5, 0, "Byte Flag") },
     { FLDATAD (UUO, uuo_cycle, 0, "UUO Cycle") },
 #if KA | PDP6
@@ -463,6 +492,11 @@ REG cpu_reg[] = {
     { FLDATAD (MEMPROT, mem_prot, 0, "Memory protection flag") },
 #endif
     { FLDATAD (NXM, nxm_flag, 0, "Non-existing memory access") },
+#if KA | KI
+    { FLDATAD (NXMSTOP, nxm_stop, 0, "Stop on non-existing memory") },
+    { FLDATAD (ABRK, adr_flag, 0, "Address break") },
+    { ORDATAD (ACOND, adr_cond, 5, "Address condition switches") },
+#endif
     { FLDATAD (CLK, clk_flg, 0, "Clock interrupt") },
     { FLDATAD (OV, ov_irq, 0, "Overflow enable") },
 #if PDP6
@@ -577,6 +611,9 @@ REG cpu_reg[] = {
     { BRDATA (ETLB, e_tlb, 8, 32, 512), REG_HRO},
     { BRDATA (UTLB, u_tlb, 8, 32, 546), REG_HRO},
 #endif
+#if PIDP10
+    { ORDATAD (READIN, rdrin_dev, 9, "Readin device")},
+#endif
     { NULL }
     };
 
@@ -656,11 +693,10 @@ MTAB cpu_mod[] = {
 /* Simulator debug controls */
 DEBTAB              cpu_debug[] = {
     {"IRQ", DEBUG_IRQ, "Debug IRQ requests"},
-#if !KS
     {"CONI", DEBUG_CONI, "Show coni instructions"},
     {"CONO", DEBUG_CONO, "Show cono instructions"},
     {"DATAIO", DEBUG_DATAIO, "Show datai and datao instructions"},
-#else
+#if KS
     {"DATA", DEBUG_DATA, "Show data transfers"},
     {"DETAIL", DEBUG_DETAIL, "Show details about device"},
     {"EXP", DEBUG_EXP, "Show exception information"},
@@ -673,7 +709,7 @@ DEVICE cpu_dev = {
     "CPU", &cpu_unit[0], cpu_reg, cpu_mod,
     1+ITS+KL, 8, 22, 1, 8, 36,
     &cpu_ex, &cpu_dep, &cpu_reset,
-    NULL, NULL, NULL, NULL, DEV_DEBUG, 0, cpu_debug,
+    NULL, NULL, &cpu_detach, NULL, DEV_DEBUG, 0, cpu_debug,
     NULL, NULL, &cpu_help, NULL, NULL, &cpu_description
     };
 
@@ -843,6 +879,7 @@ void set_interrupt(int dev, int lvl) {
     if (lvl) {
        dev_irq[dev>>2] = 0200 >> lvl;
        pi_pending = 1;
+       IOB_PI |= 0200 >> lvl;
 #if DEBUG
        sim_debug(DEBUG_IRQ, &cpu_dev, "set irq %o %o %03o %03o %03o\n",
               dev & 0774, lvl, PIE, PIR, PIH);
@@ -858,6 +895,7 @@ void set_interrupt_mpx(int dev, int lvl, int mpx) {
        if (lvl == 1 && mpx != 0)
           dev_irq[dev>>2] |= mpx << 8;
        pi_pending = 1;
+       IOB_PI |= 0200 >> lvl;
 #if DEBUG
        sim_debug(DEBUG_IRQ, &cpu_dev, "set mpx irq %o %o %o %03o %03o %03o\n",
               dev & 0774, lvl, mpx, PIE, PIR, PIH);
@@ -870,7 +908,13 @@ void set_interrupt_mpx(int dev, int lvl, int mpx) {
  * Clear the interrupt flag for a device
  */
 void clr_interrupt(int dev) {
+    uint16   lvl;
+    int      i;
     dev_irq[dev>>2] = 0;
+    /* Update bus PI flags */
+    for (lvl = i = 0; i < MAX_DEV; i++)
+        lvl |= dev_irq[i];
+    IOB_PI = lvl;
 #if DEBUG
     if (dev > 4)
         sim_debug(DEBUG_IRQ, &cpu_dev, "clear irq %o\n", dev & 0774);
@@ -905,10 +949,7 @@ int check_irq_level() {
 #endif
        return 0;
     }
-
-    /* Scan all devices */
-    for(i = lvl = 0; i < MAX_DEV; i++)
-       lvl |= dev_irq[i];
+    lvl = IOB_PI;
     if (lvl == 0)
        pi_pending = 0;
     pi_req = (lvl & PIE) | PIR;
@@ -1040,6 +1081,9 @@ t_stat dev_pi(uint32 dev, uint64 *data) {
 #if KI | KL
         res |= ((uint64)(PIR) << 18);
 #endif
+#if KI
+        res |= ((uint64)adr_flag << 31);
+#endif
 #if !KL
         res |= ((uint64)parity_irq << 15);
 #endif
@@ -1078,6 +1122,7 @@ t_stat dev_pi(uint32 dev, uint64 *data) {
         }
 #else
         MI = *data;
+        MI_flag = !MI_disable;
 #ifdef PANDA_LIGHTS
         /* Set lights */
         ka10_lights_main (*data);
@@ -1319,7 +1364,7 @@ t_stat dev_mtr(uint32 dev, uint64 *data) {
         *data = mtr_irq;
         if (mtr_enable)
             *data |= 02000;
-        *data |= (uint64)mtr_flags << 12;
+        *data |= ((uint64)mtr_flags) << 12;
         sim_debug(DEBUG_CONI, &cpu_dev, "CONI MTR %012llo\n", *data);
         break;
 
@@ -1370,7 +1415,9 @@ t_stat dev_tim(uint32 dev, uint64 *data) {
        else
            tim_val = (tim_val & 0070000) + 010000 - (int)us;
     }
+    /* Interval counter */
     clr_interrupt(4 << 2);
+    sim_cancel(uptr);
     switch(dev & 03) {
     case CONI:
         /* Interval counter */
@@ -1379,11 +1426,9 @@ t_stat dev_tim(uint32 dev, uint64 *data) {
         res |= ((uint64)(tim_val & 07777)) << 18;
         *data = res;
         sim_debug(DEBUG_CONI, &cpu_dev, "CONI TIM %012llo\n", *data);
-        return SCPE_OK;
+        break;
 
      case CONO:
-        /* Interval counter */
-        sim_cancel(uptr);
         tim_val &= 037777;   /* Clear run bit */
         tim_per = *data & 07777;
         if (*data & 020000)  /* Clear overflow and done */
@@ -1396,10 +1441,10 @@ t_stat dev_tim(uint32 dev, uint64 *data) {
         break;
 
     case DATAO:
-        return SCPE_OK;
+        break;
 
     case DATAI:
-        return SCPE_OK;
+        break;
     }
     /* If timer is on, figure out when it will go off */
     if (tim_val & 040000) {
@@ -1498,10 +1543,13 @@ t_stat dev_pag(uint32 dev, uint64 *data) {
  * Check if the last operation caused a APR IRQ to be generated.
  */
 void check_apr_irq() {
+     if (nxm_stop && nxm_flag) {
+         RUN = 0;
+     }
      if (pi_enable && apr_irq) {
          int flg = 0;
          clr_interrupt(0);
-         flg |= inout_fail | nxm_flag;
+         flg |= inout_fail | nxm_flag | adr_flag;
          if (flg)
              set_interrupt(0, apr_irq);
      }
@@ -1647,12 +1695,15 @@ t_stat dev_pag(uint32 dev, uint64 *data) {
  * Check if the last operation caused a APR IRQ to be generated.
  */
 void check_apr_irq() {
+     if (nxm_stop && nxm_flag) {
+         RUN = 0;
+     }
      if (pi_enable && apr_irq) {
          int flg = 0;
          clr_interrupt(0);
          flg |= ((FLAGS & OVR) != 0) & ov_irq;
          flg |= ((FLAGS & FLTOVR) != 0) & fov_irq;
-         flg |= nxm_flag | mem_prot | push_ovf;
+         flg |= nxm_flag | mem_prot | push_ovf | adr_flag;
          if (flg)
              set_interrupt(0, apr_irq);
      }
@@ -1686,7 +1737,7 @@ t_stat dev_apr(uint32 dev, uint64 *data) {
         res |= (((FLAGS & FLTOVR) != 0) << 6) | (fov_irq << 7) ;
         res |= (clk_flg << 9) | (((uint64)clk_en) << 10) | (nxm_flag << 12);
         res |= (mem_prot << 13) | (((FLAGS & USERIO) != 0) << 15);
-        res |= (push_ovf << 16) | (maoff >> 1);
+        res |= (adr_flag << 14) | (push_ovf << 16) | (maoff >> 1);
         *data = res;
         sim_debug(DEBUG_CONI, &cpu_dev, "CONI APR %012llo\n", *data);
         break;
@@ -1725,6 +1776,8 @@ t_stat dev_apr(uint32 dev, uint64 *data) {
             nxm_flag = 0;
         if (res & 020000)
             mem_prot = 0;
+        if (res & 040000)
+            adr_flag = 0;
         if (res & 0200000) {
 #if MPX_DEV
             mpx_enable = 0;
@@ -2998,6 +3051,27 @@ int Mem_write_byte(int n, uint16 *data) {
 
 #endif
 
+#if KA | KI
+static void
+address_conditions (int fetch, int write)
+{
+    int cond;
+    if (fetch)
+        cond = ADR_IFETCH;
+    else if (write)
+        cond = ADR_WRITE;
+    else
+        cond = ADR_DFETCH;
+    if (adr_cond & cond) {
+        if (adr_cond & ADR_STOP)
+            watch_stop = 1;
+        if (adr_cond & ADR_BREAK)
+            adr_flag = 1;
+    }
+    check_apr_irq();
+}
+#endif
+
 #if KI
 /*
  * Load the TLB entry, used for both page_lookup and MAP.
@@ -3066,6 +3140,9 @@ int page_lookup(t_addr addr, int flag, t_addr *loc, int wr, int cur_context, int
 
     if (page_fault)
         return 0;
+
+    if (adr_cond && addr == AS)
+        address_conditions (fetch, wr);
 
     /* If paging is not enabled, address is direct */
     if (!page_enable) {
@@ -3169,6 +3246,7 @@ int Mem_read(int flag, int cur_context, int fetch, int mod) {
                     MB = FM[fm_sel|AB];
                 } else {
                     MB = M[ub_ptr + ac_stack + AB];
+                    --sim_interval;
                 }
                 if (fetch == 0 && hst_lnt) {
                     hst[hst_p].mb = MB;
@@ -3298,7 +3376,10 @@ int page_lookup_its(t_addr addr, int flag, t_addr *loc, int wr, int cur_context,
     int      page = (RMASK & addr) >> 10;
     int      acc;
     int      uf = (FLAGS & USER) != 0;
-    int      ofd = (int)fault_data;
+    int      fstr = (fault_data & 0770) == 0;
+
+    if (adr_cond && addr == AS)
+        address_conditions (fetch, wr);
 
     /* If paging is not enabled, address is direct */
     if (!page_enable) {
@@ -3325,7 +3406,7 @@ int page_lookup_its(t_addr addr, int flag, t_addr *loc, int wr, int cur_context,
     /* AC & 8 = Inhibit mem protect, skip */
 
     /* Add in MAR checking */
-    if (addr == (mar & RMASK)) {
+    if (addr == (mar & RMASK) && uf == (((mar >> 18) & 04) != 0)) {
        switch((mar >> 18) & 03) {
        case 0: break;
        case 1: if (fetch) {
@@ -3405,15 +3486,15 @@ int page_lookup_its(t_addr addr, int flag, t_addr *loc, int wr, int cur_context,
     }
 fault:
     /* Update fault data, fault address only if new fault */
-    if ((ofd & 00770) == 0)
+    if (fstr)
         fault_addr = (page) | ((uf)? 0400 : 0) | ((data & 01777) << 9);
     if ((xct_flag & 04) == 0) {
         mem_prot = 1;
         fault_data |= 01000;
+        check_apr_irq();
     } else {
         PC = (PC + 1) & RMASK;
     }
-    check_apr_irq();
     return 0;
 }
 
@@ -3576,6 +3657,9 @@ int page_lookup_bbn(t_addr addr, int flag, t_addr *loc, int wr, int cur_context,
 
     if (page_fault)
         return 0;
+
+    if (adr_cond && addr == AS)
+        address_conditions (fetch, wr);
 
     /* If paging is not enabled, address is direct */
     if (!page_enable) {
@@ -3872,6 +3956,9 @@ int page_lookup_waits(t_addr addr, int flag, t_addr *loc, int wr, int cur_contex
     /* If this is modify instruction use write access */
     wr |= modify;
 
+    if (adr_cond && addr == AS)
+        address_conditions (fetch, wr);
+
     /* Figure out if this is a user space access */
     if (flag)
         uf = 0;
@@ -3970,6 +4057,9 @@ int Mem_write_waits(int flag, int cur_context) {
 #endif
 
 int page_lookup_ka(t_addr addr, int flag, t_addr *loc, int wr, int cur_context, int fetch) {
+      if (adr_cond && addr == AS)
+        address_conditions (fetch, wr);
+
       if (!flag && (FLAGS & USER) != 0) {
           if (addr <= Pl) {
              *loc = (addr + Rl) & RMASK;
@@ -4153,6 +4243,7 @@ int page_lookup(t_addr addr, int flag, t_addr *loc, int wr, int cur_context, int
              return 1;
           }
           mem_prot = 1;
+          check_apr_irq();
           return 0;
       } else {
          *loc = addr;
@@ -4171,6 +4262,7 @@ int Mem_read(int flag, int cur_context, int fetch, int mod) {
             return 1;
         if (addr >= MEMSIZE) {
             nxm_flag = 1;
+            check_apr_irq();
             return 1;
         }
         if (sim_brk_summ && sim_brk_test(AB, SWMASK('R')))
@@ -4200,6 +4292,7 @@ int Mem_write(int flag, int cur_context) {
             return 1;
         if (addr >= MEMSIZE) {
             nxm_flag = 1;
+            check_apr_irq();
             return 1;
         }
         if (sim_brk_summ && sim_brk_test(AB, SWMASK('W')))
@@ -4216,6 +4309,10 @@ int Mem_write(int flag, int cur_context) {
  * Return of 0 if successful, 1 if there was an error.
  */
 int Mem_read_nopage() {
+#if KA | KI
+    if (adr_cond && AB == AS)
+        address_conditions (0, 0);
+#endif
     if (AB < 020) {
         MB =  get_reg(AB);
     } else {
@@ -4240,6 +4337,10 @@ int Mem_read_nopage() {
  * Return of 0 if successful, 1 if there was an error.
  */
 int Mem_write_nopage() {
+#if KA | KI
+    if (adr_cond && AB == AS)
+        address_conditions (0, 1);
+#endif
     if (AB < 020) {
         set_reg(AB, MB);
     } else {
@@ -4328,6 +4429,8 @@ if (sim_step != 0) {
     sim_cancel_step();
 }
 
+RUN = 1;
+prog_stop = 0;
 #if KS
 reason = SCPE_OK;
 #else
@@ -4371,23 +4474,58 @@ if ((reason = build_dev_tab ()) != SCPE_OK)            /* build, chk dib_tab */
              if (QITS)
                  load_quantum();
 #endif
+             RUN = 0;
              return reason;
          }
     }
 
     if (sim_brk_summ && f_load_pc && sim_brk_test(PC, SWMASK('E'))) {
          reason = STOP_IBKPT;
+         RUN = 0;
          break;
     }
 
     if (watch_stop) {
          reason = STOP_IBKPT;
+         RUN = 0;
          break;
     }
+
+#if PIDP10
+    if (examine_sw) {   /* Examine memory switch */
+        AB = AS;
+        (void)Mem_read(1, 0, 0, 0);
+        examine_sw = 0;
+    }
+    if (deposit_sw) {   /* Deposit memory switch */
+        AB = AS;
+        MB = SW;
+        (void)Mem_write(1, 0);
+        deposit_sw = 0;
+    }
+    if (xct_sw) {    /* Handle Front panel xct switch */
+        modify = 0;
+        xct_flag = 0;
+        uuo_cycle = 1;
+        f_pc_inh = 1;
+        MB = SW;
+        xct_sw = 0;
+        goto no_fetch;
+    }
+    if (stop_sw) {    /* Stop switch set */
+        RUN = 0;
+        stop_sw = 0;
+    }
+    if (sing_inst_sw) {  /* Handle Front panel single instruction */
+        instr_count = 1;
+    }
+#endif
+
 
 #if MAGIC_SWITCH
     if (!MAGIC) {
          reason = STOP_MAGIC;
+         RUN = 0;
          break;
     }
 #endif /* MAGIC_SWITCH */
@@ -4506,6 +4644,10 @@ no_fetch:
         AR = MB;
         AB = MB & RMASK;
         ix = GET_XR(MB);
+#if PIDP10
+        IX = ix;   /* Save these in variable so display can show them */
+        IND = ind;
+#endif
         if (ix) {
 #if KL | KS
              if (((xct_flag & 8) != 0 && !ptr_flg) ||
@@ -4663,7 +4805,7 @@ st_pi:
             for (f = 1; f < MAX_DEV; f++) {
                 if (dev_irq[f] & pi_mask) {
                     AB = uba_get_vect(AB, pi_mask, f);
-                    dev_irq[f] = 0;
+                    clr_interrupt(f << 2);
                     break;
                 }
             }
@@ -4727,10 +4869,10 @@ st_pi:
 
     /* Update history */
     if (hst_lnt) {
-            if (PC >= 020)
+            if (PC != 017)
                 hst_p = hst_p + 1;
             if (hst_p >= hst_lnt) {
-                    hst_p = 0;
+                hst_p = 0;
             }
             hst[hst_p].pc = HIST_PC | ((BYF5)? (HIST_PC2|PC) : IA);
             hst[hst_p].ea = AB;
@@ -5868,8 +6010,8 @@ dpnorm:
 #endif
 
     case 0124: /* DMOVEM */
-#if KS
               MQ = get_reg(AC + 1);
+#if KS
               if ((FLAGS & BYTI) == 0) {
                   IA = AB;
                   AB = (AB + 1) & RMASK;
@@ -5893,13 +6035,9 @@ dpnorm:
                       goto last;
                   FLAGS |= BYTI;
               }
-              MQ = get_reg(AC + 1);
               if ((FLAGS & BYTI)) {
                   AB = (AB + 1) & RMASK;
                   MB = MQ;
-#if KL
-                  FLAGS &= ~BYTI;
-#endif
                   if (Mem_write(0, 0))
                      goto last;
                   FLAGS &= ~BYTI;
@@ -6049,6 +6187,7 @@ dpnorm:
                       if ((AB + 8) >= MEMSIZE) {
                          fault_data |= 0400;
                          mem_prot = 1;
+                         check_apr_irq();
                          break;
                       }
                       MB = ((uint64)age) << 27 |
@@ -6082,6 +6221,7 @@ dpnorm:
                       if ((AB + 8) >= MEMSIZE) {
                          fault_data |= 0400;
                          mem_prot = 1;
+                         check_apr_irq();
                          break;
                       }
                       MB = M[AB];                /* WD 0 */
@@ -6119,17 +6259,19 @@ dpnorm:
                       MB = M[AB];                /* WD 7 */
                       ac_stack = (uint32)MB;
                       page_enable = 1;
+                      check_apr_irq();
                   }
                   /* AC & 2 = Clear TLB */
                   if (AC & 2) {
-                     for (f = 0; f < 512; f++)
-                        e_tlb[f] = u_tlb[f] = 0;
-                     mem_prot = 0;
+                      for (f = 0; f < 512; f++)
+                         e_tlb[f] = u_tlb[f] = 0;
+                      mem_prot = 0;
+                      check_apr_irq();
                   }
                   /* AC & 4 = Set Prot Interrupt */
                   if (AC & 4) {
                       mem_prot = 1;
-                      set_interrupt(0, apr_irq);
+                      check_apr_irq();
                   }
                   break;
               }
@@ -6519,11 +6661,11 @@ ldb_ptr:
                   }
 #endif
               } else {
-#if KL | KS
-                  ptr_flg = 0;
-#endif
 #if KL
 ld_exe:
+#endif
+#if KL | KS
+                  ptr_flg = 0;
 #endif
                   f = 0;
 #if !KS
@@ -8489,6 +8631,8 @@ jrstf:
 #endif
                             goto muuo;
                        } else {
+                            RUN = 0;
+                            prog_stop = 1;
                             reason = STOP_HALT;
                        }
                        break;
@@ -8551,6 +8695,8 @@ jrstf:
 #endif
                       goto muuo;
                  } else {
+                      RUN = 0;
+                      prog_stop = 1;
                       reason = STOP_HALT;
                  }
               }
@@ -8815,6 +8961,11 @@ jrstf:
                   glb_sect = 0;
 #endif
               BR = AOB(BR);
+#if KL_ITS
+              if (QITS && one_p_arm)    /* Don't clear traps if 1proc */
+                 FLAGS &= ~ (BYTI);
+              else
+#endif
               FLAGS &= ~ (BYTI|ADRFLT|TRP1|TRP2);
               if (BR & C1) {
 #if KI | KL | KS
@@ -12128,6 +12279,7 @@ last:
     }
 }
 /* Should never get here */
+RUN = 0;
 #if ITS
 if (QITS)
     load_quantum();
@@ -13391,6 +13543,7 @@ qua_srv(UNIT * uptr)
 {
     if ((fault_data & 1) == 0 && pi_enable && !pi_pending && (FLAGS & USER) != 0) {
        mem_prot = 1;
+       check_apr_irq();
     }
     qua_time = BIT17;
     return SCPE_OK;
@@ -13435,8 +13588,16 @@ static const char *pdp10_clock_precalibrate_commands[] = {
 t_stat cpu_reset (DEVICE *dptr)
 {
     int     i;
+    static  int  initialized = 0;
+
+    if (!initialized) {
+         initialized = 1;
+#if PIDP10
+         pi_panel_start();
+#endif
+    }
     sim_debug(DEBUG_CONO, dptr, "CPU reset\n");
-    BYF5 = uuo_cycle = 0;
+    RUN = BYF5 = uuo_cycle = 0;
 #if KA | PDP6
     Pl = Ph = 01777;
     Rl = Rh = Pflag = 0;
@@ -13448,8 +13609,11 @@ t_stat cpu_reset (DEVICE *dptr)
     page_enable = 0;
 #endif
 #endif
-    nxm_flag = clk_flg = 0;
-    PIR = PIH = PIE = pi_enable = parity_irq = 0;
+#if KA | KI
+    adr_flag = 0;
+#endif
+    MI_flag = prog_stop = nxm_flag = clk_flg = 0;
+    IOB_PI = PIR = PIH = PIE = pi_enable = parity_irq = 0;
     pi_pending = pi_enc = apr_irq = 0;
     ov_irq =fov_irq =clk_en =clk_irq = 0;
     pi_restore = pi_hold = 0;
@@ -13582,6 +13746,15 @@ else {
     M[ea] = val & FMASK;
     }
 return SCPE_OK;
+}
+
+/* Called at close of simulator */
+t_stat cpu_detach (UNIT *uptr)
+{
+#if PIDP10
+    pi_panel_stop();
+#endif
+    return SCPE_OK;
 }
 
 /* Memory size change */
