@@ -56,7 +56,7 @@ extern "C" {
 
 #if !defined(__VAX)         /* Unsupported platform */
 
-#define SIM_FRONTPANEL_VERSION   14
+#define SIM_FRONTPANEL_VERSION   15
 
 /**
 
@@ -114,7 +114,7 @@ sim_panel_add_device_panel (PANEL *simulator_panel,
  */
 
 int
-sim_panel_destroy (PANEL *panel);
+sim_panel_destroy (PANEL **ppanel);
 
 /**
 
