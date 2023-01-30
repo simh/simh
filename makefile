@@ -2865,8 +2865,6 @@ frontpaneltest : ${BIN}frontpaneltest${EXE} ${BIN}vax${EXE}
 ${BIN}frontpaneltest${EXE} : frontpanel/FrontPanelTest.c sim_sock.c sim_frontpanel.c
 	#cmake:ignore-target
 	$(MAKEIT) OPTS="$(OS_CURSES_DEFS)" TESTS=0
-#	${MKDIRBIN}
-#	${CC} frontpanel/FrontPanelTest.c sim_sock.c sim_frontpanel.c ${CC_OUTSPEC} ${LDFLAGS} ${OS_CURSES_DEFS}
 
 else # end of primary make recipies
 
@@ -2876,6 +2874,7 @@ else # end of primary make recipies
 
   # potential specified input parameters
   #    OPTS      - the compile options (required)
+  #    LNK_OPTS  - optional platform specific linker options
   #    TEST_NAME - the name of the simulator test script (when not simply named <simulator-name>_test.ini)
   #    ALTNAME   - an optional alternate name for the current simulator target
   
@@ -2927,7 +2926,7 @@ else # end of primary make recipies
 $(empty)
 $(empty)
 endef
-    MAKE_INFO = $(foreach VAR,CC OPTS DEPS LDFLAGS DIRS BUILD_SEPARATE,$(VAR)=$($(VAR))$(NEWLINE))
+    MAKE_INFO = $(foreach VAR,CC OPTS LNK_OPTS DEPS LDFLAGS DIRS BUILD_SEPARATE,$(VAR)=$($(VAR))$(NEWLINE))
     PRIOR_MAKE_INFO = $(shell if ${TEST} -e $(call pathfix,$(BLDDIR)/Make.info); then cat $(call pathfix,$(BLDDIR)/Make.info); fi)
     ifneq ($(strip $(subst $(NEWLINE), ,$(MAKE_INFO))),$(strip $(PRIOR_MAKE_INFO)))
       # Different or no prior options, so start from scratch
@@ -3046,7 +3045,7 @@ $(TARGET): $(OBJS)
   ifeq (1,$(QUIET))
 	@echo Linking $(TARGET)
   endif
-	${CC} $(OBJS) ${OPTS} -o $@ ${LDFLAGS}
+	${CC} $(OBJS) ${OPTS} ${LNK_OPTS} -o $@ ${LDFLAGS}
     else
 # Single Compile and Link of all inputs
 $(TARGET): $(DEPS)
@@ -3054,7 +3053,7 @@ $(TARGET): $(DEPS)
   ifeq (1,$(QUIET))
 	@echo Compile and Linking $(DEPS) into $(TARGET)
   endif
-	${CC} $(DEPS) ${OPTS} -o $@ ${LDFLAGS}
+	${CC} $(DEPS) ${OPTS} ${LNK_OPTS} -o $@ ${LDFLAGS}
     endif
     ifneq (,$(ALTNAME))
       ifeq (${WIN32},)
