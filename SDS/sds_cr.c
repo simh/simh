@@ -220,6 +220,8 @@ t_stat cr_devio (uint32 fnc, uint32 inst, uint32 *dat) {
         case IO_DISC:                                   /* disconnect */
             xfr_req = xfr_req & ~XFR_CR;                /* clr xfr flag */
             sim_cancel (uptr);                          /* deactivate unit */
+            cr_eor = 0;
+            uptr->STATUS = 0;
             break;
         case IO_SKS:                                    /* SKS */
             new_ch = I_GETSKCH (inst);                  /* get chan # */
