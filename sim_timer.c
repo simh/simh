@@ -898,7 +898,10 @@ if (rtc->currd)
     time = rtc->currd;
 if (!uptr)
     uptr = rtc->clock_unit;
-sim_debug (DBG_CAL, &sim_timer_dev, "sim_rtcn_init_unit(unit=%s, time=%d, tmr=%d)\n", uptr ? sim_uname(uptr) : "", time, tmr);
+if (ticksper)
+    sim_debug (DBG_CAL, &sim_timer_dev, "sim_rtcn_init_unit_ticks(unit=%s, time=%d, tmr=%d, ticks=%d)\n", uptr ? sim_uname(uptr) : "", time, tmr, ticksper);
+else
+    sim_debug (DBG_CAL, &sim_timer_dev, "sim_rtcn_init_unit(unit=%s, time=%d, tmr=%d)\n", uptr ? sim_uname(uptr) : "", time, tmr);
 if (uptr) {
     if (!rtc->clock_unit)
         sim_register_clock_unit_tmr (uptr, tmr);
@@ -958,6 +961,8 @@ rtc = &rtcs[tmr];
 if (rtc->hz != ticksper) {                          /* changing tick rate? */
     uint32 prior_hz = rtc->hz;
 
+    if (tmr == sim_calb_tmr_last)                   /* restarting after having previously been the calibrated timer? */
+        ticksper = rtc->last_hz;                    /* Use the prior tick rate */
     if (rtc->hz == 0)
         rtc->clock_tick_start_time = sim_timenow_double ();
     if ((rtc->last_hz != ticksper) && (ticksper != 0))
@@ -1864,8 +1869,10 @@ if ((w_idle < 500) || (w_ms == 0)) {                    /* shorter than 1/2 the 
     in_nowait = TRUE;
     return FALSE;
     }
-if (w_ms > 1000)                                        /* too long a wait (runaway calibration) */
-    sim_debug (DBG_TIK, &sim_timer_dev, "waiting too long: w_ms=%d usecs, w_idle=%d usecs, sim_interval=%d, rtc->currd=%d\n", w_ms, w_idle, sim_interval, rtc->currd);
+if (w_ms > 1000) {                                      /* too long a wait (runaway calibration) */
+    sim_printf ("sim_idle() - waiting too long:  w_ms=%d usecs, w_idle=%d usecs, sim_interval=%d, rtc->currd=%d\n", w_ms, w_idle, sim_interval, rtc->currd);
+    SIM_SCP_ABORT ("sim_idle() - waiting too long");
+    }
 in_nowait = FALSE;
 if (sim_clock_queue == QUEUE_LIST_END)
     sim_debug (DBG_IDL, &sim_timer_dev, "sleeping for %d ms - pending event in %d %s\n", w_ms, sim_interval, sim_vm_interval_units);
