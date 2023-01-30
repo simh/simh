@@ -107,6 +107,7 @@ int startup_sleep = 0;
 static void
 DisplayCallback (PANEL *panel, unsigned long long sim_time, void *context)
 {
+sim_panel_debug (panel, "DisplayCallback called at instruction time %u", (unsigned int)sim_time);
 simulation_time = sim_time;
 update_display = 1;
 }
@@ -238,6 +239,7 @@ if ((f = fopen (sim_config, "w"))) {
         fprintf (f, "set remote notelnet\n");
         fprintf (f, "set cpu history=128\n");
         }
+    fprintf (f, "set clock nocalibrate=1m\n");
     fprintf (f, "set cpu autoboot\n");
     fprintf (f, "set cpu 64\n");
     fprintf (f, "set console telnet=buffered\n");
@@ -258,20 +260,21 @@ if (!panel) {
     goto Done;
     }
 
-if (debug) {
+if (debug)
     sim_panel_set_debug_mode (panel, DBG_XMT|DBG_RCV|DBG_REQ|DBG_RSP|DBG_THR|DBG_APP);
-    }
-sim_panel_debug (panel, "Starting Debug\n");
+
+sim_panel_debug (panel, "Starting Debug");
 if (1) {
+
+    sim_panel_debug (panel, "Adding sub panel TAPE DRIVE");
     tape = sim_panel_add_device_panel (panel, "TAPE DRIVE");
 
     if (!tape) {
         printf ("Error adding tape device to simulator: %s\n", sim_panel_get_error());
         goto Done;
         }
-    if (debug) {
+    if (debug)
         sim_panel_set_debug_mode (tape, DBG_XMT|DBG_RCV|DBG_REQ|DBG_RSP|DBG_THR|DBG_APP);
-        }
     }
 if (1) {
     unsigned int noop_noop_noop_halt = 0x00010101, addr400 = 0x00000400, pc_value;
@@ -304,7 +307,7 @@ if (1) {
         goto Done;
         }
     if (pc_value != addr400 + 4) {
-        printf ("Unexpected error getting PC value: %08X, expected: %08X\n", pc_value, addr400 + 4);
+        printf ("Unexpected value returned getting PC value: %08X, expected: %08X\n", pc_value, addr400 + 4);
         goto Done;
         }
     }
@@ -428,7 +431,7 @@ if (sim_panel_get_registers (panel, NULL)) {
     printf ("Error getting register data: %s\n", sim_panel_get_error());
     goto Done;
     }
-if (sim_panel_set_display_callback_interval (panel, &DisplayCallback, NULL, 200000)) {
+if (sim_panel_set_display_callback_interval (panel, &DisplayCallback, NULL, 100000)) {
     printf ("Error setting automatic display callback: %s\n", sim_panel_get_error());
     goto Done;
     }
@@ -592,6 +595,7 @@ if (1) {
         printf ("State not Halt after successful Halt\n");
         goto Done;
         }
+    sim_panel_debug (panel, "Halt Reason: %s", sim_panel_halt_text (panel));
     if (sim_panel_device_debug_mode (panel, "DZ", 1, NULL)) {
         printf ("Can't enable Debug for DZ device: %s\n", sim_panel_get_error());
         goto Done;
@@ -617,8 +621,7 @@ sim_panel_clear_error ();
 return 0;
 
 Done:
-sim_panel_destroy (panel);
-panel = NULL;
+sim_panel_destroy (&panel);
 
 /* Get rid of pseudo config file created above */
 (void)remove (sim_config);
@@ -711,11 +714,11 @@ if (1) {
         };
     int i;
 
-    sim_panel_debug (panel, "Testing sim_panel_exec_halt and sim_panel_destroy() () with simulator in Run State");
+    sim_panel_debug (panel, "Testing sim_panel_exec_halt() and sim_panel_destroy() with simulator in Run State");
     for (i=0; long_running_program[i].instr; i++)
         if (sim_panel_mem_deposit_instruction (panel, sizeof(long_running_program[i].addr), 
                                                &long_running_program[i].addr, long_running_program[i].instr)) {
-            printf ("Error setting depositing instruction '%s' into memory at location %XR0: %s\n", 
+            printf ("Error setting depositing instruction '%s' into memory at location %X: %s\n", 
                     long_running_program[i].instr, long_running_program[i].addr, sim_panel_get_error());
             goto Done;
             }
@@ -740,7 +743,7 @@ if (1) {
         }
     usleep (2000000);   /* 2 Seconds */
     sim_panel_debug (panel, "Shutting down while simulator is running");
-    sim_panel_destroy (panel);
+    sim_panel_destroy (&panel);
     }
 sim_panel_clear_error ();
 InitDisplay ();
@@ -860,7 +863,7 @@ while (1) {
 
 Done:
 DisplayRegisters (panel, 0, 1);
-sim_panel_destroy (panel);
+sim_panel_destroy (&panel);
 
 /* Get rid of pseudo config file created earlier */
 (void)remove (sim_config);
