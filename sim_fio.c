@@ -533,21 +533,25 @@ static struct pack_test {
 
 static struct relative_path_test {
     const char  *input;
-    t_bool      prepend_cwd;
+    t_bool      prepend_orig_cwd;
     const char  *working_dir;
+    t_bool      prepend_working_cwd;
+    const char  *extra_dir;
     const char  *result;
     } r_test[] = {
-        {"/xx.dat",                 TRUE,  "xx",     "../xx.dat"},
-        {"/file.dat",               TRUE,  "xx/t",   "../../file.dat"},
-        {"/../../xxx/file.dat",     TRUE,  NULL,     "../../xxx/file.dat"},
-        {"\\..\\..\\xxx\\file.dat", TRUE,  NULL,     "../../xxx/file.dat"},
-        {"file.dat",                FALSE, NULL,     "./file.dat"},
-        {"\\file.dat",              TRUE,  NULL,     "./file.dat"},
-        {"C:/XXX/yyy/file.dat",     FALSE, NULL,     "C:/XXX/yyy/file.dat"},
-        {"C:/Users/yyy/file.dat",   FALSE, NULL,     "C:/Users/yyy/file.dat"},
-        {"W:/XXX/yyy/file.dat",     FALSE, NULL,     "W:/XXX/yyy/file.dat"},
-        {"/file.dat",               TRUE,  NULL,     "./file.dat"},
-        {"/x/filepath/file.dat",    FALSE, NULL,     "/x/filepath/file.dat"},
+        {"../../../xyzz/*",         FALSE, "xya/b/c", TRUE,  "xyzz",   "../../../xyzz/*"},
+        {"../xyzz/*",               FALSE, "xya/b/c", FALSE, "xyzz",  "../xyzz/*"},
+        {"/xx.dat",                 TRUE,  "xx",      FALSE, NULL,     "../xx.dat"},
+        {"/file.dat",               TRUE,  "xx/t",    FALSE, NULL,     "../../file.dat"},
+        {"/../../xxx/file.dat",     TRUE,  NULL,      FALSE, NULL,     "../../xxx/file.dat"},
+        {"\\..\\..\\xxx\\file.dat", TRUE,  NULL,      FALSE, NULL,     "../../xxx/file.dat"},
+        {"file.dat",                FALSE, NULL,      FALSE, NULL,     "./file.dat"},
+        {"\\file.dat",              TRUE,  NULL,      FALSE, NULL,     "./file.dat"},
+        {"C:/XXX/yyy/file.dat",     FALSE, NULL,      FALSE, NULL,     "C:/XXX/yyy/file.dat"},
+        {"C:/Users/yyy/file.dat",   FALSE, NULL,      FALSE, NULL,     "C:/Users/yyy/file.dat"},
+        {"W:/XXX/yyy/file.dat",     FALSE, NULL,      FALSE, NULL,     "W:/XXX/yyy/file.dat"},
+        {"/file.dat",               TRUE,  NULL,      FALSE, NULL,     "./file.dat"},
+        {"/x/filepath/file.dat",    FALSE, NULL,      FALSE, NULL,     "/x/filepath/file.dat"},
         {NULL},
         };
 
@@ -572,6 +576,7 @@ static struct get_filelist_test {
         {NULL},
     };
 
+#if !defined (NO_FIO_TEST_CODE)
 
 t_stat sim_fio_test (const char *cptr)
 {
@@ -624,16 +629,26 @@ for (rt = r_test; rt->input; ++rt) {
     t_stat mkdir_stat = SCPE_OK;
 
     strlcpy (origcwd, cwd, sizeof (origcwd));
-    if (rt->prepend_cwd) {
-        strlcpy (input, cwd, sizeof (input));
-        strlcat (input, rt->input, sizeof (input));
-        }
-    else
-        strlcpy (input, rt->input, sizeof (input));
+    if (rt->extra_dir != NULL)
+        mkdir_stat = mkdir_cmd (0, rt->extra_dir);
     if (rt->working_dir != NULL) {
         mkdir_stat = mkdir_cmd (0, rt->working_dir);
         sim_chdir (rt->working_dir);
         wd = sim_getcwd(cwd, sizeof (cwd));
+        }
+    if (rt->prepend_orig_cwd) {
+        strlcpy (input, origcwd, sizeof (input));
+        strlcat (input, "/", sizeof (input));
+        strlcat (input, rt->input, sizeof (input));
+        }
+    else {
+        if (rt->prepend_working_cwd) {
+            strlcpy (input, cwd, sizeof (input));
+            strlcat (input, "/", sizeof (input));
+            strlcat (input, rt->input, sizeof (input));
+            }
+        else
+            strlcpy (input, rt->input, sizeof (input));
         }
     for (sep = seperators; *sep != '\0'; ++sep) {
         while ((cp = strchr (input, *sep)))
@@ -660,6 +675,16 @@ for (rt = r_test; rt->input; ++rt) {
             }
         }
     sim_chdir (origcwd);
+    if ((rt->extra_dir != NULL) && (mkdir_stat == SCPE_OK)) {
+        char *xdir = strdup (rt->extra_dir);
+        
+        sim_rmdir (rt->extra_dir);
+        while ((cp = strrchr (xdir, '/')) != NULL) {
+            *cp = '\0';
+            sim_rmdir (xdir);
+            }
+        free (xdir);
+        }
     if ((rt->working_dir != NULL) && (mkdir_stat == SCPE_OK)) {
         char *xdir = strdup (rt->working_dir);
         
@@ -720,7 +745,7 @@ for (gt = get_test; gt->name; ++gt) {
 return r;
 }
 
-
+#endif /* NO_FIO_TEST_CODE */
 int sim_stat (const char *fname, struct stat *stat_str)
 {
 char namebuf[PATH_MAX + 1];
@@ -1464,6 +1489,9 @@ return getcwd (buf, buf_size);
  * In the above example above %I% can be replaced by other 
  * environment variables or numeric parameters to a DO command
  * invocation.
+ *
+ * This routine returns an allocated buffer which must be freed by the 
+ * caller as needed to avoid leaking memory.
  */
 
 char *sim_filepath_parts (const char *filepath, const char *parts)
@@ -1626,7 +1654,7 @@ const char *sim_relative_path (const char *filenamepath)
 {
 char dir[PATH_MAX+1] = "";
 char *wd = sim_getcwd(dir, sizeof (dir));
-char dsep = (strchr (dir, '/') != NULL) ? '/' : '\\';
+char dsep = (strchr (wd, '/') != NULL) ? '/' : '\\';
 char *cp;
 static char buf[CBUFSIZE*4];
 char *filepath = NULL;
@@ -1642,36 +1670,35 @@ if (strchr (filepath, fsep) == NULL) {  /* file directory path separators change
         *cp = fsep;                     /* restore original file path separator */
     }
 if (dsep != fsep) {                     /* if directory path separators aren't the same */
-    while ((cp = strchr (dir, dsep)) != NULL)
+    while ((cp = strchr (wd, dsep)) != NULL)
         *cp = fsep;                     /* change to the file path separator */
     dsep = fsep;
     }
-cp = dir - 1;
-cwd_dirs = (isalpha(dir[0]) && (dir[1] == ':')) ? 1 : 0;
+cp = wd - 1;
+cwd_dirs = (isalpha(wd[0]) && (wd[1] == ':')) ? 1 : 0;
 while ((cp = strchr (cp + 1, fsep)) != NULL)
     cwd_dirs++;
-if (dir[strlen (dir) - 1] != fsep)
+if (wd[strlen (wd) - 1] != fsep)
     cwd_dirs++;
 buf[0] = '\0';
-while ((dir[offset] != '\0') && (filepath[offset] != '\0')) {
-    if (dir[offset] == dsep) {
-        if (filepath[offset] == fsep) {
-            lastdir = offset;
-            ++offset;
-            continue;
-            }
+/* Skip over matching directory pieces */
+while ((wd[offset] != '\0') && (filepath[offset] != '\0')) {
+    if ((wd[offset] == dsep) &&
+        (filepath[offset] == fsep)) {
+        lastdir = offset;               /* save position of last director match */
+        ++offset;
+        continue;
         }
-
 #if defined(_WIN32)                     /* Windows has case independent file names */
-#define _CMP(x) toupper (x)
+#define _CMP(x) (islower (x) ? toupper (x) : x)
 #else
 #define _CMP(x) (x)
 #endif
-    if (_CMP(dir[offset]) != _CMP(filepath[offset]))
+    if (_CMP(wd[offset]) != _CMP(filepath[offset]))
         break;
     ++offset;
     }
-if (dir[offset] == '\0') {
+if (wd[offset] == '\0') {
     if (filepath[offset] == fsep) {
         lastdir = offset;
         ++offset;
@@ -1683,16 +1710,17 @@ if (dir[offset] == '\0') {
         }
     }
 else {
+    offset = lastdir + 1;
     updirs = 1;
-    while (dir[++lastdir] != '\0') {
-        if (dir[lastdir] == fsep)
+    while (wd[++lastdir] != '\0') {
+        if (wd[lastdir] == fsep)
             ++updirs;
         }
     }
 if (updirs > 0) {
     if ((offset == 3) &&                /* if only match windows drive letter? */
-        (dir[1] == ':') && 
-        (dir[2] == dsep))
+        (wd[1] == ':') && 
+        (wd[2] == dsep))
         offset = 0;                     /* */
     if ((offset > 0) && (updirs != cwd_dirs)) {
         for (up = 0; up < updirs; up++)
