@@ -2918,12 +2918,14 @@ if (f) {
         }
     else {
         /* We've got a valid footer, but it may need to be corrected */
-        if ((uptr->flags & UNIT_RO) == 0) {
-            if ((NtoHl (f->ElementEncodingSize) == 1) && 
-                (0 == memcmp (f->DriveType, "RZ", 2))) {
-                f->ElementEncodingSize = NtoHl (2);
+        if ((NtoHl (f->ElementEncodingSize) == 1) && 
+            ((0 == memcmp (f->DriveType, "RZ", 2)) || 
+             (0 == memcmp (f->DriveType, "RR", 2)))) {
+            f->ElementEncodingSize = NtoHl (2);
+            if ((uptr->flags & UNIT_RO) == 0)
                 store_disk_footer (uptr, (char *)f->DriveType);
-                }
+            }
+        if ((uptr->flags & UNIT_RO) == 0) {
             if ((NtoHl (f->SectorSize) != 512) &&
                 (f->FooterVersion == 0)) {
                 /* remove and rebuild early version original footer for non 512 byte sector containers */
@@ -3548,9 +3550,10 @@ if ((DK_GET_FMT (uptr) == DKUF_F_VHD) || (ctx->footer)) {
                     sim_show_message = saved_show_message;
                     if (r != SCPE_OK) {
                         if (size_settable_drive_type != NULL) {
-                            sim_switches |= SWMASK ('L');       /* LBN size */
+                            sim_switches |= SWMASK ('L');   /* LBN size */
                             snprintf (cmd, sizeof (cmd), "%s %s=%u", sim_uname (uptr), size_settable_drive_type->name, (uint32)(ctx->container_size / ctx->sector_size));
                             r = set_cmd (0, cmd);
+                            uptr->flags |= saved_RO_flags;  /* restore unit Read Only state after size adjustment */
                             }
                         else
                             r = sim_messagef (SCPE_INCOMPDSK, "%s: Cannot set to drive type %s\n", sim_uname (uptr), container_dtype);
