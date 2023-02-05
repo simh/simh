@@ -341,7 +341,6 @@
 
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
 
-#include <ctype.h>
 #include <math.h>
 
 /* Telnet protocol constants - negatives are for init'ing signed char data */
@@ -2065,7 +2064,7 @@ tmxr_debug_trace_line (lp, "tmxr_getc_ln()");
 if (((lp->conn || lp->txbfd) && lp->rcve) &&            /* (conn or buffered) & enb & */
     ((!lp->rxbps) ||                                    /* (!rate limited || enough time passed)? */
      (sim_gtime_now >= lp->rxnexttime))) {
-    if (!sim_send_poll_data (&lp->send, &val)) {        /* injected input characters available? */
+    if (!sim_send_poll_data (lp->send, &val)) {         /* injected input characters available? */
         j = lp->rxbpi - lp->rxbpr;                      /* # input chrs */
         if (j) {                                        /* any? */
             tmp = lp->rxb[lp->rxbpr];                   /* get char */
@@ -2409,8 +2408,8 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
 static int32 tmxr_rqln_bare (const TMLN *lp, t_bool speed)
 {
 if (speed) {
-    if (lp->send.extoff < lp->send.insoff) {/* buffered SEND data? */
-        if (sim_gtime () < lp->send.next_time) /* too soon? */
+    if (lp->send->extoff < lp->send->insoff) {/* buffered SEND data? */
+        if (sim_gtime () < lp->send->next_time) /* too soon? */
             return 0;
         else
             return 1;
@@ -2486,7 +2485,7 @@ if ((lp->conn && (TXBUF_AVAIL(lp) > 1)) ||              /* connected and room fo
         fputc (chr, lp->txlog);                         /* log to actual file */
         sim_oline = save_oline;                         /* resture output socket */
         }
-    sim_exp_check (&lp->expect, chr);                   /* process expect rules as needed */
+    sim_exp_check (lp->expect, chr);                    /* process expect rules as needed */
     if (!sim_is_running &&                              /* attach message or other non simulation time message? */
         !sim_is_remote_console_master_line (lp)) {                              
         tmxr_send_buffered_data (lp);                   /* put data on wire */
@@ -3717,8 +3716,13 @@ for (i=0; i<tmxr_open_device_count; ++i)
 if (!found) {
     tmxr_open_devices = (TMXR **)realloc(tmxr_open_devices, (tmxr_open_device_count+1)*sizeof(*tmxr_open_devices));
     tmxr_open_devices[tmxr_open_device_count++] = mux;
-    for (i=0; i<mux->lines; i++)
-        mux->ldsc[i].send.after = mux->ldsc[i].send.delay = 0;
+    for (i=0; i<mux->lines; i++) {
+        if (mux->ldsc[i].send == NULL)
+            mux->ldsc[i].send = (SEND *)calloc (1, sizeof (SEND));
+        if (mux->ldsc[i].expect == NULL)
+            mux->ldsc[i].expect = (EXPECT *)calloc (1, sizeof (EXPECT));
+        mux->ldsc[i].send->after = mux->ldsc[i].send->delay = 0;
+        }
     }
 }
 
@@ -3759,9 +3763,9 @@ for (i=0; i<tmxr_open_device_count; ++i)
         if (lp)
             *lp = &tmxr_open_devices[i]->ldsc[line];
         if (snd)
-            *snd = &tmxr_open_devices[i]->ldsc[line].send;
+            *snd = tmxr_open_devices[i]->ldsc[line].send;
         if (exp)
-            *exp = &tmxr_open_devices[i]->ldsc[line].expect;
+            *exp = tmxr_open_devices[i]->ldsc[line].expect;
         return SCPE_OK;
         }
 return SCPE_ARG;
@@ -3790,12 +3794,12 @@ int i, j;
 strcpy (line_name, "");
 for (i=0; i<tmxr_open_device_count; ++i)
     for (j=0; j<tmxr_open_devices[i]->lines; ++j)
-        if ((snd == &tmxr_open_devices[i]->ldsc[j].send) ||
-            (exp == &tmxr_open_devices[i]->ldsc[j].expect)) {
+        if ((snd == tmxr_open_devices[i]->ldsc[j].send) ||
+            (exp == tmxr_open_devices[i]->ldsc[j].expect)) {
             if (tmxr_open_devices[i]->lines > 1)
-                snprintf (line_name, sizeof (line_name), "%s:%d", tmxr_open_devices[i]->ldsc[j].send.dptr->name, j);
+                snprintf (line_name, sizeof (line_name), "%s:%d", tmxr_open_devices[i]->ldsc[j].send->dptr->name, j);
             else
-                strlcpy (line_name, tmxr_open_devices[i]->ldsc[j].send.dptr->name, sizeof (line_name));
+                strlcpy (line_name, tmxr_open_devices[i]->ldsc[j].send->dptr->name, sizeof (line_name));
             break;
             }
 return line_name;
@@ -3867,10 +3871,10 @@ if ((mp->lines > 1) ||
 uptr->dynflags |= UNIT_TM_POLL;                         /* tag as polling unit */
 if (mp->dptr) {
     for (i=0; i<mp->lines; i++) {
-        mp->ldsc[i].expect.dptr = mp->dptr;
-        mp->ldsc[i].expect.dbit = TMXR_DBG_EXP;
-        mp->ldsc[i].send.dptr = mp->dptr;
-        mp->ldsc[i].send.dbit = TMXR_DBG_SEND;
+        mp->ldsc[i].expect->dptr = mp->dptr;
+        mp->ldsc[i].expect->dbit = TMXR_DBG_EXP;
+        mp->ldsc[i].send->dptr = mp->dptr;
+        mp->ldsc[i].send->dbit = TMXR_DBG_SEND;
         if (mp->ldsc[i].uptr == NULL)
             mp->ldsc[i].uptr = mp->uptr;
         mp->ldsc[i].uptr->tmxr = (void *)mp;
@@ -4170,9 +4174,9 @@ for (i=0; i<mp->lines; i++) {
     TMLN *lp = &mp->ldsc[i];
 
     if (uptr == lp->uptr) {                     /* read polling unit? */
-        if ((lp->send.extoff < lp->send.insoff) &&
-            (sim_gtime_now < lp->send.next_time))
-            due = (int32)(lp->send.next_time - sim_gtime_now);
+        if ((lp->send->extoff < lp->send->insoff) &&
+            (sim_gtime_now < lp->send->next_time))
+            due = (int32)(lp->send->next_time - sim_gtime_now);
         else {
             if ((lp->rxbps)        &&           /* while rate limiting? */
                 (tmxr_rqln_bare (lp, FALSE))) { /* with pending input data */
@@ -4722,10 +4726,10 @@ if ((lp->serport == 0) && (lp->sock) && (!lp->datagram))
     fprintf (st, " %s\n", (lp->notelnet) ? "Telnet disabled (RAW data)" : "Telnet protocol");
 if ((!lp->notelnet) && (lp->nomessage))
     fprintf (st, " Telnet connect message disabled\n");
-if (lp->send.buffer)
-    sim_show_send_input (st, &lp->send);
-if (lp->expect.buf)
-    sim_exp_showall (st, &lp->expect);
+if (lp->send->buffer)
+    sim_show_send_input (st, lp->send);
+if (lp->expect->buf)
+    sim_exp_showall (st, lp->expect);
 if (lp->txlog)
     fprintf (st, " Logging to %s\n", lp->txlogname);
 }

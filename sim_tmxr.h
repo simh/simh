@@ -56,6 +56,7 @@ extern "C" {
 typedef struct SERPORT *SERHANDLE;
 #endif
 
+#include "sim_defs.h"
 #include "sim_sock.h"
 
 #define TMXR_V_VALID    15
@@ -202,8 +203,8 @@ struct tmln {
     UNIT                *uptr;                          /* input polling unit (default to mp->uptr) */
     UNIT                *o_uptr;                        /* output polling unit (default to lp->uptr)*/
     DEVICE              *dptr;                          /* line specific device */
-    EXPECT              expect;                         /* Expect rules */
-    SEND                send;                           /* Send input state */
+    EXPECT              *expect;                        /* Expect rules */
+    SEND                *send;                          /* Send input state */
     struct framer_data  *framer;                        /* ddcmp framer data */
     };
 

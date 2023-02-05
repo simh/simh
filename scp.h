@@ -38,7 +38,6 @@
 #define SIM_SCP_H_     0
 
 #include "sim_fio.h"
-#include <sys/stat.h>
 
 #ifdef  __cplusplus
 extern "C" {
