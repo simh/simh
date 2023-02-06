@@ -903,7 +903,7 @@ if ((ptr = get_sim_sw (ptr)) == NULL)               /* get switches */
     return SCPE_INVSW;
 get_glyph (ptr, gbuf, 0);                           /* get glyph */
 if (gbuf[0] && strcmp (gbuf, "CPU"))
-    return SCPE_ARG;                                /* Only can specify CPU device */
+    return sim_messagef (SCPE_ARG, "Invalid boot device: %s, must specify BOOT CPU or simply BOOT\n", gbuf);
 return run_cmd (flag, "CPU");
 }
 
