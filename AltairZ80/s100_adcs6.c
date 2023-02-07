@@ -215,10 +215,10 @@ static UNIT adcs6_unit[] = {
     { UDATA (&adcs6_svc, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, ADCS6_CAPACITY) },
     { UDATA (&adcs6_svc, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, ADCS6_CAPACITY) },
     { UDATA (&adcs6_svc, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, ADCS6_CAPACITY) },
-    { UDATA (&adcs6_ctc_svc, UNIT_DISABLE, 0) },  /* CTC0 */
-    { UDATA (&adcs6_ctc_svc, UNIT_DISABLE, 0) },  /* CTC1 */
-    { UDATA (&adcs6_ctc_svc, UNIT_DISABLE, 0) },  /* CTC2 */
-    { UDATA (&adcs6_ctc_svc, UNIT_DISABLE, 0) },  /* CTC3 */
+    { UDATA (&adcs6_ctc_svc, UNIT_DISABLE, 0), ADCS6_WAIT },  /* CTC0 */
+    { UDATA (&adcs6_ctc_svc, UNIT_DISABLE, 0), ADCS6_WAIT },  /* CTC1 */
+    { UDATA (&adcs6_ctc_svc, UNIT_DISABLE, 0), ADCS6_WAIT },  /* CTC2 */
+    { UDATA (&adcs6_ctc_svc, UNIT_DISABLE, 0), ADCS6_WAIT },  /* CTC3 */
 };
 
 static REG adcs6_reg[] = {
@@ -639,6 +639,15 @@ static t_stat adcs6_reset(DEVICE *dptr)
     PNP_INFO *pnp = (PNP_INFO *)dptr->ctxt;
     int i;
 
+    for (i = 0; i < ADCS6_MAX_UNITS; i++) {
+        adcs6_unit[i].u4 = i;
+    }
+
+    sim_set_uname(&adcs6_unit[4], "ADCS6_CTC0");
+    sim_set_uname(&adcs6_unit[5], "ADCS6_CTC1");
+    sim_set_uname(&adcs6_unit[6], "ADCS6_CTC2");
+    sim_set_uname(&adcs6_unit[7], "ADCS6_CTC3");
+
     if(dptr->flags & DEV_DIS) { /* Disconnect ROM and I/O Ports */
         if (adcs6_info->rom_disabled == FALSE) {
             sim_map_resource(pnp->mem_base, pnp->mem_size, RESOURCE_TYPE_MEMORY, &adcs6rom, "adcs6rom", TRUE);
@@ -700,23 +709,6 @@ static t_stat adcs6_reset(DEVICE *dptr)
             sim_printf("%s: error mapping I/O resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
             return SCPE_ARG;
         }
-
-        for (i = 0; i < ADCS6_MAX_UNITS; i++) {
-            adcs6_unit[i].u4 = i;
-        }
-
-        adcs6_unit[4].u4 = 4;
-        sim_set_uname(&adcs6_unit[4], "ADCS6_CTC0");
-        adcs6_unit[4].wait = ADCS6_WAIT;
-        adcs6_unit[5].u4 = 5;
-        sim_set_uname(&adcs6_unit[5], "ADCS6_CTC1");
-        adcs6_unit[5].wait = ADCS6_WAIT;
-        adcs6_unit[6].u4 = 6;
-        sim_set_uname(&adcs6_unit[6], "ADCS6_CTC2");
-        adcs6_unit[6].wait = ADCS6_WAIT;
-        adcs6_unit[7].u4 = 7;
-        sim_set_uname(&adcs6_unit[7], "ADCS6_CTC3");
-        adcs6_unit[7].wait = ADCS6_WAIT;
 
         /* Reset memory control registers */
         adcs6_info->mctrl0 = 0;
