@@ -873,7 +873,7 @@ static t_uint64 estimate_div_128_to_64(t_uint64 a0, t_uint64 a1, t_uint64 b)
 
     sub_128( a0, a1, term0, term1, &rem0, &rem1 );
 
-    while (((int64_t)rem0) < 0) {
+    while (((t_int64)rem0) < 0) {
         z -= 0x100000000ull;
         b1 = b << 32;
         add_128(rem0, rem1, b0, b1, &rem0, &rem1);
@@ -985,7 +985,7 @@ static t_int64 round_pack_int64(t_bool sign,
                                 RM rounding_mode)
 {
     t_bool increment;
-    int64_t z;
+    t_int64 z;
 
     increment = (t_int64)abs_1 < 0;
 
