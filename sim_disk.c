@@ -5037,9 +5037,9 @@ static t_stat sim_os_disk_unload_raw (FILE *f)
 if (ioctl ((int)((long)f), CDROM_GET_CAPABILITY, NULL) < 0)
     return SCPE_OK;
 if (ioctl((int)((long)f), CDROM_LOCKDOOR, 0) < 0)
-    return SCPE_IOERR;
+    return sim_messagef (SCPE_OK, "Apparent CDROM can't unlock door: %s\n", strerror (errno));
 if (ioctl((int)((long)f), CDROMEJECT) < 0)
-    return SCPE_IOERR;
+    return sim_messagef (SCPE_OK, "Apparent CDROM can't eject: %s\n", strerror (errno));
 #endif
 return SCPE_OK;
 }
