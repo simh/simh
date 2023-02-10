@@ -9613,16 +9613,16 @@ else if (flag == RU_BOOT) {                             /* boot */
         return SCPE_2MARG;
     dptr = find_unit (gbuf, &uptr);                     /* locate unit */
     if (dptr == NULL)                                   /* found dev? */
-        return sim_messagef (SCPE_NXDEV, "Non-existent device: %s\n", gbuf);
+        return sim_messagef (SCPE_NXUN, "No such Unit: %s\n", gbuf);
     if (uptr == NULL)                                   /* valid unit? */
-        return SCPE_NXUN;
+        return sim_messagef (SCPE_NXUN, "No such Unit: %s\n", gbuf);
     if (dptr->boot == NULL)                             /* can it boot? */
-        return SCPE_NOFNC;
+        return sim_messagef (SCPE_NOFNC, "Non bootable device: %s\n", gbuf);
     if (uptr->flags & UNIT_DIS)                         /* disabled? */
         return sim_messagef (SCPE_UDIS, "Unit disabled: %s\n", sim_uname (uptr));
     if ((uptr->flags & UNIT_ATTABLE) &&                 /* if attable, att? */
         !(uptr->flags & UNIT_ATT))
-        return SCPE_UNATT;
+        return sim_messagef (SCPE_UNATT, "Unit not attached: %s\n", sim_uname (uptr));
     unitno = (int32) (uptr - dptr->units);              /* recover unit# */
     if ((r = sim_run_boot_prep (flag)) != SCPE_OK)      /* reset sim */
         return r;
