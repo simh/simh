@@ -608,13 +608,8 @@ t_stat r;
 if ((ptr = get_sim_sw (ptr)) == NULL)                   /* get switches */
     return SCPE_INVSW;
 r = vax750_boot_parse (flag, ptr);                      /* parse the boot cmd */
-if (r != SCPE_OK) {                                     /* error? */
-    if (r >= SCPE_BASE) {                               /* message available? */
-        sim_printf ("%s\n", sim_error_text (r));
-        r |= SCPE_NOMESSAGE;
-        }
+if (r != SCPE_OK)                                       /* error? */
     return r;
-    }
 strncpy (cpu_boot_cmd, ptr, CBUFSIZE-1);                /* save for reboot */
 return run_cmd (flag, "CPU");
 }
@@ -632,7 +627,7 @@ UNIT *uptr;
 t_stat r;
 
 if (!ptr || !*ptr)
-    return SCPE_2FARG;
+    return sim_messagef (SCPE_2FARG, "Missing boot device/unit specifier\n");
 if (ptr && (*ptr == '/')) {                             /* handle "BOOT /R5:n DEV" format */
     ptr = get_glyph (ptr, rbuf, 0);                     /* get glyph */
     regptr = rbuf;
@@ -654,15 +649,18 @@ if ((strncmp (regptr, "/R5:", 4) == 0) ||
     (strncmp (regptr, "/r5=", 4) == 0)) {
     r5v = (int32) get_uint (regptr + 4, 16, LMASK, &r);
     if (r != SCPE_OK)
-        return r;
+        return sim_messagef (r, "Can't parse R5 value from: %s\n", regptr + 4);
     }
-else if (*regptr == '/') {
-    r5v = (int32) get_uint (regptr + 1, 16, LMASK, &r);
-    if (r != SCPE_OK)
-        return r;
-    }
-else if (*regptr != 0)
-    return SCPE_ARG;
+else
+    if (*regptr == '/') {
+        r5v = (int32) get_uint (regptr + 1, 16, LMASK, &r);
+        if (r != SCPE_OK)
+            return sim_messagef (r, "Can't parse R5 value from: %s\n", regptr + 1);
+        }
+    else {
+        if (*regptr != 0)
+            return sim_messagef (SCPE_ARG, "Invalid boot argument: %s\n", regptr);
+        }
 if (gbuf[0]) {
     unitno = -1;
     for (i = 0; boot_tab[i].devname != NULL; i++) {
@@ -671,7 +669,7 @@ if (gbuf[0]) {
             if (memcmp (gbuf, ((char *)rom) + (0x100 * boot_tab[i].bootdev), 2)) {
                 r = mctl_populate_rom (boot_tab[i].bootcodefile);
                 if (r != SCPE_OK)
-                    return r;
+                    return sim_messagef (r, "Can't load ROM file: %s\n", boot_tab[i].bootcodefile);
                 vax750_bootdev = boot_tab[i].bootdev;
                 }
             sprintf(dbuf, "%s%s", boot_tab[i].devname, gbuf + strlen(boot_tab[i].romdevalias));
@@ -743,7 +741,7 @@ else {
     PC = 0xFA02 + 0x100*vax750_bootdev;
     return SCPE_OK;
     }
-return SCPE_NOFNC;
+return sim_messagef (SCPE_NOFNC, "Non bootable device: %s\n", gbuf);
 }
 
 /* Bootstrap - finish up bootstrap process */
