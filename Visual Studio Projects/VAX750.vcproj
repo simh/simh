@@ -405,6 +405,10 @@
 				RelativePath="..\VAX\vax_syscm.c"
 				>
 			</File>
+			<File
+				RelativePath="..\VAX\vax_uw.c"
+				>
+			</File>
 			<Filter
 				Name="slirp"
 				>

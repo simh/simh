@@ -65,6 +65,7 @@ extern DEVICE xu_dev, xub_dev;
 extern DEVICE dmc_dev;
 extern DEVICE dup_dev;
 extern DEVICE ch_dev;
+extern DEVICE uw_dev;
 
 DEVICE *sim_devices[] = { 
     &cpu_dev,
@@ -103,6 +104,7 @@ DEVICE *sim_devices[] = {
     &dmc_dev,
     &dup_dev,
     &ch_dev,
+    &uw_dev,
     NULL
     };
 
