@@ -6383,6 +6383,23 @@ static t_stat sim_instr_mmu (void) {
     return reason;
 }
 
+/*
+ * This sequence of instructions is a mix that mimics
+ * a resonable instruction set that is a close estimate
+ * to the calibrated result.
+ */
+
+static const char *cpu_clock_precalibrate_commands[] = {
+    "-m 100 LXI H,200H",
+    "-m 103 MVI B,0",
+    "-m 105 DCR B",
+    "-m 106 MOV M,B",
+    "-m 107 INX H",
+    "-m 108 JNZ 0105H",
+    "-m 10B JMP 0100H",
+    "PC 100",
+    NULL};
+
 /* reset routine */
 
 static t_stat cpu_reset(DEVICE *dptr) {
@@ -6400,6 +6417,7 @@ static t_stat cpu_reset(DEVICE *dptr) {
     setBankSelect(0);
     cpu8086reset();
     m68k_cpu_reset();
+    sim_clock_precalibrate_commands = cpu_clock_precalibrate_commands;
     sim_brk_types = (SWMASK('E') | SWMASK('I') | SWMASK('M'));
     sim_brk_dflt = SWMASK('E');
     for (i = 0; i < PCQ_SIZE; i++)
