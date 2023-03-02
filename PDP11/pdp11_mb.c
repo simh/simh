@@ -46,17 +46,17 @@ static uint32 history[HSIZE];
 /* BITS IN MBCSR */
 #define MBINTE 0100
 #define MBAFRZ 0200
-#define MBXAYR 0400		/* X<A<Y READ TRAP */
-#define MBXAYW 01000		/* X<A<Y WRITE TRAP */
-#define MBNOIN 02000		/* IGNORE INIT */
-#define MBINAO 04000		/* INTERRUPT ON ALMOST OVERFLOW */
+#define MBXAYR 0400             /* X<A<Y READ TRAP */
+#define MBXAYW 01000            /* X<A<Y WRITE TRAP */
+#define MBNOIN 02000            /* IGNORE INIT */
+#define MBINAO 04000            /* INTERRUPT ON ALMOST OVERFLOW */
 
 /* BITS IN MBXHGH AND MBYHGH*/
-#define MBREDT 04		/* READ TRAP BIT */
-#define MBWRTT 010		/* WRITE TRAP BIT */
+#define MBREDT 04               /* READ TRAP BIT */
+#define MBWRTT 010              /* WRITE TRAP BIT */
 
 /* BITS IN MBHHGH */
-#define MBWRTB 04		/* WRITE BIT IN HISTORY MEMORY HIGH BITS */
+#define MBWRTB 04               /* WRITE BIT IN HISTORY MEMORY HIGH BITS */
 
 #define IOLN_MB   020
 DIB mb_dib = {

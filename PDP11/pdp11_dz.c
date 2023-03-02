@@ -72,7 +72,6 @@
 #define DZ_8B_DFLT      TT_MODE_8B
 #endif
 
-#include "sim_sock.h"
 #include "sim_tmxr.h"
 
 #if !defined (DZ_MUXES)
@@ -840,8 +839,8 @@ for (dz = 0; dz < dz_desc.lines/DZ_LINES; dz++) {
     for (muxln = 0; muxln < DZ_LINES; muxln++) {
         TMLN *lp = &dz_ldsc[(dz * DZ_LINES) + muxln];
 
-		if (lp->serconfig)
-            tmxr_set_config_line (lp, lp->serconfig);	/* make settings consistent */
+        if (lp->serconfig)
+            tmxr_set_config_line (lp, lp->serconfig);   /* make settings consistent */
         }
     if (!dz_mctl || (0 == (dz_csr[dz] & CSR_MSE)))      /* enabled? */
         continue;
@@ -869,10 +868,10 @@ for (dz = 0; dz < dz_desc.lines/DZ_LINES; dz++) {
     for (muxln = 0; muxln < DZ_LINES; muxln++) {
         TMLN *lp = &dz_ldsc[(dz * DZ_LINES) + muxln];
 
-		free (lp->serconfig);
-		lp->serconfig = NULL;
+        free (lp->serconfig);
+        lp->serconfig = NULL;
         }
-	}
+    }
 return r;
 }
 

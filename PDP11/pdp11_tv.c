@@ -77,14 +77,14 @@ static uint16 RAM[64*FB];
 #define TVINC     0077  /* Mask for the increment. */
 
 /* TVSEL bits. */
-#define TVRCNS    0077	/* The console number mask. */
+#define TVRCNS    0077  /* The console number mask. */
 #define TVNSH     0000  /* No shift write mode. */
-#define TVIOR     0100	/* The inclusive or mode. */
-#define TVXOR     0200	/* The xor mode. */
-#define TVMOV     0300	/* The move function. */
+#define TVIOR     0100  /* The inclusive or mode. */
+#define TVXOR     0200  /* The xor mode. */
+#define TVMOV     0300  /* The move function. */
 
 /* TVSHR bits. */
-#define TVSHCN    0017	/* The shift count. */
+#define TVSHCN    0017  /* The shift count. */
 
 /* TVCNSL bits. */
 #define SCROLL  007777  /* Scroll pointer. */
@@ -180,8 +180,7 @@ render_display (uint16 display)
   int i;
   if (display >= TV_WINDOWS)
     return;
-  sim_debug (DBG_VID, &tv_dev, "Render display %d buffer %d\n",
-	     display, buffer);
+  sim_debug (DBG_VID, &tv_dev, "Render display %d buffer %d\n", display, buffer);
   for (i = 0; i < (TV_PIXELS / 8); i += 2)
     render_word (buffer, i);
   tv_updated[display] = 1;
