@@ -2903,12 +2903,20 @@ for (i = 1; i < argc; i++) {                            /* loop thru args */
     if (argv[i] == NULL)                                /* paranoia */
         continue;
     if ((*argv[i] == '-') && lookswitch) {              /* switch? */
+        int arg;
+
         if (get_switches (argv[i], &sw, NULL) == SW_ERROR) {
             fprintf (stderr, "Invalid switch %s\n", argv[i]);
             free (targv);
             return EXIT_FAILURE;
             }
         sim_switches = sim_switches | sw;
+        /* Remove digested switch special argument to avoid confusion later */
+        for (arg = i + 1; argv[arg] != NULL; arg++)
+            argv[arg - 1] = argv[arg];
+        argv[arg] = NULL;
+        --argc;
+        --i;
         }
     else {
         if ((strlen (argv[i]) + strlen (cbuf) + 3) >= sizeof(cbuf)) {

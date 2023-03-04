@@ -243,6 +243,7 @@ CONST char *match_ext (CONST char *fnam, const char *ext);
 int sim_cmp_string (const char *s1, const char *s2);
 t_stat sim_fetch_binary_file (const char *filename, const char *filepath, size_t size, unsigned int checksum);
 t_stat show_version (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr);
+t_stat set_dev_enbdis (DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr);
 t_stat set_dev_debug (DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr);
 t_stat show_dev_debug (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr);
 t_stat sim_add_debug_flags (DEVICE *dptr, DEBTAB *debflags);
