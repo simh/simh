@@ -2968,6 +2968,11 @@ AIO_INIT;                                               /* init Asynch I/O */
 sim_finit ();                                           /* init fio package */
 sim_disk_init ();                                       /* init disk package */
 sim_tape_init ();                                       /* init tape package */
+if ((argc > 2) && 
+    (sim_strcasecmp (argv[1], "CheckSourceCode") == 0)) {
+    return sim_check_source (argc - 1, argv + 1);
+    }
+
 for (i = 0; cmd_table[i].name; i++) {
     size_t alias_len = strlen (cmd_table[i].name);
     char *cmd_name = (char *)calloc (1 + alias_len, sizeof (*cmd_name));

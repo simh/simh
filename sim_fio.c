@@ -564,12 +564,22 @@ static struct get_filelist_test {
     int         expected_count;
    } get_test[] = {
         {"test-1",
+         {"file.txt",
+          NULL},
+         "file.txt", 1},
+        {"test-2",
+         {"aab/bbc/ccd/eef/file.txt", 
+          "aab/bbc/ccd/eef/file2.txt", 
+          "aac/bbd/cce/eef/file2.txt", 
+          NULL},
+         "file.txt", 1},
+        {"test-3",
          {"aab/bbc/ccd/eef/file.txt", 
           "aab/bbc/ccd/eef/file2.txt", 
           "aac/bbd/cce/eef/file2.txt", 
           NULL},
          "*.txt", 3},
-        {"test-2",
+        {"test-4",
          {"xab/bbc/ccd/eef/file.txt", 
           "xab/bbc/ccd/eef/file2.bbb", 
           "xac/bbd/cce/eef/file2.txt", 
@@ -590,8 +600,8 @@ char test_desc[512];
 uint8 result[512];
 
 sim_register_internal_device (&sim_fio_test_dev);
-sim_fio_test_dev.dctrl = (sim_switches & SWMASK ('D')) ? FIO_DBG_PACK : 0;
-sim_fio_test_dev.dctrl = (sim_switches & SWMASK ('S')) ? FIO_DBG_SCAN : 0;
+sim_fio_test_dev.dctrl |= (sim_switches & SWMASK ('D')) ? FIO_DBG_PACK : 0;
+sim_fio_test_dev.dctrl |= (sim_switches & SWMASK ('S')) ? FIO_DBG_SCAN : 0;
 sim_set_deb_switches (SWMASK ('F'));
 sim_messagef (SCPE_OK, "sim_buf_pack_unpack - tests\n");
 for (pt = p_test; pt->src; ++pt) {
@@ -722,8 +732,10 @@ for (gt = get_test; gt->name; ++gt) {
         fclose (fopen (xpath, "w"));
         free (filename);
         }
-    snprintf (xpath, sizeof (xpath), "testfiles/%s", gt->search);
+    sim_chdir ("testfiles");
+    snprintf (xpath, sizeof (xpath), "%s", gt->search);
     filelist = sim_get_filelist (xpath);
+    sim_chdir ("..");
     r = sim_messagef ((gt->expected_count != sim_count_filelist (filelist)) ? SCPE_IERR : SCPE_OK, 
                       "sim_get_filelist (\"%s\") yielded %d entries:\n", xpath, sim_count_filelist (filelist));
     sim_print_filelist (filelist);
@@ -788,6 +800,82 @@ if (NULL == _sim_expand_homedir (path, pathbuf, sizeof (pathbuf)))
 return rmdir (pathbuf);
 }
 
+typedef struct FILELIST_DIRECTORY_CACHE {
+    struct FILELIST_DIRECTORY_CACHE *next;
+    char *directory;
+    char **dirlist;
+    } FILELIST_DIRECTORY_CACHE;
+
+static FILELIST_DIRECTORY_CACHE *_filelist_directory_cache = NULL;
+
+static char **_check_filelist_directory_cache (const char *directory)
+{
+FILELIST_DIRECTORY_CACHE *entry = _filelist_directory_cache;
+
+while (entry != NULL) {
+    if (strcmp (directory, entry->directory) == 0) {
+        sim_debug (FIO_DBG_SCAN, &sim_fio_test_dev, "_check_filelist_directory_cache(directory=\"%s\") found with %d entries\n", directory, sim_count_filelist (entry->dirlist));
+        return entry->dirlist;
+        }
+    entry = entry->next;
+    }
+sim_debug (FIO_DBG_SCAN, &sim_fio_test_dev, "_check_filelist_directory_cache(directory=\"%s\") not found\n", directory);
+return NULL;
+}
+
+static void _save_filelist_directory_cache (const char *directory, char **dirlist)
+{
+FILELIST_DIRECTORY_CACHE *entry;
+
+if (_check_filelist_directory_cache (directory) != NULL) {
+    sim_debug (FIO_DBG_SCAN, &sim_fio_test_dev, "_save_filelist_directory_cache(directory=\"%s\") previously saved with %d directories\n", directory, sim_count_filelist (dirlist));
+    return;
+    }
+entry = (FILELIST_DIRECTORY_CACHE *)calloc (1, sizeof (*entry));
+entry->directory = strdup (directory);
+entry->dirlist = dirlist;
+entry->next = _filelist_directory_cache;
+_filelist_directory_cache = entry;
+sim_debug (FIO_DBG_SCAN, &sim_fio_test_dev, "_save_filelist_directory_cache(directory=\"%s\") saved with %d directories\n", directory, sim_count_filelist (dirlist));
+}
+
+static void _flush_filelist_directory_cache (void)
+{
+FILELIST_DIRECTORY_CACHE *entry = _filelist_directory_cache;
+
+while (entry != NULL) {
+    _filelist_directory_cache = entry->next;
+    free (entry->directory);
+    sim_free_filelist (&entry->dirlist);
+    free (entry);
+    entry = _filelist_directory_cache;
+    }
+}
+
+static char **filelist_skip_directories = NULL;
+
+void sim_set_get_filelist_skip_directories (const char * const *dirlist)
+{
+int dircount = 0;
+
+if (dirlist != NULL) {
+    while (dirlist[dircount++] != NULL);
+    --dircount;
+    }
+
+sim_free_filelist (&filelist_skip_directories);
+
+filelist_skip_directories = (char **)calloc (dircount + 1, sizeof (*filelist_skip_directories));
+dircount = 0;
+while (*dirlist != NULL)
+    filelist_skip_directories[dircount++] = strdup (*dirlist++);
+}
+
+void sim_clear_get_filelist_skip_directories (void)
+{
+sim_free_filelist (&filelist_skip_directories);
+}
+
 static void _sim_dirlist_entry (const char *directory, 
                                  const char *filename,
                                  t_offset FileSize,
@@ -796,19 +884,41 @@ static void _sim_dirlist_entry (const char *directory,
 {
 char **dirlist = *(char ***)context;
 char FullPath[PATH_MAX + 1];
-int listcount = 0;
+int listcount;
 
 if ((strcmp (filename, "..") == 0)       || /* Ignore previous dir */
-    (strcmp (filename, ".") == 0)        || /* Ignore current dir */
     ((filestat->st_mode & S_IFDIR) == 0) || /* Ignore anything not a directory */
     (stop_cpu))
     return;
+
+if (filelist_skip_directories != NULL) {
+    char **cdir = filelist_skip_directories;
+
+    while (*cdir != NULL) {
+        if (strcmp (*cdir, filename) == 0)
+            break;
+        ++cdir;
+        }
+    if (*cdir != NULL) {
+        sim_debug (FIO_DBG_SCAN, &sim_fio_test_dev, "Skipping directory: %s\n", filename);
+        return;
+        }
+    }
+
 if (strcmp (filename, ".") == 0)
     filename = "";
 snprintf (FullPath, sizeof (FullPath), "%s%s%s", directory, filename, (*filename != '\0') ? "/" : "");
+
+/* Ignore this entry if it is already in the directory list */
+listcount = 0;
 if (dirlist != NULL) {
-    while (dirlist[listcount++] != NULL);
-    --listcount;
+    while (dirlist[listcount] != NULL) {
+        if (strcmp (FullPath, dirlist[listcount]) == 0) {
+            sim_debug (FIO_DBG_SCAN, &sim_fio_test_dev, "Ignoring already present directory: %s\n", FullPath);
+            return;
+            }
+        ++listcount;
+        }
     }
 dirlist = (char **)realloc (dirlist, (listcount + 2) * sizeof (*dirlist));
 dirlist[listcount] = strdup (FullPath);
@@ -843,20 +953,20 @@ filelist[listcount + 1] = NULL;
 
 char **sim_get_filelist (const char *filename)
 {
-t_stat r;
+t_stat r = SCPE_OK;
 char *dir = sim_filepath_parts (filename, "p");
 size_t dirsize = strlen (dir);
 char *file = sim_filepath_parts (filename, "nx");
-char **dirlist, **dirs;
+char **dirlist = NULL, **dirs;
 char **filelist = NULL;
 
 sim_debug (FIO_DBG_SCAN, &sim_fio_test_dev, "sim_get_filelist(filename=\"%s\")\n", filename);
 sim_debug (FIO_DBG_SCAN, &sim_fio_test_dev, " Looking for Directories in\"%s\"\n", dir);
 dir = (char *)realloc (dir, dirsize + 2);
 strlcat (dir, "*", dirsize + 2);
-dirlist = NULL;
-r = sim_dir_scan (dir, _sim_dirlist_entry, &dirlist);
-free (dir);
+dirlist = _check_filelist_directory_cache (dir);
+if (dirlist == NULL)
+    r = sim_dir_scan (dir, _sim_dirlist_entry, &dirlist);
 sim_debug (FIO_DBG_SCAN, &sim_fio_test_dev, " %d directories found, r=%d\n", sim_count_filelist (dirlist), r);
 if (r == SCPE_OK) {
     filelist = NULL;
@@ -879,13 +989,14 @@ if (r == SCPE_OK) {
                 }
             }
         }
-    else
-        sim_dir_scan (filename, _sim_filelist_entry, &filelist);
+    sim_dir_scan (filename, _sim_filelist_entry, &filelist);
     free (file);
-    sim_free_filelist (&dirlist);
+    _save_filelist_directory_cache (dir, dirlist);
+    free (dir);
     return filelist;
     }
 free (file);
+free (dir);
 r = sim_dir_scan (filename, _sim_filelist_entry, &filelist);
 if (r == SCPE_OK)
     return filelist;
@@ -1468,7 +1579,13 @@ char *sim_getcwd (char *buf, size_t buf_size)
 #if defined (VMS)
 return getcwd (buf, buf_size, 0);
 #else
-return getcwd (buf, buf_size);
+char *result = getcwd (buf, buf_size);
+
+#if defined (_WIN32)
+if ((result != NULL) && sim_islower (buf[0]) && (buf[1] == ':'))
+    buf[0] = sim_toupper (buf[0]);
+#endif
+return result;
 #endif
 }
 
@@ -1539,8 +1656,8 @@ else {          /* Need to prepend current directory */
     }
 while ((c = strchr (fullpath, '\\')))           /* standardize on / directory separator */
        *c = '/';
-if ((fullpath[1] == ':') && islower (fullpath[0]))
-    fullpath[0] = toupper (fullpath[0]);
+if ((fullpath[1] == ':') && sim_islower (fullpath[0]))
+    fullpath[0] = sim_toupper (fullpath[0]);
 while ((c = strstr (fullpath + 1, "//")))       /* strip out redundant / characters (leaving the option for a leading //) */
        memmove (c, c + 1, 1 + strlen (c + 1));
 while ((c = strstr (fullpath, "/./")))          /* strip out irrelevant /./ sequences */
@@ -1690,7 +1807,7 @@ while ((wd[offset] != '\0') && (filepath[offset] != '\0')) {
         continue;
         }
 #if defined(_WIN32)                     /* Windows has case independent file names */
-#define _CMP(x) (islower (x) ? toupper (x) : x)
+#define _CMP(x) (sim_islower (x) ? sim_toupper (x) : x)
 #else
 #define _CMP(x) (x)
 #endif
@@ -1772,6 +1889,8 @@ if ((hFind =  FindFirstFileA (cptr, &File)) != INVALID_HANDLE_VALUE) {
         while ((c = strchr (DirName, '\\')))
             *c = '/';                           /* Convert backslash to slash */
         }
+    if (sim_islower (DirName[0]) && (DirName[1] == ':'))
+        DirName[0] = sim_toupper (DirName[0]);
     sprintf (&DirName[strlen (DirName)], "%c", *pathsep);
     do {
         FileSize = (((t_int64)(File.nFileSizeHigh)) << 32) | File.nFileSizeLow;
@@ -2124,3 +2243,516 @@ if (n != 0) {
 return (s - src - 1);               /* count does not include NUL */
 }
 
+/* SCP Simulator Source Code validator support */
+
+static const char *_check_source_skip_dirs[] = {
+    ".git",
+    ".github",
+    ".travis",
+    "BIN",
+    "doc",
+    NULL
+    };
+
+static const char *_check_source_scp_sub_dirs[] = {
+    "slirp",
+    "slirp_glue",
+    "slirp_glue/qemu",
+    "slirp_glue/qemu/sysemu",
+    "display",
+    NULL
+    };
+
+
+static const char *_check_source_allowed_sysincludes[] = {
+    "ctype.h",
+    "errno.h",
+    "limits.h",
+    "math.h",
+    "setjmp.h",
+    "stdarg.h",
+    "stddef.h",
+    "stdio.h",
+    "stdlib.h",
+    "string.h",
+    "sys/stat.h",
+    "time.h",
+    "SDL.h",
+    "SDL_ttf.h",
+    NULL
+    };
+
+typedef struct FILE_STATS {
+    char RelativePath[PATH_MAX + 1];
+    t_offset FileSize;
+    int Lines;
+    t_bool IsInScpDir;
+    t_bool HasBinary;
+    t_bool IsSource;
+    t_bool HasTabs;
+    t_bool HasSimSockInclude;
+    int BenignIncludeCount;
+    char **BenignIncludes;
+    int LocalIncludeCount;
+    char **LocalIncludes;
+    int SysIncludeCount;
+    char **SysIncludes;
+    int OtherSysIncludeCount;
+    char **OtherSysIncludes;
+    int MissingIncludeCount;
+    char **MissingIncludes;
+    int LineEndingsLF;
+    int LineEndingsCRLF;
+    t_bool ProblemFile;
+    } FILE_STATS;
+
+static char *sim_check_scp_dir = NULL;
+
+static void _check_source_check_file (const char *directory, 
+                                      const char *filename, 
+                                      t_offset FileSize, 
+                                      FILE_STATS *Stats)
+{
+char filepath[PATH_MAX + 1];
+FILE *f;
+char *data;
+char *extension;
+char *dir;
+t_offset byte;
+size_t lfcount = 0, 
+       crlfcount = 0, 
+       tabcount = 0, 
+       wscount = 0, 
+       bincount = 0;
+const char *errmsg;
+
+data = (char *)malloc ((size_t)(FileSize + 1));
+data[FileSize] = '\0';
+snprintf (filepath, sizeof (filepath), "%s%s", directory, filename);
+strlcpy (Stats->RelativePath, sim_relative_path (filepath), sizeof (Stats->RelativePath));
+extension = sim_filepath_parts (filepath, "x");
+Stats->IsSource = ((0 == strcmp (".c", extension)) || (0 == strcmp (".h", extension)));
+dir = sim_filepath_parts (directory, "p");
+Stats->IsInScpDir = (sim_check_scp_dir != NULL) && (strcmp (dir, sim_check_scp_dir) == 0);
+free (dir);
+if ((!Stats->IsInScpDir) && (sim_check_scp_dir != NULL)) {
+    const char **scp_sub_dir = _check_source_scp_sub_dirs;
+
+    while (*scp_sub_dir != NULL) {
+        char tmp_dir[PATH_MAX + 1];
+
+        strlcpy (tmp_dir, sim_check_scp_dir, sizeof (tmp_dir));
+        strlcat (tmp_dir, *scp_sub_dir, sizeof (tmp_dir));
+        strlcat (tmp_dir, &directory[strlen (directory) - 1], sizeof (tmp_dir));
+        if (strcmp (directory, tmp_dir) == 0)
+            break;
+        ++scp_sub_dir;
+        }
+    Stats->IsInScpDir = (*scp_sub_dir != NULL);
+    }
+f = fopen (filepath, "rb");
+if ((f == NULL) || 
+    ((size_t)FileSize != fread (data, 1, (size_t)FileSize, f))) {
+    fprintf (stderr, "Error Opening or Reading: %s - %s\n", filepath, strerror (errno));
+    fclose (f);
+    free (data);
+    Stats->ProblemFile = TRUE;
+    return;
+    }
+Stats->FileSize = FileSize;
+for (byte=0; (byte < FileSize) && (bincount < 100); ++byte) {
+    switch (data[byte]) {
+        case '\n':
+            ++lfcount;
+            break;
+        case '\r':
+            if (data[byte+1] == '\n')
+                ++crlfcount;
+            break;
+        case '\t':
+            ++tabcount;
+            break;
+        default:
+            if (sim_isspace (data[byte]))
+                ++wscount;
+            else {
+                if (!sim_isprint (data[byte]))
+                    ++bincount;
+                }
+            break;
+        }
+    }
+fclose (f);
+if (tabcount > 0)
+    Stats->HasTabs = TRUE;
+if (Stats->HasTabs && Stats->IsSource)
+    Stats->ProblemFile = TRUE;
+if (FileSize > 0) {
+    if (crlfcount == lfcount)
+        Stats->Lines = crlfcount;
+    else {
+        Stats->Lines = lfcount;
+        Stats->ProblemFile = TRUE;
+        }
+    }
+if (bincount > 0)
+    Stats->HasBinary = TRUE;
+Stats->LineEndingsCRLF = crlfcount;
+Stats->LineEndingsLF = lfcount;
+if (Stats->IsSource) {
+    static pcre *sys_include_re = NULL;
+    static pcre *local_include_re = NULL;
+    static pcre *sim_sock_re = NULL;
+    int rc;
+    int matches = 0;
+    int ovec[6];
+    int startoffset = 0;
+    int erroffset;
+
+    if (sim_sock_re == NULL)
+        sim_sock_re = pcre_compile ("\\#\\s*include\\s+\\\"sim_sock\\.h\"", 0, &errmsg, &erroffset, NULL);
+
+    matches = 0;
+    while (1) {
+        rc = pcre_exec (sim_sock_re, NULL, data, (int)FileSize, startoffset, PCRE_NOTBOL, ovec, 6);
+        if (rc == PCRE_ERROR_NOMATCH)
+            break;
+        ++matches;
+        startoffset = ovec[1];
+        }
+    if ((matches > 0) && (!Stats->IsInScpDir))
+        Stats->HasSimSockInclude = TRUE;
+
+    if (local_include_re == NULL)
+        local_include_re = pcre_compile ("\\#\\s*include\\s+\\\"(.+)\\\"", 0, &errmsg, &erroffset, NULL);
+
+    matches = startoffset = 0;
+    while (1) {
+        char *local_include;
+
+        rc = pcre_exec (local_include_re, NULL, data, (int)FileSize, startoffset, PCRE_NOTBOL, ovec, 6);
+        if (rc == PCRE_ERROR_NOMATCH)
+            break;
+        ++matches;
+        startoffset = ovec[1];
+        local_include = (char *)calloc (1 + ovec[3] - ovec[2], sizeof (*local_include));
+        memcpy (local_include, &data[ovec[2]], ovec[3] - ovec[2]);
+        ++Stats->LocalIncludeCount;
+        Stats->LocalIncludes = (char **)realloc (Stats->LocalIncludes, Stats->LocalIncludeCount * sizeof (*Stats->LocalIncludes));
+        Stats->LocalIncludes[Stats->LocalIncludeCount - 1] = local_include;
+        }
+
+    if (sys_include_re == NULL)
+        sys_include_re = pcre_compile ("\\#\\s*include\\s+\\<(.+)\\>", 0, &errmsg, &erroffset, NULL);
+
+    matches = startoffset = 0;
+    while (1) {
+        char *sys_include;
+        t_bool benign_include = FALSE;
+        const char **allowed_include = _check_source_allowed_sysincludes;
+
+        rc = pcre_exec (sys_include_re, NULL, data, (int)FileSize, startoffset, PCRE_NOTBOL, ovec, 6);
+        if (rc == PCRE_ERROR_NOMATCH)
+            break;
+        ++matches;
+        startoffset = ovec[3];
+        sys_include = (char *)calloc (1 + ovec[3]-ovec[2], sizeof (*sys_include));
+        memcpy (sys_include, &data[ovec[2]], ovec[3] - ovec[2]);
+        if (Stats->IsInScpDir) {
+            ++Stats->SysIncludeCount;
+            Stats->SysIncludes = (char **)realloc (Stats->SysIncludes, Stats->SysIncludeCount * sizeof (*Stats->SysIncludes));
+            Stats->SysIncludes[Stats->SysIncludeCount - 1] = sys_include;
+            }
+        else {
+            while (*allowed_include != NULL) {
+                if (0 == strcmp (sys_include, *allowed_include))
+                    break;
+                ++allowed_include;
+                }
+            if (*allowed_include != NULL) {
+                ++Stats->BenignIncludeCount;
+                Stats->BenignIncludes = (char **)realloc (Stats->BenignIncludes, Stats->BenignIncludeCount * sizeof (*Stats->BenignIncludes));
+                Stats->BenignIncludes[Stats->BenignIncludeCount - 1] = sys_include;
+                }
+            else {
+                ++Stats->OtherSysIncludeCount;
+                Stats->OtherSysIncludes = (char **)realloc (Stats->OtherSysIncludes, Stats->OtherSysIncludeCount * sizeof (*Stats->OtherSysIncludes));
+                Stats->OtherSysIncludes[Stats->OtherSysIncludeCount - 1] = sys_include;
+                }
+            }
+        }
+    if ((!Stats->IsInScpDir) && (Stats->OtherSysIncludeCount != 0))
+        Stats->ProblemFile = TRUE;
+    }
+free (extension);
+free (data);
+}
+
+typedef struct CHECK_STATS {
+    int BinaryFiles;
+    int SourceFiles;
+    int TextFiles;
+    int ProblemFiles;
+    int FileCount;
+    FILE_STATS **Files;
+    } CHECK_STATS;
+
+static void _check_source_directory_check (const char *directory, 
+                                           const char *filename,
+                                           t_offset FileSize,
+                                           const struct stat *filestat,
+                                           void *context)
+{
+CHECK_STATS *Stats = (CHECK_STATS *)context;
+
+if (filestat->st_mode & S_IFDIR) {
+    char dirpath[PATH_MAX + 1];
+    char RelativePath[PATH_MAX + 1];
+    const char **skip_dir = _check_source_skip_dirs;
+    char pathsep = directory[strlen (directory) - 1];
+
+    /* Ignore directory self and parent */
+    if ((0 == strcmp (filename, ".")) || 
+        (0 == strcmp (filename, "..")))
+        return;
+        
+    /* Ignore uninteresting directories */
+    while (*skip_dir != NULL) {
+        if (0 == strcmp (filename, *skip_dir))
+            return;
+        ++skip_dir;
+        }
+    strlcpy (RelativePath, sim_relative_path (dirpath), sizeof (RelativePath));
+
+    sim_dir_scan (RelativePath, _check_source_directory_check, Stats);
+    }
+else {
+    ++Stats->FileCount;
+    Stats->Files = (FILE_STATS **)realloc (Stats->Files, Stats->FileCount * sizeof (FILE_STATS **));
+    Stats->Files[Stats->FileCount - 1] = (FILE_STATS *)calloc (1, sizeof (FILE_STATS));
+    _check_source_check_file (directory, filename, FileSize, Stats->Files[Stats->FileCount - 1]);
+    }
+}
+
+static void _check_source_scp_check (const char *directory, 
+                       const char *filename,
+                       t_offset FileSize,
+                       const struct stat *filestat,
+                       void *context)
+{
+char **scp_dir = (char **)context;
+
+if (strcmp ("scp.c", filename) == 0)
+    *scp_dir = sim_filepath_parts (directory, "p");
+}
+
+static void _check_source_print_string_list (const char *title, char **list, int count)
+{
+int i;
+
+if (count > 0) {
+    sim_printf ("    %s:\n", title);
+    for (i = 0; i < count; i++)
+        sim_printf ("        %s\n", list[i]);
+    }
+}
+
+static void _check_source_free_string_list (char **list, int count)
+{
+int i;
+
+for (i = 0; i < count; i++)
+    free (list[i]);
+free (list);
+}
+
+static void _sim_check_source_file_report (FILE_STATS *File, int maxnamelen)
+{
+if ((sim_switches & SWMASK ('D')) || (File->ProblemFile)) {
+    sim_printf ("%*.*s   ", -maxnamelen, -maxnamelen, File->RelativePath);
+    sim_printf ("%8u bytes", (unsigned int)File->FileSize);
+    if (File->Lines)
+        sim_printf (" %5d lines", File->Lines);
+    if (File->IsSource) {
+        if (File->HasTabs)
+            sim_printf (", has-tabs");
+        if (File->HasBinary)
+            sim_printf (", has-binary(non-ascii)");
+        if ((File->LineEndingsCRLF != 0) && (File->LineEndingsCRLF != File->LineEndingsLF))
+            sim_printf (", mixed CRLF and LF line-endings");
+        else {
+            if (File->LineEndingsLF == File->LineEndingsCRLF)
+                sim_printf (", CRLF line-endings");
+            else
+                sim_printf (", LF line-endings");
+            }
+        }
+    sim_printf ("\n");
+    if (File->HasSimSockInclude)
+        sim_printf ("Has unneeded include of sim_sock.h\n");
+    _check_source_print_string_list ("Benign (unneeded) System Include Files", File->BenignIncludes,   File->BenignIncludeCount);
+    _check_source_print_string_list ("Local Include Files",                    File->LocalIncludes,    File->LocalIncludeCount);
+    _check_source_print_string_list ("System Include Files",                   File->SysIncludes,      File->SysIncludeCount);
+    _check_source_print_string_list ("Other System Include Files",             File->OtherSysIncludes, File->OtherSysIncludeCount);
+    _check_source_print_string_list ("Missing Include Files",                  File->MissingIncludes,  File->MissingIncludeCount);
+    }
+_check_source_free_string_list (File->BenignIncludes,   File->BenignIncludeCount);
+_check_source_free_string_list (File->LocalIncludes,    File->LocalIncludeCount);
+_check_source_free_string_list (File->SysIncludes,      File->SysIncludeCount);
+_check_source_free_string_list (File->OtherSysIncludes, File->OtherSysIncludeCount);
+_check_source_free_string_list (File->MissingIncludes,  File->MissingIncludeCount);
+free (File);
+}
+
+static void _check_source_add_needed_include (FILE_STATS *File, const char *include_file, CHECK_STATS *Stats)
+{
+char filepath[PATH_MAX + 1];
+int file;
+char **files;
+
+if (sim_check_scp_dir == NULL)
+    return;
+
+for (file = 0; file < Stats->FileCount; file++) {
+    char *filename = sim_filepath_parts (Stats->Files[file]->RelativePath, "nx");
+
+    if (strcmp (include_file, filename) == 0) {
+        free (filename);
+        break;
+        }
+    free (filename);
+    }
+if (file == Stats->FileCount) {
+    char *filename;
+    char *filedir;
+
+    snprintf (filepath, sizeof (filepath), "%s%s", sim_check_scp_dir, include_file);
+    filename = sim_filepath_parts (filepath, "nx");
+    filedir = sim_filepath_parts (filepath, "p");
+    if (strchr (include_file, filedir[strlen (filedir) - 1]) != NULL)
+        snprintf (filepath, sizeof (filepath), "%s%s", sim_check_scp_dir, filename);
+    free (filename);
+    free (filedir);
+    files = sim_get_filelist (filepath);
+    if (files != NULL) {
+        char RelativePath[PATH_MAX + 1];
+
+        strlcpy (RelativePath, sim_relative_path (files[0]), sizeof (RelativePath));
+
+        for (file = 0; file < Stats->FileCount; file++) {
+            if (strcmp (RelativePath, Stats->Files[file]->RelativePath) == 0)
+                break;
+            }
+        if (file == Stats->FileCount) {
+            struct stat statb;
+            char *directory = sim_filepath_parts (files[0], "p");
+            char *filename = sim_filepath_parts (files[0], "nx");
+
+            sim_stat (files[0], &statb);
+            ++Stats->FileCount;
+            Stats->Files = (FILE_STATS **)realloc (Stats->Files, Stats->FileCount * sizeof (FILE_STATS **));
+            Stats->Files[Stats->FileCount - 1] = (FILE_STATS *)calloc (1, sizeof (FILE_STATS));
+            _check_source_check_file (directory, filename, statb.st_size, Stats->Files[Stats->FileCount - 1]);
+            free (directory);
+            free (filename);
+            }
+        }
+    else {
+        if (!File->IsInScpDir)
+            File->ProblemFile = TRUE;
+        ++File->MissingIncludeCount;
+        File->MissingIncludes = (char **)realloc (File->MissingIncludes, File->MissingIncludeCount * sizeof (*File->MissingIncludes));
+        File->MissingIncludes[File->MissingIncludeCount - 1] = strdup (include_file);
+        }
+    sim_free_filelist (&files);
+    }
+}
+
+static int _check_source_compare (const void *pa, const void *pb)
+{
+char **a = (char **)pa;
+char **b = (char **)pb;
+
+return strcasecmp(*a, *b);
+}
+
+
+static t_stat _sim_check_source_report (CHECK_STATS *Stats)
+{
+t_stat stat = SCPE_OK;
+int file, namelen;
+
+qsort (Stats->Files, Stats->FileCount, sizeof (Stats->Files[0]), _check_source_compare);
+for (file = namelen = 0; file < Stats->FileCount; file++) {
+    if (namelen < (int)strlen (Stats->Files[file]->RelativePath))
+        namelen = (int)strlen (Stats->Files[file]->RelativePath);
+    }
+
+/* Populate Counts */
+for (file = 0; file < Stats->FileCount; file++) {
+    if (Stats->Files[file]->HasBinary)
+        ++Stats->BinaryFiles;
+    else
+        ++Stats->TextFiles;
+    if (Stats->Files[file]->IsSource)
+        ++Stats->SourceFiles;
+    if (Stats->Files[file]->ProblemFile)
+        ++Stats->ProblemFiles;
+    }
+/* Report Results */
+if ((sim_check_scp_dir != NULL) && 
+    ((sim_switches & SWMASK ('D')) || (Stats->ProblemFiles > 0))) {
+    sim_printf ("scp.c directory: %s\n", sim_relative_path (sim_check_scp_dir));
+    free (sim_check_scp_dir);
+    sim_check_scp_dir = NULL;
+    }
+for (file = 0; file < Stats->FileCount; file++)
+    _sim_check_source_file_report (Stats->Files[file], namelen);
+if (Stats->ProblemFiles > 0)
+    stat = SCPE_FMT;
+free (Stats->Files);
+free (Stats);
+if (sim_switches & SWMASK ('E')) /* -E switch means don't return any error */
+    stat = SCPE_OK;
+return stat;
+}
+
+int
+sim_check_source (int argc, char **argv)
+{
+CHECK_STATS *Stats = (CHECK_STATS *)calloc (1, sizeof (*Stats));
+int i, file;
+static const char *source_skip_dirs[] = { ".git", "BIN", NULL};
+
+if (sim_switches & SWMASK ('D')) {
+    sim_printf ("Check Source args:");
+    for (i = 0; i < argc; i++)
+        sim_printf (" %s", argv[i]);
+    sim_printf ("\n");
+    }
+free (sim_check_scp_dir);
+sim_check_scp_dir = NULL;
+sim_set_get_filelist_skip_directories (source_skip_dirs);
+/* Find the directory where scp.c is located */
+for (i = 1; i < argc; i++) {
+    if (sim_check_scp_dir != NULL)
+        break;
+    sim_dir_scan (argv[i], _check_source_scp_check, &sim_check_scp_dir);
+    }
+/* Process the list of files */
+while (--argc > 0) {
+    ++argv;
+    sim_dir_scan (*argv, _check_source_directory_check, Stats);
+    }
+/* Add includes to the file list if they're not there */
+for (file = 0; file < Stats->FileCount; file++) {
+    int include;
+
+    for (include = 0; include < Stats->Files[file]->LocalIncludeCount; include++) {
+        _check_source_add_needed_include (Stats->Files[file], Stats->Files[file]->LocalIncludes[include], Stats);
+        }
+    }
+sim_clear_get_filelist_skip_directories ();
+_flush_filelist_directory_cache ();
+return _sim_check_source_report (Stats);
+}

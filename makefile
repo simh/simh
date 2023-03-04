@@ -2888,6 +2888,10 @@ else # end of primary make recipies
     CC := @$(CC)
   endif
 
+  # Extract source directories from the dependencies
+    
+  D1 = $(sort $(foreach dir,$(DEPS),$(dir $(dir))))
+
   # Extract potential source code directories from the -I specifiers in the options
 
   space = $(empty) $(empty)
@@ -2905,7 +2909,7 @@ else # end of primary make recipies
   D6=$(foreach include,$(D5),$(patsubst ^-I%,%,$(include)))
   # chop off any extra options beyond the include directory
   D7=$(foreach include,$(D6),$(word 1,$(subst ^,$(space),$(include))))
-  DIRS = $(D7)
+  DIRS = $(strip $(D1) $(D7))
 
   ifneq ($(WIN32),)
     pathfix = $(subst /,\,$(1))
@@ -3042,17 +3046,17 @@ endif
 # Multiple Separate compiles for each input
 $(TARGET): $(OBJS)
 	$(MKDIRBIN)
-  ifeq (1,$(QUIET))
-	@echo Linking $(TARGET)
-  endif
-	${CC} $(OBJS) ${OPTS} ${LNK_OPTS} -o $@ ${LDFLAGS}
+    ifeq (1,$(QUIET))
+	  @echo Linking $(TARGET)
+    endif
+	  ${CC} $(OBJS) ${OPTS} ${LNK_OPTS} -o $@ ${LDFLAGS}
     else
 # Single Compile and Link of all inputs
 $(TARGET): $(DEPS)
 	$(MKDIRBIN)
-  ifeq (1,$(QUIET))
-	@echo Compile and Linking $(DEPS) into $(TARGET)
-  endif
+    ifeq (1,$(QUIET))
+	  @echo Compile and Linking $(DEPS) into $(TARGET)
+    endif
 	${CC} $(DEPS) ${OPTS} ${LNK_OPTS} -o $@ ${LDFLAGS}
     endif
     ifneq (,$(ALTNAME))
@@ -3065,6 +3069,9 @@ $(TARGET): $(DEPS)
     ifneq (,$(call find_test,$(word 1,$(DIRS)),$(TEST_NAME)))
     # invoke the just built simulator to engage its test activities
 	$@ $(call find_test,$(word 1,$(DIRS)),$(TEST_NAME)) ${TEST_ARG}
+    endif
+    ifneq (,$(SOURCE_CHECK))
+	  $@ $(SOURCE_CHECK_SWITCHES) CheckSourceCode $(DEPS)
     endif
 
   endif  # CPP_BUILD

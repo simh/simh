@@ -1,4 +1,5 @@
 .git-commit-id
+.git-commit-id.h
 #ignore thumbnails created by windows
 Thumbs.db
 #ignore Desktop Services Store created by OSX

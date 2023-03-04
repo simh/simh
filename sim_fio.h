@@ -88,6 +88,8 @@ typedef void (*DIR_ENTRY_CALLBACK)(const char *directory,
                                    void *context);
 t_stat sim_dir_scan (const char *cptr, DIR_ENTRY_CALLBACK entry, void *context);
 char **sim_get_filelist (const char *filename);
+void sim_set_get_filelist_skip_directories (const char * const *dirlist);
+void sim_clear_get_filelist_skip_directories (void);
 void sim_free_filelist (char ***pfilelist);
 void sim_print_filelist (char **filelist);
 int sim_count_filelist (char **filelist);
@@ -109,6 +111,7 @@ t_stat sim_shmem_open (const char *name, size_t size, SHMEM **shmem, void **addr
 void sim_shmem_close (SHMEM *shmem);
 int32 sim_shmem_atomic_add (int32 *ptr, int32 val);
 t_bool sim_shmem_atomic_cas (int32 *ptr, int32 oldv, int32 newv);
+extern int sim_check_source (int argc, char **argv);
 
 extern t_bool sim_taddr_64;         /* t_addr is > 32b and Large File Support available */
 extern t_bool sim_toffset_64;       /* Large File (>2GB) file I/O support */
