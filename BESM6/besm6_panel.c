@@ -32,7 +32,6 @@
 #include "besm6_defs.h"
 
 #ifdef HAVE_LIBSDL
-#include <stdlib.h>
 
 /*
  * Use a 640x480 window with 32 bit pixels.

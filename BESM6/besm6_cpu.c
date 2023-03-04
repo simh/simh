@@ -51,8 +51,6 @@
  * 13) A lot of comments in Russian (UTF-8).
  */
 #include "besm6_defs.h"
-#include <math.h>
-#include <float.h>
 
 
 t_value memory [MEMSIZE];

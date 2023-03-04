@@ -28,9 +28,6 @@
  * authorization from Leonid Broukhis and Serge Vakulenko.
  */
 #include "besm6_defs.h"
-#include <ctype.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 
 /*
  * Управляющее слово обмена с магнитным диском.

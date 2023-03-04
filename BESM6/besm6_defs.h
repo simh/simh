@@ -32,7 +32,6 @@
 
 #include "sim_defs.h"                           /* simulator defns */
 #include "scp.h"
-#include <setjmp.h>
 
 /* Rename of global PC variable to avoid namespace conflicts on some platforms */
 

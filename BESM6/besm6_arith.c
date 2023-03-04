@@ -26,7 +26,6 @@
  * the sale, use or other dealings in this Software without prior written
  * authorization from Leonid Broukhis and Serge Vakulenko.
  */
-#include <math.h>
 #include "besm6_defs.h"
 
 typedef struct {
