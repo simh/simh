@@ -1771,12 +1771,12 @@ static int32 simh_out(const int32 port, const int32 data) {
             if (genInterruptPos == 0) {
                 genInterruptVec = data;
                 genInterruptPos = 1;
-		sim_printf("genInterruptVec=%d genInterruptPos=%d\n", genInterruptVec, genInterruptPos);
+                sim_printf("genInterruptVec=%d genInterruptPos=%d\n", genInterruptVec, genInterruptPos);
             } else {
                 vectorInterrupt |= (1 << genInterruptVec);
                 dataBus[genInterruptVec] = data;
                 genInterruptPos = lastCommand = 0;
-		sim_printf("genInterruptVec=%d vectorInterrupt=%X dataBus=%02X genInterruptPos=%d\n", genInterruptVec, vectorInterrupt, data, genInterruptPos);
+                sim_printf("genInterruptVec=%d vectorInterrupt=%X dataBus=%02X genInterruptPos=%d\n", genInterruptVec, vectorInterrupt, data, genInterruptPos);
             }
             break;
         case setFCBAddressCmd:

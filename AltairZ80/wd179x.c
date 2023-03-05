@@ -1203,15 +1203,15 @@ static uint8 Do1793Command(uint8 cCommand)
                           " Verify ", wd179x_info->sel_drive, PCX);
                 if (pDrive->uptr->u3 == IMAGE_TYPE_IMD) {
                     if (sectSeek(pDrive->imd, pDrive->track, wd179x_info->fdc_head) != SCPE_OK) {
-	                    sim_debug(SEEK_MSG, &wd179x_dev, "FAILED\n");
-	                    wd179x_info->fdc_status |= WD179X_STAT_NOT_FOUND; /* Sector not found */
+                            sim_debug(SEEK_MSG, &wd179x_dev, "FAILED\n");
+                            wd179x_info->fdc_status |= WD179X_STAT_NOT_FOUND; /* Sector not found */
                     } else  if (testMode(pDrive)) {
-	                    wd179x_info->fdc_status |= WD179X_STAT_NOT_FOUND; /* Sector not found */
-	                    sim_debug(SEEK_MSG, &wd179x_dev, "NOT FOUND\n");
+                            wd179x_info->fdc_status |= WD179X_STAT_NOT_FOUND; /* Sector not found */
+                            sim_debug(SEEK_MSG, &wd179x_dev, "NOT FOUND\n");
                     } else {
-	                    sim_debug(SEEK_MSG, &wd179x_dev, "Ok\n");
+                            sim_debug(SEEK_MSG, &wd179x_dev, "Ok\n");
                     }
-	            }
+                }
             }
 
             if (pDrive->track == 0) {

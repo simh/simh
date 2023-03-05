@@ -155,7 +155,7 @@ static DJHDC_INFO djhdc_info_data = { { 0x0, 0, 0x54, 2 } };
 static DJHDC_INFO *djhdc_info = &djhdc_info_data;
 
 /* Disk geometries:
- *            IMI	    SCRIBE
+ *            IMI       SCRIBE
  *  Sectsize: 1024      1024
  *   Sectors: 8         8
  *     Heads: 6         4
