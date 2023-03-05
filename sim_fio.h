@@ -81,7 +81,6 @@ t_stat sim_copyfile (const char *source_file, const char *dest_file, t_bool over
 char *sim_filepath_parts (const char *pathname, const char *parts);
 const char *sim_relative_path (const char *filepath);
 char *sim_getcwd (char *buf, size_t buf_size);
-#include <sys/stat.h>
 typedef void (*DIR_ENTRY_CALLBACK)(const char *directory, 
                                    const char *filename,
                                    t_offset FileSize,

@@ -89,7 +89,8 @@ Internal routines:
 #include "sim_disk.h"
 #include "sim_ether.h"
 #include "sim_scsi.h"
-#include <sys/stat.h>
+
+#include "sim_scp_private.h"
 
 #define DKUF_F_AUTO      0                              /* Auto detect format format */
 #define DKUF_F_STD       1                              /* SIMH format */
@@ -7879,8 +7880,6 @@ return r;
 
 
 /* disk testing */
-
-#include <setjmp.h>
 
 struct disk_test_coverage {
     t_lba total_sectors;

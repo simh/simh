@@ -96,6 +96,8 @@
 #include "sim_defs.h"
 #include "sim_tape.h"
 
+#include "sim_scp_private.h"
+
 #ifndef MAX
 #define MAX(a,b)  (((a) >= (b)) ? (a) : (b))
 #endif
@@ -4375,9 +4377,6 @@ for (t = classify_tests; t->testname != NULL; t++) {
     }
 return SCPE_OK;
 }
-
-
-#include <setjmp.h>
 
 t_stat sim_tape_test (DEVICE *dptr, const char *cptr)
 {

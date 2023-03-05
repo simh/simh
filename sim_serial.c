@@ -125,10 +125,9 @@
 
 
 #include "sim_defs.h"
+#include "sim_scp_private.h"
 #include "sim_serial.h"
 #include "sim_tmxr.h"
-
-#include <ctype.h>
 
 #define SER_DEV_NAME_MAX     256                        /* maximum device name size */
 #define SER_DEV_DESC_MAX     256                        /* maximum device description size */

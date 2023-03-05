@@ -76,7 +76,6 @@
 */
 
 
-#include <ctype.h>
 #include "sim_defs.h"
 #include "sim_card.h"
 
@@ -1467,8 +1466,6 @@ for (i=0; i<cards; i++)
 fclose (f);
 return SCPE_OK;
 }
-
-#include <setjmp.h>
 
 t_stat sim_card_test (DEVICE *dptr, const char *cptr)
 {

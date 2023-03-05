@@ -51,8 +51,25 @@ extern "C" {
 #endif
 
 #if defined (_WIN32)                                    /* Windows */
+#pragma push_macro ("INT_PTR")
+#pragma push_macro ("PURE")
+#pragma push_macro ("BYTE")
+#pragma push_macro ("WORD")
+#undef INT_PTR                      /* avoid macro name collision */
+#undef PURE                         /* avoid macro name collision */
+#undef BYTE                         /* avoid macro name collision */
+#undef WORD                         /* avoid macro name collision */
 #include <winsock2.h>
 #include <winerror.h>
+#undef PACKED                       /* avoid macro name collision */
+#undef ERROR                        /* avoid macro name collision */
+#undef MEM_MAPPED                   /* avoid macro name collision */
+#undef INTERFACE                    /* avoid macro name collision */
+#include <process.h>
+#pragma pop_macro ("WORD")
+#pragma pop_macro ("BYTE")
+#pragma pop_macro ("PURE")
+#pragma pop_macro ("INT_PTR")
 
 #elif !defined (__OS2__) || defined (__EMX__)           /* VMS, Mac, Unix, OS/2 EMX */
 #include <sys/types.h>                                  /* for fcntl, getpid */

@@ -223,6 +223,7 @@
 #define IN_SCP_C 1          /* Include from scp.c */
 
 #include "sim_defs.h"
+#include "sim_scp_private.h"
 #include "sim_rev.h"
 #include "sim_disk.h"
 #include "sim_tape.h"
@@ -233,14 +234,10 @@
 #include "sim_sock.h"
 #include "sim_frontpanel.h"
 #include <signal.h>
-#include <ctype.h>
-#include <time.h>
-#include <math.h>
 #if defined(_WIN32)
 #include <io.h>
 #include <fcntl.h>
 #endif
-#include <setjmp.h>
 
 #if defined(SIM_HAVE_DLOPEN)                                /* Dynamic Readline support */
 #include <dlfcn.h>
@@ -437,7 +434,22 @@ if (sim_idle_wait) {
     pthread_cond_signal (&sim_asynch_wake);
     }
 }
-#else
+
+void sim_aio_check_event (void)
+{
+if (0 > --sim_asynch_check) {
+    AIO_UPDATE_QUEUE;
+    sim_asynch_check = sim_asynch_inst_latency;
+    }
+}
+
+void sim_aio_set_interrupt_latency (int32 instpersec)
+{
+sim_asynch_inst_latency = (int32)((((double)(instpersec))*sim_asynch_latency)/1000000000);
+if (sim_asynch_inst_latency == 0)
+    sim_asynch_inst_latency = 1;
+}
+#else /* !defined (SIM_ASYNCH_IO) */
 t_bool sim_asynch_enabled = FALSE;
 #endif
 

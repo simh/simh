@@ -343,9 +343,13 @@ extern BRKTYPTAB *sim_brk_type_desc;                    /* type descriptions */
 extern const char *sim_prog_name;                       /* executable program name */
 extern FILE *stdnul;
 extern t_bool sim_asynch_enabled;
+extern int32 sim_asynch_latency;
+extern int32 sim_asynch_inst_latency;
 #if defined(SIM_ASYNCH_IO)
 int sim_aio_update_queue (void);
 void sim_aio_activate (ACTIVATE_API caller, UNIT *uptr, int32 event_time);
+void sim_aio_check_event (void);
+void sim_aio_set_interrupt_latency (int32 instpersec);
 #endif
 
 /* VM interface */

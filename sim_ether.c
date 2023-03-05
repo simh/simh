@@ -369,7 +369,7 @@
   ------------------------------------------------------------------------------
 */
 
-#include <ctype.h>
+
 #include "sim_ether.h"
 #include "sim_sock.h"
 #include "sim_timer.h"
@@ -377,6 +377,10 @@
 #include <direct.h>
 #else
 #include <unistd.h>
+#endif
+
+#if defined (USE_READER_THREAD)
+#include <pthread.h>
 #endif
 
 #define MAX(a,b) (((a) > (b)) ? (a) : (b))
@@ -1021,7 +1025,6 @@ const char *eth_capabilities(void)
 /*============================================================================*/
 
 #include <pcap.h>
-#include <string.h>
 #else
 struct pcap_pkthdr {
     uint32 caplen;  /* length of portion present */
@@ -4504,8 +4507,6 @@ if (bpf_compile_skip_count)
 #endif /* USE_BPF */
 return (errors == 0) ? SCPE_OK : SCPE_IERR;
 }
-
-#include <setjmp.h>
 
 t_stat sim_ether_test (DEVICE *dptr, const char *cptr)
 {

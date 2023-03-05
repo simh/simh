@@ -30,6 +30,8 @@
 #include "sim_video.h"
 #include "scp.h"
 
+#include "sim_scp_private.h"
+
 int vid_active = 0;
 int32 vid_cursor_x;
 int32 vid_cursor_y;
@@ -2607,7 +2609,6 @@ return _screenshot_stat;
 }
 
 #include <SDL_audio.h>
-#include <math.h>
 
 const int AMPLITUDE = 20000;
 const int SAMPLE_FREQUENCY = 11025;

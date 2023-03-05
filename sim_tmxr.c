@@ -332,6 +332,7 @@
 #define NOT_MUX_USING_CODE /* sim_tmxr library define */
 
 #include "sim_defs.h"
+#include "sim_scp_private.h"
 #include "sim_serial.h"
 #include "sim_sock.h"
 #include "sim_timer.h"
@@ -340,8 +341,6 @@
 #include "scp.h"
 
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
-
-#include <math.h>
 
 /* Telnet protocol constants - negatives are for init'ing signed char data */
 
@@ -5549,8 +5548,6 @@ tmxr->lines = saved_lines;
 return SCPE_OK;
 }
 
-
-#include <setjmp.h>
 
 t_stat tmxr_sock_test (DEVICE *dptr, const char *cptr)
 {

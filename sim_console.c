@@ -128,11 +128,10 @@
 */
 
 #include "sim_defs.h"
+#include "sim_scp_private.h"
 #include "sim_tmxr.h"
 #include "sim_serial.h"
 #include "sim_timer.h"
-#include <ctype.h>
-#include <math.h>
 
 #ifdef __HAIKU__
 #define nice(n) ({})

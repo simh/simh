@@ -149,9 +149,6 @@ extern "C" {
 #define DONT_USE_PCAP_FINDALLDEVS 1
 #endif
 
-#if defined (USE_READER_THREAD)
-#include <pthread.h>
-#endif
 
 /* structure declarations */
 

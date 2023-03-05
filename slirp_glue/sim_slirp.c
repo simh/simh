@@ -38,6 +38,7 @@
 #include "qemu/timer.h"
 #include "libslirp.h"
 #include "sim_defs.h"
+#include "sim_scp_private.h"
 #include "sim_slirp.h"
 #include "sim_sock.h"
 #include "libslirp.h"

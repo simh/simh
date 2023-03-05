@@ -86,8 +86,8 @@
 #define NOT_MUX_USING_CODE /* sim_tmxr library provider or agnostic */
 
 #include "sim_defs.h"
-#include <ctype.h>
-#include <math.h>
+
+#include "sim_scp_private.h"
 
 #define SIM_INTERNAL_CLK (SIM_NTIMERS+(1<<30))
 #define SIM_INTERNAL_UNIT sim_internal_timer_unit

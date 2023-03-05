@@ -75,6 +75,8 @@
 
 #include "sim_defs.h"
 
+#include "sim_scp_private.h"
+
 t_bool sim_end;                     /* TRUE = little endian, FALSE = big endian */
 t_bool sim_taddr_64;                /* t_addr is > 32b and Large File Support available */
 t_bool sim_toffset_64;              /* Large File (>2GB) file I/O Support available */
@@ -982,7 +984,6 @@ return (t_offset)(ftell (st));
 
 #if defined (_WIN32)
 #define S_SIM_IO_FSEEK_EXT_ 1
-#include <sys/stat.h>
 
 int sim_fseeko (FILE *st, t_offset offset, int whence)
 {
@@ -1218,7 +1219,6 @@ int sim_set_fsize (FILE *fptr, t_addr size)
 return ftruncate(fileno(fptr), (off_t)size);
 }
 
-#include <sys/stat.h>
 #include <fcntl.h>
 #if defined (HAVE_UTIME)
 #include <utime.h>
@@ -1789,7 +1789,6 @@ return SCPE_OK;
 
 #else /* !defined (_WIN32) */
 
-#include <sys/stat.h>
 #if defined (HAVE_GLOB)
 #include <glob.h>
 #else /* !defined (HAVE_GLOB) */
