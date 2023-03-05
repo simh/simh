@@ -1363,12 +1363,12 @@ int32 sim_load(FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
                 chk -= addr >> 8;
                 for (i=0; i<HLEN; i++) {
                     byte = get_mbyte(addr + i);
-                    fprintf(fileref, "%02X", byte & BYTEMASK);	
+                    fprintf(fileref, "%02X", byte & BYTEMASK);
                     chk -= byte; chk &= BYTEMASK;
                     cnt++;
                 }
                 fprintf(fileref,"%02X\n", chk & BYTEMASK);
-	        addr += HLEN;
+                addr += HLEN;
             }
             if(addr < end) { //last record
                 fprintf(fileref, ":%02X%04X00", end - addr, addr);
@@ -1378,12 +1378,12 @@ int32 sim_load(FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
                 chk -= addr >> 8;
                 for (i=0; i<=(end - addr); i++) {
                     byte = get_mbyte(addr + i);
-                    fprintf(fileref, "%02X", byte & BYTEMASK);	
+                    fprintf(fileref, "%02X", byte & BYTEMASK);
                     chk -= byte; chk &= BYTEMASK;
                     cnt++;
                 }
                 fprintf(fileref, "%02X\n", chk);
-	        addr = end;
+                addr = end;
             }
             fprintf(fileref,":00000001FF\n"); //EOF record
         } else {                        //binary

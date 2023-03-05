@@ -1252,7 +1252,7 @@ void vt_receive()
                  * <enter>HYC<enter> needs to be typed
                  * to re-initialize the line
                  */
-                TTY_IN |= mask;		/* "long start" */
+                TTY_IN |= mask;         /* "long start" */
                 break;
             }
             switch (tty_unit[num].flags & TTY_CHARSET_MASK) {

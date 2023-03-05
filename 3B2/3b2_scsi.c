@@ -1168,7 +1168,7 @@ static void ha_cmd(uint8 op, uint8 subdev, uint32 addr, int32 len, t_bool expres
 void ha_ctrl(uint8 tc)
 {
     volatile t_bool txn_done;
-	uint32 i, j;
+    uint32 i, j;
     uint32 plen, ha_ptr;
     uint32 in_len, out_len;
     uint8 lu, status;

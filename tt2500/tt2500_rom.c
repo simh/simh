@@ -63,37 +63,37 @@ uint16 tt2500_rom[] =
 
 
 #if 0
-  0010000,	/* NOP */
-  0010000,	/* NOP */
-  0010000,	/* NOP */
-  0040025,	/* PUSHJ GETC      Call subroutine to read TTY character. */
-  0007001,	/* SUBI 0 WD       32-bit instruction computes 147577 - WD */
-  0147577,	/* 147577           (The constant "LOGO" is stored here.) */
-  0133774,	/* BNE START       Branch to START if result Not zero. */
-  0040022,	/* PUSHJ GETW      Reads 4 characters to make 16-bit word. */
-  0074201,	/* GET ADR WD      Move word from WD to ADR (register 2). */
-  0040022,	/* PUSHJ GETW      Get next data word into WD. */
-  0074301,	/* GET CNT WD      Move it to CNT. */
-  0040022,	/* PUSHJ GETW      Get another data word. */
-  0004220,	/* DEC ADR         Decrement the Address and use it to */
-  0025100,	/* CWRITE WD        write [WD] into control memory. */
-  0004320,	/* DEC CNT         Decrement the word in CNT (count). */
-  0133773,	/* BNE LOOP        Branch to LOOP unless CNT is zero. */
-  0074023,	/* GET 0 XR        Makes PC leave Bootstrap Loader. */
-  0050100,	/* JUMP 100        Jump to location 100. */
-  0040025,	/* PUSHJ GETC      Get 4 bits and shift into WD. */
-  0040025,	/* PUSHJ GETC      Get 4 more. */
-  0040025,	/* PUSHJ GETC      Get 4 more. */
-  0073320,	/* DIS INTS 2      Skip 2 steps if TTY interrupt active. */
-  0050025,	/* JUMP GETC       If not, go back and wait. */
-  0010000,	/* NOP                (Skip over this.) */
-  0074424,	/* GET CH UART     Put the character into CH. */
-  0001444,	/* ANDI CH CH      Mask out all but last four bits by */
-  0000017,	/* 17                ANDing with 0 000 000 000 001 111. */
-  0004114,	/* ROT WD 14       Rotate WD four places right. */
-  0001141,	/* ANDI WD WD      Zero out last four bits by */
-  0177760,	/* 177760           ANDing with 1 111 111 111 110 000. */
-  0002104,	/* IOR WD CH       Finally, OR them together. */
-  0075600,	/* POPJ            Return to calling program. */
+  0010000,      /* NOP */
+  0010000,      /* NOP */
+  0010000,      /* NOP */
+  0040025,      /* PUSHJ GETC      Call subroutine to read TTY character. */
+  0007001,      /* SUBI 0 WD       32-bit instruction computes 147577 - WD */
+  0147577,      /* 147577           (The constant "LOGO" is stored here.) */
+  0133774,      /* BNE START       Branch to START if result Not zero. */
+  0040022,      /* PUSHJ GETW      Reads 4 characters to make 16-bit word. */
+  0074201,      /* GET ADR WD      Move word from WD to ADR (register 2). */
+  0040022,      /* PUSHJ GETW      Get next data word into WD. */
+  0074301,      /* GET CNT WD      Move it to CNT. */
+  0040022,      /* PUSHJ GETW      Get another data word. */
+  0004220,      /* DEC ADR         Decrement the Address and use it to */
+  0025100,      /* CWRITE WD        write [WD] into control memory. */
+  0004320,      /* DEC CNT         Decrement the word in CNT (count). */
+  0133773,      /* BNE LOOP        Branch to LOOP unless CNT is zero. */
+  0074023,      /* GET 0 XR        Makes PC leave Bootstrap Loader. */
+  0050100,      /* JUMP 100        Jump to location 100. */
+  0040025,      /* PUSHJ GETC      Get 4 bits and shift into WD. */
+  0040025,      /* PUSHJ GETC      Get 4 more. */
+  0040025,      /* PUSHJ GETC      Get 4 more. */
+  0073320,      /* DIS INTS 2      Skip 2 steps if TTY interrupt active. */
+  0050025,      /* JUMP GETC       If not, go back and wait. */
+  0010000,      /* NOP                (Skip over this.) */
+  0074424,      /* GET CH UART     Put the character into CH. */
+  0001444,      /* ANDI CH CH      Mask out all but last four bits by */
+  0000017,      /* 17                ANDing with 0 000 000 000 001 111. */
+  0004114,      /* ROT WD 14       Rotate WD four places right. */
+  0001141,      /* ANDI WD WD      Zero out last four bits by */
+  0177760,      /* 177760           ANDing with 1 111 111 111 110 000. */
+  0002104,      /* IOR WD CH       Finally, OR them together. */
+  0075600,      /* POPJ            Return to calling program. */
 #endif
 };

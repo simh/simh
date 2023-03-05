@@ -90,4 +90,4 @@
 #define UNIT_MODE_TEST  (1 << UNIT_V_MODE)
 
 
-#endif	/* TX0_DEFS_H_ */
+#endif  /* TX0_DEFS_H_ */

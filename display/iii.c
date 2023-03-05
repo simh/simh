@@ -97,7 +97,7 @@ iii_draw_line(int x1, int y1, int x2, int y2, int l)
     if (dy == 0) {
         for (i = 1; i < dx; i++) {
             display_point(x1, y1, l, 0);
-	    x1+=ax;
+            x1+=ax;
         }
         return;
     } 

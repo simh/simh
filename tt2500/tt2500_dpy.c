@@ -63,7 +63,7 @@ int dpy_quit = FALSE;
        4000
        6000
 
-tv-off	   tv-off-const      1 001 (unused)
+tv-off     tv-off-const      1 001 (unused)
            tv-green-const    2 010 (unused)
 
 tv-blank   green-blank-const 4 100 (flash)

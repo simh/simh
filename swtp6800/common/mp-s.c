@@ -335,23 +335,23 @@ int32 sio0d(int32 io, int32 data)
                 case 0x11:              // PTR on
                     ptr_flag = 1;
                     ptr_unit.u3 |= RXF;
-		    printf("Reader on\n");
+                    printf("Reader on\n");
                     break;
                 case 0x12:              // PTP on
                     ptp_flag = 1;
                     ptp_unit.u3 |= TXE;
-		    printf("Punch on\n");
+                    printf("Punch on\n");
                     break;
                 case 0x13:              // PTR off
                     ptr_flag = 0;
                     if (ptr_unit.pos)
-		        printf("Reader off-%d bytes read\n", ptr_unit.pos);
+                        printf("Reader off-%d bytes read\n", ptr_unit.pos);
                     ptr_unit.pos = 0;
                     break;
                 case 0x14:              // PTP off
                     ptp_flag = 0;
                     if (ptp_unit.pos)
-		        printf("Punch off-%d bytes written\n", ptp_unit.pos);
+                        printf("Punch off-%d bytes written\n", ptp_unit.pos);
                     ptp_unit.pos = 0;
                     break;
                 default:                // ignore all other characters
