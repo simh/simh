@@ -208,6 +208,10 @@ ifneq (3,${SIM_MAJOR})
   ifneq (,$(or $(findstring pdp6,${MAKECMDGOALS}),$(findstring pdp10-ka,${MAKECMDGOALS}),$(findstring pdp10-ki,${MAKECMDGOALS})))
     VIDEO_USEFUL = true
   endif
+  # building the AltairZ80 could use video support
+  ifneq (,$(findstring altairz80,${MAKECMDGOALS}))
+    VIDEO_USEFUL = true
+  endif
 endif
 # building the SEL32 networking can be used
 ifneq (,$(findstring sel32,${MAKECMDGOALS}))
@@ -2019,6 +2023,8 @@ ALTAIR_OPT = -I ${ALTAIRD}
 
 ALTAIRZ80D = ${SIMHD}/AltairZ80
 ALTAIRZ80 = ${ALTAIRZ80D}/altairz80_cpu.c ${ALTAIRZ80D}/altairz80_cpu_nommu.c \
+	${ALTAIRZ80D}/sol20.c \
+	${ALTAIRZ80D}/s100_vdm1.c \
 	${ALTAIRZ80D}/mmd.c \
 	${ALTAIRZ80D}/s100_dj2d.c \
 	${ALTAIRZ80D}/s100_djhdc.c \
@@ -2046,7 +2052,7 @@ ALTAIRZ80 = ${ALTAIRZ80D}/altairz80_cpu.c ${ALTAIRZ80D}/altairz80_cpu_nommu.c \
 	${ALTAIRZ80D}/m68k/m68kopac.c ${ALTAIRZ80D}/m68k/m68kopdm.c \
 	${ALTAIRZ80D}/m68k/softfloat/softfloat.c \
 	${ALTAIRZ80D}/m68k/m68kopnz.c ${ALTAIRZ80D}/m68k/m68kops.c ${ALTAIRZ80D}/m68ksim.c
-ALTAIRZ80_OPT = -I ${ALTAIRZ80D}
+ALTAIRZ80_OPT = -I ${ALTAIRZ80D} -DUSE_SIM_VIDEO ${VIDEO_CCDEFS} $(VIDEO_LDFLAGS)
 
 
 GRID = ${SIMHD}/GRI

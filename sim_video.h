@@ -189,6 +189,8 @@ typedef struct key_event SIM_KEY_EVENT;
 t_stat vid_open (DEVICE *dptr, const char *title, uint32 width, uint32 height, int flags);
 #define SIM_VID_INPUTCAPTURED       1                       /* Mouse and Keyboard input captured (calling */
                                                             /* code responsible for cursor display in video) */
+#define SIM_VID_IGNORE_VBAR         2                       /* ignore video buffer aspect ratio */
+#define SIM_VID_RESIZABLE           4                       /* video screen is resizable */
 typedef void (*VID_QUIT_CALLBACK)(void);
 t_stat vid_register_quit_callback (VID_QUIT_CALLBACK callback);
 typedef void (*VID_GAMEPAD_CALLBACK)(int, int, int);
@@ -214,6 +216,7 @@ t_stat vid_set_fullscreen (t_bool flag);
 
 extern int vid_active;
 void vid_set_cursor_position (int32 x, int32 y);        /* cursor position (set by calling code) */
+void vid_set_window_size (VID_DISPLAY *vptr, int32 x, int32 y);            /* window size (set by calling code) */
 
 t_stat vid_open_window (VID_DISPLAY **vptr, DEVICE *dptr, const char *title, uint32 width, uint32 height, int flags);
 t_stat vid_close_window (VID_DISPLAY *vptr);

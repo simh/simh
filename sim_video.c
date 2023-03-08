@@ -319,17 +319,19 @@ static int SDL_SavePNG_RW(SDL_Surface *surface, SDL_RWops *dst, int freedst)
      
  */
 
-#define EVENT_REDRAW     1                              /* redraw event for SDL */
-#define EVENT_CLOSE      2                              /* close event for SDL */
-#define EVENT_CURSOR     3                              /* new cursor for SDL */
-#define EVENT_WARP       4                              /* warp mouse position for SDL */
-#define EVENT_DRAW       5                              /* draw/blit region for SDL */
-#define EVENT_SHOW       6                              /* show SDL capabilities */
-#define EVENT_OPEN       7                              /* vid_open request */
-#define EVENT_EXIT       8                              /* program exit */
-#define EVENT_SCREENSHOT 9                              /* produce screenshot of video window */
-#define EVENT_BEEP      10                              /* audio beep */
-#define MAX_EVENTS      20                              /* max events in queue */
+#define EVENT_REDRAW      1                              /* redraw event for SDL */
+#define EVENT_CLOSE       2                              /* close event for SDL */
+#define EVENT_CURSOR      3                              /* new cursor for SDL */
+#define EVENT_WARP        4                              /* warp mouse position for SDL */
+#define EVENT_DRAW        5                              /* draw/blit region for SDL */
+#define EVENT_SHOW        6                              /* show SDL capabilities */
+#define EVENT_OPEN        7                              /* vid_open request */
+#define EVENT_EXIT        8                              /* program exit */
+#define EVENT_SCREENSHOT  9                              /* produce screenshot of video window */
+#define EVENT_BEEP       10                              /* audio beep */
+#define EVENT_FULLSCREEN 11                              /* fullscreen */
+#define EVENT_SIZE       12                              /* set window size */
+#define MAX_EVENTS       20                              /* max events in queue */
 
 typedef struct {
     SIM_KEY_EVENT events[MAX_EVENTS];
@@ -378,6 +380,7 @@ t_bool vid_key_state[SDL_NUM_SCANCODES];
 VID_DISPLAY *next;
 t_bool vid_blending;
 SDL_Rect *vid_dst_last;
+SDL_Rect vid_rect;
 uint32 *vid_data_last;
 };
 
@@ -517,7 +520,7 @@ main_argv = argv;
 SDL_SetHint (SDL_HINT_RENDER_DRIVER, "software");
 SDL_SetHint (SDL_HINT_VIDEO_ALLOW_SCREENSAVER, "1");
 
-status = SDL_Init (SDL_INIT_VIDEO);
+status = SDL_Init (SDL_INIT_EVENTS);
 
 if (status) {
     fprintf (stderr, "SDL Video subsystem can't initialize: %s\n", SDL_GetError ());
@@ -541,8 +544,10 @@ while (1) {
         if (event.type == SDL_USEREVENT) {
             if (event.user.code == EVENT_EXIT)
                 break;
-            if (event.user.code == EVENT_OPEN)
+            if (event.user.code == EVENT_OPEN) {
+                SDL_Init (SDL_INIT_VIDEO);
                 vid_video_events ((VID_DISPLAY *)event.user.data1);
+            }
             else {
                 if (event.user.code == EVENT_SHOW)
                     vid_show_video_event ();
@@ -1617,6 +1622,26 @@ if (SDL_SemWait (vid_mouse_events.sem) == 0) {
     }
 }
 
+void vid_set_window_size (VID_DISPLAY *vptr, int32 w, int32 h)
+{
+SDL_Event user_event;
+
+vptr->vid_rect.h = h;
+vptr->vid_rect.w = w;
+
+user_event.type = SDL_USEREVENT;
+user_event.user.windowID = vptr->vid_windowID;
+user_event.user.code = EVENT_SIZE;
+user_event.user.data1 = NULL;
+user_event.user.data2 = NULL;
+#if defined (SDL_MAIN_AVAILABLE)
+while (SDL_PushEvent (&user_event) < 0)
+    sim_os_ms_sleep (100);
+#else
+    SDL_SetWindowSize(vptr->vid_window, w, h);
+#endif
+}
+
 t_bool vid_is_fullscreen_window (VID_DISPLAY *vptr)
 {
 return SDL_GetWindowFlags (vptr->vid_window) & SDL_WINDOW_FULLSCREEN_DESKTOP;
@@ -1629,10 +1654,22 @@ return vid_is_fullscreen_window (&vid_first);
 
 t_stat vid_set_fullscreen_window (VID_DISPLAY *vptr, t_bool flag)
 {
+SDL_Event user_event;
+
+user_event.type = SDL_USEREVENT;
+user_event.user.windowID = vptr->vid_windowID;
+user_event.user.code = EVENT_FULLSCREEN;
+user_event.user.data1 = (flag) ? vptr : NULL;
+user_event.user.data2 = NULL;
+#if defined (SDL_MAIN_AVAILABLE)
+while (SDL_PushEvent (&user_event) < 0)
+    sim_os_ms_sleep (100);
+#else
 if (flag)
     SDL_SetWindowFullscreen (vptr->vid_window, SDL_WINDOW_FULLSCREEN_DESKTOP);
 else
     SDL_SetWindowFullscreen (vptr->vid_window, 0);
+#endif
 return SCPE_OK;
 }
 
@@ -1660,6 +1697,12 @@ else {
     r->h = vptr->vid_height * w / vptr->vid_width;
     r->x = 0;
     r->y = (h - r->h) / 2;
+    }
+if (vptr->vid_flags & SIM_VID_IGNORE_VBAR) {
+    r->w = w;
+    r->h = h;
+    r->x = 0;
+    r->y = 0;
     }
 }
 
@@ -1770,6 +1813,11 @@ if (!vptr->vid_texture) {
     }
 
 vptr->vid_format = SDL_AllocFormat (SDL_PIXELFORMAT_ARGB8888);
+
+if (vptr->vid_flags & SIM_VID_RESIZABLE) {
+    SDL_SetWindowResizable(vptr->vid_window, SDL_TRUE);
+    SDL_RenderSetIntegerScale(vptr->vid_renderer, SDL_TRUE);
+}
 
 SDL_StopTextInput ();
 
@@ -2055,22 +2103,27 @@ while (vid_active) {
                         case SDL_WINDOWEVENT_EXPOSED:
                             vid_update (vptr);
                             break;
+                        default:
+                            sim_debug (SIM_VID_DBG_VIDEO, vptr->vid_dev, "Did not handle window event: %d - %s\n", event.window.event, windoweventtypes[event.window.event]);
+                            break;
                         }
                     }
                 break;
 
             case SDL_USEREVENT:
-                /* There are 9 user events generated */
-                /* EVENT_REDRAW to update the display */
-                /* EVENT_DRAW   to update a region in the display texture */
-                /* EVENT_SHOW   to display the current SDL video capabilities */
-                /* EVENT_CURSOR to change the current cursor */
-                /* EVENT_WARP   to warp the cursor position */
-                /* EVENT_OPEN   to open a new window */
-                /* EVENT_CLOSE  to wake up this thread and let */
-                /*              it notice vid_active has changed */
-                /* EVENT_SCREENSHOT to take a screenshot */
-                /* EVENT_BEEP   to emit a beep sound */
+                /* There are 11 user events generated */
+                /* EVENT_REDRAW      to update the display */
+                /* EVENT_DRAW        to update a region in the display texture */
+                /* EVENT_SHOW        to display the current SDL video capabilities */
+                /* EVENT_CURSOR      to change the current cursor */
+                /* EVENT_WARP        to warp the cursor position */
+                /* EVENT_OPEN        to open a new window */
+                /* EVENT_CLOSE       to wake up this thread and let */
+                /*                   it notice vid_active has changed */
+                /* EVENT_SCREENSHOT  to take a screenshot */
+                /* EVENT_BEEP        to emit a beep sound */
+                /* EVENT_SIZE        to change screen size */
+                /* EVENT_FULLSCREEN  to change fullscreen */
                 while (vid_active && event.user.code) {
                     /* Handle Beep first since it isn't a window oriented event */
                     if (event.user.code == EVENT_BEEP) {
@@ -2081,7 +2134,7 @@ while (vid_active) {
                     if (event.user.code != EVENT_OPEN) {
                         vptr = vid_get_event_window (&event, event.user.windowID);
                         if (vptr == NULL) {
-                            sim_debug (SIM_VID_DBG_VIDEO, vptr->vid_dev, "vid_thread() - Ignored event not bound to a window\n");
+                            sim_printf ("vid_thread() - Ignored event not bound to a window\n");
                             event.user.code = 0;    /* Mark as done */
                             break;
                         }
@@ -2124,6 +2177,17 @@ while (vid_active) {
                         }
                     if (event.user.code == EVENT_SCREENSHOT) {
                         vid_screenshot_event ();
+                        event.user.code = 0;    /* Mark as done */
+                        }
+                    if (event.user.code == EVENT_SIZE) {
+                        SDL_SetWindowSize (vptr->vid_window, vptr->vid_rect.w, vptr->vid_rect.h);
+                        event.user.code = 0;    /* Mark as done */
+                        }
+                    if (event.user.code == EVENT_FULLSCREEN) {
+                        if (event.user.data1 != NULL)
+                            SDL_SetWindowFullscreen (vptr->vid_window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+                        else
+                            SDL_SetWindowFullscreen (vptr->vid_window, 0);
                         event.user.code = 0;    /* Mark as done */
                         }
                     if (event.user.code == EVENT_BEEP) {
@@ -2357,6 +2421,8 @@ for (i = 0; i < SDL_GetNumRenderDrivers(); ++i) {
     }
 if (vid_active) {
     SDL_RendererInfo info;
+
+    info.name = "";
 
     for (vptr = &vid_first; vptr != NULL; vptr = vptr->next) {
         if (vptr->vid_active_window) {
@@ -2895,6 +2961,11 @@ return SCPE_OK;
 }
 
 void vid_set_cursor_position_window (VID_DISPLAY *vptr, int32 x, int32 y)
+{
+return;
+}
+
+void vid_set_window_size (VID_DISPLAY *vptr, int32 w, int32 h)
 {
 return;
 }

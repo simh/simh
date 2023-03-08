@@ -77,6 +77,12 @@ extern DEVICE pmmi_dev;
 extern DEVICE hayes_dev;
 extern DEVICE mmd_dev;
 extern DEVICE mmdm_dev;
+extern DEVICE sol20_dev;
+extern DEVICE sol20k_dev;
+extern DEVICE sol20t_dev;
+extern DEVICE sol20s_dev;
+extern DEVICE sol20p_dev;
+extern DEVICE vdm1_dev;
 
 extern DEVICE cromfdc_dev;
 extern DEVICE wd179x_dev;
@@ -141,6 +147,13 @@ DEVICE      *sim_devices[]  = {
     &djhdc_dev,
     &mmd_dev,
     &mmdm_dev,
+    /* Processor Technology Devices */
+    &sol20_dev,
+    &sol20k_dev,
+    &sol20t_dev,
+    &sol20s_dev,
+    &sol20p_dev,
+    &vdm1_dev,
     /* MITS 88-2SIO */
     &m2sio0_dev,
     &m2sio1_dev,
