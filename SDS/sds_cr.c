@@ -25,6 +25,7 @@
 
    17-Feb-21    kenr    Initial Version
    17-Feb-21    kenr    Added C register support to CDR boot
+   10-Mar-23    kenr    Reset cr_eor on disconnect
    */
 
 /*
