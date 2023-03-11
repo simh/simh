@@ -1,0 +1,28 @@
+# EditorConfig: https://editorconfig.org/
+root = true
+
+[*.{c,h}]
+charset = utf-8
+end_of_line = crlf
+indent_style = space
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Makefiles
+[{{M,m}akefile,descrip.mms}]
+trim_trailing_whitespace = true
+indent_style = tab
+end_of_line = crlf
+insert_final_newline = true
+
+# Other text files
+[*.{txt,ini,md,simh,.editorconfig}]
+charset = utf-8
+end_of_line = crlf
+trim_trailing_whitespace = true
+
+# Git commit messages
+[{COMMIT_EDITMSG,MERGE_MSG}]
+trim_trailing_whitespace = true
+max_line_length = 80
+indent_style = space
