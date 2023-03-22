@@ -237,7 +237,9 @@ switch (op) {                                           /* case on op */
 
     case OP_SIO:                                        /* start I/O */
         *dvst = mt_tio_status (un);                     /* get status */
-        if ((*dvst & (DVS_CST|DVS_DST)) == 0) {         /* ctrl + dev idle? */
+         if (chan_chk_dvi (dva))                         /* int pending? */
+            *dvst |= (CC2 << DVT_V_CC);                 /* SIO fails */
+        else if ((*dvst & (DVS_CST|DVS_DST)) == 0) {    /* ctrl + dev idle? */
             uptr->UCMD = MCM_INIT;                      /* start dev thread */
             sim_activate (uptr, chan_ctl_time);
             }

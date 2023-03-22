@@ -252,6 +252,7 @@ void chan_set_chi (uint32 dva, uint32 fl);
 void chan_set_dvi (uint32 dva);
 int32 chan_clr_chi (uint32 dva);
 int32 chan_chk_chi (uint32 dva);
+t_bool chan_chk_dvi (uint32 dva);
 uint32 chan_end (uint32 dva);
 uint32 chan_uen (uint32 dva);
 uint32 chan_RdMemB (uint32 dva, uint32 *dat);

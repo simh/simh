@@ -353,11 +353,6 @@ if (!io_init_inst (rn, ad, ch, dev, R[0])) {            /* valid inst? */
     CC |= CC1|CC2;
     return 0;
     }
-if (chan[ch].chf[dev] & CHF_INP) {                      /* int pending? */
-    chan[ch].disp[dev] (OP_TIO, ad, &dvst);             /* get status */
-    CC |= (CC2 | io_set_status (rn, ch, dev, dvst, 0)); /* set status */
-    return 0;
-    }
 st = chan[ch].disp[dev] (OP_SIO, ad, &dvst);            /* start I/O */
 CC |= io_set_status (rn, ch, dev, dvst, 0);             /* set status */
 if (CC & cpu_tab[cpu_model].iocc)                       /* error? */
@@ -806,7 +801,7 @@ if (chan[ch].chi[dev] & CHI_CTL)                        /* ctl int pending? */
 else return -1;
 }
 
-/* Set device interrupt */
+/* Set, check device interrupt */
 
 void chan_set_dvi (uint32 dva)
 {
@@ -815,6 +810,16 @@ uint32 dev = DVA_GETDEV (dva);
 
 chan[ch].chf[dev] |= CHF_INP;                           /* int pending */
 return;
+}
+
+t_bool chan_chk_dvi (uint32 dva)
+{
+uint32 ch = DVA_GETCHAN (dva);                          /* get ch, dev */
+uint32 dev = DVA_GETDEV (dva);
+
+if ((chan[ch].chf[dev] & CHF_INP) != 0)
+    return TRUE;
+return FALSE;
 }
 
 /* Called by device reset to reset channel registers */

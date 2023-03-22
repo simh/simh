@@ -47,6 +47,16 @@
    one for timing asynchronous seek completions. The controller will not
    start a new operation is it is busy (any of the main units active) or if
    the target device is busy (its seek unit is active).
+ 
+   The DP's seek interrupt has a unique feature: it comes and goes, lasting only
+   a sector's time; and it gets "knocked down" by any SIO to a different unit.
+   Therefore, the SIO interrupt check is complicated.
+
+   1. If there's a controller interrupt, the SIO fails.
+   2. If there's a seek interrupt on the selected unit, the SIO fails.
+   3. All other seek interrupts are "knocked down" and rescheduled for
+      some time "in the future."
+   4. The SIO completes normally.
 */
 
 #include "sigma_io_defs.h"
@@ -589,6 +599,18 @@ switch (op) {                                           /* case on op */
 
     case OP_SIO:                                        /* start I/O */
         *dvst = dp_tio_status (cidx, un);               /* get status */
+        if ((chan_chk_chi (dva) >= 0) ||                /* channel int pending? */
+            (dp_ctx[cidx].dp_ski & (1u << un))) {       /* seek int on sel unit? */
+            *dvst |= (CC2 << DVT_V_CC);                 /* SIO fails */
+            break;
+            }
+        for (i = 0; i < DP_NUMDR; i++) {                /* knock down other seek ints */
+            if (dp_ctx[cidx].dp_ski & (1u << i)) {      /* seek int on unit? */
+                dp_clr_ski (cidx, i);                   /* knock it down */
+                sim_activate (&dp_unit[i + DP_SEEK], chan_ctl_time * 10);
+                dp_unit[i + DP_SEEK].UCMD = DSC_SEEKW;  /* resched interrupt */
+                }
+            }
         if ((*dvst & (DVS_CST|DVS_DST)) == 0) {         /* ctrl + dev idle? */
             uptr->UCMD = DPS_INIT;                      /* start dev thread */
             sim_activate (uptr, chan_ctl_time);
