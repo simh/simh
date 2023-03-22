@@ -54,7 +54,7 @@
     format allowed about 88K of storage per diskette. Later, the DSDD North
     Star controller increased capacity to 350K of storage per diskette.
 
-    Both SSSD (MDSA) and DSDD (MDSAD) are supported by AltairZ80.
+    Both SSSD (MDSA) and SSDD/DSDD (MDSAD) are supported by AltairZ80.
 
     Disk images of North Star DOS and CP/M for both of the North Star
     controllers, along with utilities for disk image transfer, are available at
@@ -63,7 +63,7 @@
     Example:
 
     SET SOL20 ENA
-    SET SOL20 ROM=13C
+    SET SOL20 VER=13C
     SET MDSA ENA
     ATTACH MDSA0 CPM22b14-48K-SDC-SOL.NSI
     BOOT SOL20
@@ -937,12 +937,12 @@ static uint8 *sol20_rom = sol20_rom_41;    /* Default 4.1 ROM */
 /*
 **  PORT ASSIGNMENTS
 */
-#define SOL20_SERST       0xf8    /* SERIAL STATUS PORT          */
-#define SOL20_SDATA       0xf9    /* SERIAL DATA                 */
-#define SOL20_STAPT       0xfa    /* STATUS PORT GENERAL         */
-#define SOL20_TDATA       0xfb    /* TAPE DATA                   */
-#define SOL20_KDATA       0xfc    /* KEYBOARD DATA               */
-#define SOL20_PDATA       0xfd    /* PARALLEL DATA               */
+#define SOL20_SERST   0xf8    /* SERIAL STATUS PORT              */
+#define SOL20_SDATA   0xf9    /* SERIAL DATA                     */
+#define SOL20_STAPT   0xfa    /* STATUS PORT GENERAL             */
+#define SOL20_TDATA   0xfb    /* TAPE DATA                       */
+#define SOL20_KDATA   0xfc    /* KEYBOARD DATA                   */
+#define SOL20_PDATA   0xfd    /* PARALLEL DATA                   */
 /*
 **  BIT ASSIGNMENT MASKS
 */
@@ -1001,7 +1001,7 @@ static MTAB sol20_mod[] = {
         &set_membase, &show_membase, NULL, "ROM address"},
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VER", "VER={13,13C,41}",
         &sol20_set_rom, &sol20_show_rom, NULL, "ROM version"},
-    { MTAB_XTD|MTAB_VDV,    0,                  "PORT",     "PORT",
+    { MTAB_XTD|MTAB_VDV, 0, "PORT", "PORT",
         NULL, sol20_show_ports, NULL, "I/O port address" },
     { 0 }
 };
@@ -1078,6 +1078,8 @@ static SOL20_PORT_CTX sol20k_ctx = {
 };
 
 static REG sol20k_reg[] = {
+    { HRDATAD (RDR, sol20k_ctx.rdr, 1, "Keyboard port RX data ready"), },
+    { HRDATAD (RXD, sol20k_ctx.rxd, 8, "Keyboard port RX data register"), },
     { NULL }
 };
 
@@ -1086,9 +1088,9 @@ static UNIT sol20k_unit[] = {
 };
 
 static MTAB sol20k_mod[] = {
-    { MTAB_XTD|MTAB_VDV,    0,          "PORT",     "PORT",
+    { MTAB_XTD|MTAB_VDV, 0, "PORT", "PORT",
         NULL, sol20_show_ports, NULL, "Show serial I/O ports" },
-    { MTAB_XTD|MTAB_VDV|MTAB_VALR,  0,  "BAUD",      "BAUD",
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "BAUD", "BAUD",
         &sol20_set_baud, &sol20_show_baud, NULL, "Set baud rate (default=9600)" },
     { 0 }
 };
@@ -1151,12 +1153,11 @@ static SOL20_PORT_CTX sol20t_ctx = {
 };
 
 static REG sol20t_reg[] = {
-    { HRDATAD (BAUD, sol20t_ctx.baud,  16, "Tape port baud register"), },
-    { HRDATAD (STATUS, sol20t_ctx.baud, 8, "Tape port status register"), },
-    { HRDATAD (TXP, sol20t_ctx.tbe,     8, "Tape port TX buffer empty register"), },
-    { HRDATAD (TXD, sol20t_ctx.txd,     8, "Tape port TX data register"), },
-    { HRDATAD (RXD, sol20t_ctx.rdr,     8, "Tape port RX data ready"), },
-    { HRDATAD (RXD, sol20t_ctx.rxd,     8, "Tape port RX data register"), },
+    { HRDATAD (STATUS, sol20t_ctx.status, 8, "Tape port status register"), },
+    { HRDATAD (TBE, sol20t_ctx.tbe,       1, "Tape port TX buffer empty register"), },
+    { HRDATAD (TXD, sol20t_ctx.txd,       8, "Tape port TX data register"), },
+    { HRDATAD (RDR, sol20t_ctx.rdr,       1, "Tape port RX data ready"), },
+    { HRDATAD (RXD, sol20t_ctx.rxd,       8, "Tape port RX data register"), },
     { NULL }
 };
 
@@ -1227,10 +1228,11 @@ static SOL20_PORT_CTX sol20s_ctx = {
 };
 
 static REG sol20s_reg[] = {
-    { HRDATAD (BAUD, sol20s_ctx.baud, 16, "Modem port baud register"), },
-    { HRDATAD (TXP, sol20s_ctx.tbe, 8, "Modem port TX buffer empty register"), },
-    { HRDATAD (TXD, sol20s_ctx.txd, 8, "Modem port TX data register"), },
-    { HRDATAD (RXD, sol20s_ctx.rxd, 8, "Modem port RX register"), },
+    { HRDATAD (BAUD, sol20s_ctx.baud, 16, "Serial port baud register"), },
+    { HRDATAD (TBE, sol20s_ctx.tbe, 1, "Serial port TX buffer empty register"), },
+    { HRDATAD (TXD, sol20s_ctx.txd, 8, "Serial port TX data register"), },
+    { HRDATAD (RDR, sol20s_ctx.rdr, 1, "Serial port RX data ready"), },
+    { HRDATAD (RXD, sol20s_ctx.rxd, 8, "Serial port RX register"), },
     { NULL }
 };
 
@@ -1239,9 +1241,9 @@ static UNIT sol20s_unit[] = {
 };
 
 static MTAB sol20s_mod[] = {
-    { MTAB_XTD|MTAB_VDV,    0,                  "PORT",     "PORT",
+    { MTAB_XTD|MTAB_VDV, 0, "PORT", "PORT",
         NULL, sol20_show_ports, NULL, "Show serial I/O ports" },
-    { MTAB_XTD|MTAB_VDV|MTAB_VALR,  0,  "BAUD",      "BAUD",
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "BAUD", "BAUD",
         &sol20_set_baud, &sol20_show_baud, NULL, "Set baud rate (default=9600)" },
     { 0 }
 };
@@ -1301,8 +1303,11 @@ static SOL20_PORT_CTX sol20p_ctx = {
 };
 
 static REG sol20p_reg[] = {
-    { HRDATAD (TXP, sol20p_ctx.tbe, 8, "Printer port buffer empty register"), },
+    { HRDATAD (BAUD, sol20s_ctx.baud, 16, "Serial port baud register"), },
+    { HRDATAD (TBE, sol20p_ctx.tbe, 1, "Printer port buffer empty register"), },
     { HRDATAD (TXD, sol20p_ctx.txd, 8, "Printer port data register"), },
+    { HRDATAD (RDR, sol20k_ctx.rdr, 1, "Printer port RX data ready"), },
+    { HRDATAD (RXD, sol20p_ctx.rxd, 8, "Printer port RX data register"), },
     { NULL }
 };
 
@@ -1311,7 +1316,7 @@ static UNIT sol20p_unit[] = {
 };
 
 static MTAB sol20p_mod[] = {
-    { MTAB_XTD|MTAB_VDV|MTAB_VALR,  0,  "BAUD",      "BAUD",
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "BAUD", "BAUD",
         &sol20_set_baud, &sol20_show_baud, NULL, "Set baud rate (default=9600)" },
     { 0 }
 };
@@ -2262,11 +2267,11 @@ static t_stat sol20_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const 
     fprintf(st, "F2: Eject tape\n");
     fprintf(st, "F3: Erase tape\n");
     fprintf(st, "F4: Tape speed\n");
-    fprintf(st, "F5: Load\n");
-    fprintf(st, "F6: Mode Select\n");
-    fprintf(st, "F7: Clear\n");
+    fprintf(st, "F5: LOAD\n");
+    fprintf(st, "F6: MODE SELECT\n");
+    fprintf(st, "F7: CLEAR\n");
     fprintf(st, "F8: CAPS lock\n");
-    fprintf(st, "F10: Reboot\n");
+    fprintf(st, "F10: Reboot System\n");
 
 
     return SCPE_OK;
