@@ -12231,10 +12231,14 @@ last:
                 goto no_fetch;
            }
        } else if (pi_hold && !f_pc_inh) {
+#if KA | KI
             /* Check if I/O, then check if IRQ was raised */
             if ((IR & 0700) == 0700) {
-                (void)check_irq_level();
+                if (check_irq_level()) {
+                   pi_vect = 040 | (pi_enc << 1) | maoff;
+                }
             }
+#endif
             AB = pi_vect | pi_ov;
             pi_ov = 0;
             pi_hold = 0;
