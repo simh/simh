@@ -191,6 +191,17 @@ dh_wr(int32 data, int32 PA, int32 access)
   switch (PA & 017) {
   case 000:
     sim_debug (DBG_IO, &dh_dev, "WRITE DHSCR %06o\n", data);
+    if (access == WRITEB) {
+        /* Only writing one byte of "SCR" */
+        if ((PA & 1) == 0) {
+            /* Even byte offset */
+            data = (dh_scr & ~0377) | data;
+        }
+        else {
+            /* Odd byte offset */
+            data = (dh_scr & 0377) | (data << 8);
+        }
+    }
     dh_scr = data;
     if (data & MCLR)
       dh_reset (&dh_dev);
