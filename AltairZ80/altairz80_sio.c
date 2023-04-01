@@ -57,18 +57,9 @@
 
 uint8 *URLContents(const char *URL, uint32 *length);
 #ifndef URL_READER_SUPPORT
-#define RESULT_BUFFER_LENGTH    1024
-#define RESULT_LEAD_IN          "URL is not supported on this platform. START URL \""
-#define RESULT_LEAD_OUT         "\" URL END."
 uint8 *URLContents(const char *URL, uint32 *length) {
-    char str[RESULT_BUFFER_LENGTH] = RESULT_LEAD_IN;
-    char *result;
-    strncat(str, URL, RESULT_BUFFER_LENGTH - strlen(RESULT_LEAD_IN) - strlen(RESULT_LEAD_OUT) - 1);
-    strcat(str, RESULT_LEAD_OUT);
-    result = (char*)malloc(strlen(str) + 1);
-    strcpy(result, str);
-    *length = strlen(str);
-    return (uint8*)result;
+    *length = 0;
+    return (uint8*)NULL;
 }
 #endif
 
@@ -279,9 +270,11 @@ static void processDirEntry (const char *directory,
                              void *context) {
     if (filename != NULL) {
         NameNode_t *top = (NameNode_t *)malloc(sizeof(NameNode_t));
-        top -> name = strdup(filename);
-        top -> next = nameListHead;
-        nameListHead = top;
+        if (top) {
+            top->name = strdup(filename);
+            top->next = nameListHead;
+            nameListHead = top;
+        }
     }
 }
 
