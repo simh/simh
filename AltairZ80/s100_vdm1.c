@@ -62,7 +62,7 @@ t_stat (*vdm1_kb_callback)(SIM_KEY_EVENT *kev) = NULL;
 
 static uint8 vdm1_ram[VDM1_MEM_SIZE];
 static uint8 vdm1_dstat = 0x00;
-static t_bool vdm1_dirty = FALSE;
+static t_bool vdm1_dirty = TRUE;
 static t_bool vdm1_reverse = FALSE;
 static t_bool vdm1_blink = FALSE;
 static uint16 vdm1_counter = 0;
@@ -358,7 +358,7 @@ t_stat vdm1_reset(DEVICE *dptr)
             return r;
         }
 
-        vid_set_window_size(vdm1_vptr, 800, 600);
+        vid_set_window_size(vdm1_vptr, VDM1_XSIZE, VDM1_YSIZE * 2);
 
         vdm1_palette[0] = vid_map_rgb_window(vdm1_vptr, 0x00, 0x00, 0x00);
         vdm1_palette[1] = vid_map_rgb_window(vdm1_vptr, 0x00, 0xFF, 0x30);
@@ -377,16 +377,16 @@ t_stat vdm1_reset(DEVICE *dptr)
 
 static t_stat vdm1_boot(int32 unitno, DEVICE *dptr)
 {
-    exdep_cmd(EX_D, "-m  0 MVI A,0");
-    exdep_cmd(EX_D, "-m  2 OUT 0FEH");
-    exdep_cmd(EX_D, "-m  4 MVI C,0");
-    exdep_cmd(EX_D, "-m  6 MVI B,0");
-    exdep_cmd(EX_D, "-m  8 LXI H,0CC00H");
-    exdep_cmd(EX_D, "-m  B DCR B");
-    exdep_cmd(EX_D, "-m  C MOV M,B");
-    exdep_cmd(EX_D, "-m  D INX H");
-    exdep_cmd(EX_D, "-m  E MOV A,H");
-    exdep_cmd(EX_D, "-m  F CPI 0D0H");
+    exdep_cmd(EX_D, "-m 00 MVI A,0");
+    exdep_cmd(EX_D, "-m 02 OUT 0FEH");
+    exdep_cmd(EX_D, "-m 04 MVI C,0");
+    exdep_cmd(EX_D, "-m 06 MVI B,0");
+    exdep_cmd(EX_D, "-m 08 LXI H,0CC00H");
+    exdep_cmd(EX_D, "-m 0B DCR B");
+    exdep_cmd(EX_D, "-m 0C MOV M,B");
+    exdep_cmd(EX_D, "-m 0D INX H");
+    exdep_cmd(EX_D, "-m 0E MOV A,H");
+    exdep_cmd(EX_D, "-m 0F CPI 0D0H");
     exdep_cmd(EX_D, "-m 11 JNZ 000BH");
     exdep_cmd(EX_D, "-m 14 DCX H");
     exdep_cmd(EX_D, "-m 15 MOV A,H");
