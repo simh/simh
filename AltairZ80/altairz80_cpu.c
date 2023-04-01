@@ -6628,7 +6628,7 @@ static const char* m68kVariantToString[] = {
 
 static t_stat chip_show(FILE *st, UNIT *uptr, int32 val, CONST void *desc) {
     fprintf(st, cpu_unit.flags & UNIT_CPU_OPSTOP ? "ITRAP, " : "NOITRAP, ");
-    if (chiptype < NUM_CHIP_TYPE) {
+    if ((chiptype >= 0) && (chiptype < NUM_CHIP_TYPE)) {
         fprintf(st, "%s", cpu_mod[chiptype].mstring);
         if (chiptype == CHIP_TYPE_M68K) {
             fprintf(st, " (%s)", m68kVariantToString[m68kvariant]);
@@ -6677,7 +6677,7 @@ static t_stat cpu_show(FILE *st, UNIT *uptr, int32 val, CONST void *desc) {
             }
         fprintf(st, "]");
     }
-    if (chiptype < NUM_CHIP_TYPE) {
+    if ((chiptype >= 0) && (chiptype < NUM_CHIP_TYPE)) {
         first = TRUE;
         /* show verbose CPU flags */
         for (i = 0; cpuflags[chiptype][i].mask; i++)
@@ -6861,7 +6861,7 @@ static int32 bankseldev(const int32 port, const int32 io, const int32 data) {
 }
 
 static void cpu_set_chiptype_short(const int32 value) {
-    if ((chiptype == value) || (chiptype >= NUM_CHIP_TYPE))
+    if ((chiptype == value) || (value < 0) || (value >= NUM_CHIP_TYPE))
         return; /* nothing to do */
     if (((chiptype == CHIP_TYPE_8080) && (value == CHIP_TYPE_Z80)) ||
         ((chiptype == CHIP_TYPE_Z80) && (value == CHIP_TYPE_8080))) {
@@ -7090,7 +7090,7 @@ static t_stat cpu_set_hist(UNIT *uptr, int32 val, CONST char *cptr, void *desc) 
    uint32 i, lnt;
    t_stat r;
 
-    if ((chiptype != CHIP_TYPE_8080) && (chiptype != CHIP_TYPE_Z80)) {
+    if ((chiptype >= 0) && (chiptype != CHIP_TYPE_8080) && (chiptype != CHIP_TYPE_Z80)) {
         sim_printf("History not supported for chiptype: %s\n",
                (chiptype < NUM_CHIP_TYPE) ? cpu_mod[chiptype].mstring : "????");
         return SCPE_NOFNC;
@@ -7158,7 +7158,8 @@ t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 
     if ((chiptype != CHIP_TYPE_8080) && (chiptype != CHIP_TYPE_Z80)) {
         sim_printf("History not supported for chiptype: %s\n",
-               (chiptype < NUM_CHIP_TYPE) ? cpu_mod[chiptype].mstring : "????");
+            (0 <= chiptype) && (chiptype < NUM_CHIP_TYPE) ?
+            cpu_mod[chiptype].mstring : "????");
         return SCPE_NOFNC;
     }
 
@@ -7377,6 +7378,9 @@ static t_stat cpu_hex_load(FILE *fileref, CONST char *cptr, CONST char *fnam, in
 
         bufptr = datastr;
 
+        /* Ensure datastr is NULL-terminated. */
+        datastr[sizeof(datastr) - 1] = '\0';
+
         if ((rectype == 0) && (bytecnt > 0) && (addr+bytecnt <= MAXMEMORY)) {
             if (cnt == 0)
                 org = addr;
@@ -7413,7 +7417,8 @@ void cpu_raise_interrupt(uint32 irq) {
         cpu8086_intr(irq);
     } else if (cpu_unit.flags & UNIT_CPU_VERBOSE) {
         sim_printf("Interrupts not fully supported for chiptype: %s\n",
-               (chiptype < NUM_CHIP_TYPE) ? cpu_mod[chiptype].mstring : "????");
+            (0 <= chiptype) && (chiptype < NUM_CHIP_TYPE) ?
+            cpu_mod[chiptype].mstring : "????");
     }
 }
 
