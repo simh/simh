@@ -6412,7 +6412,7 @@ static t_stat cpu_reset(DEVICE *dptr) {
     AF_S = AF1_S = 0;
     BC_S = DE_S = HL_S = 0;
     BC1_S = DE1_S = HL1_S = 0;
-    IR_S = IX_S = IY_S = SP_S = 0;
+    IR_S = IX_S = IY_S = SP_S = PC_S = 0;
     IM_S = IFF_S = 0;  /* Set IM0, reset IFF1 and IFF2 */
     setBankSelect(0);
     cpu8086reset();
