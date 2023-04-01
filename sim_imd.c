@@ -1,6 +1,6 @@
 /*************************************************************************
  *                                                                       *
- * Copyright (c) 2007-2022 Howard M. Harte.                              *
+ * Copyright (c) 2007-2023 Howard M. Harte.                              *
  * https://github.com/hharte                                             *
  *                                                                       *
  * Permission is hereby granted, free of charge, to any person obtaining *
@@ -55,7 +55,12 @@ DISK_INFO *diskOpenEx(FILE *fileref, uint32 isVerbose, DEVICE *device, uint32 de
 {
     DISK_INFO *myDisk = NULL;
 
-    myDisk = (DISK_INFO *)malloc(sizeof(DISK_INFO));
+    myDisk = (DISK_INFO*)calloc(1, sizeof(DISK_INFO));
+    if (myDisk == NULL) {
+        sim_printf("%s: %s(): memory allocation failure.\n", __FILE__, __FUNCTION__);
+        return NULL;
+    }
+
     myDisk->file = fileref;
     myDisk->device = device;
     myDisk->debugmask = debugmask;
@@ -765,6 +770,12 @@ t_stat trackWrite(DISK_INFO *myDisk,
      */
     dataLen = sectorLen + 1;
     sectorData = (uint8 *)malloc(dataLen);
+
+    if (sectorData == NULL) {
+        sim_printf("%s: %s(): memory allocation failure.\n", __FILE__, __FUNCTION__);
+        return SCPE_MEM;
+    }
+
     memset(sectorData, fillbyte, dataLen);
     sectorData[0] = SECT_RECORD_NORM;
 
