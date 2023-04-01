@@ -1,6 +1,6 @@
 /*************************************************************************
  *                                                                       *
- * Copyright (c) 2007-2022 Howard M. Harte.                              *
+ * Copyright (c) 2007-2023 Howard M. Harte.                              *
  * https://github.com/hharte                                             *
  *                                                                       *
  * Permission is hereby granted, free of charge, to any person obtaining *
@@ -537,6 +537,11 @@ static uint8 DISK3_Write(const uint32 Addr, uint8 cData)
 
                 dataBuffer = (uint8 *)malloc(xfr_len);
 
+                if (dataBuffer == NULL) {
+                    sim_printf("%s: memory allocation failure.\n", sim_uname(pDrive->uptr));
+                    break;
+                }
+
                 if(sim_fseek((pDrive->uptr)->fileref, file_offset, SEEK_SET) == 0) {
 
                     if(disk3_info->iopb[DISK3_IOPB_ARG1] == 1) { /* Read */
@@ -615,6 +620,12 @@ static uint8 DISK3_Write(const uint32 Addr, uint8 cData)
                 file_offset += (disk3_info->iopb[DISK3_IOPB_ARG3] * data_len);
 
                 fmtBuffer = (uint8 *)malloc(data_len);
+
+                if (fmtBuffer == NULL) {
+                    sim_printf("%s: memory allocation failure.\n", sim_uname(pDrive->uptr));
+                    break;
+                }
+
                 memset(fmtBuffer, disk3_info->iopb[DISK3_IOPB_ARG2], data_len);
 
                 if(sim_fseek((pDrive->uptr)->fileref, file_offset, SEEK_SET) == 0) {

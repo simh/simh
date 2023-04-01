@@ -1,6 +1,6 @@
 /*************************************************************************
  *                                                                       *
- * Copyright (c) 2007-2022 Howard M. Harte.                              *
+ * Copyright (c) 2007-2023 Howard M. Harte.                              *
  * https://github.com/hharte                                             *
  *                                                                       *
  * Permission is hereby granted, free of charge, to any person obtaining *
@@ -138,6 +138,11 @@ static t_stat fw2_attach(UNIT *uptr, CONST char *cptr)
     }
 
     fw2_info[i] = (FW2_INFO *)calloc(1, sizeof(FW2_INFO));
+
+    if (fw2_info[i] == NULL) {
+        return SCPE_MEM;
+    }
+
     fw2_info[i]->uptr = uptr;
     fw2_info[i]->uptr->u3 = baseaddr;
 
@@ -200,7 +205,9 @@ static t_stat fw2_detach(UNIT *uptr)
 static t_stat get_base_address(const char *cptr, uint32 *baseaddr)
 {
     uint32 b;
-    sscanf(cptr, "%x", &b);
+
+    if (sscanf(cptr, "%x", &b) != 1) return SCPE_ARG;
+
     if(b & (FW2_CAPACITY-1)) {
         sim_printf("FWII must be on a %d-byte boundary.\n", FW2_CAPACITY);
         return SCPE_ARG;
