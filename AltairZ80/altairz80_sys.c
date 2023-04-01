@@ -952,3 +952,19 @@ t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
     return SCPE_OK;
 }
 
+/* find_unit_index   find index of a unit
+
+   Inputs:
+        uptr    =       pointer to unit
+   Outputs:
+        result  =       index of device
+*/
+int32 find_unit_index(UNIT* uptr)
+{
+    DEVICE *dptr = find_dev_from_unit(uptr);
+
+    if (dptr == NULL)
+        return -1;
+
+    return (uptr - dptr->units);
+}
