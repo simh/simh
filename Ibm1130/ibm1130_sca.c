@@ -265,7 +265,7 @@ t_stat sca_set_baud (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 }
 
 /*********************************************************************************************
- * HANDY MACROS 
+ * HANDY MACROS
  *********************************************************************************************/
 
 #define in_bsc_mode()           (sca_unit.flags  & UNIT_BISYNC)                 /* TRUE if user selected BSC mode */
@@ -476,7 +476,7 @@ static t_stat sca_attach (UNIT *uptr, CONST char *cptr)
             return r;
         if (sca_lsock == INVALID_SOCKET)
             return SCPE_OPENERR;
-        
+
         SETBIT(sca_unit.flags, UNIT_LISTEN);    /* note that we are listening, not yet connected */
 
         name[sizeof (name) - 1] = '\0';
@@ -524,12 +524,12 @@ static t_stat sca_attach (UNIT *uptr, CONST char *cptr)
             return SCPE_OPENERR;
         }
     }
-    
+
     /* set up socket connect or listen. on success, set UNIT_ATT.
      * If listen mode, set UNIT_LISTEN. sca_svc will poll for connection
      * If connect mode, set dsw SCA_DSW_READY to indicate connection is up
      */
-    
+
     SETBIT(sca_unit.flags, UNIT_ATT);                   /* record successful socket binding */
 
     sca_state = SCA_STATE_IDLE;
@@ -567,7 +567,7 @@ static t_stat sca_detach (UNIT *uptr)
         sim_close_sock(sca_lsock);
         sca_lsock = INVALID_SOCKET;
     }
-    
+
     free(sca_unit.filename);
     sca_unit.filename = NULL;
 
@@ -680,7 +680,7 @@ static t_stat sca_svc (UNIT *uptr)
 
     if (sca_dsw & SCA_DSW_READY) {              /* if connected */
 
-        /* if rcvd data buffer is empty, and if in one of the receive states, checÄk for arrival of received data */
+        /* if rcvd data buffer is empty, and if in one of the receive states, check for arrival of received data */
         if (in_receive_state() && sca_rcvptr >= sca_nrcvd)
             sca_check_indata();
 
@@ -927,7 +927,7 @@ void xio_sca (int32 iocc_addr, int32 func, int32 modify)
                 sichar = (uint8) (ReadW(iocc_addr) >> 8);
                 sca_nsyns = 0;                      /* reset SYN suppression */
             }
-            /* else? does presence of mod bit preclude sending a character? */ 
+            /* else? does presence of mod bit preclude sending a character? */
             if ((modify & 0x07) == 0) {             /* no modifiers */
                 /* transmit character --
                  * note: in write mode, failure to write soon enough after a write response interrupt causes a check

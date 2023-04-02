@@ -1676,7 +1676,7 @@ if (xidex) {                                            /* is EMA declared? */
     }
 }                                                       /* not EMA reference */
 ndim = ReadW(dtbl++);
-if (ndim<0) goto em15;                                  /* negative ´dimensions */
+if (ndim<0) goto em15;                                  /* negative dimensions */
 sum = 0;                                                /* accu for index calc */
 while (ndim > 0) {
     MR = ReadW (atbl++);                                /* fetch address of A(N) */
