@@ -219,12 +219,13 @@ iox_tty(int addr)
 /*
  * Real-time clock.
  */
-#define US_PER_CLK      20000
 #define CLK_PER_SEC     50
 
 int int_enabled, dev_ready;
 
 struct intr rtc_int = { 0, 1 };
+
+t_stat clk_reset(DEVICE *dptr);
 
 t_stat clk_svc(UNIT *uptr);
 
@@ -243,7 +244,7 @@ MTAB clk_mod[] = {
 DEVICE clk_dev = {
         "RTC", &clk_unit, clk_reg, clk_mod,
         1, 0, 0, 0, 0, 0,
-        NULL, NULL, NULL,
+        NULL, NULL, &clk_reset,
         NULL, NULL, NULL,
         0, 0
 };
@@ -258,18 +259,14 @@ iox_clk(int addr)
                 regA = 0;
                 break;
         case 1: /* Reset counter */
-                sim_cancel(&clk_unit);
-                if (!sim_is_active(&clk_unit))
-                        sim_activate(&clk_unit, sim_rtc_init(US_PER_CLK));
+                sim_activate_after_abs(&clk_unit, 1000000/CLK_PER_SEC);
                 break;
         case 2: /* read status */
                 regA = (dev_ready << 3) | int_enabled;
                 break;
 
         case 3: /* set status */
-                sim_cancel(&clk_unit);
-                if (!sim_is_active(&clk_unit))
-                        sim_activate(&clk_unit, sim_rtc_init(US_PER_CLK));
+                sim_activate_after_abs(&clk_unit, 1000000/CLK_PER_SEC);
                 int_enabled = regA & 1;
                 if (BIT13(regA))
                         dev_ready = 0;
@@ -282,9 +279,17 @@ iox_clk(int addr)
 }
 
 t_stat
+clk_reset (DEVICE *dptr)
+{
+        sim_rtc_init(1000000/CLK_PER_SEC);
+        return SCPE_OK;
+}
+
+t_stat
 clk_svc(UNIT *uptr)
 {
-        sim_activate(&clk_unit, sim_rtc_calb(US_PER_CLK));
+        sim_rtc_calb(CLK_PER_SEC);
+        sim_activate_after(&clk_unit, 1000000/CLK_PER_SEC);
         dev_ready = 1;
         if (int_enabled)
                 extint(13, &rtc_int);
