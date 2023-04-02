@@ -18,7 +18,7 @@ jobs:
           - 3b2 3b2-700 alpha altair altairz80 b5500 besm6 cdc1700 eclipse gri h316 hp2100 hp3000
           - i1401 i1620 i650 i701 i7010 i704 i7070 i7080 i7090 i7094 ibm1130 id16 id32 vaxstation4000m60 vaxstation4000vlc 
           - imlac infoserver100 infoserver1000 infoserver150vxt intel-mds lgp microvax1 microvax2 microvax2000 microvax3100 microvax3100e 
-          - microvax3100m80 microvax3900 nova pdp1 pdp10 pdp10-ka pdp10-ki pdp10-kl pdp10-ks pdp11 pdp15 pdp4 pdp6 pdp7 
+          - microvax3100m80 microvax3900 nd100 nova pdp1 pdp10 pdp10-ka pdp10-ki pdp10-kl pdp10-ks pdp11 pdp15 pdp4 pdp6 pdp7 
           - pdp8 pdp9 pdq3 rtvax1000 s3 sage scelbi sds sel32 sigma ssem swtp6800mp-a swtp6800mp-a2 tt2500 tx-0 uc15
           - vax vax730 vax750 vax780 vax8200 vax8600 vaxstation3100m30 vaxstation3100m38 vaxstation3100m76 
     steps:
