@@ -128,6 +128,9 @@
 122. COC: Received break generates a data-in channel transaction with a flag bit set
      in the line number.
 123. DP: dp_inv_adr error must set a TDV visible flag (i.e., PGE) before UEND.
+124. IO, all devices: moved SIO reject-on-interrupt test to devices.
+125. DP: SIO will knock down pending device interrupts and allow operation to proceed.
+126. MT: AIO must mask unit number before calling TDV status.
 
 Diagnostic Notes
 ----------------

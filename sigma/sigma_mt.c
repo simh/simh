@@ -267,7 +267,8 @@ switch (op) {                                           /* case on op */
 
     case OP_AIO:                                        /* acknowledge int */
         un = mt_clr_int (mt_dib.dva);                   /* clr int, get unit and flag */
-        *dvst = (mt_tdv_status (un) & MTAI_MASK) |      /* device status */
+        *dvst =
+            (mt_tdv_status (un & DVA_M_DEVMU) & MTAI_MASK) | /* device status */
             (un & MTAI_INT) |                           /* device int flag */
             ((un & DVA_M_UNIT) << DVT_V_UN);            /* unit number */
         break;
