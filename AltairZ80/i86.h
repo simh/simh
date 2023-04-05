@@ -44,8 +44,7 @@ Priority 1: If LOWFIRST is defined, use it. LOWFIRST must be 1 if the
             lower part of a 16 bit quantity comes first in memory, otherwise
             LOWFIRST must be 0
 Priority 2: If __BIG_ENDIAN__ is defined, use it to define LOWFIRST accordingly
-Priority 3: OS 9 on Macintosh needs LOWFIRST 0
-Priority 4: Use LOWFIRST 1 as default
+Priority 3: Use LOWFIRST 1 as default
 */
 
 #ifndef LOWFIRST
@@ -55,8 +54,6 @@ Priority 4: Use LOWFIRST 1 as default
 #else
 #define LOWFIRST 1
 #endif
-#elif defined (__MWERKS__) && defined (macintosh)
-#define LOWFIRST 0
 #else
 #define LOWFIRST 1
 #endif

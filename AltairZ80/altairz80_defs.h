@@ -87,10 +87,6 @@ typedef enum {
 
 #define ADDRESS_FORMAT          "[0x%08x]"
 
-#if (defined (__MWERKS__) && defined (macintosh)) || defined(__DECC)
-#define __FUNCTION__ __FILE__
-#endif
-
 typedef struct {
     uint32 mem_base;    /* Memory Base Address */
     uint32 mem_size;    /* Memory Address space requirement */

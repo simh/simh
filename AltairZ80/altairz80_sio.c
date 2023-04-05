@@ -200,13 +200,7 @@ static uint32 stopWatchDelta        = 0;        /* stores elapsed time of stop w
 static int32 getStopWatchDeltaPos   = 0;        /* determines the state for receiving stopWatchDelta            */
 static uint32 stopWatchNow          = 0;        /* stores starting time of stop watch                           */
 static int32 markTimeSP             = 0;        /* stack pointer for timer stack                                */
-
-                                                /* default time in milliseconds to sleep for SIMHSleepCmd       */
-#if defined (__MWERKS__) && defined (macintosh)
-       uint32 SIMHSleep             = 0;        /* no sleep on Macintosh OS9                                    */
-#else
-       uint32 SIMHSleep             = 1;        /* default value is one millisecond                             */
-#endif
+       uint32 SIMHSleep             = 1;        /* default time in milliseconds to sleep for SIMHSleepCmd is 1  */
 static uint32 sleepAllowedCounter   = 0;        /* only sleep on no character available when == 0               */
 static uint32 sleepAllowedStart     = SLEEP_ALLOWED_START_DEFAULT;  /* default start for above counter          */
 
@@ -229,10 +223,7 @@ static int32 FCBAddress = CPM_FCB_ADDRESS;      /* FCB Address                  
 
 /* support for wild card file expansion */
 
-#if defined (__MWERKS__) && defined (macintosh)
-const static char hostPathSeparator     = ':';  /* colon on Macintosh OS 9  */
-const static char hostPathSeparatorAlt  = ':';  /* no alternative           */
-#elif defined (_WIN32)
+#if defined (_WIN32)
 const static char hostPathSeparator     = '\\'; /* back slash in Windows    */
 const static char hostPathSeparatorAlt  = '/';  /* '/' is an alternative    */
 #else

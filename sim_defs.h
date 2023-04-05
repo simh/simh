@@ -93,7 +93,7 @@
         sim_devices[]           array of pointers to simulated devices
         sim_PC                  pointer to saved PC register descriptor
         sim_interval            simulator interval to next event
-        sim_stop_messages[SCPE_BASE]     
+        sim_stop_messages[SCPE_BASE]
                                 array of pointers to stop messages
         sim_instr()             instruction execution routine
         sim_load()              binary loader routine
@@ -135,7 +135,7 @@ extern int sim_vax_snprintf(char *buf, size_t buf_size, const char *fmt, ...);
 #define EXIT_SUCCESS 0
 #endif
 
-#if (defined (__MWERKS__) && defined (macintosh)) || defined(__DECC)
+#if defined(__DECC)
 #define __FUNCTION__ __FILE__
 #endif
 
@@ -190,7 +190,7 @@ typedef __int32          int32;
 typedef unsigned __int8  uint8;
 typedef unsigned __int16 uint16;
 typedef unsigned __int32 uint32;
-#else                                                   
+#else
 /* All modern/standard compiler environments */
 /* any other environment needa a special case above */
 #include <stdint.h>
@@ -299,7 +299,7 @@ typedef uint32          t_addr;
 #define SIM_INLINE inline
 #define SIM_NOINLINE  __attribute__ ((noinline))
 #else
-#define SIM_INLINE 
+#define SIM_INLINE
 #define SIM_NOINLINE
 #endif
 
@@ -498,7 +498,7 @@ struct DEVICE {
                                                         /* mem size routine */
     char                *lname;                         /* logical name */
     t_stat              (*help)(FILE *st, DEVICE *dptr,
-                            UNIT *uptr, int32 flag, const char *cptr); 
+                            UNIT *uptr, int32 flag, const char *cptr);
                                                         /* help */
     t_stat              (*attach_help)(FILE *st, DEVICE *dptr,
                             UNIT *uptr, int32 flag, const char *cptr);
@@ -835,10 +835,10 @@ struct MEMFILE {
     size_t              pos;                         /* data used */
     };
 
-/* 
+/*
    The following macros exist to help populate structure contents
 
-   They are dependent on the declaration order of the fields 
+   They are dependent on the declaration order of the fields
    of the structures they exist to populate.
 
  */
@@ -914,14 +914,14 @@ struct MEMFILE {
    This specifies a arrayed register whose elements are array[0].field,
    array[1].field, etc.
 
-   All above macro names from ORDATA through XRDATA have two additional 
-   precisely related macros.  The first it the above name with D appended and 
-   has an additional parameter which is a quoted string describing the purpose 
-   of the register which is visible when displaying HELP about a device's 
+   All above macro names from ORDATA through XRDATA have two additional
+   precisely related macros.  The first it the above name with D appended and
+   has an additional parameter which is a quoted string describing the purpose
+   of the register which is visible when displaying HELP about a device's
    registers.  The second related macro has the above name with DF appended
-   and has two additional parameters.  The first parameter is the register 
+   and has two additional parameters.  The first parameter is the register
    description, and the second is the name of a BITFIELD array which describes
-   the fields in the register's contents.  This info is used to display the 
+   the fields in the register's contents.  This info is used to display the
    register contents (via EXAMINE) along with the detailed bitfield data.
    For example:
 
@@ -946,7 +946,7 @@ struct MEMFILE {
        will occur before stringization, resulting in the wrong register name.
 
     3. Additional REG initialization values may be supplied after a macro
-       invocation.  If present, these begin with the "flags" field which is, 
+       invocation.  If present, these begin with the "flags" field which is,
        for the most part, not specified as a macro parameter.
 
     4. The URDATA macro is obsolescent and present for backward-compatibility.
@@ -965,8 +965,8 @@ struct MEMFILE {
 #define _RegCheck(nm,loc,rdx,wd,off,dep,desc,flds,qptr,siz,elesiz,macro) \
     nm, (loc), (rdx), (wd), (off), (dep), (desc), (flds), (qptr), (siz), sizeof(loc), sizeof(*(loc)), (elesiz), #macro, __FILE__, __LINE__
 
-/* Generic Register declaration for all fields.  
-   If the register structure is extended, this macro will be retained and a 
+/* Generic Register declaration for all fields.
+   If the register structure is extended, this macro will be retained and a
    new internal macro will be provided that populates the new register structure */
 #define REGDATA(nm,loc,rdx,wd,off,dep,desc,flds,fl,qptr,siz) \
     _RegCheck(#nm,&(loc),rdx,wd,off,dep,desc,flds,qptr,siz,sizeof((loc)),REGDATA),(fl)
