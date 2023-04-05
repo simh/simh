@@ -3436,7 +3436,7 @@ static int32 mmddev(int32 Addr, int32 rw, int32 data)
     }
 }
 
-static void intZ80()
+static void intZ80(void)
 {
     if (mmd_ctx->MMD.intenable) {
         vectorInterrupt |= (1 << mmd_ctx->MMD.intvec);
@@ -3502,7 +3502,7 @@ static uint8 MMD_Dev_Read(uint32 Addr)
     return (cData);
 }
 
-static uint8 MMD_FDC_Read_Data()
+static uint8 MMD_FDC_Read_Data(void)
 {
     uint8 cData = 0xff;
 
@@ -3659,7 +3659,7 @@ static void MMD_Command_Stack(int32 Data)
     }
 }
 
-static void MMD_Command_Proc()
+static void MMD_Command_Proc(void)
 {
 
     switch (mmd_ctx->MMD.cmd) {
@@ -3811,7 +3811,7 @@ static const char * MMD_Command_String(int32 command)
     return string;
 }
 
-static uint8 MMD_Result_Stack()
+static uint8 MMD_Result_Stack(void)
 {
     uint8 cData;
 
@@ -3825,7 +3825,7 @@ static uint8 MMD_Result_Stack()
     return cData;
 }
 
-static uint8 MMD_Exec_Format()
+static uint8 MMD_Exec_Format(void)
 {
     uint8 drive = mmd_ctx->drive;
 
@@ -3853,7 +3853,7 @@ static uint8 MMD_Exec_Format()
     return 0;
 }
 
-static uint8 MMD_Exec_Read()
+static uint8 MMD_Exec_Read(void)
 {
     uint8 cData;
     uint8 drive = mmd_ctx->drive;
@@ -3920,7 +3920,7 @@ static uint8 MMD_Exec_Write(int32 Data)
     return Data;
 }
 
-static uint8 MMD_Term_Count()
+static uint8 MMD_Term_Count(void)
 {
     if (mmd_ctx->MMD.status & MMD_STAT_EXM) {
         mmd_ctx->MMD.tc = TRUE;
@@ -4002,7 +4002,7 @@ static uint8 MMD_Write_Sector(uint8 drive)
     return r;
 }
 
-static void MMD_Dump_Sector() {
+static void MMD_Dump_Sector(void) {
     int32 i;
 
     for (i = 0; i < 32; i++) {

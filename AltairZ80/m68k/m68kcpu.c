@@ -1151,7 +1151,7 @@ void m68k_pulse_halt(void)
 
 /* Get and set the current CPU context */
 /* This is to allow for multiple CPUs */
-unsigned int m68k_context_size()
+unsigned int m68k_context_size(void)
 {
     return sizeof(m68ki_cpu_core);
 }

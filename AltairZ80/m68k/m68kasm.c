@@ -3758,7 +3758,7 @@ static int oplookup(const char* s)
 
 
 
-static void init_ophash() 
+static void init_ophash(void)
 
 {
 
@@ -3792,7 +3792,7 @@ static char* yystream;
 
 
 
-static int yylex()
+static int yylex(void)
 
 {
 

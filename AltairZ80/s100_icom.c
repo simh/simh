@@ -995,7 +995,7 @@ static int32 icomdev(int32 Addr, int32 rw, int32 data)
     }
 }
 
-static void showReadSec()
+static void showReadSec(void)
 {
     int i;
     ICOM_REG *pICOM;
@@ -1015,7 +1015,7 @@ static void showReadSec()
     }
 }
 
-static void showWriteSec()
+static void showWriteSec(void)
 {
     int i;
     ICOM_REG *pICOM;

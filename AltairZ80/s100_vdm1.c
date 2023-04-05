@@ -465,7 +465,7 @@ const char *vdm1_description (DEVICE *dptr)
 /*
  * Draw and refresh the screen in the video window
  */
-static void vdm1_refresh() {
+static void vdm1_refresh(void) {
     if (vdm1_active) {
         vdm1_render();
         vid_draw_window(vdm1_vptr, VDM1_MARGIN, VDM1_MARGIN, VDM1_XSIZE, VDM1_YSIZE, vdm1_surface);
@@ -477,7 +477,7 @@ static void vdm1_refresh() {
  * The VDM-1 display is make up of 16 64-character rows. Each character occupies
  * 1 byte in memory from CC00-CFFF.
  */
-static void vdm1_render()
+static void vdm1_render(void)
 {
     uint8 x,y,s,c,c1;
     int addr = 0;

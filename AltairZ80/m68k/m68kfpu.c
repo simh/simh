@@ -1479,7 +1479,7 @@ static void fmovem(uint16 w2)
     }
 }
 
-static void fscc()
+static void fscc(void)
 {
   // added by JFF, this seems to work properly now 
   int condition = OPER_I_16() & 0x3f;
@@ -1549,7 +1549,7 @@ static void fbcc32(void)
 }
 
 
-void m68040_fpu_op0()
+void m68040_fpu_op0(void)
 {
     m68ki_cpu.fpu_just_reset = 0;
 
@@ -1638,7 +1638,7 @@ static void perform_fsave(uint32 addr, int inc)
 }
 
 // FRESTORE on a NULL frame reboots the FPU - all registers to NaN, the 3 status regs to 0
-static void do_frestore_null()
+static void do_frestore_null(void)
 {
     int i;
 
@@ -1656,7 +1656,7 @@ static void do_frestore_null()
     m68ki_cpu.fpu_just_reset = 1;
 }
 
-void m68040_fpu_op1()
+void m68040_fpu_op1(void)
 {
     int ea = REG_IR & 0x3f;
     int mode = (ea >> 3) & 0x7;

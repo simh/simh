@@ -243,7 +243,7 @@ static int32 currentNameIndex           = 0;
 static int32 lastPathSeparatorIndex     = 0;
 static int32 firstPathCharacterIndex    = 0;
 
-static void deleteNameList() {
+static void deleteNameList(void) {
     while (nameListHead != NULL) {
         NameNode_t *next = nameListHead -> next;
         free(nameListHead -> name);

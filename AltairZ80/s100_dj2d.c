@@ -1494,7 +1494,7 @@ static t_stat dj2d_show_baud(FILE *st, UNIT *uptr, int32 value, const void *desc
     return SCPE_OK;
 }
 
-static t_stat dj2d_config_line()
+static t_stat dj2d_config_line(void)
 {
     char config[20];
     const char *fmt;

@@ -780,7 +780,7 @@ static void showsector(uint8 drive, uint8 isRead, uint8 *buf) {
     sim_debug(RD_DATA_DETAIL_MSG|WR_DATA_DETAIL_MSG, &jade_dev, "\n");
 }
 
-static void showcb()
+static void showcb(void)
 {
     DBG_PRINT((JADE_SNAME
         " cmd=0x%02X drv=%d trk=%02d sec=%02d mod=0x%02X sts=0x%02X lad=%04X lng=%04X\n",
@@ -953,7 +953,7 @@ static uint8 PROM_Boot(JADE_INFO *info)
 ** Boot Loader Transient (BLT) module into the sector buffer.
 ** The BLT is emulated with DCM_DBSLdr() function.
 */
-static void DCM_Init()
+static void DCM_Init(void)
 {
     /* Move Bank 1 to Bank 0 */
     memcpy(bank0, bank1, JADE_BANK_SIZE);
@@ -985,7 +985,7 @@ static void DCM_Init()
 #define LNG_1K    1024
 #define SEC_BG    4                    /* First BIOS sector */
 
-static void DCM_DBSLdr()
+static void DCM_DBSLdr(void)
 {
     uint8 sec = SEC_BG;
     uint16 d = LNG_1K;
@@ -1022,7 +1022,7 @@ static void DCM_DBSLdr()
 * THIS FUNCTION HANDLES TO THE INDIVIDUAL COMMAND       *
 * ROUTINES.                                             *
 ********************************************************/
-static uint8 DCM_Execute()
+static uint8 DCM_Execute(void)
 {
     uint8 sts;
 

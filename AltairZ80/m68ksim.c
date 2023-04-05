@@ -324,7 +324,7 @@ static uint32 MC6850_data_read(void) {
     return (((ch > 0) && (!stop_cpu)) ? ch & 0xff : 0xff);
 }
 
-static int MC6850_status_read() {
+static int MC6850_status_read(void) {
     return m68k_MC6850_status;
 }
 
