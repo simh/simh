@@ -83,49 +83,6 @@ extern "C" {
    sim_setnonblock      set socket non-blocking
 */
 
-/* First, all the non-implemented versions */
-
-#if defined (__OS2__) && !defined (__EMX__)
-
-void sim_init_sock (void)
-{
-}
-
-void sim_cleanup_sock (void)
-{
-}
-
-SOCKET sim_master_sock_ex (const char *hostport, int *parse_status, int opt_flags)
-{
-return INVALID_SOCKET;
-}
-
-SOCKET sim_connect_sock_ex (const char *sourcehostport, const char *hostport, const char *default_host, const char *default_port, int opt_flags)
-{
-return INVALID_SOCKET;
-}
-
-SOCKET sim_accept_conn (SOCKET master, char **connectaddr);
-{
-return INVALID_SOCKET;
-}
-
-int sim_read_sock (SOCKET sock, char *buf, int nbytes)
-{
-return -1;
-}
-
-int sim_write_sock (SOCKET sock, char *msg, int nbytes)
-{
-return 0;
-}
-
-void sim_close_sock (SOCKET sock)
-{
-return;
-}
-
-#else                                                   /* endif unimpl */
 
 /* UNIX, Win32, Macintosh, VMS, OS2 (Berkeley socket) routines */
 
@@ -1415,8 +1372,6 @@ void sim_close_sock (SOCKET sock)
 shutdown(sock, SD_BOTH);
 closesocket (sock);
 }
-
-#endif                                                  /* end else !implemented */
 
 #ifdef  __cplusplus
 }

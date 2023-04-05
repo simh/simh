@@ -71,7 +71,7 @@ extern "C" {
 #pragma pop_macro ("PURE")
 #pragma pop_macro ("INT_PTR")
 
-#elif !defined (__OS2__) || defined (__EMX__)           /* VMS, Mac, Unix, OS/2 EMX */
+#else                                                   /* VMS, Mac, Unix */
 #include <sys/types.h>                                  /* for fcntl, getpid */
 #include <sys/socket.h>                                 /* for sockets */
 #include <string.h>

@@ -2878,10 +2878,6 @@ t_bool device_unit_tests = FALSE;
 t_stat stat = SCPE_OK;
 CTAB *docmdp = NULL;
 
-#if defined (__MWERKS__) && defined (macintosh)
-argc = ccommand (&argv);
-#endif
-
 /* Make sure that argv has at least 10 elements and that it ends in a NULL pointer */
 targv = (char **)calloc (1+MAX(10, argc), sizeof(*targv));
 for (i=0; i<argc; i++)
