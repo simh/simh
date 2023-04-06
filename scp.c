@@ -10875,7 +10875,7 @@ return (CONST char *)get_glyph_gen (iptr, optr, 0, TRUE, FALSE, 0);
         result  =       true if yes, false if no
 */
 
-t_stat get_yn (const char *ques, t_stat deflt)
+t_bool get_yn (const char *ques, t_bool deflt)
 {
 char cbuf[CBUFSIZE];
 const char *cptr;
@@ -17210,7 +17210,7 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
         stat = tstat;
         sim_printf ("%s device tests returned: %d - %s\n", dptr->name, SCPE_BARE_STATUS (tstat), sim_error_text (tstat));
         if (sim_ttisatty()) {
-            if (get_yn ("Continue with additional tests? [N] ", SCPE_STOP) == SCPE_STOP)
+            if (get_yn ("Continue with additional tests? [N] ", FALSE) == FALSE)
                 break;
             }
         else
