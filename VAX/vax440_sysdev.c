@@ -40,6 +40,7 @@
 #include "vax_ka48a_bin.h" /* Defines BOOT_CODE_FILENAME and BOOT_CODE_ARRAY, etc */
 #endif
 
+const char *boot_code_filename = BOOT_CODE_FILENAME;
 
 t_stat vax460_boot (int32 flag, CONST char *ptr);
 

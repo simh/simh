@@ -35,6 +35,8 @@
 
 #include "vax_is1000_bin.h" /* Defines BOOT_CODE_FILENAME and BOOT_CODE_ARRAY, etc */
 
+const char *boot_code_filename = BOOT_CODE_FILENAME;
+
 t_stat is1000_boot (int32 flag, CONST char *ptr);
 
 /* Special boot command, overrides regular boot */

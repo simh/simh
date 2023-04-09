@@ -123,7 +123,6 @@ t_stat sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
 t_stat r;
 int32 i;
-extern void va_mem_wr_B (int32 pa, int32 val);
 uint32 origin, limit, step = 1;
 
 if (flag)                                               /* dump? */
@@ -139,10 +138,14 @@ else {
         step = 2;
         }
     else {
+#if !defined(VAX_620)
         if (sim_switches & SWMASK ('V')) {              /* VCB02 ROM? */
             origin = QDMBASE;
             limit = QDMBASE + QDMSIZE;
             step = 1;
+#else
+        if (0) {
+#endif
             }
         else {
             origin = 0;                                 /* memory */
@@ -161,8 +164,15 @@ while ((i = Fgetc (fileref)) != EOF) {                  /* read byte stream */
     if (sim_switches & SWMASK ('R'))                    /* ROM? */
         rom_wr_B (origin, i);                           /* not writeable */
     else {
-        if (sim_switches & SWMASK ('V'))                /* VCB02 ROM? */
+#if !defined(VAX_620)
+        if (sim_switches & SWMASK ('V')) {              /* VCB02 ROM? */
+            extern void va_mem_wr_B (int32 pa, int32 val);
+
             va_mem_wr_B (origin, i);
+#else
+        if (0) {
+#endif
+            }
         else
             WriteB (origin, i);                         /* store byte */
         }

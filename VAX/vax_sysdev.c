@@ -61,6 +61,8 @@
 
 #include "vax_ka655x_bin.h" /* Defines BOOT_CODE_FILENAME and BOOT_CODE_ARRAY, etc */
 
+const char *boot_code_filename = BOOT_CODE_FILENAME;
+
 #define UNIT_V_NODELAY  (UNIT_V_UF + 0)                 /* ROM access equal to RAM access */
 #define UNIT_NODELAY    (1u << UNIT_V_NODELAY)
 
@@ -604,18 +606,17 @@ fprintf (st, "Read-only memory (ROM)\n\n");
 fprintf (st, "The boot ROM consists of a single unit, simulating the %uKB boot ROM.  It\n", ROMSIZE >> 10);
 fprintf (st, "has no registers.  The boot ROM can be loaded with a binary byte stream\n");
 fprintf (st, "using the LOAD -r command:\n\n");
-fprintf (st, "    LOAD -r %s        load ROM image %s\n\n", BOOT_CODE_FILENAME, BOOT_CODE_FILENAME);
+fprintf (st, "    LOAD -r %s        load ROM image %s\n\n", boot_code_filename, boot_code_filename);
 fprintf (st, "When the simulator starts running (via the BOOT command), if the ROM has\n");
-if (BOOT_CODE_ARRAY != NULL) {
-    fprintf (st, "not yet been loaded, an internal 'built-in' copy of the %s image\n", BOOT_CODE_FILENAME);
+#if !defined (DONT_USE_INTERNAL_ROM)
+    fprintf (st, "not yet been loaded, an internal 'built-in' copy of the %s image\n", boot_code_filename);
     fprintf (st, "will be loaded into the ROM address space.\n");
-    }
-else {
+#else
     fprintf (st, "not yet been loaded, an attempt will be made to automatically load the\n");
     fprintf (st, "ROM image from the file %s in the current working directory.\n", BOOT_CODE_FILENAME);
     fprintf (st, "If that load attempt fails, then a copy of the missing ROM file is\n");
     fprintf (st, "written to the current directory and the load attempt is retried.\n");
-    }
+#endif
 fprintf (st, "Once the ROM address space has been populated execution will be started.\n\n");
 fprintf (st, "ROM accesses a use a calibrated delay that slows ROM-based execution to\n");
 fprintf (st, "about 500K instructions per second.  This delay is required to make the\n");

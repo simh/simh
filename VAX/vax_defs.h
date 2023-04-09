@@ -49,7 +49,6 @@
 #endif
 
 #include "sim_defs.h"
-#include <setjmp.h>
 
 /* Stops and aborts */
 
@@ -1043,5 +1042,6 @@ extern int32 int_req[IPL_HLVL];                         /* intr, IPL 14-17 */
 extern uint32 *M;                                       /* Memory */
 extern DEVICE cpu_dev;                                  /* CPU */
 extern UNIT cpu_unit;                                   /* CPU */
+extern const char *boot_code_filename;
 
 #endif                                                  /* _VAX_DEFS_H */
