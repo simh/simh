@@ -115,6 +115,7 @@ DEVICE *sim_devices[] = {
 
    -r           load ROM
    -n           load NVR
+   -v           load VCB02 ROM
    -o           for memory, specify origin
 */
 
@@ -122,6 +123,7 @@ t_stat sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
 t_stat r;
 int32 i;
+extern void va_mem_wr_B (int32 pa, int32 val);
 uint32 origin, limit, step = 1;
 
 if (flag)                                               /* dump? */
@@ -130,26 +132,40 @@ if (sim_switches & SWMASK ('R')) {                      /* ROM? */
     origin = ROMBASE;
     limit = ROMBASE + ROMSIZE;
     }
-else if (sim_switches & SWMASK ('N')) {                 /* NVR? */
-    origin = NVRBASE;
-    limit = NVRBASE + NVRASIZE;
-    step = 2;
-    }
 else {
-    origin = 0;                                         /* memory */
-    limit = (uint32) cpu_unit.capac;
-    if (sim_switches & SWMASK ('O')) {                  /* origin? */
-        origin = (int32) get_uint (cptr, 16, 0xFFFFFFFF, &r);
-        if (r != SCPE_OK)
-            return SCPE_ARG;
+    if (sim_switches & SWMASK ('N')) {                 /* NVR? */
+        origin = NVRBASE;
+        limit = NVRBASE + NVRASIZE;
+        step = 2;
+        }
+    else {
+        if (sim_switches & SWMASK ('V')) {              /* VCB02 ROM? */
+            origin = QDMBASE;
+            limit = QDMBASE + QDMSIZE;
+            step = 1;
+            }
+        else {
+            origin = 0;                                 /* memory */
+            limit = (uint32) cpu_unit.capac;
+            if (sim_switches & SWMASK ('O')) {          /* origin? */
+                origin = (int32) get_uint (cptr, 16, 0xFFFFFFFF, &r);
+                if (r != SCPE_OK)
+                    return SCPE_ARG;
+                }
+            }
         }
     }
-while ((i = Fgetc (fileref)) != EOF) {                   /* read byte stream */
+while ((i = Fgetc (fileref)) != EOF) {                  /* read byte stream */
     if (origin >= limit)                                /* NXM? */
         return SCPE_NXM;
     if (sim_switches & SWMASK ('R'))                    /* ROM? */
         rom_wr_B (origin, i);                           /* not writeable */
-    else WriteB (origin, i);                            /* store byte */
+    else {
+        if (sim_switches & SWMASK ('V'))                /* VCB02 ROM? */
+            va_mem_wr_B (origin, i);
+        else
+            WriteB (origin, i);                         /* store byte */
+        }
     origin = origin + step;
     }
 return SCPE_OK;

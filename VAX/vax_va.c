@@ -170,6 +170,7 @@ uint32 va_palette[256];                                 /* Colour palette */
 
 uint32 va_dla = 0;                                      /* display list addr */
 uint32 va_rom_poll = 0;
+uint8 *va_rom = (uint8 *)BOOT_CODE_ARRAY;               /* VCB02 ROM */
 
 /* debug variables */
 
@@ -551,7 +552,7 @@ int32 va_mem_rd (int32 pa)
 {
 int32 rg = (pa >> 1) & 0x7FFF;
 int32 data;
-uint16 *qr = (uint16*) vax_vcb02_bin;
+uint16 *qr = (uint16*)va_rom;
 
 if (rg >= VA_RSV_OF) {
     return 0;
@@ -608,6 +609,12 @@ data = qr[rg];
 va_rom_poll = sim_grtime ();
 sim_debug (DBG_ROM, &va_dev, "rom_rd: %X, %X from PC %08X\n", pa, data, fault_PC);
 return sim_rom_read_with_delay (data);
+}
+
+/* Loading ROM support */
+void va_mem_wr_B (int32 pa, int32 val)
+{
+va_rom[pa - QDMBASE] = val;
 }
 
 void va_mem_wr (int32 pa, int32 val, int32 lnt)
@@ -1105,6 +1112,18 @@ if (dptr->flags & DEV_DIS) {
         }
     else
         return SCPE_OK;
+    }
+else {
+    if (va_rom == NULL) {
+        int32 saved_switches = sim_switches;
+
+        va_rom = (uint8*)calloc (BOOT_CODE_SIZE, 1);
+        sim_switches = SWMASK ('V');
+        r = cpu_load_bootcode (BOOT_CODE_FILENAME, BOOT_CODE_ARRAY, BOOT_CODE_SIZE, FALSE, 0, BOOT_CODE_FILEPATH, BOOT_CODE_CHECKSUM);
+        sim_switches = saved_switches;
+        if (r != SCPE_OK)
+            return r;
+        }
     }
 
 if (!vid_active)  {

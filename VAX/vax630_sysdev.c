@@ -344,15 +344,22 @@ return SCPE_OK;
 t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "Read-only memory (ROM)\n\n");
-fprintf (st, "The boot ROM consists of a single unit, simulating the 64KB boot ROM.  It has\n");
+fprintf (st, "The boot ROM consists of a single unit, simulating the %uKB boot ROM.  It has\n", ROMSIZE >> 10);
 fprintf (st, "no registers.  The boot ROM is loaded with a binary byte stream using the \n");
 fprintf (st, "LOAD -r command:\n\n");
-fprintf (st, "   LOAD -r KA630.BIN      load ROM image KA630.BIN\n\n");
+fprintf (st, "   LOAD -r %s      load ROM image %s\n\n", BOOT_CODE_FILENAME, BOOT_CODE_FILENAME);
 fprintf (st, "When the simulator starts running (via the BOOT command), if the ROM has\n");
-fprintf (st, "not yet been loaded, an attempt will be made to automatically load the\n");
-fprintf (st, "ROM image from the file ka655x.bin in the current working directory.\n");
-fprintf (st, "If that load attempt fails, then a copy of the missing ROM file is\n");
-fprintf (st, "written to the current directory and the load attempt is retried.\n\n");
+if (BOOT_CODE_ARRAY != NULL) {
+    fprintf (st, "not yet been loaded, an internal 'built-in' copy of the %s image\n", BOOT_CODE_FILENAME);
+    fprintf (st, "will be loaded into the ROM address space.\n");
+    }
+else {
+    fprintf (st, "not yet been loaded, an attempt will be made to automatically load the\n");
+    fprintf (st, "ROM image from the file %s in the current working directory.\n", BOOT_CODE_FILENAME);
+    fprintf (st, "If that load attempt fails, then a copy of the missing ROM file is\n");
+    fprintf (st, "written to the current directory and the load attempt is retried.\n");
+    }
+fprintf (st, "Once the ROM address space has been populated execution will be started.\n\n");
 fprintf (st, "ROM accesses a use a calibrated delay that slows ROM-based execution to\n");
 fprintf (st, "about 500K instructions per second.  This delay is required to make the\n");
 fprintf (st, "power-up self-test routines run correctly on very fast hosts.\n");
