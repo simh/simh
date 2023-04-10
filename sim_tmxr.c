@@ -2407,7 +2407,8 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
 static int32 tmxr_rqln_bare (const TMLN *lp, t_bool speed)
 {
 if (speed) {
-    if (lp->send->extoff < lp->send->insoff) {/* buffered SEND data? */
+    if ((lp->send != NULL) &&
+        (lp->send->extoff < lp->send->insoff)) {/* buffered SEND data? */
         if (sim_gtime () < lp->send->next_time) /* too soon? */
             return 0;
         else
@@ -4173,7 +4174,8 @@ for (i=0; i<mp->lines; i++) {
     TMLN *lp = &mp->ldsc[i];
 
     if (uptr == lp->uptr) {                     /* read polling unit? */
-        if ((lp->send->extoff < lp->send->insoff) &&
+        if ((lp->send != NULL) &&
+            (lp->send->extoff < lp->send->insoff) &&
             (sim_gtime_now < lp->send->next_time))
             due = (int32)(lp->send->next_time - sim_gtime_now);
         else {
@@ -4725,9 +4727,9 @@ if ((lp->serport == 0) && (lp->sock) && (!lp->datagram))
     fprintf (st, " %s\n", (lp->notelnet) ? "Telnet disabled (RAW data)" : "Telnet protocol");
 if ((!lp->notelnet) && (lp->nomessage))
     fprintf (st, " Telnet connect message disabled\n");
-if (lp->send->buffer)
+if ((lp->send != NULL) && (lp->send->buffer))
     sim_show_send_input (st, lp->send);
-if (lp->expect->buf)
+if ((lp->expect != NULL) && (lp->expect->buf))
     sim_exp_showall (st, lp->expect);
 if (lp->txlog)
     fprintf (st, " Logging to %s\n", lp->txlogname);
