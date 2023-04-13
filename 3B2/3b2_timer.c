@@ -92,9 +92,13 @@
 #define QUICK_DELAY 100
 #endif
 
-#define DELAY_US(C,N) ((TIMER_MODE(C) == 3) ?                \
-                       (TIME_BASE[(N)] * (C)->divider) / 2 : \
-                       TIME_BASE[(N)] * (C)->divider)
+#define MIN_US 100
+
+#define CALC_US(C,N) ((TIMER_MODE(C) == 3) ?      \
+                      (TIME_BASE[(N)] * (C)->divider) / 2 : \
+                      TIME_BASE[(N)] * (C)->divider)
+
+#define DELAY_US(C,N) (MAX(MIN_US, CALC_US((C),(N))))
 
 #if defined(REV3)
 /* Microseconds per step (Version 3 system board):
