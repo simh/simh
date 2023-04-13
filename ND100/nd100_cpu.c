@@ -168,7 +168,7 @@ DEVICE cpu_dev = {
 };
 
 t_stat
-sim_instr()
+sim_instr(void)
 {
         int IR;
         int reason;
@@ -1525,7 +1525,7 @@ nd_tra(int reg)
 }
 
 int
-highest_level()
+highest_level(void)
 {
         int i, d = pid & pie;
 
@@ -1549,19 +1549,6 @@ fls(int msk)
                 if (j & msk)
                         return i;
         return -1;
-}
-
-int
-ffs(mask)
-        register int mask;
-{
-        register int bit;
-
-        if (mask == 0)
-                return(0);
-        for (bit = 1; !(mask & 1); bit++)
-                mask >>= 1;
-        return(bit);
 }
 
 /*
