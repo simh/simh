@@ -770,6 +770,11 @@ static int32 sio0sCore(const int32 port, const int32 io, const int32 data) {
     pollConnection();
     if (io == 0) { /* IN */
         if (sio_unit.u4) {                                  /* attached to a file?                      */
+            ch = sim_poll_kbd();                            /* yes, check for stop condition first      */
+            if ((ch == SCPE_OK) && stop_cpu) {
+                sim_interval = 0;                           /* detect stop condition as soon as possible*/
+                return spi.sio_cannot_read | spi.sio_can_write; /* do not consume stop character        */
+            }
             if (sio_unit.u3)                                /* character available?                     */
                 return spi.sio_can_read | spi.sio_can_write;
             ch = getc(sio_unit.fileref);
@@ -783,6 +788,11 @@ static int32 sio0sCore(const int32 port, const int32 io, const int32 data) {
             }
         }
         if (sio_unit.flags & UNIT_ATT) {                    /* attached to a port?                      */
+            ch = sim_poll_kbd();                            /* yes, check for stop condition first      */
+            if ((ch == SCPE_OK) && stop_cpu) {
+                sim_interval = 0;                           /* detect stop condition as soon as possible*/
+                return spi.sio_cannot_read | spi.sio_can_write; /* do not consume stop character        */
+            }
             if (tmxr_rqln(&TerminalLines[spi.terminalLine]))
                 result = spi.sio_can_read;
             else {
@@ -798,9 +808,9 @@ static int32 sio0sCore(const int32 port, const int32 io, const int32 data) {
             return spi.sio_can_read | spi.sio_can_write;
         ch = sim_poll_kbd();                                /* no, try to get a character               */
         if ((ch == SCPE_OK) && stop_cpu) {
-                sim_interval = 0;                           /* detect stop condition as soon as possible*/
-                return spi.sio_cannot_read | spi.sio_can_write; /* do not consume stop character        */
-            }
+            sim_interval = 0;                               /* detect stop condition as soon as possible*/
+            return spi.sio_cannot_read | spi.sio_can_write; /* do not consume stop character        */
+        }
         if (ch) {                                           /* character available?                     */
             sio_unit.u3 = TRUE;                             /* indicate character available             */
             sio_unit.buf = ch;                              /* store character in buffer                */
