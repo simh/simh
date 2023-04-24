@@ -133,6 +133,9 @@ typedef struct {
     uint8 fdc_sec_len;      /* N Sector Length */
     int8 step_dir;
     uint8 cmdtype;          /* Type of current/former command */
+    uint16 external_fifo_len;
+    uint8 *external_fifo;
+    uint16 fdc_fifo_index;
     WD179X_DRIVE_INFO drive[WD179X_MAX_DRIVES];
 } WD179X_INFO;
 
@@ -198,7 +201,6 @@ static t_stat wd179x_sectWrite(WD179X_DRIVE_INFO* pDrive, uint8 Cyl, uint8 Head,
 static uint8 Do1793Command(uint8 cCommand);
 static t_stat wd179x_trackWrite(WD179X_DRIVE_INFO* pDrive, uint8 Cyl,
     uint8 Head, uint8 fillbyte, uint32* flags);
-
 
 WD179X_INFO wd179x_info_data = { { 0x0, 0, 0x30, 4 }, 1793, 0, 0 };
 WD179X_INFO *wd179x_info = &wd179x_info_data;
@@ -334,6 +336,18 @@ static t_stat wd179x_reset(DEVICE *dptr)
     wd179x_info->cmdtype = 0;
 
     return SCPE_OK;
+}
+
+void wd179x_connect_external_fifo(uint16 fifo_len, uint8* storage)
+{
+    wd179x_info->external_fifo_len = fifo_len;
+    wd179x_info->external_fifo = storage;
+    wd179x_info->fdc_fifo_index = 0;
+}
+
+void wd179x_reset_external_fifo(void)
+{
+    wd179x_info->fdc_fifo_index = 0;
 }
 
 void wd179x_external_restore(void)
@@ -613,12 +627,13 @@ uint8 WD179X_Read(const uint32 Addr)
             cData = 0xFF;      /* Return High-Z data */
             if (wd179x_info->fdc_read == TRUE) {
                 if (wd179x_info->fdc_dataindex < wd179x_info->fdc_datacount) {
+                    wd179x_info->fdc_status &= ~(WD179X_STAT_BUSY);       /* Clear BUSY */
                     cData = sdata.raw[wd179x_info->fdc_dataindex];
                     if (wd179x_info->fdc_read_addr == TRUE) {
                         sim_debug(STATUS_MSG, &wd179x_dev, "WD179X[%d]: " ADDRESS_FORMAT
-                                  " READ_ADDR[%d] = 0x%02x\n",
+                                  " READ_ADDR[%d/%d] = 0x%02x\n",
                                   wd179x_info->sel_drive, PCX,
-                                  wd179x_info->fdc_dataindex, cData);
+                                  wd179x_info->fdc_dataindex, wd179x_info->fdc_datacount, cData);
                     }
 
                     wd179x_info->fdc_dataindex++;
@@ -877,6 +892,7 @@ static uint8 Do1793Command(uint8 cCommand)
     WD179X_DRIVE_INFO    *pDrive;
     uint32 flags = 0;
     uint32 readlen;
+    uint32 writelen;
 
     if (wd179x_info->sel_drive >= WD179X_MAX_DRIVES) {
         return 0xFF;
@@ -1073,6 +1089,37 @@ static uint8 Do1793Command(uint8 cCommand)
             wd179x_info->fdc_read_addr = FALSE;
 
             sdata.raw[wd179x_info->fdc_dataindex] = wd179x_info->fdc_data;
+
+            if (wd179x_info->external_fifo_len) {
+                /* For external FIFO, write the sector immediately, as the sofware pre-fills a FIFO, which is then read out into the FDC using DRQ */
+                wd179x_info->fdc_status &= ~(WD179X_STAT_DRQ | WD179X_STAT_BUSY);       /* Clear DRQ, BUSY */
+                wd179x_info->drq = 0;
+                wd179x_info->intrq = 1;
+                if (wd179x_info->intenable) {
+                    vectorInterrupt |= (1 << wd179x_info->intvector);
+                    dataBus[wd179x_info->intvector] = wd179x_info->intvector * 2;
+                }
+
+                sim_debug(WR_DATA_MSG, &wd179x_dev, "WD179X[%d]: " ADDRESS_FORMAT
+                    " Writing sector, T:%2d/S:%d/N:%2d, Len=%d\n", wd179x_info->sel_drive, PCX, pDrive->track, wd179x_info->
+                    fdc_head, wd179x_info->fdc_sector, 128 << wd179x_info->fdc_sec_len);
+
+                /* Copy the data from the external FIFO */
+                memcpy(sdata.raw, &wd179x_info->external_fifo[wd179x_info->fdc_fifo_index], 128 << wd179x_info->fdc_sec_len);
+                wd179x_info->fdc_fifo_index += 128 << wd179x_info->fdc_sec_len;
+                wd179x_info->fdc_fifo_index &= (wd179x_info->external_fifo_len - 1);
+
+                wd179x_sectWrite(pDrive,
+                    pDrive->track,
+                    wd179x_info->fdc_head,
+                    wd179x_info->fdc_sector,
+                    sdata.raw,
+                    128 << wd179x_info->fdc_sec_len,
+                    &flags,
+                    &writelen);
+
+                wd179x_info->fdc_write = FALSE;
+            }
             break;
         /* Type III Commands */
         case WD179X_READ_ADDR:
@@ -1235,6 +1282,14 @@ static uint8 Do1793Command(uint8 cCommand)
         case WD179X_READ_ADDR:
         case WD179X_READ_TRACK:
         case WD179X_WRITE_TRACK:
+            wd179x_info->fdc_status &= ~(WD179X_STAT_BUSY);     /* Clear BUSY */
+            if (wd179x_info->intenable) {
+                wd179x_info->intrq = 1;
+                vectorInterrupt |= (1 << wd179x_info->intvector);
+                dataBus[wd179x_info->intvector] = wd179x_info->intvector * 2;
+            }
+            wd179x_info->drq = 1;
+            break;
         /* Type IV Commands */
         case WD179X_FORCE_INTR:
         default:
@@ -1321,6 +1376,12 @@ done:
         wd179x_info->fdc_dataindex = 0;
         wd179x_info->fdc_read = TRUE;
         wd179x_info->fdc_read_addr = FALSE;
+        if (wd179x_info->external_fifo_len) {
+            /* Save the FDC data in the external FIFO */
+            memcpy(&wd179x_info->external_fifo[wd179x_info->fdc_fifo_index], sdata.raw, 128 << wd179x_info->fdc_sec_len);
+            wd179x_info->fdc_fifo_index += 128 << wd179x_info->fdc_sec_len;
+            wd179x_info->fdc_fifo_index &= (wd179x_info->external_fifo_len - 1);
+        }
     } else {
         wd179x_info->fdc_status = 0; /* Clear DRQ, BUSY */
         wd179x_info->fdc_status |= WD179X_STAT_NOT_FOUND;

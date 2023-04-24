@@ -60,6 +60,11 @@ extern DEVICE selchan_dev;
 extern DEVICE ss1_dev;
 extern DEVICE if3_dev;
 extern DEVICE i8272_dev;
+extern DEVICE ibc_dev;
+extern DEVICE ibc_hdc_dev;
+extern DEVICE ibc_smd_dev;
+extern DEVICE ibctimer_device;
+extern DEVICE ibcrtctimer_device;
 extern DEVICE mdriveh_dev;
 extern DEVICE switchcpu_dev;
 
@@ -127,6 +132,12 @@ DEVICE      *sim_devices[]  = {
     &disk1a_dev, &disk2_dev, &disk3_dev, &ss1_dev, &mdriveh_dev, &selchan_dev, &if3_dev,
     /* Cromemco Devices */
     &cromfdc_dev,
+    /* Integrated Business Computers (IBC) Devices */
+    &ibc_dev,
+    &ibctimer_device,
+    &ibcrtctimer_device,
+    &ibc_hdc_dev,
+    &ibc_smd_dev,
     /* IMSAI Devices */
     &fif_dev,
     /* Micropolis Devices */
