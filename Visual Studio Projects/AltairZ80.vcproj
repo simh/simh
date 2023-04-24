@@ -252,6 +252,19 @@
 				>
 			</File>
 			<File
+				RelativePath="..\AltairZ80\ibc.c"
+				>
+			</File>
+			<File
+				RelativePath="..\AltairZ80\ibc_mcc_hdc.c"
+				>
+			</File>
+			<File
+				RelativePath="..\AltairZ80\ibc_smd_hdc.c"
+				>
+			</File>
+
+			<File
 				RelativePath="..\AltairZ80\insnsd.c"
 				>
 			</File>
