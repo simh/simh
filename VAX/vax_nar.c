@@ -89,10 +89,13 @@ return SCPE_OK;
 t_stat nar_setmac (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 {
 t_stat status;
+DEVICE *dptr = find_dev ("XS");
 
 if (!cptr)
     return SCPE_IERR;
-status = eth_mac_scan (&nar_mac, cptr);
+if (uptr->flags & UNIT_ATT)
+    return sim_messagef (SCPE_ALATT, "Can't change MAC address after %s is attached\n", dptr->name);
+status = eth_mac_scan_ex (&nar_mac, cptr, uptr);
 if (status != SCPE_OK)
     return status;
 nar_reset (&nar_dev);
@@ -136,7 +139,8 @@ t_stat r;
 
 if (!nar_init) {                                        /* set initial MAC */
     nar_init = TRUE;
-    r = eth_mac_scan (&nar_mac, "08:00:2B:00:00:00/24");
+    /* Set an initial MAC address in the DEC range */
+    r = nar_setmac (dptr->units, 0, "08:00:2B:00:00:00/24", NULL);
     if (r != SCPE_OK)
         return r;
     }

@@ -67,7 +67,7 @@
   Compaq Tru64 Unix         ??
   VMS                       Alpha/Itanium VMS only, needs VMS libpcap
   
-  WinPcap is no longer developed or supported by was available from: 
+  WinPcap is no longer developed or supported but was available from: 
                         http://winpcap.polito.it/
   Npcap is a complete replacement for systems running Windows7 and later
   and is available from:
@@ -903,6 +903,7 @@ t_stat eth_show (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
   ETH_LIST  list[ETH_MAX_DEVICE];
   int number;
 
+  fprintf(st, "Ethernet Packet Info: %s\n", eth_version());
   number = eth_devices(ETH_MAX_DEVICE, list, FALSE);
   fprintf(st, "ETH devices:\n");
   if (number == -1)
@@ -2746,7 +2747,7 @@ t_stat eth_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const cha
 {
 fprintf (st, "%s attach help\n\n", dptr->name);
 fprintf (st, "   sim> SHOW ETHERNET\n");
-fprintf (st, "   libpcap version 1.0.0\n");
+fprintf (st, "   Ethernet Packet Info: NAT, TAP, VDE, UDP, PCAP: libpcap version 1.10.1 (with TPACKET_V3)\n");
 fprintf (st, "   ETH devices:\n");
 fprintf (st, "    eth0   en0                                  (No description available)\n");
 #if defined(HAVE_TAP_NETWORK)

@@ -1096,9 +1096,10 @@ t_stat ni_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
         "+sim> ATTACH %D en0\n"
         "1 Dependencies\n"
 #if defined(_WIN32)
-        " The WinPcap package must be installed in order to enable\n"
-        " communication with other computers on the local LAN.\n"
+        " The NPcap or WinPcap package must be installed in order to enable\n"
+        " communication with the host system or other computers on the local LAN.\n"
         "\n"
+        " The NPcap package is available from https://github.com/nmap/npcap\n"
         " The WinPcap package is available from http://www.winpcap.org/\n"
 #else
         " To build simulators with the ability to communicate to other computers\n"
