@@ -33,7 +33,8 @@
 
 #define STOP_HALT       1
 #define STOP_IBKPT      2
-#define STOP_ACCESS     3
+#define STOP_DBKPT      3
+#define STOP_ACCESS     4
 
 #define FLAG_PTR     010000
 #define FLAG_PTP     000400

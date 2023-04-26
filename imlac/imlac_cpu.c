@@ -57,7 +57,7 @@ static uint16 ION;
 /* ROM state. */
 static int rom_type = ROM_NONE;
 
-static int halt;
+static t_stat stop_reason;
 uint16 memmask = 017777;
 
 typedef struct {
@@ -175,12 +175,17 @@ static void memaddr (uint16 addr)
 static void memrd (void)
 {
   MB = M[MA];
+  if (sim_brk_summ && sim_brk_test(MA, SWMASK('R')))
+    stop_reason = STOP_DBKPT;
 }
 
 static void memwr (void)
 {
-  if (rom_type == ROM_NONE || (MA & 0177740) != 040)
+  if (rom_type == ROM_NONE || (MA & 0177740) != 040) {
     M[MA] = MB;
+    if (sim_brk_summ && sim_brk_test(MA, SWMASK('W')))
+      stop_reason = STOP_DBKPT;
+  }
 }
 
 static void cpu_class1 (uint16 insn)
@@ -200,7 +205,8 @@ static void cpu_class1 (uint16 insn)
     AC |= DS;
   }
 
-  halt = !(insn & 0100000);
+  if ((insn & 0100000) == 0)
+    stop_reason = STOP_HALT;
 }
 
 static void cpu_ral (int n)
@@ -443,7 +449,7 @@ t_stat sim_instr (void)
   if ((reason = build_dev_tab ()) != SCPE_OK)
     return reason;
 
-  halt = 0;
+  stop_reason = 0;
 
   for (;;) {
     AIO_CHECK_EVENT;
@@ -470,8 +476,8 @@ t_stat sim_instr (void)
         return SCPE_STEP;
     }
 
-    if (halt)
-      return STOP_HALT;
+    if (stop_reason)
+      return stop_reason;
 
     if (ion_delay && --ion_delay == 0) {
       sim_debug (DBG_IRQ, &irq_dev, "Interrupts on\n");
@@ -569,7 +575,7 @@ static t_bool cpu_is_pc_a_subroutine_call (t_addr **ret_addrs)
 static t_stat
 cpu_reset (DEVICE *dptr)
 {
-  sim_brk_types = SWMASK('D') | SWMASK('E');
+  sim_brk_types = SWMASK('D') | SWMASK('E') | SWMASK('R') | SWMASK('W');
   sim_brk_dflt = SWMASK ('E');
   sim_vm_is_subroutine_call = &cpu_is_pc_a_subroutine_call;
   return SCPE_OK;
