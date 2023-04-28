@@ -2334,7 +2334,6 @@ extension = sim_filepath_parts (filepath, "x");
 Stats->IsSource = ((0 == strcmp (".c", extension)) || (0 == strcmp (".h", extension)));
 dir = sim_filepath_parts (directory, "p");
 Stats->IsInScpDir = (sim_check_scp_dir != NULL) && (strcmp (dir, sim_check_scp_dir) == 0);
-free (dir);
 if ((!Stats->IsInScpDir) && (sim_check_scp_dir != NULL)) {
     const char **scp_sub_dir = _check_source_scp_sub_dirs;
 
@@ -2343,13 +2342,14 @@ if ((!Stats->IsInScpDir) && (sim_check_scp_dir != NULL)) {
 
         strlcpy (tmp_dir, sim_check_scp_dir, sizeof (tmp_dir));
         strlcat (tmp_dir, *scp_sub_dir, sizeof (tmp_dir));
-        strlcat (tmp_dir, &directory[strlen (directory) - 1], sizeof (tmp_dir));
-        if (strcmp (directory, tmp_dir) == 0)
+        strlcat (tmp_dir, &dir[strlen (dir) - 1], sizeof (tmp_dir));
+        if (strcmp (dir, tmp_dir) == 0)
             break;
         ++scp_sub_dir;
         }
     Stats->IsInScpDir = (*scp_sub_dir != NULL);
     }
+free (dir);
 f = fopen (filepath, "rb");
 if ((f == NULL) || 
     ((size_t)FileSize != fread (data, 1, (size_t)FileSize, f))) {
