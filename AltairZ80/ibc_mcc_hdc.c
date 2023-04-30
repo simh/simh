@@ -71,6 +71,7 @@
 
 #define IBC_HDC_ERROR_ID_NOT_FOUND  (1 << 4)
 
+#define IBC_HDC_CMD_MASK            0x7f
 #define IBC_HDC_CMD_RESET           0x00
 #define IBC_HDC_CMD_READ_SECT       0x01
 #define IBC_HDC_CMD_WRITE_SECT      0x02
@@ -403,7 +404,7 @@ static uint8 IBC_HDC_Write(const uint32 Addr, uint8 cData)
             ibc_hdc_info->taskfile[TF_DRIVE] = ibc_hdc_info->reg_temp_holding[1];
             ibc_hdc_info->taskfile[TF_TRKL] = ibc_hdc_info->reg_temp_holding[2];
             ibc_hdc_info->taskfile[TF_TRKH] = ibc_hdc_info->reg_temp_holding[3];
-            if ((ibc_hdc_info->taskfile[TF_CMD] & 0x80) != IBC_HDC_CMD_READ_PARAMETERS) {
+            if ((ibc_hdc_info->taskfile[TF_CMD] & IBC_HDC_CMD_MASK) != IBC_HDC_CMD_READ_PARAMETERS) {
                 ibc_hdc_info->sel_drive = ibc_hdc_info->taskfile[TF_DRIVE] & 0x03;
             }
             ibc_hdc_info->status_reg = 0x30;
@@ -533,7 +534,7 @@ static t_stat IBC_HDC_doCommand(void)
 {
     t_stat r = SCPE_OK;
     IBC_HDC_DRIVE_INFO* pDrive = &ibc_hdc_info->drive[ibc_hdc_info->sel_drive];
-    uint8 cmd = ibc_hdc_info->taskfile[TF_CMD] & 0x7F;
+    uint8 cmd = ibc_hdc_info->taskfile[TF_CMD] & IBC_HDC_CMD_MASK;
 
     pDrive->cur_cyl    = ibc_hdc_info->taskfile[TF_TRKH] << 8;
     pDrive->cur_cyl   |= ibc_hdc_info->taskfile[TF_TRKL];
