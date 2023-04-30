@@ -1814,10 +1814,12 @@ if (!vptr->vid_texture) {
 
 vptr->vid_format = SDL_AllocFormat (SDL_PIXELFORMAT_ARGB8888);
 
+#ifdef SDL_WINDOW_RESIZABLE
 if (vptr->vid_flags & SIM_VID_RESIZABLE) {
     SDL_SetWindowResizable(vptr->vid_window, SDL_TRUE);
     SDL_RenderSetIntegerScale(vptr->vid_renderer, SDL_TRUE);
 }
+#endif
 
 SDL_StopTextInput ();
 
