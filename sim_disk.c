@@ -1158,7 +1158,8 @@ switch (DK_GET_FMT (uptr)) {                            /* case on format */
         return sim_disk_detach (uptr);
     case DKUF_F_RAW:                                    /* Raw Physical Disk Access */
         ctx->media_removed = 1;
-        return sim_os_disk_unload_raw (uptr->fileref);  /* remove/eject disk */
+        sim_os_disk_unload_raw (uptr->fileref);         /* remove/eject disk */
+        return sim_disk_detach (uptr);
         break;
     default:
         return SCPE_NOFNC;

@@ -91,6 +91,7 @@ All Simulator updates on Open SIMH will be present in this repository, and any c
     This mode will often be useful for running diagnostics which expect a particular relationship between perceived wall clock and instruction times.  It might also be useful for running test scripts which may want to compare output of previous executions to to current execution or to compare execution on arbitrarily different host computers.  
     
     In NOCALIBRATE mode, the operator gets to specify the pseudo execution rate along with the base wall clock time that access to pseudo wall clock accesses returns.
+- All removable devices get detached on a media unload without regard to data access format (SIMH, VHD or RAW).  
 
 #### Changes to the PDP-11 and VAX simulators also not in the Open SIMH repo
 
@@ -108,6 +109,7 @@ All Simulator updates on Open SIMH will be present in this repository, and any c
 - HELP CPU shows supported breakpoint types.
 - Add device support for DL11-C/DL11-D/DL11-E/DLV11-J in addition to the original KL11/DL11-A/DL11-B/DL11-E/DL11-F support.  These new devices have different bus address ranges and can coexist with the original DL devices.  The new devices are DLCJI and DLCJO and are managed identically to the original DLI and DLO devices.
 - All improvements and fixes to the PDP11 simulator from simh Version 3.12-3 release and beyond.
+- MicroVAX I has unsupported devices (TQ, TS, and VH) removed.
 
 ### All relevant changes in the simh v3.12-3 release have been merged into this repo
 
