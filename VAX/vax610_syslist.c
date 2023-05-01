@@ -48,11 +48,8 @@ extern DEVICE lpt_dev;
 extern DEVICE clk_dev;
 extern DEVICE rq_dev, rqb_dev, rqc_dev, rqd_dev;
 extern DEVICE rl_dev;
-extern DEVICE ts_dev;
-extern DEVICE tq_dev;
 extern DEVICE dz_dev;
 extern DEVICE xq_dev, xqb_dev;
-extern DEVICE vh_dev;
 extern DEVICE vc_dev;
 extern DEVICE lk_dev;
 extern DEVICE vs_dev;
@@ -68,7 +65,6 @@ DEVICE *sim_devices[] = {
     &tto_dev,
     &tdc_dev,
     &dz_dev,
-    &vh_dev,
     &cr_dev,
     &lpt_dev,
 #if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
@@ -81,8 +77,6 @@ DEVICE *sim_devices[] = {
     &rqb_dev,
     &rqc_dev,
     &rqd_dev,
-    &ts_dev,
-    &tq_dev,
     &xq_dev,
     &xqb_dev,
     NULL
