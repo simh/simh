@@ -64,9 +64,9 @@
 #define RADA_GETTK(x)   (((x) >> rad_tab[rad_model].tk_v) & rad_tab[rad_model].tk_m)
 #define RADA_GETSC(x)   (((x) >> rad_tab[rad_model].sc_v) & rad_tab[rad_model].sc_m)
 
-/* Address bad flag */
+/* Write protect flag */
 
-#define RADA_INV        0x80
+#define RADA_WP         0x80
 
 /* Status byte 3 is current sector */
 /* Status byte 4 (7212 only) is failing sector */
@@ -131,6 +131,7 @@ t_stat rad_showtype (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_bool rad_inv_ad (uint32 *da);
 t_bool rad_inc_ad (void);
 t_bool rad_end_sec (UNIT *uptr, uint32 lnt, uint32 exp, uint32 st);
+t_bool rad_wp_trk (uint32 adr);
 
 /* RAD data structures
 
@@ -263,7 +264,7 @@ return 0;
 
 t_stat rad_svc (UNIT *uptr)
 {
-uint32 i, sc, da, cmd, wd, wd1, c[4], gp;
+uint32 i, sc, da, cmd, wd, wd1, c[4];
 uint32 *fbuf = (uint32 *) uptr->filebuf;
 uint32 un = uptr - rad_unit;
 uint32 dva = rad_dib.dva | un;
@@ -318,8 +319,10 @@ switch (rad_cmd) {
         break;
 
     case RADS_SENSE:                                    /* sense */
-        c[0] = ((rad_ad >> 8) & 0x7F) | (rad_inv_ad (NULL)? RADA_INV: 0);
-        c[1] = rad_ad & 0xFF;                           /* address */
+        c[0] = (rad_ad >> 8) & 0x7F;                    /* addr hi */
+        if (rad_wp_trk (rad_ad))                        /* addr wr prot? */
+            c[0] |= RADA_WP;                            /* set flag */
+        c[1] = rad_ad & 0xFF;                           /* addr lo */
         c[2] = GET_PSC (rad_time);                      /* curr sector */
         c[3] = 0;
         for (i = 0, st = 0; (i < rad_tab[rad_model].nbys) && (st != CHS_ZBC); i++) {
@@ -333,9 +336,7 @@ switch (rad_cmd) {
         break;
 
     case RADS_WRITE:                                    /* write */
-        gp = (RADA_GETSC (rad_ad) * RAD_N_WLK) /        /* write lock group */
-            rad_tab[rad_model].tkun;
-        if ((rad_wlk >> gp) & 1) {                      /* write lock set? */
+        if (rad_wp_trk (rad_ad)) {                      /* write protected? */
             rad_flags |= RADV_WPE;                      /* set status */
             chan_uen (dva);                             /* uend */
             return SCPE_OK;
@@ -496,6 +497,18 @@ if (sc >= rad_tab[rad_model].sctk) {                    /* overflow? */
 rad_ad = ((tk << rad_tab[rad_model].tk_v) |             /* rebuild rad_ad */
           (sc << rad_tab[rad_model].sc_v));
 if (tk >= rad_tab[rad_model].tkun)                      /* overflow? */
+    return TRUE;
+return FALSE;
+}
+
+/* Test disk addr for protected tracks */
+
+t_bool rad_wp_trk (uint32 adr)
+{
+uint32 trk = RADA_GETTK (adr);                          /* track */
+uint32 sw = (trk * RAD_N_WLK) / rad_tab[rad_model].tkun; /* switch num */
+
+if ((rad_wlk >> sw) & 1)                                /* switch set? */
     return TRUE;
 return FALSE;
 }
