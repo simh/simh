@@ -1,4 +1,4 @@
-/* sigma_io.c: XDS Sigma IO simulator
+ /* sigma_io.c: XDS Sigma IO simulator
 
    Copyright (c) 2007-2022, Robert M Supnik
 
@@ -499,11 +499,12 @@ if ((rn != 0) && !(dvst & DVT_NOST)) {                  /* return status? */
     if (tdv)
         mrgst = (DVT_GETDVS (dvst) << 8) | (chan[ch].chf[dev] & 0xFF);
     else mrgst = ((DVT_GETDVS(dvst) << 8) & ~CHF_ALL) | (chan[ch].chf[dev] & CHF_ALL);
-    R[rn] = chan[ch].clc[dev];                          /* even reg */
-    if (!odd)                                           /* even pair? */
-        WritePW (0x20, R[rn]);                          /* write to 20 */
+    if ((rn & 1) == 0) {                                /* even reg? */
+        R[rn] = chan[ch].clc[dev];                      /* current addr to R */
+        WritePW (0x20, R[rn]);                          /* and loc 20 */
+        }
     R[rn|1] = (mrgst << 16) | chan[ch].bc[dev];         /* odd reg */
-    WritePW (0x20 + odd, R[rn|1]);                      /* write to 20/21 */
+    WritePW (0x21, R[rn|1]);                            /* write loc 21 */
     }
 return DVT_GETCC (dvst);
 }
