@@ -174,6 +174,7 @@ uint32 cpu_pdf = 0;                                     /* proc detected fault *
 uint32 cons_alarm = 0;                                  /* console alarm */
 uint32 cons_alarm_enb = 0;                              /* alarm enable */
 uint32 cons_pcf = 0;
+uint32 wait_state = 0;                                  /* wait state */
 uint32 rf_bmax = 4;                                     /* num reg blocks */
 uint32 exu_lim = 32;                                    /* nested EXU limit */
 uint32 stop_op = 0;                                     /* stop on ill op */
@@ -446,7 +447,8 @@ while (reason == 0) {                                   /* loop until stop */
 
     if (int_hireq < NO_INT) {                           /* interrupt req? */
         uint32 sav_hi, vec, wd, op;
-        
+
+        wait_state = 0;                                 /* exit wait state */
         sav_hi = int_hireq;                             /* save level */
         vec = io_ackn_int (int_hireq);                  /* get vector */
         if (vec == 0) {                                 /* illegal vector? */
@@ -474,6 +476,8 @@ while (reason == 0) {                                   /* loop until stop */
             }
         else reason = tr2;                              /* normal status code */
         }
+    else if (wait_state != 0)                           /* wait state? don't fetch */
+         continue;
     else {                                              /* normal instruction */
         if (sim_brk_summ &&
             sim_brk_test (PC, SWMASK ('E'))) {          /* breakpoint? */
@@ -1501,7 +1505,7 @@ switch (op) {
         if (!io_poss_int ())                            /* intr possible? */
             return STOP_WAITNOINT;                      /* machine is hung */
 // put idle here
-        int_hireq = io_eval_int ();                     /* re-eval intr */
+        wait_state = 1;                                 /* wait for intr */
         break;
 
     case OP_AIO:                                        /* acknowledge int */
@@ -2513,6 +2517,7 @@ cpu_new_PSD (1, PSW1_DFLT | (PSW1 & PSW1_PCMASK), PSW2_DFLT);
 cpu_pdf = 0;
 cons_alarm = 0;
 cons_pcf = 0;
+wait_state = 0;
 set_rf_display (R);
 if (M == NULL)
     M = (uint32 *) calloc (MAXMEMSIZE, sizeof (uint32));
