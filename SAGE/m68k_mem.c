@@ -28,13 +28,6 @@
 */
 
 #include "m68k_cpu.h"
-#include <ctype.h>
-
-#if defined(_WIN32)
-#include <windows.h>
-#else
-#include <unistd.h>
-#endif
 
 /* io hash */
 #define IOHASHSIZE 97 /* must be prime */

@@ -36,13 +36,6 @@
 */
 
 #include "m68k_cpu.h"
-#include <ctype.h>
-
-#if defined(_WIN32)
-#include <windows.h>
-#else
-#include <unistd.h>
-#endif
 
 /* status reg flags */
 #define FLAG_C          0x0001

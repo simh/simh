@@ -393,14 +393,6 @@
 */
 
 #include "m68k_cpu.h"
-#include <ctype.h>
-#include <string.h>
-
-#if defined(_WIN32)
-#include <windows.h>
-#else
-#include <unistd.h>
-#endif
 
 struct _ea {
       int ea;

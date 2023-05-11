@@ -32,14 +32,6 @@
 */
 
 #include "m68k_cpu.h"
-#include <ctype.h>
-#include <string.h>
-
-#if defined(_WIN32)
-#include <windows.h>
-#else
-#include <unistd.h>
-#endif
 
 t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
