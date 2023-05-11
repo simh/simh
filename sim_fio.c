@@ -2282,6 +2282,29 @@ static const char *_check_source_allowed_sysincludes[] = {
     NULL
     };
 
+static const char *_check_source_platform_defines[] = {
+    "_WIN32",
+    "(__ALPHA)",
+    "(__ia64)",
+    "(VMS)",
+    "__VMS",
+    "__unix__",
+    "__linux",
+    "__hpux",
+    "_AIX",
+    "__APPLE__",
+    "__FreeBSD__",
+    "__NetBSD__",
+    "__OpenBSD__",
+    "__CYGWIN__",
+    "__VAX",
+    "__sun",
+    "__amd64__",
+    "__x86_64__",
+    "__itanium__",
+    NULL
+    };
+
 typedef struct FILE_STATS {
     char RelativePath[PATH_MAX + 1];
     t_offset FileSize;
@@ -2301,6 +2324,8 @@ typedef struct FILE_STATS {
     char **OtherSysIncludes;
     int MissingIncludeCount;
     char **MissingIncludes;
+    int PlatformDefineCount;
+    char **PlatformDefines;
     int LineEndingsLF;
     int LineEndingsCRLF;
     t_bool ProblemFile;
@@ -2408,6 +2433,7 @@ if (Stats->IsSource) {
     int ovec[6];
     int startoffset = 0;
     int erroffset;
+    const char **platform_define;
 
     if (sim_sock_re == NULL)
         sim_sock_re = pcre_compile ("\\#\\s*include\\s+\\\"sim_sock\\.h\"", 0, &errmsg, &erroffset, NULL);
@@ -2481,7 +2507,15 @@ if (Stats->IsSource) {
                 }
             }
         }
-    if ((!Stats->IsInScpDir) && (Stats->OtherSysIncludeCount != 0))
+    for (platform_define = _check_source_platform_defines; *platform_define != NULL; ++platform_define) {
+        if (strstr (data, *platform_define) != NULL) {
+            ++Stats->PlatformDefineCount;
+            Stats->PlatformDefines = (char **)realloc (Stats->PlatformDefines, Stats->PlatformDefineCount * sizeof (*Stats->PlatformDefines));
+            Stats->PlatformDefines[Stats->PlatformDefineCount - 1] = strdup (*platform_define);
+            }
+        }
+
+    if ((!Stats->IsInScpDir) && (Stats->OtherSysIncludeCount != 0) && (Stats->PlatformDefineCount != 0))
         Stats->ProblemFile = TRUE;
     }
 free (extension);
@@ -2595,12 +2629,14 @@ if ((sim_switches & SWMASK ('D')) || (File->ProblemFile)) {
     _check_source_print_string_list ("System Include Files",                   File->SysIncludes,      File->SysIncludeCount);
     _check_source_print_string_list ("Other System Include Files",             File->OtherSysIncludes, File->OtherSysIncludeCount);
     _check_source_print_string_list ("Missing Include Files",                  File->MissingIncludes,  File->MissingIncludeCount);
+    _check_source_print_string_list ("Platform Specific Defines",              File->PlatformDefines,  File->PlatformDefineCount);
     }
 _check_source_free_string_list (File->BenignIncludes,   File->BenignIncludeCount);
 _check_source_free_string_list (File->LocalIncludes,    File->LocalIncludeCount);
 _check_source_free_string_list (File->SysIncludes,      File->SysIncludeCount);
 _check_source_free_string_list (File->OtherSysIncludes, File->OtherSysIncludeCount);
 _check_source_free_string_list (File->MissingIncludes,  File->MissingIncludeCount);
+_check_source_free_string_list (File->PlatformDefines,  File->PlatformDefineCount);
 free (File);
 }
 
