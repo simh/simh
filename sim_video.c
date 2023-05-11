@@ -27,6 +27,9 @@
    11-Jun-2013  MB      First version
 */
 
+#if defined(HAVE_LIBPNG) && defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
+#include <png.h>
+#endif
 #include "sim_video.h"
 #include "scp.h"
 
@@ -154,7 +157,6 @@ static char tmp_key_name[40];
  * http://www.libpng.org/pub/png/src/libpng-LICENSE.txt
  */
 #include <SDL.h>
-#include <png.h>
 #include <zlib.h>
 
 #define SUCCESS 0
