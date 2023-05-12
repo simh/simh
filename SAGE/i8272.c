@@ -43,10 +43,6 @@
 #include "m68k_cpu.h"
 #include "chip_defs.h"
 
-#if defined (_WIN32)
-#include <windows.h>
-#endif
-
 #include "sim_imd.h"
 
 /* internal state machine:
