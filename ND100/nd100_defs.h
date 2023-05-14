@@ -82,14 +82,24 @@
 
 #define ND_SKP_CLEPT    0140301
 #define ND_SKP_EXR      0140600
+#define ND_SKP_ADDD     0140120 /* CE/CX */
 #define ND_SKP_BFILL    0140130
 #define ND_SKP_MOVB     0140131
 #define ND_SKP_MOVBF    0140132
+#define ND_SKP_VERSN    0140133 /* ND110 */
 #define ND_SKP_RMPY     0141200
 #define ND_SKP_RDIV     0141600
 #define ND_SKP_LBYT     0142200
 #define ND_SKP_SBYT     0142600
 #define ND_SKP_MIX3     0143200
+#define ND_SKP_LDATX    0143300 /* ND100 */
+#define ND_SKP_LDXTX    0143301 /* ND100 */
+#define ND_SKP_LDDTX    0143302 /* ND100 */
+#define ND_SKP_LDBTX    0143303 /* ND100 */
+#define ND_SKP_STATX    0143304 /* ND100 */
+#define ND_SKP_STZTX    0143305 /* ND100 */
+#define ND_SKP_STDTX    0143306 /* ND100 */
+#define ND_SKP_LWCS     0143500 /* NOP on N110 */
 #define ND_SKP_IDENT10  0143604
 #define ND_SKP_IDENT11  0143611
 #define ND_SKP_IDENT12  0143622
@@ -115,6 +125,7 @@
 #define ND_WAIT         0151000
 #define ND_MONMSK       0177400
 
+#define ND_MIS_OPCOM    0150400
 #define ND_MIS_IOF      0150401
 #define ND_MIS_ION      0150402
 #define ND_MIS_POF      0150404
@@ -128,19 +139,31 @@
 #define ND_MIS_DEPO     0150417
 
 /* Internal registers */
+#define IR_PANS         000     /* Panel status */
 #define IR_STS          001     /* Status reg (as in register stack) */
-#define IR_OPR          002     /* Operator reg */
 #define IR_LMP          002     /* Display reg */
-#define IR_PGS          003     /* paging status reg */
 #define IR_PCR          003     /* paging control reg */
-#define IR_PVL          004     /* Previous level */
 #define IR_IIC          005     /* Internal interrupt code */
 #define IR_IIE          005     /* Internal interrupt enable */
 #define IR_PID          006     /* Priority interrupt detect */
 #define IR_PIE          007     /* Priority interrupt enable */
 #define IR_CSR          010     /* Cache status reg */
-#define IR_PCR14        014     /* paging control reg */
+#define IR_CCL          010     /* (W) Cache clear reg */
+#define IR_LCIL         011     /* (W) Lower cache inhibit limit register */
+#define IR_UCIL         012     /* (W) Upper cache inhibit limit register */
 #define IR_ECCR         015     /* Error Correction Control Register */
+
+#define IRR_OPR         002     /* Operator reg */
+#define IRR_PGS         003     /* paging status reg */
+#define  PGS_FF         0100000 /* fetch fault */
+#define  PGS_PM         0040000 /* permit violation */
+#define IRR_PVL         004     /* Previous level (oddly encoded) */
+#define IRR_PES         013     /* Parity error status */
+#define  PES_FETCH      0100000 /* Memory error during fetch, EXAM or DEPO */
+#define  PES_DMA        0040000 /* Error occurred during DMA */
+#define IRR_PGC         014     /* Read paging control reg */
+#define IRR_PEA         015     /* Parity error address */
+int mm_tra(int reg);
 
 /* internal interrupt enable register */
 #define IIE_MC          0000002 /* Monitor call */
@@ -172,7 +195,10 @@
 #define ISPON()         BIT14(regSTH)
 #define ISSEX()         BIT13(regSTH)
 
-/* paging bits */
+/* page table bits */
+#define PT_WPM          0100000
+#define PT_RPM          0040000
+#define PT_FPM          0020000
 #define PT_WIP          0010000
 #define PT_PGU          0004000
 
@@ -198,7 +224,8 @@ extern uint16 PM[];
 extern uint16 R[8];
 extern uint16 regSTH;   /* common for all levels */
 extern int ald;         /* Automatic load descriptor - set by boot */
-extern int curlvl;
+extern int curlvl;      /* Current interrupt level */
+extern int userring;    /* Current user ring */
 
 /*
  * interrupt link per device.
@@ -220,18 +247,31 @@ int iox_floppy(int addr);
 int iox_tty(int addr);
 int iox_clk(int addr);
 
+/* virtual memory access */
 #define M_PHYS  0
 #define M_PT    1
 #define M_APT   2
 #define M_FETCH 3
 
-uint16 rdmem(int addr/* , int how*/);
-uint8 rdbyte(int vaddr, int lr/* , int how*/);
-void wrmem(int addr, int val/* , int how*/);
-void wrbyte(int vaddr, int val, int lr/* , int how*/);
-void mm_wrpcr(void);
-void mm_rdpcr(void);
+/* physical memory access */
+#define PM_CPU  10      /* CPU requesting (longjmp allowed) */
+#define PM_DMA  11      /* device requesting (no longjmp) */
 
+/* Decide page table for late read */
+#define SELPT2(IR) ((IR) & 03400 ? M_APT : M_PT)
+
+int dma_rdmem(int addr);
+int dma_wrmem(int addr, int val);
+uint16 prdmem(int addr, int how);
+void pwrmem(int addr, int val, int how);
+uint16 rdmem(int addr, int how);
+uint8 rdbyte(int vaddr, int lr, int how);
+void wrmem(int addr, int val, int how);
+void wrbyte(int vaddr, int val, int lr, int how);
+void mm_wrpcr(void);
+void mm_privcheck(void);
+
+void intrpt14(int, int where);
 void extint(int lvl, struct intr *intr);
 
 #define STOP_UNHIOX     1
@@ -239,6 +279,7 @@ void extint(int lvl, struct intr *intr);
 #define STOP_CKSUM      3
 #define STOP_BP         4
 #define STOP_WAIT       5
+#define STOP_END        6
 
 /* Useful bit extraction macros */
 #define BIT0(x)         ((x) & 1)

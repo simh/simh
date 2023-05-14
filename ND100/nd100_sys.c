@@ -30,7 +30,7 @@
 char sim_name[] = "ND100";
 
 extern REG cpu_reg[];
-REG *sim_PC = &cpu_reg[2];
+REG *sim_PC = &cpu_reg[8];
 int32 sim_emax = 1;
 
 DEVICE *sim_devices[] = {
@@ -50,6 +50,7 @@ const char *sim_stop_messages[SCPE_BASE] = {
         "Checksum error",
         "Simulator breakpoint",
         "Wait at level 0",
+        "manual end",
 };
 
 static int mlp;
@@ -60,7 +61,7 @@ gb(FILE *f)
         int w;
 
         if (f == NULL)
-                return rdmem(mlp++);
+                return prdmem(mlp++, PM_CPU);
         w = getc(f) & 0377;
         return w;
 }
@@ -106,7 +107,7 @@ sim_load(FILE *f, CONST char *buf, CONST char *fnam, t_bool flag)
                         /* images have MSB first */
                         s = (getc(f) & 0377) << 8;
                         s |= getc(f) & 0377;
-                        wrmem(i, s);
+                        pwrmem(i, s, PM_CPU);
                 }
                 f = NULL;
         }
@@ -133,8 +134,8 @@ sim_load(FILE *f, CONST char *buf, CONST char *fnam, t_bool flag)
         printf("Load address %06o\n", E = gw(f));
         printf("Word count   %06o\n", F = gw(f));
         for (i = s = 0; i < F; i++) {
-                wrmem(E+i, gw(f));
-                s += rdmem(E+i);
+                pwrmem(E+i, gw(f), PM_CPU);
+                s += prdmem(E+i, PM_CPU);
         }
         printf("Checksum     %06o\n", H = gw(f));
         if (H != s)
@@ -178,6 +179,10 @@ static char *tratab[] = {
 static char *trrtab[] = {
         "panc", "sts", "lmp", "pcr", "err04", "iie", "pid", "pie",
         "cclr", "lcil", "ucil", "err13", "err14", "eccr", "err16", "err17"
+};
+
+static char *mitab[] = {
+        "ldatx", "ldxtx", "lddtx", "ldbtx", "statx", "stztx", "stdtx", "ERR"
 };
 
 t_stat
@@ -330,6 +335,8 @@ fprint_sym(FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw)
                                 fprintf(of, "sbyt");
                         else if ((op & 0177707) == ND_SKP_EXR)
                                 fprintf(of, "exr %s", dactab[(op & 070) >> 3]);
+                        else if ((op & 0177700) == ND_SKP_LDATX)
+                                fprintf(of, "%s", mitab[op & 07]);
                         else if ((op & 0177700) == ND_SKP_RMPY)
                                 fprintf(of, "rmpy %s %s",
                                     dactab[(op & 070) >> 3], dactab[op & 07]);

@@ -54,6 +54,8 @@ t_stat tty_setpar(UNIT *uptr);
 #define TT_OCTRL_ACT    0000004 /* set device active */
 
 #define TT_OSTAT_IRDY   0000001 /* device ready gives interrupt */
+#define TT_OSTAT_EINT   0000002 /* error interrupt enabled */
+#define TT_OSTAT_ACT    0000004 /* device active */
 #define TT_OSTAT_RDY    0000010 /* device ready for transfer */
 
 UNIT tti_unit = { UDATA (&tti_svc, 0, 0), KBD_POLL_WAIT };
@@ -147,6 +149,7 @@ tto_svc(UNIT *uptr)
                 sim_activate (uptr, uptr->wait);        /* try again */
                 return ((r == SCPE_STALL)? SCPE_OK : r);/* !stall? report */
         }
+        tto_status &= ~TT_OSTAT_ACT;
         tto_status |= TT_OSTAT_RDY;
         if (tto_ctrl & TT_OCTRL_EIRDY)
                 extint(10, &tto_int);
@@ -193,6 +196,7 @@ iox_tty(int addr)
         case 5: /* Write data */
                 tto_unit.buf = regA & 0177;
                 tto_status &= ~TT_OSTAT_RDY;
+                tto_status |= TT_OSTAT_ACT;
                 sim_activate (&tto_unit, tto_unit.wait);
                 break;
 
@@ -201,15 +205,8 @@ iox_tty(int addr)
                 break;
 
         case 7: /* Write output control reg */
-                tto_ctrl = regA;
-                if (tto_ctrl & TT_OCTRL_ACT)
-                        tto_status |= TT_OSTAT_RDY;
-                else
-                        tto_status &= ~TT_OSTAT_RDY;
-                if (tto_ctrl & TT_OCTRL_EIRDY)
-                        tto_status |= TT_OSTAT_IRDY;
-                else
-                        tto_status &= ~TT_OSTAT_IRDY;
+                /* Only interrupts are controlled */
+                tto_status = (tto_status & ~03) | (regA & 03);
                 break;
         }
 

@@ -30,12 +30,6 @@
 #include "nd100_defs.h"
 
 #define MAXMEMSIZE      512*1024
-#undef  TIMERHACK
-
-#ifdef TIMERHACK
-int rtc_int_enabled, rtc_dev_ready, rtccnt;
-void chkrtc(void);
-#endif
 
 typedef struct {
         int     ir;
@@ -59,11 +53,11 @@ static  Hist_entry *hist = NULL;
 static  struct intr *ilnk[4];   /* level 10-13 */
 jmp_buf env;
 
-uint16 R[8], RBLK[16][8], regSTH;
+uint16 R[8], RBLK[16][8], regSTH, oregP;
 int curlvl;             /* current interrupt level */
 int iic, iie, iid;      /* IIC/IIE/IID register */
 int pid, pie;           /* PID/PIE register */
-int ald, eccr, pvl, lmp;
+int ald, eccr, pvl, lmp, opr;
 
 #define SETC()          (regSTL |= STS_C)
 #define CLRC()          (regSTL &= ~STS_C)
@@ -88,11 +82,9 @@ static int nd_tra(int reg);
 static int nd_mcl(int reg);
 static int nd_mst(int reg);
 static int highest_level(void);
-static void intrpt14(int);
 static void identrm(int);
 static uint16 add3(uint16 a, uint16 d, uint16 c);
 int fls(int);
-
 
 int ins_store(int ir, int addr);
 int ins_stdf(int ir, int addr);
@@ -144,6 +136,7 @@ REG cpu_reg[] = {
         { ORDATA(A, regA, 16) },
         { ORDATA(T, regT, 16) },
         { ORDATA(X, regX, 16) },
+        { ORDATA(oldP, oregP, 16) },
         { DRDATA(LVL, curlvl, 4) },
         { DRDATA(LMP, lmp, 16) },
         { DRDATA(PVL, pvl, 4) },
@@ -151,6 +144,7 @@ REG cpu_reg[] = {
         { ORDATA(PIE, pie, 16) },
         { ORDATA(IIC, iic, 4) },
         { ORDATA(IIE, iie, 10) },
+        { ORDATA(OPR, opr, 16) },
         { NULL }
 };
 
@@ -176,16 +170,16 @@ sim_instr(void)
         int first = 1;
         uint16 off;
 
-        reason = setjmp(env);
+        (void)setjmp(env);
+        reason = 0;
 
 while (reason == 0) {
         if (sim_interval <= 0)
                 if ((reason = sim_process_event ()))
                         break;
 
-#ifdef TIMERHACK
-        chkrtc();
-#endif
+        if (regSTL & STS_Z)
+                intrpt14(IIE_V, PM_DMA); /* no longjmp here */
         if ((pid & pie) > (0177777 >> (15-curlvl)) && ISION()) {
                 /* need to interrupt */
                 pvl = curlvl;
@@ -199,10 +193,21 @@ while (reason == 0) {
                         regT = SEXT8(IR);
         }
 
-        IR = rdmem(regP);
+        /*
+         * ND100 manual clause 2.3.8.3 says that the instruction faults happens 
+         * after the P reg is incremented, hence will point to one instruction
+         * past the instruction causing the fault.
+         * But; if the fault is during fetch, P will not be incremented.
+         */
+        IR = rdmem(regP, M_FETCH);
+        oregP = regP++;
+
         sim_interval--;
 
-        if (first == 0 && sim_brk_summ && sim_brk_test (regP, SWMASK ('E'))) {
+        if (regSTH & STS_TG)
+                return STOP_BP;
+
+        if (first == 0 && sim_brk_summ && sim_brk_test(oregP, SWMASK ('E'))) {
                 reason = STOP_BP;
                 break;
         }
@@ -229,8 +234,6 @@ while (reason == 0) {
                 off = getoff(IR);
 
         reason = (*ins_table[ID(IR)])(IR, off);
-        if (reason == 0)
-                regP++;
 }
         return reason;
 }
@@ -248,7 +251,7 @@ cpu_ex(t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 {
         if (addr >= MAXMEMSIZE)
                 return SCPE_ARG;
-        *vptr = rdmem(addr);
+        *vptr = rdmem(addr, M_PT); /* XXX */
         return SCPE_OK;
 }
 
@@ -279,7 +282,7 @@ int
 ins_store(int IR, int off)
 {
         int n = ((IR >> 11) & 03) + 4;
-        wrmem(off, n == 4 ? 0 : R[n]);
+        wrmem(off, n == 4 ? 0 : R[n], SELPT2(IR));
         return SCPE_OK;
 }
 
@@ -289,10 +292,12 @@ ins_store(int IR, int off)
 int
 ins_stdf(int IR, int off)
 {
+        int pt = SELPT2(IR);
+
         if (ID(IR) == ID(ND_STF) /* && 48-bit */)
-                wrmem(off++, regT);
-        wrmem(off++, regA);
-        wrmem(off, regD);
+                wrmem(off++, regT, pt);
+        wrmem(off++, regA, pt);
+        wrmem(off, regD, pt);
         return SCPE_OK;
 }
 
@@ -302,10 +307,11 @@ ins_stdf(int IR, int off)
 int
 ins_lddf(int IR, int off)
 {
+        int pt = SELPT2(IR);
         if (ID(IR) == ID(ND_LDF) /* && 48-bit */)
-                regT = rdmem(off++);
-        regA = rdmem(off++);
-        regD = rdmem(off);
+                regT = rdmem(off++, pt);
+        regA = rdmem(off++, pt);
+        regD = rdmem(off, pt);
         return SCPE_OK;
 }
 
@@ -315,7 +321,7 @@ ins_lddf(int IR, int off)
 int
 ins_load(int IR, int off)
 {
-        R[((IR&014000) >> 11) + 4] = rdmem(off);
+        R[((IR&014000) >> 11) + 4] = rdmem(off, SELPT2(IR));
         return SCPE_OK;
 }
 
@@ -326,8 +332,9 @@ int
 ins_min(int IR, int off)
 {
         uint16 s;
+        int pt = SELPT2(IR);
 
-        wrmem(off, s = rdmem(off) + 1);
+        wrmem(off, s = rdmem(off, pt) + 1, pt);
         if (s == 0)
                 regP++;
         return SCPE_OK;
@@ -339,7 +346,7 @@ ins_min(int IR, int off)
 int
 ins_add(int IR, int off)
 {
-        uint16 d = rdmem(off);
+        uint16 d = rdmem(off, SELPT2(IR));
         int n = 0;
 
         if (ID(IR) == ID(ND_SUB))
@@ -354,7 +361,7 @@ ins_add(int IR, int off)
 int
 ins_andor(int IR, int off)
 {
-        uint16 s = rdmem(off);
+        uint16 s = rdmem(off, SELPT2(IR));
 
         regA = BIT11(IR) ? (regA | s) : (regA & s);
         return SCPE_OK;
@@ -394,7 +401,7 @@ static void
 ins_bfill(int IR)
 {
         while (regT & 07777) {
-                wrbyte(regX, regA, BIT15(regT));
+                wrbyte(regX, regA, BIT15(regT), M_APT);
                 regT--;
                 regT ^= 0100000;
                 if (BIT15(regT) == 0)
@@ -442,8 +449,8 @@ ins_movb(int IR)
 
         if (regX > regA) {      /* copy bottom-top */
                 for (i = BYTELN(regD); i < BYTELN(regT); i++, regD++) {
-                        int8 w = rdbyte(regA, BIT15(regD));
-                        wrbyte(regX, w, BIT15(regT));
+                        int8 w = rdbyte(regA, BIT15(regD), M_APT);
+                        wrbyte(regX, w, BIT15(regT), M_APT);
                         regD ^= 0100000;
                         if (BIT15(regD) == 0) regA++;
                         regT ^= 0100000;
@@ -494,8 +501,8 @@ ins_movbf(int IR)
         }
 
         for (i = BYTELN(regD); i < BYTELN(regT); i++, regD++) {
-                int8 w = rdbyte(regA, BIT15(regD));
-                wrbyte(regX, w, BIT15(regT));
+                int8 w = rdbyte(regA, BIT15(regD), M_APT);
+                wrbyte(regX, w, BIT15(regT), M_APT);
                 regD ^= 0100000;
                 if (BIT15(regD) == 0) regA++;
                 regT ^= 0100000;
@@ -515,11 +522,41 @@ ins_skip_ext(int IR)
         uint16 d;
         int16 ss, sd;
         int32 shc;
-        int reason = 0;
+        int paddr, reason = 0;
 
         if ((IR & 0177707) == ND_SKP_CLEPT) {
-                intrpt14(IIE_II);
-                regP--;
+                intrpt14(IIE_II, PM_CPU);
+        } else if ((IR & 0177700) == ND_SKP_LDATX) {
+                /* Special physmem instructions */
+                d = regX + ((IR & 070) >> 3);
+                paddr = ((unsigned int)regT << 16) | (unsigned int)d;
+                switch (IR & ~070) {
+                case ND_SKP_LDATX:
+                        regA = prdmem(paddr, PM_CPU);
+                        break;
+                case ND_SKP_STZTX:
+                        pwrmem(paddr, 0, PM_CPU);
+                        break;
+                case ND_SKP_STATX:
+                        pwrmem(paddr, regA, PM_CPU);
+                        break;
+                case ND_SKP_STDTX:
+                        pwrmem(paddr++, regA, PM_CPU);
+                        pwrmem(paddr, regD, PM_CPU);
+                        break;
+                case ND_SKP_LDXTX:
+                        regX = prdmem(paddr, PM_CPU);
+                        break;
+                case ND_SKP_LDDTX:
+                        regA = prdmem(paddr++, PM_CPU);
+                        regD = prdmem(paddr, PM_CPU);
+                        break;
+                case ND_SKP_LDBTX:
+                        regB = (prdmem(paddr, PM_CPU) << 1) | 0177000;
+                        break;
+                default:
+                        intrpt14(IIE_II, PM_CPU);
+                }
         } else if (IR == ND_SKP_MIX3) {
                 /* X = (A-1)*3 */
                 regX = (regA-1)*3;
@@ -531,14 +568,22 @@ ins_skip_ext(int IR)
                 identrm(12);
         } else if (IR == ND_SKP_IDENT13) {
                 identrm(13);
-        } else if (IR == ND_SKP_BFILL)
+        } else if (IR == ND_SKP_ADDD) {
+                intrpt14(IIE_II, PM_CPU);
+        } else if (IR == ND_SKP_BFILL) {
                 ins_bfill(IR);
-        else if (IR == ND_SKP_MOVB)
+        } else if (IR == ND_SKP_MOVB) {
                 ins_movb(IR);
-        else if (IR == ND_SKP_MOVBF)
+        } else if (IR == ND_SKP_MOVBF) {
                 ins_movbf(IR);
-        else if (IR == ND_SKP_LBYT) {
-                d = rdmem(regT + (regX >> 1));
+        } else if (IR == ND_SKP_LWCS) {
+                ;
+        } else if (IR == 0140127) {     /* XXX */
+                intrpt14(IIE_II, PM_CPU);
+        } else if (IR == ND_SKP_VERSN) {
+                intrpt14(IIE_II, PM_CPU);
+        } else if (IR == ND_SKP_LBYT) {
+                d = rdmem(regT + (regX >> 1), M_APT);
                 if (regX & 1)
                         regA = d & 0377;
                 else
@@ -546,9 +591,9 @@ ins_skip_ext(int IR)
         } else if (IR == ND_SKP_SBYT) {
                 d = regT + (regX >> 1);
                 if (regX & 1)
-                        wrmem(d, (rdmem(d) & 0xff00) | (regA & 0xff));
+                        wrmem(d, (rdmem(d, M_APT) & 0xff00) | (regA & 0xff), M_APT);
                 else
-                        wrmem(d, (rdmem(d) & 0xff) | (regA << 8));
+                        wrmem(d, (rdmem(d, M_APT) & 0xff) | (regA << 8), M_APT);
         } else if ((IR & 0177700) == ND_SKP_RMPY) {
                 ss = R[(IR & 070) >> 3];
                 sd = R[IR & 07];
@@ -560,10 +605,9 @@ ins_skip_ext(int IR)
                 shc = (regA << 16) | regD;
                 regA = shc / ss;
                 regD = shc % ss;
-        } else if (IR == 0142700) {
+        } else if (IR == 0142700 || IR == 0143700) {
                 /* ??? what is this? */
-                intrpt14(IIE_II);
-                regP--;
+                intrpt14(IIE_II, PM_CPU);
         } else
                 reason = STOP_UNHINS;
         return reason;
@@ -590,11 +634,10 @@ ins_srb(int IR)
         /* Save current level (maybe used) to reg block */
         for (i = 0; i < 8; i++)
                 RBLK[curlvl][i] = R[i];
-        RBLK[curlvl][rnP]++;    /* following insn */
 
         /* store requested block to memory */
         for (i = 0; i < 8; i++)
-                wrmem(regX+i, RBLK[n][s2r[i]]);
+                wrmem(regX+i, RBLK[n][s2r[i]], M_APT);
 }
 
 /*
@@ -614,13 +657,63 @@ ins_lrb(int IR)
 
         /* fetch from memory */
         for (i = 0; i < 8; i++)
-                RBLK[n][s2r[i]] = rdmem(regX+i);
+                RBLK[n][s2r[i]] = rdmem(regX+i, M_APT);
         RBLK[n][rnSTS] &= 0377;
 
         if (n == curlvl)
                 for (i = 0; i < 8; i++)
                         if (i != rnP)
                                 R[i] = RBLK[n][i];
+}
+
+/*
+ * Priv instructions, mostly for handling status reg.
+ */
+static int
+nd_mis_opc(int IR)
+{
+        static int srbits[] = { 0, STS_IONI, STS_IONI, 0,
+            STS_PONI, (STS_PONI|STS_IONI), STS_SEXI, STS_SEXI,
+            STS_PONI, 0, (STS_PONI|STS_IONI) };
+        int rv = 0;
+
+        mm_privcheck();
+        switch (IR) {
+        /* case ND_MIS_OPCOM: */
+        /*      break; */
+
+        case ND_MIS_IOF:
+        case ND_MIS_POF:
+        case ND_MIS_PIOF:
+        case ND_MIS_REX:
+                regSTH &= ~srbits[IR & 017];
+                break;
+
+        case ND_MIS_ION:
+        case ND_MIS_SEX:
+        case ND_MIS_PON:
+        case ND_MIS_PION:
+                regSTH |= srbits[IR & 017];
+                break;
+
+        case ND_MIS_IOXT:
+                rv = iox_check(regT);
+                break;
+
+        case ND_MIS_EXAM:
+                regT = prdmem((regA << 16) | regD, M_FETCH);
+                break;
+
+        case ND_MIS_DEPO:
+                pwrmem((regA << 16) | regD, regT, M_FETCH);
+                break;
+
+        default:
+                rv = STOP_UNHINS;
+                break;
+        }
+        return rv;
+
 }
 
 /*
@@ -632,29 +725,9 @@ ins_mis(int IR, int off)
         int reason = 0;
         int n, i;
 
-        if (IR == ND_MIS_SEX)
-                regSTH |= STS_SEXI;
-        else if (IR == ND_MIS_DEPO) {
-                if ((n = ((regA << 16) | regD)) <= MAXMEMSIZE)
-                        PM[n] = regT;
-        } else if (IR == ND_MIS_EXAM) {
-                if ((n = ((regA << 16) | regD)) <= MAXMEMSIZE)
-                        regT = PM[n];
-        } else if (IR == ND_MIS_REX) {
-                regSTH &= ~STS_SEXI;
-        } else if (IR == ND_MIS_PON) {
-                regSTH |= STS_PONI;
-        } else if (IR == ND_MIS_POF) {
-                regSTH &= ~STS_PONI;
-        } else if (IR == ND_MIS_ION) {
-                regSTH |= STS_IONI;
-        } else if (IR == ND_MIS_IOF) {
-                regSTH &= ~STS_IONI;
-        } else if (IR == ND_MIS_PIOF) {
-                regSTH &= ~(STS_IONI|STS_PONI);
-        } else if (IR == ND_MIS_IOXT) {
-                reason = iox_check(regT);
-        } else if ((IR & ND_MIS_TRMSK) == ND_MIS_TRA)
+        if ((IR & 0177760) == ND_MIS_OPCOM)
+                reason = nd_mis_opc(IR);
+        else if ((IR & ND_MIS_TRMSK) == ND_MIS_TRA)
                 reason = nd_tra(IR & ~ND_MIS_TRMSK);
         else if ((IR & ND_MIS_TRMSK) == ND_MIS_TRR)
                 reason = nd_trr(IR & ~ND_MIS_TRMSK);
@@ -663,12 +736,14 @@ ins_mis(int IR, int off)
         else if ((IR & ND_MIS_TRMSK) == ND_MIS_MCL)
                 reason = nd_mcl(IR & ~ND_MIS_TRMSK);
         else if ((IR & ND_MIS_IRRMSK) == ND_MIS_IRR) {
+                mm_privcheck();
                 n = (IR >> 3) & 017;
                 if (n == curlvl)
                         regA = R[IR & 07];
                 else
                         regA = RBLK[n][IR & 07];
         } else if ((IR & ND_MIS_IRRMSK) == ND_MIS_IRW) {
+                mm_privcheck();
                 n = (IR >> 3) & 017;
                 RBLK[n][IR & 07] = regA;
                 if (n == curlvl && (IR & 07) != rnP)
@@ -679,21 +754,18 @@ ins_mis(int IR, int off)
                 ins_lrb(IR);
         } else if ((IR & ND_MONMSK) == ND_MON) {
                 RBLK[14][rnT] = SEXT8(IR);
-                intrpt14(IIE_MC);
+                intrpt14(IIE_MC, PM_CPU);
         } else if ((IR & ND_MONMSK) == ND_WAIT) {
                 if (ISION() == 0) {
-                        regP++;
                         reason = STOP_WAIT;
                 } else if (curlvl > 0) {
                         pid &= ~(1 << curlvl);
                         n = highest_level();
                         if (curlvl != n) {
-                                regP++;
                                 for (i = 0; i < 8; i++) {
                                         RBLK[curlvl][i] = R[i];
                                         R[i] = RBLK[n][i];
                                 }
-                                regP--;
                         }
                         curlvl = n;
                 }
@@ -794,6 +866,7 @@ ins_bop(int IR, int addr)
 
         int rd, n, reason = 0;
 
+        regSTL = (regSTL & 0377) | regSTH; /* Hack for bskp */
         rd = IR & 7;
         n = (IR >> 3) & 017;
         switch ((IR >> 7) & 017) {
@@ -825,7 +898,6 @@ ins_bop(int IR, int addr)
                 if (((regSTL & STS_K) != 0) ^ (((R[rd] >> n) & 1) != 0))
                         regP++;
                 break;
-
 
         case 010: /* BSTA store ~K and set K */
                 R[rd] &= ~(1 << n);
@@ -885,6 +957,7 @@ ins_bop(int IR, int addr)
                 reason = STOP_UNHINS;
                 break;
         }
+        regSTL &= 0377;
         return reason;
 }
 
@@ -1000,11 +1073,11 @@ int
 ins_fmu(int IR, int addr)
 {
         struct fp f1, f2;
-        int s3, e3;
+        int s3, e3, pt = SELPT2(IR);
         t_uint64 m3;
 
         /* Fetch from memory */
-        mkfp48(&f1, rdmem(addr), rdmem(addr+1), rdmem(addr+2));
+        mkfp48(&f1, rdmem(addr, pt), rdmem(addr+1, pt), rdmem(addr+2, pt));
 
         /* From registers */
         mkfp48(&f2, regT, regA, regD);
@@ -1044,11 +1117,12 @@ int
 ins_fdv(int IR, int addr)
 {
         struct fp f1, f2;
-        int s3, e3;
+        int s3, e3, pt;
         t_uint64 m3;
 
         /* Fetch from memory */
-        mkfp48(&f1, rdmem(addr), rdmem(addr+1), rdmem(addr+2));
+        pt = SELPT2(IR);
+        mkfp48(&f1, rdmem(addr, pt), rdmem(addr+1, pt), rdmem(addr+2, pt));
 
         /* From registers */
         mkfp48(&f2, regT, regA, regD);
@@ -1059,7 +1133,7 @@ ins_fdv(int IR, int addr)
                 regSTL |= STS_Z;
                 regT |= 077777;
                 regA = regD = 0177777;
-                intrpt14(IIE_V);
+                intrpt14(IIE_V, PM_CPU);
                 return SCPE_OK;
         }
 
@@ -1177,8 +1251,9 @@ int
 ins_fad(int IR, int addr)
 {       
         struct fp f1, f2;
+        int pt = SELPT2(IR);
 
-        mkfp48(&f1, rdmem(addr), rdmem(addr+1), rdmem(addr+2));
+        mkfp48(&f1, rdmem(addr, pt), rdmem(addr+1, pt), rdmem(addr+2, pt));
         mkfp48(&f2, regT, regA, regD);
 
         if (f1.s ^ f2.s)
@@ -1192,8 +1267,9 @@ int
 ins_fsb(int IR, int addr)
 {       
         struct fp f1, f2;
+        int pt = SELPT2(IR);
 
-        mkfp48(&f1, rdmem(addr), rdmem(addr+1), rdmem(addr+2));
+        mkfp48(&f1, rdmem(addr, pt), rdmem(addr+1, pt), rdmem(addr+2, pt));
         mkfp48(&f2, regT, regA, regD);
 
         f1.s ^= 1; /* swap sign of right op */
@@ -1233,7 +1309,7 @@ add3(uint16 a, uint16 d, uint16 c)
 int
 ins_mpy(int IR, int off)
 {
-        int res = (int)(int16)regA * (int)(int16)rdmem(off);
+        int res = (int)(int16)regA * (int)(int16)rdmem(off, SELPT2(IR));
         regA = res;
         regSTL &= ~STS_Q;
         if (res > 32767)
@@ -1248,12 +1324,13 @@ int
 ins_jmpl(int IR, int off)
 {
         if (BIT12(IR))
-                regL = regP+1;
-        regP = off-1;
+                regL = regP;
+        regP = off;
         return SCPE_OK;
 }
 /*
  * Conditional jump.
+ * off is unused here.
  */
 int
 ins_cjp(int IR, int off)
@@ -1313,8 +1390,6 @@ ins_rop(int IR, int off)
         rd = IR & 07;
         s = rs ? R[rs] : 0;
         d = rd ? R[rd] : 0;
-        if (rs == 2) s++;
-        if (rd == 2) d++;
         if (BIT6(IR)) d = 0;    /* clear dest */
         if (BIT7(IR)) s = ~s;   /* complement src */
         if (BIT10(IR)) { /* add source to destination */
@@ -1335,7 +1410,6 @@ ins_rop(int IR, int off)
                 }
         }
         if (rd) R[rd] = d;
-        if (rd == 2) regP--;
         return SCPE_OK;
 }
 
@@ -1345,28 +1419,17 @@ ins_rop(int IR, int off)
 static int
 iox_check(int dev)
 {
-#ifdef TIMERHACK
-        if ((dev & 03777) == 011) {
-                rtccnt = 0;
-                return SCPE_OK;
-        }
-        if ((dev & 03777) == 013) {
-                rtc_int_enabled = regA & 1;
-                if ((regA >> 13) & 1)
-                        rtc_dev_ready = 0;
-                return SCPE_OK;
-        }
-#else
+
+        mm_privcheck();
+
         if ((dev & 0177774) == 010)
                 return iox_clk(dev);
-#endif
         if ((dev & 0177770) == 0300)
                 return iox_tty(dev);
         if ((dev & 0177770) == 01560)
                 return iox_floppy(dev);
 
-        intrpt14(IIE_IOX);
-
+        intrpt14(IIE_IOX, PM_CPU);
         return SCPE_OK;
 
 }
@@ -1376,15 +1439,15 @@ getoff(int ir)
 {
         int ea;
 
-        ea = BIT8(ir) ? regB : regP;
-        if (BIT10(ir) & !BIT9(ir))
+        ea = BIT8(ir) ? regB : oregP;
+        if (BIT10(ir) & !BIT9(ir) & !BIT8(ir))
                 ea = 0;
         ea += SEXT8(ir);
         if (BIT9(ir))
-                ea = rdmem(ea);
+                ea = rdmem(ea & 0177777, BIT8(ir) ? M_APT : M_PT);
         if (BIT10(ir))
                 ea += regX;
-        return ea;
+        return ea & 0177777;
 }
 
 /*
@@ -1394,6 +1457,8 @@ static int
 nd_mcl(int reg)
 {
         int reason = SCPE_OK;
+
+        mm_privcheck();
 
         switch (reg) {
         case IR_STS:
@@ -1421,14 +1486,16 @@ nd_mst(int reg)
 {
         int reason = SCPE_OK;
 
+        mm_privcheck();
+
         switch (reg) {
         case IR_STS:
                 regSTL |= (regA & 0377);
                 break;
-        case 006: /* PID */
+        case IR_PID: /* PID */
                 pid |= regA;
                 break;
-        case 007: /* PIE */
+        case IR_PIE: /* PIE */
                 pie |= regA;
                 break;
                 
@@ -1446,6 +1513,8 @@ nd_trr(int reg)
 {
         int reason = SCPE_OK;
 
+        mm_privcheck();
+
         switch (reg) {
         case IR_STS:
                 regSTL = regA & 0377;
@@ -1457,13 +1526,19 @@ nd_trr(int reg)
                 mm_wrpcr();
                 break;
         case 005: /* IIE */
-                iie = regA & 02776;
+                iie = regA & 03776;
                 break;
         case 006: /* PID */
                 pid = regA;
                 break;
         case 007: /* PIE */
                 pie = regA;
+                break;
+        case IR_CCL:
+                break;
+        case IR_LCIL:
+                break;
+        case IR_UCIL:
                 break;
         case IR_ECCR:
                 eccr = regA;
@@ -1482,15 +1557,20 @@ nd_tra(int reg)
 {
         int reason = SCPE_OK;
 
+        mm_privcheck();
+
         switch (reg) {
+        case IR_PANS:
+                regA = 0;
+                break;
         case IR_STS: /* STS */
                 regA = regSTL | regSTH | (curlvl << 8);
                 break;
-        case IR_PGS: /* 3 */
-                regA = 0; /* XXX */
+        case IRR_OPR:
+                regA = opr;
                 break;
-        case IR_PVL: /* 4 */
-                regA = pvl;
+        case IRR_PVL:
+                regA = (pvl << 3) | 0153602;
                 break;
         case IR_IIC:    /* read IIC.  Clears IIC and IID */
                 regA = iic;
@@ -1509,23 +1589,14 @@ nd_tra(int reg)
         case 012: /* ALD */
                 regA = ald;
                 break;
-        case 013: /* PES */
-                regA = 0; /* XXX */
-                break;
-        case 014: /* read back PCR */
-                mm_rdpcr();
-                break;
-        case 015: /* */
-                regA = 0; /* XXX */
-                break;
         default:
-                reason = STOP_UNHINS;
+                reason = mm_tra(reg);
         }
         return reason;
 }
 
 int
-highest_level(void)
+highest_level()
 {
         int i, d = pid & pie;
 
@@ -1555,14 +1626,19 @@ fls(int msk)
  * Post an internal interrupt for the given source.
  */
 void
-intrpt14(int src)
+intrpt14(int src, int where)
 {
         iid |= src;     /* set detect flipflop */
         for (iic = 0; (src & 1) == 0; iic++, src >>= 1)
                 ;
 
-        if (iid & iie)  /* if internal int enabled, post priority int */
+        if (iid & iie) { /* if internal int enabled, post priority int */
                 pid |= (1 << 14);
+                /* If we can interrupt, jump directly back */
+                if (ISION() && curlvl < 14 && (pie & (1 << 14)) &&
+                    (where == PM_CPU))
+                        longjmp(env, 0);
+        }
 }
 
 void
@@ -1587,7 +1663,8 @@ identrm(int id)
         struct intr *ip = ilnk[id-10];
 
         if (ip == 0) {
-                intrpt14(IIE_IOX);
+                intrpt14(IIE_IOX, PM_CPU);
+                regA = 0;
         } else {
                 regA = ip->ident;
                 ilnk[id-10] = ip->next;
@@ -1597,21 +1674,6 @@ identrm(int id)
                         pid &= ~(1 << id);
         }
 }
-
-#ifdef TIMERHACK
-struct intr rtc_intx = { 0, 1 };
-void
-chkrtc(void)
-{
-        if (rtccnt++ < 5001)
-                return;
-        rtccnt = 0;
-        rtc_dev_ready = 1;
-        if (rtc_int_enabled) {
-                extint(13, &rtc_intx);
-        }
-}
-#endif
 
 static void
 hist_save(int ir)
@@ -1626,13 +1688,13 @@ hist_save(int ir)
 
         hist_ptr->ir = ir;
         hist_ptr->sts = regSTL | regSTH | (curlvl << 8);
-        hist_ptr->d = R[1];
-        hist_ptr->p = R[2];
-        hist_ptr->b = R[3];
-        hist_ptr->l = R[4];
-        hist_ptr->a = R[5];
-        hist_ptr->t = R[6];
-        hist_ptr->x = R[7];
+        hist_ptr->d = regD;
+        hist_ptr->p = oregP;
+        hist_ptr->b = regB;
+        hist_ptr->l = regL;
+        hist_ptr->a = regA;
+        hist_ptr->t = regT;
+        hist_ptr->x = regX;
 }
 
 t_stat
@@ -1732,4 +1794,3 @@ hist_show(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
         }
         return SCPE_OK;
 }
-

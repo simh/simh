@@ -31,13 +31,21 @@
 #include "nd100_defs.h"
 
 /*
- * Floppy and Streamer Controller (3112).
+ * Floppy and Streamer Controller 3112.
  * ND documentation ND-11.021.1
  *
- * Currently only 5 1/4" DS/DD floppies implemented (no streamer).
+ * Also support Floppy Controller 3027 (Z80 version).
+ * ND documentation ND-11.015.1
+ *
+ * Currently only floppies implemented (no streamer).
  *
  * The device uses eight IOX addresses, but the transfer commands 
  * are given in a command block of 12 words in memory.
+ *
+ * ND uses three floppy formats (but in theory can handle a lot of formats).
+ *      - SS/SD 8" (type 0):    77*8*512= 315392 bytes.
+ *      - DS/DD 8" (type 017):  77*8*1024*2= 1261568 bytes.
+ *      - DS/DD 5 1/4 (type 017?): 80*8*1024*2= 1261568 bytes.
  */
 
 t_stat floppy_svc(UNIT *uptr);
@@ -45,6 +53,9 @@ t_stat floppy_reset (DEVICE *dptr);
 t_stat floppy_boot (int32 unitno, DEVICE *dptr);
 t_stat floppy_attach (UNIT *uptr, CONST char *cptr);
 static int floppy_excmd(void);
+static int floppy_test(UNIT *up);
+static int dtomem(FILE *fp, int daddr, int maddr, int wcnt, int how);
+static int getmval(void);
 
 #define FL_NTR  80      /* # tracks/side */
 #define FL_NSC  8       /* # sectors/track */
@@ -59,7 +70,7 @@ static int floppy_excmd(void);
 #define FL_ST_RDY       0000010 /* device ready for transfer (RFT) */
 #define FL_ST_ERR       0000020 /* OR of errors */
 #define FL_ST_HE        0000100 /* Hard error (DMA) */
-#define FL_ST_DENS      0100000 /* Dual density ctlr */
+#define FL_ST_DENS      0140000 /* Dual density ctlr */
 
 /* hardware control word */
 #define FL_CW_IE        0000002 /* interrupt enable (RFT) */
@@ -128,6 +139,7 @@ static int fl_lpl;      /* devno + 7 load pointer low */
 /* Command word (000) */
 #define CW_FL_RD        0000000 /* Read data */
 #define CW_FL_WR        0000001 /* Write data */
+#define CW_FL_EXTST     0000036 /* Read extended status */
 #define CW_FL_RDFMT     0000042 /* Read format */
 #define CW_FL_CMDMSK    077     /* mask for command */
 #define CW_FL_SELSH     6       /* shift for unit */
@@ -147,6 +159,7 @@ static int fl_lpl;      /* devno + 7 load pointer low */
 #define U_READ  01      /* unit reading */
 #define U_WRITE 02      /* unit writing */
 #define U_RDFMT 03      /* Read format */
+#define U_EXTST 04      /* Read extended status */
 
 #define devaddr u4      /* unit offset (in words) */
 #define wcnt    u5      /* word count */
@@ -199,13 +212,9 @@ iox_floppy(int addr)
         int n;
         int rv = 0;
 
-
         switch (addr & 07) {
         case 0: /* read data */
                 regA = 0;
-                break;
-
-        case 1:
                 break;
 
         case 2:
@@ -214,6 +223,10 @@ iox_floppy(int addr)
 
         case 3:
                 n = regA;
+                if (n & FL_CW_TEST) {
+                        rv = floppy_test(&floppy_unit[0]);
+                        break;
+                }
                 if (n & FL_CW_FCE) {
                         rv = floppy_excmd();
                         break;
@@ -239,10 +252,10 @@ iox_floppy(int addr)
                 break;
 
         default:
-                rv = STOP_UNHIOX;
-                break;
+                if ((addr & 1) == 0)
+                        regA = 0;
+                break; /* Unused IOXes are ignored */
         }
-
         return rv;
 }
 
@@ -253,32 +266,61 @@ floppy_reset(DEVICE *dptr)
         return 0;
 }
 
+/*
+ * Estimate floppy format based on disk size and return status2 word.
+ *      - SS/SD = 315392 bytes, c/h/s 77/1/8 (512b sectors)
+ *      - DS/DD = 1261568 bytes, c/h/s 77/2/8 (1024b sectors)
+ *      - DS/DD 5 1/4" = 1310720 bytes, c/h/s 80/2/8 (1024b sectors)
+ */
+static int
+readfmt(UNIT *up)
+{
+        if (sim_fseek(up->fileref, 0, SEEK_END) < 0)
+                return -1;
+        switch (sim_ftell(up->fileref)) {
+        case 315392:
+                return 0;
+        case 1261568:
+                return ST2_FL_DD|ST2_FL_DS|ST2_FL_BS1K;
+        case 1310720:
+                return /* ST2_FL_514| */ST2_FL_DD|ST2_FL_DS|ST2_FL_BS1K;
+        default:
+                break;
+        }
+        return -1;
+}
+        
+
 t_stat
 floppy_svc(UNIT *uptr)
 {
-        unsigned char *wp;
-        int i, j;
-        int cbaddr = fl_lpl + ((fl_lph & 0377) << 8);
+        int cbaddr = getmval();
         int lah = 0, lal = 0;
+        int status2 = 0;
+        int remwh = 0, remwl = 0;
 
         if ((fl_rstatus & FL_ST_ACT) == 0)
                 return STOP_UNHIOX;
 
         switch (uptr->state) {
         case U_READ:
-                wp = malloc(uptr->wcnt * 2);
-                if (fseek(uptr->fileref, uptr->devaddr * 2, SEEK_SET) < 0)
-                        goto err;
-                if (sim_fread(wp, uptr->wcnt, 2, uptr->fileref) < 0)
-                        goto err;
-                for (i = 0, j = 0; i < uptr->wcnt; i++, j += 2)
-                        wrmem(uptr->memaddr+i, (wp[j] << 8) | wp[j+1]);
+                dtomem(uptr->fileref, uptr->devaddr,
+                    uptr->memaddr, uptr->wcnt, PM_DMA);
                 lah = (uptr->memaddr + uptr->wcnt) >> 16;
                 lal = (uptr->memaddr + uptr->wcnt) & 0177777;
-                free(wp);
                 break;
 
         case U_RDFMT:
+                if ((status2 = readfmt(uptr)) < 0)
+                        goto err;
+                break;
+
+        case U_EXTST: /* XXX no docs found...? */
+                lah = (uptr->memaddr + uptr->wcnt) >> 16;
+                lal = (uptr->memaddr + uptr->wcnt) & 0177777;
+                remwh = 0100000; /* XXX */
+                remwl = 1; /* XXX */
+                pwrmem(uptr->memaddr, 06201, PM_DMA); /* XXX */
                 break;
 
         case U_WRITE:
@@ -286,13 +328,12 @@ floppy_svc(UNIT *uptr)
                 return STOP_UNHIOX;
         }
 
-        wrmem(cbaddr+CB_ST1, FL_ST_RDY);
-        wrmem(cbaddr+CB_ST2,
-            ST2_FL_BS1K|ST2_FL_DS|ST2_FL_DD|ST2_FL_514);
-        wrmem(cbaddr+CB_LAH, lah);
-        wrmem(cbaddr+CB_LAL, lal);
-        wrmem(cbaddr+CB_REMWH, 0);
-        wrmem(cbaddr+CB_REMWL, 0);
+        pwrmem(cbaddr+CB_ST1, FL_ST_RDY, PM_DMA);
+        pwrmem(cbaddr+CB_ST2, status2, PM_DMA); /* set after error or rdfmt */
+        pwrmem(cbaddr+CB_LAH, lah, PM_DMA);
+        pwrmem(cbaddr+CB_LAL, lal, PM_DMA);
+        pwrmem(cbaddr+CB_REMWH, remwh, PM_DMA);
+        pwrmem(cbaddr+CB_REMWL, remwl, PM_DMA);
 
         fl_rstatus &= ~FL_ST_ACT;
         fl_rstatus |= FL_ST_RDY;
@@ -305,6 +346,38 @@ err:
         return STOP_UNHIOX;
 }
 
+/*
+ * Get physical memory address for command block.
+ */
+static int
+getmval(void)
+{
+        return fl_lpl + ((fl_lph & 0377) << 8);
+}
+
+/*
+ * Read a block from file fp, position daddr (bytes) to ND100 memory maddr
+ * wcnt words.
+ * Return 0 or fail.
+ */
+static int
+dtomem(FILE *fp, int daddr, int maddr, int wcnt, int how)
+{
+        unsigned char *wp;
+        int bcnt = wcnt *2;
+        int i;
+
+        wp = malloc(wcnt * 2);  /* bounce buffer */
+        if (sim_fseek(fp, daddr, SEEK_SET) < 0)
+                return STOP_UNHIOX;
+        if (sim_fread(wp, bcnt, 1, fp) < 0)
+                return STOP_UNHIOX;
+        for (i = 0; i < bcnt; i += 2)
+                wrmem(maddr++, (wp[i] << 8) | wp[i+1], how);
+        free(wp);
+        return SCPE_OK;
+}
+
 t_stat
 floppy_boot(int32 unitno, DEVICE *dptr)
 {
@@ -312,14 +385,63 @@ floppy_boot(int32 unitno, DEVICE *dptr)
         return 1;
 }
 
+/*
+ * It seems that some of the boot programs uses the Z80 test programs
+ * on the controller card.  We try to mimic the behaviour.
+ * 
+ * This data structure (in ND100) is used in test T13 and T14.
+ *
+ *      15                    8 7                     0
+ *      +---------------------------------------------+
+ *    0 | ND100 Load address                          |
+ *      +---------------------------------------------+
+ *    1 | Z80 address                                 |
+ *      +---------------------------------------------+
+ *    2 | Byte count                                  |
+ *      +---------------------------------------------+
+ */
+static int
+floppy_test(UNIT *up)
+{
+        int cbaddr = getmval();
+        int n100addr, z80addr, bcnt;
+        int rv = 0;
+
+        if ((regA & FL_CW_FCE) == 0)
+                return STOP_UNHIOX; /* What to do? */
+        switch (regA >> 9) {
+        case 016: /* T14, load from Z80 to ND100 */
+                n100addr = prdmem(cbaddr, PM_CPU);
+                z80addr = prdmem(cbaddr+1, PM_CPU);
+                bcnt = prdmem(cbaddr+2, PM_CPU);
+                if (bcnt > 3584)
+                        return STOP_UNHIOX;
+                printf("\r\n addr %06o nd100 %06o z80 %04x count %o\r\n", 
+                    cbaddr, prdmem(cbaddr, PM_CPU),
+                    prdmem(cbaddr+1, PM_CPU), prdmem(cbaddr+2, PM_CPU));
+                dtomem(up->fileref, up->devaddr + z80addr - 0x2200,
+                    n100addr, bcnt/2, PM_CPU);
+                break;
+
+        default:
+                return STOP_UNHIOX;
+        }
+        return rv;
+}
+
+/*
+ * Execute. Fills in the unit local vars memaddr/wcnt/devaddr from the 
+ * command block and setup for interrupt later.
+ */
 static int
 floppy_excmd(void)
 {
         UNIT *unit;
-        int cw, u, cmd;
-        int cbaddr = fl_lpl + ((fl_lph & 0377) << 8);
+        int cw, u, cmd, i;
+        int cbaddr = getmval();
+        int status2, sectsz;
 
-        cw = rdmem(cbaddr+CB_CW);
+        cw = prdmem(cbaddr+CB_CW, PM_CPU);
         u = (cw >> CW_FL_SELSH) & 03;
         cmd = cw & CW_FL_CMDMSK;
 
@@ -327,26 +449,34 @@ floppy_excmd(void)
         if ((unit->flags & UNIT_ATT) == 0)
                 goto err; /* floppy not inserted */
 
+        status2 = readfmt(unit);
+        sectsz = (status2 & ST2_FL_BS1K) == 0 ? 512 : 1024;
+
         /* XXX check disk size, word count etc... */
-        unit->memaddr = ((rdmem(cbaddr+CB_DAHMAH) & 0377) << 16) | rdmem(cbaddr+CB_MAL);
-        unit->wcnt = ((rdmem(cbaddr+CB_OPTWCH) & 0377) << 16) | rdmem(cbaddr+CB_WCL);
-        unit->devaddr = ((rdmem(cbaddr+CB_DAHMAH) & 0177400) << 8) |
-                    rdmem(cbaddr+CB_DAL);
+        unit->memaddr = ((prdmem(cbaddr+CB_DAHMAH, PM_CPU) & 0377) << 16) |
+            prdmem(cbaddr+CB_MAL, PM_CPU);
+        i = prdmem(cbaddr+CB_OPTWCH, PM_CPU);
+        unit->wcnt = ((i & 0377) << 16) | prdmem(cbaddr+CB_WCL, PM_CPU);
+        if ((i & CB_OPT_WC) == 0)
+                unit->wcnt *= (sectsz/2);
+        unit->devaddr = (((prdmem(cbaddr+CB_DAHMAH, PM_CPU) & 0177400) << 8) |
+            prdmem(cbaddr+CB_DAL, PM_CPU)) * sectsz;
 
-        if (cmd == CW_FL_RDFMT) {
-                unit->state = U_RDFMT;
-        } else if (cmd == CW_FL_RD || cmd == CW_FL_WR) {
-                if (cmd == CW_FL_WR)
-                        goto err; /* floppy write protected */
-
-                if ((cw & CW_FL_1K) != CW_FL_1K)
-                        goto err; /* Require 1K sectors */
-                if ((cw & (CW_FL_DS|CW_FL_DD)) != (CW_FL_DS|CW_FL_DD))
-                        goto err; /* Must be double sided/double density */
-
+        switch (cmd) {
+        case CW_FL_RD:
                 unit->state = U_READ;
-        } else
+                break;
+        case CW_FL_WR:
+                goto err; /* floppy write protected */
+        case CW_FL_EXTST:
+                unit->state = U_EXTST;
+                break;
+        case CW_FL_RDFMT:
+                unit->state = U_RDFMT;
+                break;
+        default:
                 goto err;
+        }
 
         sim_activate(&floppy_unit[u], 10);
         fl_rstatus &= ~FL_ST_RDY;
