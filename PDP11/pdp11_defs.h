@@ -617,7 +617,7 @@ typedef struct pdp_dib DIB;
 #define INT_V_RL        2
 #define INT_V_RX        3
 #define INT_V_TM        4
-#define INT_V_RP        5
+#define INT_V_RHA       5
 #define INT_V_TS        6
 #define INT_V_HK        7
 #define INT_V_RQ        8
@@ -627,10 +627,10 @@ typedef struct pdp_dib DIB;
 #define INT_V_RY        12
 #define INT_V_XQ        13
 #define INT_V_XU        14
-#define INT_V_TU        15
+#define INT_V_RHB       15
 #define INT_V_RF        16
 #define INT_V_RC        17
-#define INT_V_RS        18
+#define INT_V_RHC       18
 #define INT_V_DMCRX     19
 #define INT_V_DMCTX     20
 #define INT_V_DUPRX     21
@@ -685,7 +685,7 @@ typedef struct pdp_dib DIB;
 #define INT_RL          (1u << INT_V_RL)
 #define INT_RX          (1u << INT_V_RX)
 #define INT_TM          (1u << INT_V_TM)
-#define INT_RP          (1u << INT_V_RP)
+#define INT_RHA         (1u << INT_V_RHA)
 #define INT_TS          (1u << INT_V_TS)
 #define INT_HK          (1u << INT_V_HK)
 #define INT_RQ          (1u << INT_V_RQ)
@@ -695,10 +695,10 @@ typedef struct pdp_dib DIB;
 #define INT_RY          (1u << INT_V_RY)
 #define INT_XQ          (1u << INT_V_XQ)
 #define INT_XU          (1u << INT_V_XU)
-#define INT_TU          (1u << INT_V_TU)
+#define INT_RHB         (1u << INT_V_RHB)
 #define INT_RF          (1u << INT_V_RF)
 #define INT_RC          (1u << INT_V_RC)
-#define INT_RS          (1u << INT_V_RS)
+#define INT_RHC         (1u << INT_V_RHC)
 #define INT_DMCRX       (1u << INT_V_DMCRX)
 #define INT_DMCTX       (1u << INT_V_DMCTX)
 #define INT_KMCA        (1u << INT_V_KMCA)
@@ -755,7 +755,7 @@ typedef struct pdp_dib DIB;
 #define IPL_RL          5
 #define IPL_RX          5
 #define IPL_TM          5
-#define IPL_RP          5
+#define IPL_RHA         5
 #define IPL_TS          5
 #define IPL_HK          5
 #define IPL_RQ          5
@@ -766,10 +766,10 @@ typedef struct pdp_dib DIB;
 #define IPL_XQ          5
 #define IPL_XU          5
 #define IPL_CH          5
-#define IPL_TU          5
+#define IPL_RHB         5
 #define IPL_RF          5
 #define IPL_RC          5
-#define IPL_RS          5
+#define IPL_RHC         5
 #define IPL_DMCRX       5
 #define IPL_DMCTX       5
 #define IPL_KMCA        5
