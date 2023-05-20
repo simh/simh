@@ -3388,12 +3388,6 @@ const char helpString[] =
     " on the local LAN, the libpcap development package must be installed on\n"
     " the system which builds the simulator.\n"
     "\n"
-#if defined(__APPLE__)
-#else
-#if defined(__linux__)
-#else
-#endif
-#endif
 #endif
     "1 Privileges Required\n"
 #if defined(_WIN32)
