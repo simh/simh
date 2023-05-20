@@ -2305,6 +2305,19 @@ static const char *_check_source_platform_defines[] = {
     NULL
     };
 
+static const char *_check_source_scp_only_apis[] = {
+    "sim_os_ms_sleep",
+    "sim_master_sock",
+    "sim_accept_conn",
+    "sim_accept_conn_ex",
+    "sim_connect_sock",
+    "sim_connect_sock_ex",
+    "sim_read_sock",
+    "sim_write_sock",
+    "sim_close_sock",
+    NULL
+    };
+
 typedef struct FILE_STATS {
     char RelativePath[PATH_MAX + 1];
     t_offset FileSize;
@@ -2326,6 +2339,8 @@ typedef struct FILE_STATS {
     char **MissingIncludes;
     int PlatformDefineCount;
     char **PlatformDefines;
+    int ScpAPICount;
+    char **ScpAPIs;
     int LineEndingsLF;
     int LineEndingsCRLF;
     t_bool ProblemFile;
@@ -2434,12 +2449,13 @@ if (Stats->IsSource) {
     int startoffset = 0;
     int erroffset;
     const char **platform_define;
+    const char **scp_api;
 
     if (sim_sock_re == NULL)
         sim_sock_re = pcre_compile ("\\#\\s*include\\s+\\\"sim_sock\\.h\"", 0, &errmsg, &erroffset, NULL);
 
     matches = 0;
-    while (1) {
+    while (sim_sock_re != NULL) {
         rc = pcre_exec (sim_sock_re, NULL, data, (int)FileSize, startoffset, PCRE_NOTBOL, ovec, 6);
         if (rc == PCRE_ERROR_NOMATCH)
             break;
@@ -2453,7 +2469,7 @@ if (Stats->IsSource) {
         local_include_re = pcre_compile ("\\#\\s*include\\s+\\\"(.+)\\\"", 0, &errmsg, &erroffset, NULL);
 
     matches = startoffset = 0;
-    while (1) {
+    while (local_include_re != NULL) {
         char *local_include;
 
         rc = pcre_exec (local_include_re, NULL, data, (int)FileSize, startoffset, PCRE_NOTBOL, ovec, 6);
@@ -2472,7 +2488,7 @@ if (Stats->IsSource) {
         sys_include_re = pcre_compile ("\\#\\s*include\\s+\\<(.+)\\>", 0, &errmsg, &erroffset, NULL);
 
     matches = startoffset = 0;
-    while (1) {
+    while (sys_include_re != NULL) {
         char *sys_include;
         t_bool benign_include = FALSE;
         const char **allowed_include = _check_source_allowed_sysincludes;
@@ -2515,7 +2531,18 @@ if (Stats->IsSource) {
             }
         }
 
-    if ((!Stats->IsInScpDir) && (Stats->OtherSysIncludeCount != 0) && (Stats->PlatformDefineCount != 0))
+    for (scp_api = _check_source_scp_only_apis; *scp_api != NULL; ++scp_api) {
+        if (strstr (data, *scp_api) != NULL) {
+            ++Stats->ScpAPICount;
+            Stats->ScpAPIs = (char **)realloc (Stats->ScpAPIs, Stats->ScpAPICount * sizeof (*Stats->ScpAPIs));
+            Stats->ScpAPIs[Stats->ScpAPICount - 1] = strdup (*scp_api);
+            }
+        }
+
+    if ((!Stats->IsInScpDir) && 
+        ((Stats->OtherSysIncludeCount != 0) || 
+         (Stats->PlatformDefineCount != 0)  || 
+         (Stats->ScpAPICount != 0)))
         Stats->ProblemFile = TRUE;
     }
 free (extension);
@@ -2600,9 +2627,11 @@ for (i = 0; i < count; i++)
 free (list);
 }
 
-static void _sim_check_source_file_report (FILE_STATS *File, int maxnamelen)
+static void _sim_check_source_file_report (FILE_STATS *File, int maxnamelen, t_stat stat)
 {
-if ((sim_switches & SWMASK ('D')) || (File->ProblemFile)) {
+if ((sim_switches & SWMASK ('D')) || (File->ProblemFile) || 
+    ((stat != SCPE_OK) && 
+     ((File->HasSimSockInclude) || (File->BenignIncludeCount != 0)))) {
     sim_printf ("%*.*s   ", -maxnamelen, -maxnamelen, File->RelativePath);
     sim_printf ("%8u bytes", (unsigned int)File->FileSize);
     if (File->Lines)
@@ -2630,6 +2659,7 @@ if ((sim_switches & SWMASK ('D')) || (File->ProblemFile)) {
     _check_source_print_string_list ("Other System Include Files",             File->OtherSysIncludes, File->OtherSysIncludeCount);
     _check_source_print_string_list ("Missing Include Files",                  File->MissingIncludes,  File->MissingIncludeCount);
     _check_source_print_string_list ("Platform Specific Defines",              File->PlatformDefines,  File->PlatformDefineCount);
+    _check_source_print_string_list ("SCP Private APIs",                       File->ScpAPIs,          File->ScpAPICount);
     }
 _check_source_free_string_list (File->BenignIncludes,   File->BenignIncludeCount);
 _check_source_free_string_list (File->LocalIncludes,    File->LocalIncludeCount);
@@ -2637,6 +2667,7 @@ _check_source_free_string_list (File->SysIncludes,      File->SysIncludeCount);
 _check_source_free_string_list (File->OtherSysIncludes, File->OtherSysIncludeCount);
 _check_source_free_string_list (File->MissingIncludes,  File->MissingIncludeCount);
 _check_source_free_string_list (File->PlatformDefines,  File->PlatformDefineCount);
+_check_source_free_string_list (File->ScpAPIs,          File->ScpAPICount);
 free (File);
 }
 
@@ -2743,7 +2774,7 @@ if ((sim_check_scp_dir != NULL) &&
     sim_check_scp_dir = NULL;
     }
 for (file = 0; file < Stats->FileCount; file++)
-    _sim_check_source_file_report (Stats->Files[file], namelen);
+    _sim_check_source_file_report (Stats->Files[file], namelen, stat);
 if (Stats->ProblemFiles > 0)
     stat = SCPE_FMT;
 free (Stats->Files);
