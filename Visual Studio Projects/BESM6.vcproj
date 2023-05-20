@@ -95,7 +95,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				Description="Running Available Tests"
+				Description="Running Available Tests..."
 				CommandLine="Post-Build-Event.cmd BESM6 &quot;$(TargetDir)$(TargetName).exe&quot;"
 			/>
 		</Configuration>
@@ -183,7 +183,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				Description="Running Available Tests"
+				Description="Running Available Tests..."
 				CommandLine="Post-Build-Event.cmd BESM6 &quot;$(TargetDir)$(TargetName).exe&quot;"
 			/>
 		</Configuration>

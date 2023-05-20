@@ -25,7 +25,7 @@
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
-				Description="Build Dependent ROM include File(s) &amp; Check for required build dependencies &amp; git commit id"
+				Description="Build Dependent ROM include File(s) &amp; Check for required build dependencies &amp; git commit id..."
 				CommandLine="Pre-Build-Event.cmd &quot;$(TargetDir)$(TargetName).exe&quot; LIBPCRE ROM BUILD"
 			/>
 			<Tool
@@ -95,7 +95,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				Description="Running Available Tests"
+				Description="Running Available Tests..."
 				CommandLine="Post-Build-Event.cmd VAX &quot;$(TargetDir)$(TargetName).exe&quot; vax-diag_test"
 			/>
 		</Configuration>
@@ -108,7 +108,7 @@
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
-				Description="Build Dependent ROM include File(s) &amp; Check for required build dependencies &amp; git commit id"
+				Description="Build Dependent ROM include File(s) &amp; Check for required build dependencies &amp; git commit id..."
 				CommandLine="Pre-Build-Event.cmd &quot;$(TargetDir)$(TargetName).exe&quot; LIBPCRE ROM BUILD"
 			/>
 			<Tool
@@ -186,7 +186,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				Description="Running Available Tests"
+				Description="Running Available Tests..."
 				CommandLine="Post-Build-Event.cmd VAX &quot;$(TargetDir)$(TargetName).exe&quot; vax-diag_test"
 			/>
 		</Configuration>

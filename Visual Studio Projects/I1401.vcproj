@@ -25,7 +25,7 @@
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
-				Description="Check for required build dependencies &amp; git commit id"
+				Description="Check for required build dependencies &amp; git commit id..."
 				CommandLine="Pre-Build-Event.cmd &quot;$(TargetDir)$(TargetName).exe&quot; LIBPCRE"
 			/>
 			<Tool
@@ -95,7 +95,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				Description="Running Available Tests"
+				Description="Running Available Tests..."
 				CommandLine="Post-Build-Event.cmd I1401 &quot;$(TargetDir)$(TargetName).exe&quot;"
 			/>
 		</Configuration>
@@ -108,7 +108,7 @@
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
-				Description="Check for required build dependencies &amp; git commit id"
+				Description="Check for required build dependencies &amp; git commit id..."
 				CommandLine="Pre-Build-Event.cmd &quot;$(TargetDir)$(TargetName).exe&quot; LIBPCRE"
 			/>
 			<Tool
@@ -183,7 +183,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				Description="Running Available Tests"
+				Description="Running Available Tests..."
 				CommandLine="Post-Build-Event.cmd I1401 &quot;$(TargetDir)$(TargetName).exe&quot;"
 			/>
 		</Configuration>

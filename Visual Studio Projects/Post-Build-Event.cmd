@@ -71,6 +71,6 @@ set _deps_line=
 for /F "usebackq tokens=2 delims==" %%f in (`type %_project_deps%`) do set _deps_line=!_deps_line! %%f
 del %_project_deps%
 del %_project_linedeps%
-echo Checking Source for %~n2 simulator
+echo Checking Source in %~n2 simulator...
 %2 %_deps_switches% CheckSourceCode %_deps_line%
 set _deps_line=
