@@ -3086,9 +3086,9 @@ $(TARGET): $(DEPS)
 	copy $(TARGET) $(@D)\$(ALTNAME)${EXE}
       endif
     endif
-    ifneq (,$(call find_test,$(word 1,$(DIRS)),$(TEST_NAME)))
+    ifneq (,$(call find_test,$(word 2,$(DIRS)),$(TEST_NAME)))
     # invoke the just built simulator to engage its test activities
-	$@ $(call find_test,$(word 1,$(DIRS)),$(TEST_NAME)) ${TEST_ARG}
+	$@ $(call find_test,$(word 2,$(DIRS)),$(TEST_NAME)) ${TEST_ARG}
     endif
     ifneq (,$(SOURCE_CHECK))
 	  $@ $(SOURCE_CHECK_SWITCHES) CheckSourceCode $(DEPS)
