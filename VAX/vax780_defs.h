@@ -98,12 +98,13 @@
 
 #define NEXUS_NUM       16                              /* number of nexus */
 #define MCTL_NUM        2                               /* number of mem ctrl */
-#define MBA_NUM         2                               /* number of MBA's */
+#define MBA_NUM         3                               /* number of MBA's */
 #define TR_MCTL0        1                               /* nexus assignments */
 #define TR_MCTL1        2
 #define TR_UBA          3
 #define TR_MBA0         8
 #define TR_MBA1         9
+#define TR_MBA2         10
 #define NEXUS_HLVL      (IPL_HMAX - IPL_HMIN + 1)
 #define SCB_NEXUS       0x100                           /* nexus intr base */
 #define SBI_FAULTS      0xFC000000                      /* SBI fault flags */
@@ -118,6 +119,7 @@
 #define IPL_UBA         (0x15 - IPL_HMIN)
 #define IPL_MBA0        (0x15 - IPL_HMIN)
 #define IPL_MBA1        (0x15 - IPL_HMIN)
+#define IPL_MBA2        (0x15 - IPL_HMIN)
 
 /* Nexus interrupt macros */
 

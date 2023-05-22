@@ -114,6 +114,7 @@ static t_stat (*nexusW[NEXUS_NUM])(int32 dat, int32 ad, int32 md);
 
 static struct boot_dev boot_tab[] = {
     { "RP", BOOT_MB, 0 },
+    { "RPB", BOOT_MB, 0 },
     { "HK", BOOT_HK, 0 },
     { "RL", BOOT_RL, 0 },
     { "RQ", BOOT_UDA, 1 << 24 },

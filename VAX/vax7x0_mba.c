@@ -23,7 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   mba0, mba1           RH780 Massbus adapter
+   mba0, mba1, mba2           RH780 Massbus adapter
 
    28-May-08    RMS     Inlined physical memory routines
 */
@@ -324,6 +324,29 @@ REG mba1_reg[] = {
     { NULL }
     };
 
+DIB mba2_dib = { TR_MBA2, 0, &mba_rdreg, &mba_wrreg, 0, NVCL (MBA2) };
+
+UNIT mba2_unit = { UDATA (NULL, 0, 0) };
+
+MTAB mba2_mod[] = {
+    { MTAB_XTD|MTAB_VDV, TR_MBA2, "NEXUS", NULL,
+      NULL, &show_nexus, NULL, "Display nexus" },
+    { 0 }
+    };
+
+REG mba2_reg[] = {
+    { HRDATAD (CNFR,            mba_cnf[2],      32, "config register") },
+    { HRDATAD (CR,               mba_cr[2],       4, "control register") },
+    { HRDATAD (SR,               mba_sr[2],      32, "status register") },
+    { HRDATAD (VA,               mba_va[2],      17, "virtual address register") },
+    { HRDATAD (BC,               mba_bc[2],      16, "byte count register") },
+    { HRDATAD (DR,               mba_dr[2],      32, "diag register") },
+    { HRDATAD (SMR,              mba_dr[2],      32, "sel map register") },
+    { BRDATAD (MAP,             mba_map[2], 16, 32, MBA_NMAPR, "map registers") },
+    { FLDATAD (NEXINT, nexus_req[IPL_MBA2], TR_MBA2, "nexus interrupt request") },
+    { NULL }
+    };
+
 DEBTAB mba_deb[] = {
     { "REGREAD", MBA_DEB_RRD },
     { "REGWRITE", MBA_DEB_RWR },
@@ -351,6 +374,15 @@ DEVICE mba_dev[] = {
     NULL, NULL, &mba_reset,
     NULL, NULL, NULL,
     &mba1_dib, DEV_NEXUS | DEV_DEBUG, 0,
+    mba_deb, NULL, NULL, &mba_help, NULL, NULL, 
+    &mba_description
+    },
+    {
+    "MBA2", &mba2_unit, mba2_reg, mba2_mod,
+    1, 0, 0, 0, 0, 0,
+    NULL, NULL, &mba_reset,
+    NULL, NULL, NULL,
+    &mba2_dib, DEV_NEXUS | DEV_DEBUG, 0,
     mba_deb, NULL, NULL, &mba_help, NULL, NULL, 
     &mba_description
     }
