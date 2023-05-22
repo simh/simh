@@ -1616,21 +1616,21 @@ PDP15_OPT = -DPDP15 -I ${PDP18BD}
 PDP11D = ${SIMHD}/PDP11
 PDP11 = ${PDP11D}/pdp11_fp.c ${PDP11D}/pdp11_cpu.c ${PDP11D}/pdp11_dz.c \
 	${PDP11D}/pdp11_cis.c ${PDP11D}/pdp11_lp.c ${PDP11D}/pdp11_rk.c \
-	${PDP11D}/pdp11_rl.c ${PDP11D}/pdp11_rp.c ${PDP11D}/pdp11_rx.c \
-	${PDP11D}/pdp11_stddev.c ${PDP11D}/pdp11_sys.c ${PDP11D}/pdp11_tc.c \
-	${PDP11D}/pdp11_tm.c ${PDP11D}/pdp11_ts.c ${PDP11D}/pdp11_io.c \
-	${PDP11D}/pdp11_rq.c ${PDP11D}/pdp11_tq.c ${PDP11D}/pdp11_pclk.c \
-	${PDP11D}/pdp11_ry.c ${PDP11D}/pdp11_pt.c ${PDP11D}/pdp11_hk.c \
-	${PDP11D}/pdp11_xq.c ${PDP11D}/pdp11_xu.c ${PDP11D}/pdp11_vh.c \
-	${PDP11D}/pdp11_rh.c ${PDP11D}/pdp11_tu.c ${PDP11D}/pdp11_cpumod.c \
-	${PDP11D}/pdp11_cr.c ${PDP11D}/pdp11_rf.c ${PDP11D}/pdp11_dl.c \
-	${PDP11D}/pdp11_ta.c ${PDP11D}/pdp11_rc.c ${PDP11D}/pdp11_kg.c \
-	${PDP11D}/pdp11_ke.c ${PDP11D}/pdp11_dc.c ${PDP11D}/pdp11_dmc.c \
-	${PDP11D}/pdp11_kmc.c ${PDP11D}/pdp11_dup.c ${PDP11D}/pdp11_rs.c \
-	${PDP11D}/pdp11_vt.c ${PDP11D}/pdp11_td.c ${PDP11D}/pdp11_io_lib.c \
-	${PDP11D}/pdp11_rom.c ${PDP11D}/pdp11_ch.c ${PDP11D}/pdp11_dh.c \
-	${PDP11D}/pdp11_ng.c ${PDP11D}/pdp11_daz.c ${PDP11D}/pdp11_tv.c \
-	${PDP11D}/pdp11_mb.c \
+	${PDP11D}/pdp11_rl.c ${PDP11D}/pdp11_rp.c ${PDP11D}/pdp11_rpb.c \
+	${PDP11D}/pdp11_rx.c ${PDP11D}/pdp11_stddev.c ${PDP11D}/pdp11_sys.c \
+	${PDP11D}/pdp11_tc.c ${PDP11D}/pdp11_tm.c ${PDP11D}/pdp11_ts.c \
+	${PDP11D}/pdp11_io.c ${PDP11D}/pdp11_rq.c ${PDP11D}/pdp11_tq.c \
+	${PDP11D}/pdp11_pclk.c ${PDP11D}/pdp11_ry.c ${PDP11D}/pdp11_pt.c \
+	${PDP11D}/pdp11_hk.c ${PDP11D}/pdp11_xq.c ${PDP11D}/pdp11_xu.c \
+	${PDP11D}/pdp11_vh.c ${PDP11D}/pdp11_rh.c ${PDP11D}/pdp11_tu.c \
+	${PDP11D}/pdp11_cpumod.c ${PDP11D}/pdp11_cr.c ${PDP11D}/pdp11_rf.c \
+	${PDP11D}/pdp11_dl.c ${PDP11D}/pdp11_ta.c ${PDP11D}/pdp11_rc.c \
+	${PDP11D}/pdp11_kg.c ${PDP11D}/pdp11_ke.c ${PDP11D}/pdp11_dc.c \
+	${PDP11D}/pdp11_dmc.c ${PDP11D}/pdp11_kmc.c ${PDP11D}/pdp11_dup.c \
+	${PDP11D}/pdp11_rs.c ${PDP11D}/pdp11_vt.c ${PDP11D}/pdp11_td.c \
+	${PDP11D}/pdp11_io_lib.c ${PDP11D}/pdp11_rom.c ${PDP11D}/pdp11_ch.c \
+	${PDP11D}/pdp11_dh.c ${PDP11D}/pdp11_ng.c ${PDP11D}/pdp11_daz.c \
+	${PDP11D}/pdp11_tv.c ${PDP11D}/pdp11_mb.c \
 	${DISPLAYL} ${DISPLAYNG} ${DISPLAYVT} $(NETWORK_DEPS)
 PDP11_OPT = -DVM_PDP11 -I ${PDP11D} ${NETWORK_OPT} ${DISPLAY_OPT}
 

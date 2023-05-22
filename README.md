@@ -67,7 +67,7 @@ All Simulator updates on Open SIMH will be present in this repository, and any c
 - Simulators with video devices that may be enabled, no longer disable the screen saver until the video display is presented.  Optionally enabling or disabling the OS screen saver by an environment variable.
 - More readable output of SHOW <dev>|<unit> with variable sized DEVICE and UNIT names.
 - Automatic Cryllic Font detection in BESM6 simulator at runtime rather than build time.  More relevant for distribution binaries.
-- Build-in command history and tab file name completion previously done by GPL readline now done by BSD licensed library available on all platforms (expecially Windows).
+- Built-in command history and tab file name completion previously done by GPL readline now done by BSD licensed library available on all platforms (especially Windows).
 - Robust register sanity checking for all register definition macros.
 - When building on windows, the windows-build dependency libraries are automatically downloaded even if git is not available.
 - Extended video component version information displayed in SHOW VERSION output.
@@ -86,9 +86,9 @@ All Simulator updates on Open SIMH will be present in this repository, and any c
 - Support for building on systems with the gameoftrees.org (got) source control system.
 - Frontpanel API improvements, document clarifications and bug fixes.
 - Added a SET CLOCK NOCALIBRATE mode.  
-    NOCALIBRATE mode allows all activity of a simulator run to occur with precisely consistent event timing.  In this mode, every clock tick takes precisely the same number of instructions/cycles.  Likewise, the polling activities for MUX or other poll oriented devices occurs after precisely the same number of instructions/cycles executed.  As a consequence of this mode, no effort to align simulated clock ticks (and simulated access to wall clock time) is made.  
+    NOCALIBRATE mode allows all activity of a simulator run to occur with precisely consistent event timing.  In this mode, every clock tick takes precisely the same number of instructions/cycles.  Likewise, the polling activities for MUX or other poll oriented devices occurs after precisely the same number of instructions/cycles executed.  As a consequence of this mode, no effort to align simulated clock ticks (and simulated access to wall clock time) is made.
     
-    This mode will often be useful for running diagnostics which expect a particular relationship between perceived wall clock and instruction times.  It might also be useful for running test scripts which may want to compare output of previous executions to to current execution or to compare execution on arbitrarily different host computers.  
+    This mode will often be useful for running diagnostics which expect a particular relationship between perceived wall clock and instruction times.  It might also be useful for running test scripts which may want to compare output of previous executions to to current execution or to compare execution on arbitrarily different host computers.  It will also be useful when running under a host system debugger which might produce confusing results when various wall clock pause times when stopping at breakpoints.
     
     In NOCALIBRATE mode, the operator gets to specify the pseudo execution rate along with the base wall clock time that access to pseudo wall clock accesses returns.
 - All removable devices get detached on a media unload without regard to data access format (SIMH, VHD or RAW).  
@@ -110,6 +110,7 @@ All Simulator updates on Open SIMH will be present in this repository, and any c
 - Add device support for DL11-C/DL11-D/DL11-E/DLV11-J in addition to the original KL11/DL11-A/DL11-B/DL11-E/DL11-F support.  These new devices have different bus address ranges and can coexist with the original DL devices.  The new devices are DLCJI and DLCJO and are managed identically to the original DLI and DLO devices.
 - All improvements and fixes to the PDP11 simulator from simh Version 3.12-3 release and beyond.
 - MicroVAX I has unsupported devices (TQ, TS, and VH) removed.
+- VAX750, VAX780, VAX8600 and PDP11 support additional Massbus disks on DEVICE RPB.
 
 ### All relevant changes in the simh v3.12-3 release have been merged into this repo
 

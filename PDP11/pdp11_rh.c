@@ -168,6 +168,7 @@ t_stat mba_show_type (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 int32 mba0_inta (void);
 int32 mba1_inta (void);
 int32 mba2_inta (void);
+int32 mba3_inta (void);
 void mba_set_int (uint32 mb);
 void mba_clr_int (uint32 mb);
 void mba_upd_cs1 (uint32 set, uint32 clr, uint32 mb);
@@ -834,6 +835,14 @@ massbus[2].iff = 0;                                     /* clear CSTB INTR */
 return mba2_dib.vec;                                    /* acknowledge */
 }
 
+int32 mba3_inta (void)
+{
+massbus[3].cs1 &= ~CS1_IE;                              /* clear int enable */
+massbus[3].cs3 &= ~CS1_IE;                              /* in both registers */
+massbus[3].iff = 0;                                     /* clear CSTB INTR */
+return mba3_dib.vec;                                    /* acknowledge */
+}
+
 /* Map physical address to Massbus number, offset */
 
 int32 mba_map_pa (int32 pa, int32 *ofs)
@@ -897,13 +906,14 @@ if (((dptr->flags & DEV_DIS) &&     /* Already Disabled     */
     (!(dptr->flags & DEV_DIS) &&    /* Already Enabled      */
      (dibp->ba != MBA_AUTO)))
     return;
-if (dptr->flags & DEV_DIS) {        /* Disabling? */
+if ((dptr->flags & DEV_DIS) ||      /* Disabling OR */
+    (build_dib_tab() != SCPE_OK)) { /* somehow invalid? */
     uint32 mb = dibp->ba;
 
+    dptr->flags |= DEV_DIS;         /*   assure disabled */
     dibp->ba = MBA_AUTO;            /*   Flag unassigned */
     mba_reset (&mba_dev[mb]);       /*   reset prior MBA */
     }
-build_dib_tab();
 if (!(dptr->flags & DEV_DIS))       /* Enabling? */
     mba_reset (&mba_dev[dibp->ba]); /*   reset new MBA */
 }
@@ -963,7 +973,7 @@ for (i = mba_devs = 0; sim_devices[i] != NULL; i++) {
 t_stat build_mbus_tab (DEVICE *dptr, DIB *dibp)
 {
 uint32 idx;
-static const char *mbus_devs[] = {"RP", "TU", "RS", NULL};
+static const char *mbus_devs[] = {"RP", "TU", "RS", "RPB", NULL};
 
 if ((dptr == NULL) || (dibp == NULL))                   /* validate args */
     return SCPE_IERR;
@@ -997,7 +1007,7 @@ const char *const text =
 #if MBA_NUM == 3
 " RH11/RH70/RH70-emulating Massbus adapters (RHA, RHB, RHC)\n"
 #else
-"1RH11/RH70/RH70-emulating Massbus adapters (RHA, RHB, RHC, RHD)\n"
+" RH11/RH70/RH70-emulating Massbus adapters (RHA, RHB, RHC, RHD)\n"
 #endif
 "\n"
 " The RH70/RH11/RH70-emulating Massbus adapters interface Massbus\n"

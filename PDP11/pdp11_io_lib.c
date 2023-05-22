@@ -698,6 +698,8 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
         {012440}, {0224} },                             /* RH11/RH70 - fx CSR, fx VEC */
     { { "RHC" },  1,  1,  0, 0, 
         {012040}, {0204} },                             /* RH11/RH70 - fx CSR, fx VEC */
+    { { "RHD" },  1,  1,  0, 0, 
+        {016300}, {0150} },                             /* RH11/RH70 - fx CSR, fx VEC */
     { { "CLK" },         1,  1,  0, 0, 
         {017546}, {0100} },                             /* KW11L - fx CSR, fx VEC */
     { { "PCLK" },        1,  1,  0, 0, 

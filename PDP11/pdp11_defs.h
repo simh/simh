@@ -642,6 +642,7 @@ typedef struct pdp_dib DIB;
 #define INT_V_NG        27
 #define INT_V_DHRX      28
 #define INT_V_DHTX      29
+#define INT_V_RHD       30
 
 #define INT_V_PIR4      0                               /* BR4 */
 #define INT_V_TTI       1
@@ -735,6 +736,7 @@ typedef struct pdp_dib DIB;
 #define INT_DLCJO       (1u << INT_V_DLCJO)
 #define INT_DHRX        (1u << INT_V_DHRX)
 #define INT_DHTX        (1u << INT_V_DHTX)
+#define INT_RHD         (1u << INT_V_RHD)
 
 #define INT_INTERNAL7   (INT_PIR7)
 #define INT_INTERNAL6   (INT_PIR6 | INT_CLK)
@@ -770,6 +772,7 @@ typedef struct pdp_dib DIB;
 #define IPL_RF          5
 #define IPL_RC          5
 #define IPL_RHC         5
+#define IPL_RHD         5
 #define IPL_DMCRX       5
 #define IPL_DMCTX       5
 #define IPL_KMCA        5
@@ -832,7 +835,7 @@ typedef struct pdp_dib DIB;
 
 /* Massbus definitions */
 
-#define MBA_NUM         3                               /* number of MBA's */
+#define MBA_NUM         4                               /* number of MBA's */
 #define MBA_AUTO        (uint32)0xFFFFFFFF              /* Unassigned MBA */
 #define MBA_RMASK       037                             /* max 32 reg */
 #define MBE_NXD         1                               /* nx drive */
