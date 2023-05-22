@@ -161,7 +161,7 @@ ifneq ($(findstring Windows,${OS}),)
     endif
   endif
 else
-  export GNUMakeVERSION = $(shell ($(MAKE) --version | grep 'GNU Make' | awk '{ print $$3 }'))
+  export GNUMakeVERSION = $(shell ($(MAKE) --version /dev/null 2>&1 | grep 'GNU Make' | awk '{ print $$3 }'))
   ifeq (old,$(shell $(MAKE) --version /dev/null 2>&1 | grep 'GNU Make' | awk '{ if ($$3 < "3.81") {print "old"} }'))
     $(warning *** Warning *** GNU Make Version $(GNUMakeVERSION) is too old to)
     $(warning *** Warning *** fully process this makefile)
@@ -261,10 +261,10 @@ find_exe = $(abspath $(strip $(firstword $(foreach dir,$(strip $(subst :, ,${PAT
 find_lib = $(firstword $(abspath $(strip $(firstword $(foreach dir,$(strip ${LIBPATH}),$(foreach ext,$(strip ${LIBEXT}),$(wildcard $(dir)/lib$(1).$(ext))))))))
 find_include = $(abspath $(strip $(firstword $(foreach dir,$(strip ${INCPATH}),$(wildcard $(dir)/$(1).h)))))
 ifeq (Darwin,$(OSTYPE))
-  ifeq (/usr/local/bin/brew,$(shell which brew 2>/dev/null))
+  ifeq (/usr/local/bin/brew,$(call find_exe,brew))
     PKG_MGR = HOMEBREW
   else
-    ifeq (/opt/local/bin/port,$(shell which port 2>/dev/null))
+    ifeq (/opt/local/bin/port,$(call find_exe,port))
       PKG_MGR = MACPORTS
     endif
   endif
@@ -327,8 +327,8 @@ else
 endif
 ifeq (${WIN32},)  #*nix Environments (&& cygwin)
   ifeq (${GCC},)
-    ifeq (,$(shell which gcc 2>/dev/null))
-      ifneq (clang,$(findstring clang,$(and $(shell which cc 2>/dev/null),$(shell cc -v /dev/null 2>&1 | grep 'clang'))))
+    ifeq (,$(call find_exe,gcc))
+      ifneq (clang,$(findstring clang,$(and $(call find_exe,cc),$(shell cc -v /dev/null 2>&1 | grep 'clang'))))
         $(info *** Warning *** Using local cc since gcc isn't available locally.)
         $(info *** Warning *** You may need to install gcc to build working simulators.)
       endif
@@ -350,7 +350,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
     OSNAME = windows-build
   endif
   ifeq (Darwin,$(OSTYPE))
-    ifeq (,$(shell which port 2>/dev/null)$(shell which brew 2>/dev/null))
+    ifeq (,$(call find_exe,port)$(call find_exe,brew))
       $(info *** Info *** simh dependent packages on macOS must be provided by either the)
       $(info *** Info *** HomeBrew package system or by the MacPorts package system.)
       $(info *** Info *** Neither of these seem to be installed on the local system.)
@@ -418,13 +418,13 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
   endif
   ifeq (git-repo,$(shell if ${TEST} -e ./.git; then echo git-repo; fi))
     GIT_REPO=1
-    GIT_PATH=$(strip $(shell which git))
+    GIT_PATH=$(strip $(call find_exe,git))
     ifeq (,$(GIT_PATH))
       $(error building using a git repository, but git is not available)
     endif
   endif
   ifeq (got-repo,$(shell if ${TEST} -e ./.got; then echo got-repo; fi))
-    GIT_PATH=$(strip $(shell which git))
+    GIT_PATH=$(strip $(call find_exe,git))
     ifeq (,$(GIT_PATH))
       $(error building using a got repository, but git is not available)
     endif
@@ -736,8 +736,8 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
   endif
   # The recursive logic needs a GNU make at least v4 when building with 
   # separate compiles
-  ifneq (,$(shell which gmake 2>/dev/null))
-    override MAKE = $(shell which gmake 2>/dev/null)
+  ifneq (,$(call find_exe,gmake))
+    override MAKE = $(call find_exe,gmake)
   endif
   ifneq (,$(and $(findstring 3.,$(GNUMakeVERSION)),$(BUILD_SEPARATE)))
     NEEDED_PKGS += DPKG_GMAKE
@@ -849,7 +849,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
     endif
     ifneq (,$(call find_include,SDL2/SDL))
       ifneq (,$(call find_lib,SDL2))
-        ifneq (,$(shell which sdl2-config))
+        ifneq (,$(call find_exe,sdl2-config))
           SDLX_CONFIG = sdl2-config
         endif
         ifneq (,$(SDLX_CONFIG))
@@ -1372,7 +1372,8 @@ ifneq (,$(and $(findstring APT,$(PKG_MGR)),$(USEFUL_PACKAGES)))
   endif
 endif
 ifneq (,$(and $(findstring YUM,$(PKG_MGR)),$(USEFUL_PACKAGES)))
-  ifeq (,$(shell $(SHELL) -c 'read -p "[Enter Y or N, Default is Y] " answer; echo $$answer' | grep -i n))
+  ANSWER = $(shell $(SHELL) -c 'read -p "[Enter Y or N, Default is Y] " answer; echo $$answer' | grep -i n)
+  ifneq (n,$(ANSWER))
     $(info Enter:    $$ sudo yum install $(USEFUL_PACKAGES))
     $(info when that completes)
     $(info re-enter: $$ $(MAKE) $(MAKECMDGOALS) $(EXTRAS))
@@ -1544,8 +1545,8 @@ SCSI = ${SIMHD}/sim_scsi.c
 BIN = BIN/
 # The recursive logic needs a GNU make at least v4 when building with 
 # separate compiles
-ifneq (,$(shell which gmake 2>/dev/null))
-  override MAKE = $(shell which gmake 2>/dev/null)
+ifneq (,$(call find_exe,gmake))
+  override MAKE = $(call find_exe,gmake)
 endif
 ifneq (,$(and $(findstring 3.,$(GNUMakeVERSION)),$(BUILD_SEPARATE)))
   ifeq (HOMEBREW,$(PKG_MGR))
@@ -1554,7 +1555,7 @@ ifneq (,$(and $(findstring 3.,$(GNUMakeVERSION)),$(BUILD_SEPARATE)))
     $(info *** Installing the latest GNU make using HomeBrew...)
     BREW_RESULT = $(shell brew install make 1>&2)
     $(info $(BREW_RESULT))
-    override MAKE = $(shell which gmake 2>/dev/null)
+    override MAKE = $(call find_exe,gmake)
   else
     $(info makefile:error *** You can't build with separate compiles using version $(GNUMakeVERSION))
     $(error of GNU make.  A GNU make version 4 or later is required.)
@@ -2900,7 +2901,7 @@ else # end of primary make recipies
   override DEPS := $(filter %.c,$(DEPS))  # only worry about building C source modules
 
   ifeq (,$(OPTS))
-    $(error *** ERROR ***  Missing build options.)
+    $(error ERROR ***  Missing build options.)
   endif
 
   ifeq (1,$(QUIET))
@@ -2945,7 +2946,7 @@ else # end of primary make recipies
   OBJS = $(addsuffix .o,$(addprefix $(BLDDIR)/,$(basename $(notdir $(DEPS)))))
   $(shell $(MKDIR) $(call pathfix,$(BLDDIR)))
   ifeq (,$(findstring 3.,$(GNUMakeVERSION)))
-  define NEWLINE
+    define NEWLINE
 $(empty)
 $(empty)
 endef
