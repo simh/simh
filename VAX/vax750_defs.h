@@ -79,10 +79,11 @@
 
 #define NEXUS_NUM       16                              /* number of nexus */
 #define MCTL_NUM        2                               /* number of mem ctrl */
-#define MBA_NUM         2                               /* number of MBA's */
+#define MBA_NUM         3                               /* number of MBA's */
 #define TR_MCTL         0                               /* nexus assignments */
 #define TR_MBA0         4
 #define TR_MBA1         5
+#define TR_MBA2         6
 #define TR_UBA          8
 #define TR_CI           15
 #define NEXUS_HLVL      (IPL_HMAX - IPL_HMIN + 1)
@@ -99,6 +100,7 @@
 #define IPL_UBA         (0x15 - IPL_HMIN)
 #define IPL_MBA0        (0x15 - IPL_HMIN)
 #define IPL_MBA1        (0x15 - IPL_HMIN)
+#define IPL_MBA2        (0x15 - IPL_HMIN)
 #define IPL_CI          (0x15 - IPL_HMIN)
 
 /* Nexus interrupt macros */

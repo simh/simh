@@ -585,6 +585,10 @@ static struct boot_dev boot_tab[] = {
     { "RP",  "DB",  "ka750_new.bin", BOOT_B, 0,        0        },  /* DBAn */
     { "RP",  "DRA", "ka750_new.bin", BOOT_B, BOOT_MB,  0        },  /* DRAn */
     { "RP",  "DR",  "ka750_new.bin", BOOT_B, 0,        0        },  /* DRAn */
+    { "RPB", "DBB", "ka750_new.bin", BOOT_B, BOOT_MB,  0        },  /* DBAn */
+    { "RPB", "DBB", "ka750_new.bin", BOOT_B, 0,        0        },  /* DBAn */
+    { "RPB", "DRB", "ka750_new.bin", BOOT_B, BOOT_MB,  0        },  /* DRAn */
+    { "RPB", "DRB", "ka750_new.bin", BOOT_B, 0,        0        },  /* DRAn */
     { "HK",  "DMA", "ka750_old.bin", BOOT_B, BOOT_HK,  0        },  /* DMAn */
     { "HK",  "DM",  "ka750_old.bin", BOOT_B, 0,        0        },  /* DMAn */
     { "RL",  "DLA", "ka750_old.bin", BOOT_C, BOOT_RL,  0        },  /* DLAn */

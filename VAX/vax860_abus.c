@@ -93,6 +93,7 @@ char cpu_boot_cmd[CBUFSIZE]  = { 0 };                   /* boot command */
 
 static struct boot_dev boot_tab[] = {
     { "RP", BOOT_MB, 0 },
+    { "RPB", BOOT_MB, 0 },
     { "HK", BOOT_HK, 0 },
     { "RL", BOOT_RL, 0 },
     { "RQ", BOOT_UDA, 1 << 24 },

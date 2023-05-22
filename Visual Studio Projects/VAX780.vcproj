@@ -247,6 +247,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\PDP11\pdp11_rpb.c"
+				>
+			</File>
+			<File
 				RelativePath="..\PDP11\pdp11_rq.c"
 				>
 			</File>
