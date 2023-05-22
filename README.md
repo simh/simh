@@ -646,7 +646,7 @@ Ubuntu/Debian:
 
 Fedora/RedHat:
 
-    # yum install gcc libpcap-devel libpcre3-dev libedit-devel SDL2-devel libpng-devel zlib-devel SDL2_ttf-devel
+    # yum install gcc libpcap-devel pcre-devel libedit-devel SDL2-devel libpng-devel zlib-devel SDL2_ttf-devel
 
 ###### NetBSD - Dependencies
 
