@@ -263,7 +263,6 @@
 				RelativePath="..\AltairZ80\ibc_smd_hdc.c"
 				>
 			</File>
-
 			<File
 				RelativePath="..\AltairZ80\insnsd.c"
 				>
@@ -409,10 +408,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\AltairZ80\sol20.c"
-				>
-			</File>
-			<File
 				RelativePath="..\scp.c"
 				>
 			</File>
@@ -462,6 +457,10 @@
 			</File>
 			<File
 				RelativePath="..\AltairZ80\m68k\softfloat\softfloat.c"
+				>
+			</File>
+			<File
+				RelativePath="..\AltairZ80\sol20.c"
 				>
 			</File>
 			<File
