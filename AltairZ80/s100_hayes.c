@@ -32,8 +32,6 @@
    additional information.
 */
 
-#include <stdio.h>
-
 #include "altairz80_defs.h"
 #include "sim_tmxr.h"
 
@@ -499,7 +497,7 @@ static t_stat hayes_config_line(UNIT *uptr)
     }
 
     /*
-    ** AltairZ80 and TMXR refuse to want to play together 
+    ** AltairZ80 and TMXR refuse to want to play together
     ** nicely when the CLOCK register is set to anything
     ** other than 0.
     **

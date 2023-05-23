@@ -1396,15 +1396,15 @@ static t_stat sol20_reset(DEVICE *dptr)
             if ((vdm1 = find_dev("VDM1")) != NULL) {
                 set_dev_enbdis(vdm1, NULL, 1, NULL);
             }
-#else
-            sim_messagef(SCPE_NOFNC, "%s device requires VDM1 video support.\n", SOL20_SNAME);
-            return SCPE_NOFNC;
-#endif
 
             set_dev_enbdis(&sol20k_dev, NULL, 1, NULL);
             set_dev_enbdis(&sol20t_dev, NULL, 1, NULL);
             set_dev_enbdis(&sol20s_dev, NULL, 1, NULL);
             set_dev_enbdis(&sol20p_dev, NULL, 1, NULL);
+#else
+            sim_messagef(SCPE_NOFNC, "%s device requires VDM1 video support.\n", SOL20_SNAME);
+            return SCPE_NOFNC;
+#endif
         }
 
         if (sim_map_resource(sol20_ctx.rom_base, sol20_ctx.rom_size, RESOURCE_TYPE_MEMORY, &sol20rom, "sol20rom", FALSE) != 0) {
@@ -1562,7 +1562,7 @@ static t_stat sol20_svc(UNIT *uptr)
 
     sim_activate_after_abs(uptr, uptr->wait);  /* reactivate timer */
 
-    return SCPE_OK;
+    return r;
 }
 
 /*

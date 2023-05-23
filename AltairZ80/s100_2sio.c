@@ -87,8 +87,6 @@
    * = Active Low
 */
 
-#include <stdio.h>
-
 #include "altairz80_defs.h"
 #include "sim_tmxr.h"
 

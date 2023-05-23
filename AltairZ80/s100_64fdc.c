@@ -40,7 +40,6 @@
 /*#define DBG_MSG */
 
 #include "altairz80_defs.h"
-#include "sim_defs.h"   /* simulator definitions */
 #include "wd179x.h"
 
 #ifdef DBG_MSG

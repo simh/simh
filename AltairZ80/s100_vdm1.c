@@ -402,15 +402,10 @@ static t_stat vdm1_boot(int32 unitno, DEVICE *dptr)
 }
 
 static int32 vdm1_io(const int32 port, const int32 io, const int32 data) {
-    int32 result = 0xff;
-
-    if (io == 1) { /* OUT */
-        if (port == VDM1_DSTAT) {
-            vdm1_dstat = data & 0xff;
-        }
+    if ((io == 1) && (port == VDM1_DSTAT)) {
+        vdm1_dstat = data & 0xff;
     }
-
-    return result;
+    return 0xff;
 }
 
 /*

@@ -28,7 +28,6 @@
 */
 
 #include "m68k/m68k.h"
-#include <ctype.h>
 
 #define SWITCHCPU_DEFAULT 0xfd
 
@@ -2110,7 +2109,7 @@ void PutByteDMA(const uint32 Addr, const uint32 Value) {
 #define INOUTFLAGS_NONZERO(x)                                           \
     INOUTFLAGS((HIGH_REGISTER(BC) & 0xa8) | ((HIGH_REGISTER(BC) == 0) << 6), x)
 
-int32 switch_cpu_now = TRUE; /* hharte */
+int32 switch_cpu_now = TRUE;
 
 t_stat sim_instr (void) {
     t_stat result;
@@ -3747,7 +3746,7 @@ static t_stat sim_instr_mmu (void) {
                         break;
                     }
                 }
-                
+
                 INCR(1);
                 adr = HL;
                 switch ((op = GetBYTE(PC)) & 7) {
@@ -4878,7 +4877,7 @@ static t_stat sim_instr_mmu (void) {
                         break;
                     }
                 }
-                
+
                 INCR(1);
                 switch (RAM_PP(PC)) {
 
@@ -5593,7 +5592,7 @@ static t_stat sim_instr_mmu (void) {
                         break;
                     }
                 }
-                
+
                 INCR(1);
                 switch (RAM_PP(PC)) {
 
@@ -6520,6 +6519,7 @@ static t_stat cpu_ex(t_value *vptr, t_addr addr, UNIT *uptr, int32 sw) {
             break;
 
         default:
+            *vptr = 0; // make clear to static checking that a value is assigned in all cases
             return SCPE_AFAIL;
             break;
     }
@@ -6914,14 +6914,14 @@ static int32 switchcpu_io(const int32 port, const int32 io, CONST int32 data) {
                     sim_printf("CPU: " ADDRESS_FORMAT " SWITCH(port=%02x) to 8086\n", PCX, port);
                 }
                 new_chiptype = CHIP_TYPE_8086;
-                switch_cpu_now = FALSE; /* hharte */
+                switch_cpu_now = FALSE;
                 break;
             case CHIP_TYPE_8086:
                 if (cpu_unit.flags & UNIT_CPU_VERBOSE) {
                     sim_printf("CPU: " ADDRESS_FORMAT " SWITCH(port=%02x) to 8085/Z80\n", PCX, port);
                 }
                 new_chiptype = CHIP_TYPE_Z80;
-                switch_cpu_now = FALSE; /* hharte */
+                switch_cpu_now = FALSE;
                 break;
             default:
                 sim_printf("%s: invalid chiptype: %d\n", __FUNCTION__, chiptype);
@@ -7087,8 +7087,8 @@ static t_stat m68k_set_chiptype(UNIT* uptr, int32 value, CONST char* cptr, void*
 }
 
 static t_stat cpu_set_hist(UNIT *uptr, int32 val, CONST char *cptr, void *desc) {
-   uint32 i, lnt;
-   t_stat r;
+    uint32 i, lnt;
+    t_stat r;
 
     if ((chiptype >= 0) && (chiptype != CHIP_TYPE_8080) && (chiptype != CHIP_TYPE_Z80)) {
         sim_printf("History not supported for chiptype: %s\n",
@@ -7425,12 +7425,11 @@ void cpu_raise_interrupt(uint32 irq) {
 static t_addr disp_addr = 0;
 
 static t_stat cpu_cmd_memory(int32 flag, const char *cptr) {
-    const char *result;
     char abuf[16];
     t_addr lo, hi, last;
     t_value byte;
 
-    if ((result = get_range(NULL, cptr, &lo, &hi, 16, MEMORYMASK, 0)) == NULL) {
+    if (get_range(NULL, cptr, &lo, &hi, 16, MEMORYMASK, 0) == NULL) {
         lo = hi = disp_addr;
     }
     else {

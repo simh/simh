@@ -236,15 +236,15 @@ static const char *const g_cc[16] =
 {"t", "f", "hi", "ls", "cc", "cs", "ne", "eq", "vc", "vs", "pl", "mi", "ge", "lt", "gt", "le"};
 
 static const char *const g_cpcc[64] =
-{/* 000    001    010    011    100    101    110    111 */
-      "f",  "eq", "ogt", "oge", "olt", "ole", "ogl",  "or", /* 000 */
-     "un", "ueq", "ugt", "uge", "ult", "ule",  "ne",   "t", /* 001 */
+{/*   000    001    010    011    100    101    110    111 */
+      "f",  "eq", "ogt", "oge", "olt", "ole", "ogl",  "or",  /* 000 */
+     "un", "ueq", "ugt", "uge", "ult", "ule",  "ne",   "t",  /* 001 */
      "sf", "seq",  "gt",  "ge",  "lt",  "le",  "gl",  "gle", /* 010 */
-  "ngle", "ngl", "nle", "nlt", "nge", "ngt", "sne",  "st", /* 011 */
-      "?",   "?",   "?",   "?",   "?",   "?",   "?",   "?", /* 100 */
-      "?",   "?",   "?",   "?",   "?",   "?",   "?",   "?", /* 101 */
-      "?",   "?",   "?",   "?",   "?",   "?",   "?",   "?", /* 110 */
-      "?",   "?",   "?",   "?",   "?",   "?",   "?",   "?"  /* 111 */
+   "ngle", "ngl", "nle", "nlt", "nge", "ngt", "sne",  "st",  /* 011 */
+      "?",   "?",   "?",   "?",   "?",   "?",   "?",   "?",  /* 100 */
+      "?",   "?",   "?",   "?",   "?",   "?",   "?",   "?",  /* 101 */
+      "?",   "?",   "?",   "?",   "?",   "?",   "?",   "?",  /* 110 */
+      "?",   "?",   "?",   "?",   "?",   "?",   "?",   "?"   /* 111 */
 };
 
 static const char *const g_mmuregs[8] =
@@ -404,7 +404,7 @@ static char* make_signed_hex_str_32(uint val)
 /* make string of immediate value */
 static char* get_imm_str_s(uint size)
 {
-    static char str[15];
+    static char str[25];
     if(size == 0)
         sprintf(str, "#%s", make_signed_hex_str_8(read_imm_8()));
     else if(size == 1)
@@ -1840,7 +1840,7 @@ static void d68040_fpu(void)
 
         case 0x5:   // control to ea
         {
-            
+
             strcpy(g_dasm_str, "fmovem.l   ");
             if (w2 & 0x1000) strcat(g_dasm_str, "fpcr");
             if (w2 & 0x0800) strcat(g_dasm_str, "/fpsr");

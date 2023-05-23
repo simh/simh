@@ -30,7 +30,6 @@
 */
 
 #include "m68k/m68k.h"
-#include <ctype.h>
 
 #define SIM_EMAX 6
 
@@ -574,7 +573,7 @@ t_stat fprint_sym(FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw) {
 
         default:
             return SCPE_IERR;
-            
+
     }
     fprintf(of, "%s", disasm_result);
     return 1 - r;

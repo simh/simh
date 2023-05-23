@@ -40,7 +40,6 @@
  *************************************************************************/
 
 #include "altairz80_defs.h"
-#include "sim_defs.h"   /* simulator definitions */
 #include "wd179x.h"
 
 #define DEV_NAME    "ADCS6"

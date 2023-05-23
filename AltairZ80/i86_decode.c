@@ -189,7 +189,7 @@ static uint32 getFullPC(void) {
     return cpu8086.R_IP + (cpu8086.R_CS << 4);
 }
 
-extern int32 switch_cpu_now; /* hharte */
+extern int32 switch_cpu_now;
 
 t_stat sim_instr_8086(void) {
     t_stat reason = SCPE_OK;
@@ -198,7 +198,7 @@ t_stat sim_instr_8086(void) {
     setCPURegisters();
     intr = 0;
     newIP = PCX_S - 16 * CS_S;
-    switch_cpu_now = TRUE; /* hharte */
+    switch_cpu_now = TRUE;
     if ((0 <= newIP) && (newIP <= 0xffff))
         cpu8086.R_IP = newIP;
     else {
