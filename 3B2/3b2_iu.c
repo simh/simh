@@ -233,7 +233,8 @@ MTAB contty_mod[] = {
     { MTAB_XTD|MTAB_VDV|MTAB_NMO, 1, "CONNECTIONS", NULL,
       NULL, &tmxr_show_cstat, (void *)&contty_desc, "Display current connection" },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "STATISTICS", NULL,
-      NULL, &tmxr_show_cstat, (void *)&contty_desc, "Display CONTTY statistics" }
+      NULL, &tmxr_show_cstat, (void *)&contty_desc, "Display CONTTY statistics" },
+    { 0 }
 };
 
 CONST char *brg_rates[IU_SPEED_REGS][IU_SPEEDS] = {
@@ -276,7 +277,8 @@ DEVICE contty_dev = {
 
 MTAB iu_timer_mod[] = {
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "MULT", "MULT={1|2|3|4}",
-      &iu_timer_set_mult, &iu_timer_show_mult, NULL, "Timer Multiplier" }
+      &iu_timer_set_mult, &iu_timer_show_mult, NULL, "Timer Multiplier" },
+    { 0 }
 };
 
 REG iu_timer_reg[] = {
