@@ -13593,8 +13593,6 @@ else {
     ep->match = match_buf;
     ep->size = match_size;
     }
-ep->match_pattern = (char *)malloc (strlen (match) + 1);
-strcpy (ep->match_pattern, match);
 if (ep->act) {                                          /* replace old action? */
     free (ep->act);                                     /* deallocate */
     ep->act = NULL;                                     /* now no action */
