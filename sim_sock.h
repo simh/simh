@@ -138,6 +138,8 @@ int sim_addr_acl_check (const char *validate_addr, const char *acl);
 #define SIM_SOCK_OPT_DATAGRAM       0x0002
 #define SIM_SOCK_OPT_NODELAY        0x0004
 #define SIM_SOCK_OPT_BLOCKING       0x0008
+#define SIM_SOCK_OPT_SET_BACKLOG(N) ((N) << 16)
+#define SIM_SOCK_OPT_BACKLOG(opts)  ((((opts) >> 16) == 0) ? 1 : ((opts) >> 16))
 SOCKET sim_master_sock_ex (const char *hostport, int *parse_status, int opt_flags);
 #define sim_master_sock(hostport, parse_status) sim_master_sock_ex(hostport, parse_status, ((sim_switches & SWMASK ('U')) ? SIM_SOCK_OPT_REUSEADDR : 0))
 SOCKET sim_connect_sock_ex (const char *sourcehostport, const char *hostport, const char *default_host, const char *default_port, int opt_flags);

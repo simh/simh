@@ -1045,7 +1045,7 @@ if (!(opt_flags & SIM_SOCK_OPT_BLOCKING)) {
     if (sta == SOCKET_ERROR)                            /* fcntl error? */
         return sim_err_sock (newsock, "setnonblock");
     }
-sta = listen (newsock, 1);                              /* listen on socket */
+sta = listen (newsock, SIM_SOCK_OPT_BACKLOG(opt_flags));/* listen on socket */
 if (sta == SOCKET_ERROR)                                /* listen error? */
     return sim_err_sock (newsock, "listen");
 return newsock;                                         /* got it! */
@@ -1329,8 +1329,10 @@ int sim_read_sock (SOCKET sock, char *buf, int nbytes)
 int rbytes, err;
 
 rbytes = recv (sock, buf, nbytes, 0);
-if (rbytes == 0)                                        /* disconnect */
+if (rbytes == 0) {                                       /* disconnect */
+    err = WSAGetLastError ();
     return -1;
+    }
 if (rbytes == SOCKET_ERROR) {
     err = WSAGetLastError ();
     if (err == WSAEWOULDBLOCK)                          /* no data */
