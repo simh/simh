@@ -1097,7 +1097,7 @@ do {
         sim_os_clock_resoluton_ms = clock_diff;
     clock_last = clock_now;
     } while (clock_now < clock_start + 100);
-if (((sim_idle_rate_ms != 0) && (sim_os_clock_resoluton_ms != 0)) || (sim_idle_rate_ms < sim_os_clock_resoluton_ms))
+if ((sim_os_clock_resoluton_ms != 0) && (sim_idle_rate_ms >= sim_os_clock_resoluton_ms))
     sim_os_tick_hz = 1000/(sim_os_clock_resoluton_ms * (sim_idle_rate_ms/sim_os_clock_resoluton_ms));
 else {
     fprintf (stderr, "Can't properly determine host system clock capabilities.\n");
