@@ -1,6 +1,6 @@
 /* pdp11_fp.c: PDP-11 floating point simulator (32b version)
 
-   Copyright (c) 1993-2018, Robert M Supnik
+   Copyright (c) 1993-2023, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,8 +23,10 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   05-Jun-23    RMS     Fixed bug in FIS dirty zero check ("Joonio")
    10-Dec-22    RMS     Fixed bug in FUIV operation (James Fehlinger)
    21-Aug-22    RMS     Restored MMR1 operation for 11/44, 11/45-70 (Walter Mueller)
+   28-May-18    RMS     Fixed FPCHG macro to avoid undefined operation (Mark Pizzolato)
    24-Mar-15    RMS     MMR1 does not track register changes (Johnny Billquist)
    20-Apr-13    RMS     MMR1 does not track PC changes (Johnny Billquist)
    22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
@@ -924,7 +926,7 @@ return;
 
 t_stat fis11 (int32 IR)
 {
-    int32 reg, exta, pa, pa2;
+int32 reg, exta, pa, pa2;
 fpac_t fac, fsrc;
 
 reg = IR & 07;                                          /* isolate reg */
@@ -952,7 +954,7 @@ pa2 = last_pa;
 fac.l = 0;
 if (GET_SIGN (fsrc.h) && (GET_EXP (fsrc.h) == 0))       /* clean 0's */
     fsrc.h = fsrc.l = 0;
-if (GET_SIGN (fac.h) && (GET_EXP (fac.l) == 0))
+if (GET_SIGN (fac.h) && (GET_EXP (fac.h) == 0))
     fac.h = fac.l = 0;
 
 N = Z = V = C = 0;                                      /* clear cc's */
