@@ -270,7 +270,11 @@ ifeq (Darwin,$(OSTYPE))
   endif
 endif
 ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,apt-get)))
-  PKG_MGR = APT
+  ifneq (Android,$(shell uname -o))
+    PKG_MGR = APT
+  else
+    PKG_MGR = TERMUX
+  endif
 endif
 ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,yum)))
   PKG_MGR = YUM
@@ -304,6 +308,7 @@ ifneq (3,${SIM_MAJOR})
   PKGS_SRC_PKGSRC     = -        -             -              pcre         editline      SDL2        png          zlib       SDL2_ttf        gmake
   PKGS_SRC_PKGBSD     = -        -             -              pcre         libedit       sdl2        png          -          sdl2_ttf        gmake
   PKGS_SRC_PKGADD     = -        -             -              pcre         -             sdl2        png          -          sdl2-ttf        gmake
+  PKGS_SRC_TERMUX     = -        libpcap       -              -            -             sdl2        -            -          -               -
   ifneq (0,$(TESTS))
     ifneq (,${TEST_ARG})
       export TEST_ARG
@@ -525,7 +530,12 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
     else
       ifeq (Linux,$(OSTYPE))
         ifeq (Android,$(shell uname -o))
-          OS_CCDEFS += -D__ANDROID_API__=$(shell getprop ro.build.version.sdk) -DSIM_BUILD_OS=" On Android Version $(shell getprop ro.build.version.release)"
+          ANDROID_API=$(shell getprop ro.build.version.sdk)
+          ANDROID_VERSION=$(shell getprop ro.build.version.release)
+          OS_CCDEFS += -DSIM_BUILD_OS=" On Android Version $(ANDROID_VERSION) sdk=$(ANDROID_API)"
+          ifeq (,$(shell clang sim_BuildROMs.c -o /dev/null -D__ANDROID_API__=$(ANDROID_API) 2>&1))
+            OS_CCDEFS += -D__ANDROID_API__=$(ANDROID_API)
+          endif
         endif
         ifneq (lib,$(findstring lib,$(UNSUPPORTED_BUILD)))
           ifeq (Android,$(shell uname -o))
@@ -1366,6 +1376,14 @@ endif
 ifneq (,$(and $(findstring APT,$(PKG_MGR)),$(USEFUL_PACKAGES)))
   ifeq (,$(shell $(SHELL) -c 'read -p "[Enter Y or N, Default is Y] " answer; echo $$answer' | grep -i n))
     $(info Enter:    $$ sudo apt-get install $(USEFUL_PACKAGES))
+    $(info when that completes)
+    $(info re-enter: $$ $(MAKE) $(MAKECMDGOALS) $(EXTRAS))
+    $(error )
+  endif
+endif
+ifneq (,$(and $(findstring TERMUX,$(PKG_MGR)),$(USEFUL_PACKAGES)))
+  ifeq (,$(shell $(SHELL) -c 'read -p "[Enter Y or N, Default is Y] " answer; echo $$answer' | grep -i n))
+    $(info Enter:    $$ sudo pkg install $(USEFUL_PACKAGES))
     $(info when that completes)
     $(info re-enter: $$ $(MAKE) $(MAKECMDGOALS) $(EXTRAS))
     $(error )
