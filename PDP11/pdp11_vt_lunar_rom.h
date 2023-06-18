@@ -1,27 +1,23 @@
 #ifndef ROM_lunar_lda_H
 #define ROM_lunar_lda_H 0
 /*
-   PDP11/pdp11_vt_lunar_rom.h         produced at Fri Nov 11 12:38:32 2022
-   from PDP11/lunar11/lunar.lda which was last modified at Wed Oct 19 15:16:01 2022
+   PDP11/pdp11_vt_lunar_rom.h         produced at Sat Jun 17 18:17:48 2023
+   from PDP11/lunar11/lunar.lda which was last modified at Sat Apr 29 15:56:36 2023
    file size: 13824 (0x3600) - checksum: 0xFFF15D00
    This file is a generated file and should NOT be edited or changed by hand.
 */
-#undef BOOT_CODE_SIZE
+#if !defined(BOOT_CODE_SIZE)
 #define BOOT_CODE_SIZE 0x3600
-#undef BOOT_CODE_CHECKSUM
 #define BOOT_CODE_CHECKSUM 0xFFF15D00
-#undef BOOT_CODE_FILENAME
 #define BOOT_CODE_FILENAME "lunar.lda"
-#undef BOOT_CODE_FILEPATH
 #define BOOT_CODE_FILEPATH "PDP11/lunar11/lunar.lda"
-#undef BOOT_CODE_ARRAY
 #if defined(DONT_USE_INTERNAL_ROM)
 #define BOOT_CODE_ARRAY NULL
 #else
 #define BOOT_CODE_ARRAY lunar_lda
 #endif
 #define BOOT_CODE_URL NULL
-#if !defined(BOOT_CODE_SIZE_1)
+#elif !defined(BOOT_CODE_SIZE_1)
 #define BOOT_CODE_SIZE_1 0x3600
 #define BOOT_CODE_CHECKSUM_1 0xFFF15D00
 #define BOOT_CODE_FILENAME_1 "lunar.lda"

@@ -1,27 +1,23 @@
 #ifndef ROM_swtp_swtbugv10_bin_H
 #define ROM_swtp_swtbugv10_bin_H 0
 /*
-   swtp6800/swtp6800/swtp_swtbugv10_bin.h         produced at Fri Nov 11 12:38:32 2022
-   from swtp6800/swtp6800/swtbugv10.bin which was last modified at Wed Oct 19 15:16:02 2022
+   swtp6800/swtp6800/swtp_swtbugv10_bin.h         produced at Sat Jun 17 18:17:48 2023
+   from swtp6800/swtp6800/swtbugv10.bin which was last modified at Sat Apr 29 15:56:38 2023
    file size: 1024 (0x400) - checksum: 0xFFFE4FBC
    This file is a generated file and should NOT be edited or changed by hand.
 */
-#undef BOOT_CODE_SIZE
+#if !defined(BOOT_CODE_SIZE)
 #define BOOT_CODE_SIZE 0x400
-#undef BOOT_CODE_CHECKSUM
 #define BOOT_CODE_CHECKSUM 0xFFFE4FBC
-#undef BOOT_CODE_FILENAME
 #define BOOT_CODE_FILENAME "swtbugv10.bin"
-#undef BOOT_CODE_FILEPATH
 #define BOOT_CODE_FILEPATH "swtp6800/swtp6800/swtbugv10.bin"
-#undef BOOT_CODE_ARRAY
 #if defined(DONT_USE_INTERNAL_ROM)
 #define BOOT_CODE_ARRAY NULL
 #else
 #define BOOT_CODE_ARRAY swtp_swtbugv10_bin
 #endif
 #define BOOT_CODE_URL NULL
-#if !defined(BOOT_CODE_SIZE_1)
+#elif !defined(BOOT_CODE_SIZE_1)
 #define BOOT_CODE_SIZE_1 0x400
 #define BOOT_CODE_CHECKSUM_1 0xFFFE4FBC
 #define BOOT_CODE_FILENAME_1 "swtbugv10.bin"

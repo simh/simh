@@ -1,27 +1,23 @@
 #ifndef ROM_vax_ka655x_bin_H
 #define ROM_vax_ka655x_bin_H 0
 /*
-   VAX/vax_ka655x_bin.h         produced at Fri Nov 11 12:38:31 2022
-   from VAX/ka655x.bin which was last modified at Fri Nov 04 10:00:46 2022
+   VAX/vax_ka655x_bin.h         produced at Sat Jun 17 18:17:47 2023
+   from VAX/ka655x.bin which was last modified at Fri Dec 30 21:23:28 2022
    file size: 131072 (0x20000) - checksum: 0xFF7673B6
    This file is a generated file and should NOT be edited or changed by hand.
 */
-#undef BOOT_CODE_SIZE
+#if !defined(BOOT_CODE_SIZE)
 #define BOOT_CODE_SIZE 0x20000
-#undef BOOT_CODE_CHECKSUM
 #define BOOT_CODE_CHECKSUM 0xFF7673B6
-#undef BOOT_CODE_FILENAME
 #define BOOT_CODE_FILENAME "ka655x.bin"
-#undef BOOT_CODE_FILEPATH
 #define BOOT_CODE_FILEPATH "VAX/ka655x.bin"
-#undef BOOT_CODE_ARRAY
 #if defined(DONT_USE_INTERNAL_ROM)
 #define BOOT_CODE_ARRAY NULL
 #else
 #define BOOT_CODE_ARRAY vax_ka655x_bin
 #endif
 #define BOOT_CODE_URL NULL
-#if !defined(BOOT_CODE_SIZE_1)
+#elif !defined(BOOT_CODE_SIZE_1)
 #define BOOT_CODE_SIZE_1 0x20000
 #define BOOT_CODE_CHECKSUM_1 0xFF7673B6
 #define BOOT_CODE_FILENAME_1 "ka655x.bin"

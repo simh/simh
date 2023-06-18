@@ -1,27 +1,23 @@
 #ifndef ROM_vax_is1000_bin_H
 #define ROM_vax_is1000_bin_H 0
 /*
-   VAX/vax_is1000_bin.h         produced at Fri Nov 11 12:38:32 2022
-   from VAX/is1000.bin which was last modified at Fri Nov 04 10:00:46 2022
+   VAX/vax_is1000_bin.h         produced at Sat Jun 17 18:14:30 2023
+   from VAX/is1000.bin which was last modified at Sat Apr 29 15:56:37 2023
    file size: 524288 (0x80000) - checksum: 0xFCBCD74A
    This file is a generated file and should NOT be edited or changed by hand.
 */
-#undef BOOT_CODE_SIZE
+#if !defined(BOOT_CODE_SIZE)
 #define BOOT_CODE_SIZE 0x80000
-#undef BOOT_CODE_CHECKSUM
 #define BOOT_CODE_CHECKSUM 0xFCBCD74A
-#undef BOOT_CODE_FILENAME
 #define BOOT_CODE_FILENAME "is1000.bin"
-#undef BOOT_CODE_FILEPATH
 #define BOOT_CODE_FILEPATH "VAX/is1000.bin"
-#undef BOOT_CODE_ARRAY
 #if defined(DONT_USE_INTERNAL_ROM)
 #define BOOT_CODE_ARRAY NULL
 #else
 #define BOOT_CODE_ARRAY vax_is1000_bin
 #endif
 #define BOOT_CODE_URL NULL
-#if !defined(BOOT_CODE_SIZE_1)
+#elif !defined(BOOT_CODE_SIZE_1)
 #define BOOT_CODE_SIZE_1 0x80000
 #define BOOT_CODE_CHECKSUM_1 0xFCBCD74A
 #define BOOT_CODE_FILENAME_1 "is1000.bin"

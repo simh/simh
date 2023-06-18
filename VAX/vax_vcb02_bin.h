@@ -1,27 +1,23 @@
 #ifndef ROM_vax_vcb02_bin_H
 #define ROM_vax_vcb02_bin_H 0
 /*
-   VAX/vax_vcb02_bin.h         produced at Fri Nov 11 12:38:32 2022
-   from VAX/vcb02.bin which was last modified at Fri Nov 04 10:01:07 2022
+   VAX/vax_vcb02_bin.h         produced at Sat Jun 17 18:17:48 2023
+   from VAX/vcb02.bin which was last modified at Sat Apr 29 15:56:37 2023
    file size: 16384 (0x4000) - checksum: 0xFFF1D2AD
    This file is a generated file and should NOT be edited or changed by hand.
 */
-#undef BOOT_CODE_SIZE
+#if !defined(BOOT_CODE_SIZE)
 #define BOOT_CODE_SIZE 0x4000
-#undef BOOT_CODE_CHECKSUM
 #define BOOT_CODE_CHECKSUM 0xFFF1D2AD
-#undef BOOT_CODE_FILENAME
 #define BOOT_CODE_FILENAME "vcb02.bin"
-#undef BOOT_CODE_FILEPATH
 #define BOOT_CODE_FILEPATH "VAX/vcb02.bin"
-#undef BOOT_CODE_ARRAY
 #if defined(DONT_USE_INTERNAL_ROM)
 #define BOOT_CODE_ARRAY NULL
 #else
 #define BOOT_CODE_ARRAY vax_vcb02_bin
 #endif
 #define BOOT_CODE_URL NULL
-#if !defined(BOOT_CODE_SIZE_1)
+#elif !defined(BOOT_CODE_SIZE_1)
 #define BOOT_CODE_SIZE_1 0x4000
 #define BOOT_CODE_CHECKSUM_1 0xFFF1D2AD
 #define BOOT_CODE_FILENAME_1 "vcb02.bin"

@@ -1,30 +1,26 @@
 #ifndef ROM_vax_ka750_bin_old_H
 #define ROM_vax_ka750_bin_old_H 0
 /*
-   VAX/vax_ka750_bin_old.h         produced at Fri Nov 11 12:38:32 2022
-   from VAX/ka750_old.bin which was last modified at Fri Nov 04 10:00:46 2022
+   VAX/vax_ka750_bin_old.h         produced at Sat Jun 17 18:17:48 2023
+   from VAX/ka750_old.bin which was last modified at Sat Apr 29 15:56:37 2023
    file size: 1024 (0x400) - checksum: 0xFFFEBAA5
    This file is a generated file and should NOT be edited or changed by hand.
 
    From ROM set: 990A9, 948A9, 906A9, 905A9 (Boots: A=DD, B=DM, C=DL, D=DU)
 
 */
-#undef BOOT_CODE_SIZE
+#if !defined(BOOT_CODE_SIZE)
 #define BOOT_CODE_SIZE 0x400
-#undef BOOT_CODE_CHECKSUM
 #define BOOT_CODE_CHECKSUM 0xFFFEBAA5
-#undef BOOT_CODE_FILENAME
 #define BOOT_CODE_FILENAME "ka750_old.bin"
-#undef BOOT_CODE_FILEPATH
 #define BOOT_CODE_FILEPATH "VAX/ka750_old.bin"
-#undef BOOT_CODE_ARRAY
 #if defined(DONT_USE_INTERNAL_ROM)
 #define BOOT_CODE_ARRAY NULL
 #else
 #define BOOT_CODE_ARRAY vax_ka750_bin_old
 #endif
 #define BOOT_CODE_URL NULL
-#if !defined(BOOT_CODE_SIZE_1)
+#elif !defined(BOOT_CODE_SIZE_1)
 #define BOOT_CODE_SIZE_1 0x400
 #define BOOT_CODE_CHECKSUM_1 0xFFFEBAA5
 #define BOOT_CODE_FILENAME_1 "ka750_old.bin"
