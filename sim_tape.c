@@ -996,11 +996,11 @@ t_stat sim_tape_detach (UNIT *uptr)
 {
 struct tape_context *ctx;
 uint32 f;
-t_stat r;
 t_bool auto_format = FALSE;
 
 if (uptr == NULL)
     return SCPE_IERR;
+sim_cancel (uptr);
 if (!(uptr->flags & UNIT_ATT))
     return SCPE_UNATT;
 
@@ -1018,13 +1018,7 @@ MT_CLR_INMRK (uptr);                                    /* Not within a TAR tape
 if (MT_GET_FMT (uptr) >= MTUF_F_ANSI) {
     memory_free_tape ((void *)uptr->fileref);
     uptr->fileref = NULL;
-    uptr->flags &= ~UNIT_ATT;
-    r = SCPE_OK;
     }
-else
-    r = detach_unit (uptr);                             /* detach unit */
-if (r != SCPE_OK)
-    return r;
 switch (f) {                                            /* case on format */
 
     case MTUF_F_TPC:                                    /* TPC */
@@ -1046,6 +1040,17 @@ free (ctx->chunk_buf);
 free (uptr->tape_ctx);
 uptr->tape_ctx = NULL;
 uptr->io_flush = NULL;
+uptr->flags = uptr->flags & ~(UNIT_ATT | ((uptr->flags & UNIT_ROABLE) ? UNIT_RO : 0));
+free (uptr->filename);
+uptr->filename = NULL;
+if (uptr->fileref) {                        /* Only close open file */
+    if (fclose (uptr->fileref) == EOF) {
+        uptr->fileref = NULL;
+        return SCPE_IOERR;
+        }
+    uptr->fileref = NULL;
+    }
+uptr->dynflags &= ~UNIT_NO_FIO;
 if (auto_format)    /* format was determined or specified at attach time? */
     sim_tape_set_fmt (uptr, 0, "SIMH", NULL);   /* restore default format */
 return SCPE_OK;
