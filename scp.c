@@ -2862,6 +2862,45 @@ return 0;
 }
 #endif
 
+
+static FILE *fopen_tempfile (char **tmpname)
+{
+#ifdef _WIN32
+FILE *tmp = NULL;
+
+do {
+    int fd;
+    *tmpname = _tempnam (NULL, "simh");
+    fd = _open (*tmpname, _O_CREAT | _O_RDWR | _O_EXCL, _S_IREAD | _S_IWRITE);
+    if (fd != -1) {
+        tmp = _fdopen (fd, "w+");
+        break;
+        }
+    } while (1);
+#else
+FILE *tmp = tmpfile();
+
+*tmpname = NULL;
+#endif
+
+if (tmp == NULL) {
+    fprintf (stderr, "Unable to create temporary file: %s\n", strerror (errno));
+    free (*tmpname);
+    }
+return tmp;
+}
+
+static void fclose_tempfile (FILE *file, char **tmpname)
+{
+if (file != NULL)
+    fclose (file);
+#if defined _WIN32
+unlink (*tmpname);
+free (*tmpname);
+*tmpname = NULL;
+#endif
+}
+
 t_stat process_stdin_commands (t_stat stat, char *argv[], t_bool do_called);
 
 /* Main command loop */
@@ -9987,7 +10026,6 @@ if (sim_dfunit == NULL)                                 /* got a unit? */
     return SCPE_NXUN;
 cptr = get_glyph (cptr, gbuf, 0);                       /* get list */
 if ((flag == EX_D) && (*cptr == 0))                     /* deposit needs more */
-
     return SCPE_2FARG;
 ofile = sim_ofile? sim_ofile: stdout;                   /* no ofile? use stdout */
 
@@ -15200,22 +15238,8 @@ static void displayMagicTopic (FILE *st, DEVICE *dptr, TOPIC *topic)
 {
 char tbuf[CBUFSIZE];
 size_t i, skiplines = 0;
-#ifdef _WIN32
-FILE *tmp;
 char *tmpnam;
-
-do {
-    int fd;
-    tmpnam = _tempnam (NULL, "simh");
-    fd = _open (tmpnam, _O_CREAT | _O_RDWR | _O_EXCL, _S_IREAD | _S_IWRITE);
-    if (fd != -1) {
-        tmp = _fdopen (fd, "w+");
-        break;
-        }
-    } while (1);
-#else
-FILE *tmp = tmpfile();
-#endif
+FILE *tmp = fopen_tempfile (&tmpnam);
 
 if (!tmp) {
     fprintf (st, "Unable to create temporary file: %s\n", strerror (errno));
@@ -15255,11 +15279,7 @@ while (fgets (tbuf, sizeof (tbuf), tmp)) {
         fputs ("    ", st);
     fputs (tbuf, st);
     }
-fclose (tmp);
-#ifdef _WIN32
-remove (tmpnam);
-free (tmpnam);
-#endif
+fclose_tempfile (tmp, &tmpnam);
 }
 /* Flatten and display help for those who say they prefer it.
  */
