@@ -66,7 +66,7 @@ set _project_linedeps="%~dp0%~n2.linedeps"
 findstr RelativePath "%_project_file%" | findstr /C:.c | findstr /C:windows-build /V > %_project_deps%
 for /F "usebackq tokens=2 delims==" %%f in (`type %_project_deps%`) do @echo %%f>>%_project_linedeps%
 set _deps_switches=
-if exist "%_script_name%.Run-Source-Check-Switches" set _deps_switches=-DV
+if exist "%_script_name%.Run-Source-Check-Switches" for /f "usebackq eol=; tokens=1*" %%i in ("%_script_name%.Run-Source-Check-Switches") do set _deps_switches=%%i
 set _deps_line=
 for /F "usebackq tokens=2 delims==" %%f in (`type %_project_deps%`) do set _deps_line=!_deps_line! %%f
 del %_project_deps%
@@ -74,3 +74,4 @@ del %_project_linedeps%
 echo Checking Source in %~n2 simulator...
 %2 %_deps_switches% CheckSourceCode %_deps_line%
 set _deps_line=
+if errorlevel 1 exit /B 1

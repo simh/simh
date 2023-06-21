@@ -196,27 +196,27 @@
 			Filter="cpp;c;cxx;def;odl;idl;hpj;bat;asm"
 			>
 			<File
-				RelativePath="..\ibm1130\ibm1130_cpu.c"
+				RelativePath="..\Ibm1130\ibm1130_cpu.c"
 				>
 			</File>
 			<File
-				RelativePath="..\ibm1130\ibm1130_cr.c"
+				RelativePath="..\Ibm1130\ibm1130_cr.c"
 				>
 			</File>
 			<File
-				RelativePath="..\ibm1130\ibm1130_disk.c"
+				RelativePath="..\Ibm1130\ibm1130_disk.c"
 				>
 			</File>
 			<File
-				RelativePath="..\ibm1130\ibm1130_fmt.c"
+				RelativePath="..\Ibm1130\ibm1130_fmt.c"
 				>
 			</File>
 			<File
-				RelativePath="..\ibm1130\ibm1130_gdu.c"
+				RelativePath="..\Ibm1130\ibm1130_gdu.c"
 				>
 			</File>
 			<File
-				RelativePath="..\ibm1130\ibm1130_gui.c"
+				RelativePath="..\Ibm1130\ibm1130_gui.c"
 				>
 			</File>
 			<File
@@ -224,7 +224,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\ibm1130\ibm1130_prt.c"
+				RelativePath="..\Ibm1130\ibm1130_prt.c"
 				>
 			</File>
 			<File
@@ -236,11 +236,11 @@
 				>
 			</File>
 			<File
-				RelativePath="..\ibm1130\ibm1130_stddev.c"
+				RelativePath="..\Ibm1130\ibm1130_stddev.c"
 				>
 			</File>
 			<File
-				RelativePath="..\ibm1130\ibm1130_sys.c"
+				RelativePath="..\Ibm1130\ibm1130_sys.c"
 				>
 			</File>
 			<File
@@ -369,15 +369,15 @@
 				>
 			</File>
 			<File
-				RelativePath="..\ibm1130\ibm1130_conin.h"
+				RelativePath="..\Ibm1130\ibm1130_conin.h"
 				>
 			</File>
 			<File
-				RelativePath="..\ibm1130\ibm1130_conout.h"
+				RelativePath="..\Ibm1130\ibm1130_conout.h"
 				>
 			</File>
 			<File
-				RelativePath="..\ibm1130\ibm1130_defs.h"
+				RelativePath="..\Ibm1130\ibm1130_defs.h"
 				>
 			</File>
 			<File
@@ -385,11 +385,11 @@
 				>
 			</File>
 			<File
-				RelativePath="..\ibm1130\ibm1130_prtwheel.h"
+				RelativePath="..\Ibm1130\ibm1130_prtwheel.h"
 				>
 			</File>
 			<File
-				RelativePath="..\ibm1130\ibm1130res.h"
+				RelativePath="..\Ibm1130\ibm1130res.h"
 				>
 			</File>
 			<File
