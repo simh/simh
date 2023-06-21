@@ -8724,6 +8724,10 @@ if (!(uptr->flags & UNIT_ATT)) {                        /* not attached? */
     }
 if ((dptr = find_dev_from_unit (uptr)) == NULL)
     return SCPE_OK;
+if ((dptr->flags & DEV_DISK) && ((dptr->flags & DEV_TAPE) == 0))
+    return sim_disk_detach (uptr);
+if ((dptr->flags & DEV_TAPE) && ((dptr->flags & DEV_DISK) == 0))
+    return sim_tape_detach (uptr);
 if ((uptr->flags & UNIT_BUF) && (uptr->filebuf)) {
     uint32 cap = (uptr->hwmark + dptr->aincr - 1) / dptr->aincr;
     if (((uptr->flags & UNIT_RO) == 0) && 
