@@ -137,7 +137,6 @@ t_stat rx_rd (int32 *data, int32 PA, int32 access);
 t_stat rx_wr (int32 data, int32 PA, int32 access);
 t_stat rx_svc (UNIT *uptr);
 t_stat rx_attach (UNIT *uptr, CONST char *cptr);
-t_stat rx_detach (UNIT *uptr);
 t_stat rx_reset (DEVICE *dptr);
 t_stat rx_boot (int32 unitno, DEVICE *dptr);
 void rx_done (int32 esr_flags, int32 new_ecode);
@@ -206,7 +205,7 @@ DEVICE rx_dev = {
     "RX", rx_unit, rx_reg, rx_mod,
     RX_NUMDR, 8, 20, 1, 8, 8,
     NULL, NULL, &rx_reset,
-    &rx_boot, &rx_attach, &rx_detach,
+    &rx_boot, &rx_attach, NULL,
     &rx_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DISK, 0,
     NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &drv_tab
     };
@@ -505,12 +504,6 @@ t_stat rx_attach (UNIT *uptr, CONST char *cptr)
 return sim_disk_attach (uptr, cptr, RX_NUMBY, 
                      sizeof (uint16), TRUE, 0, 
                      "RX01", 0, 0);
-}
-
-t_stat rx_detach (UNIT *uptr)
-{
-sim_cancel (uptr);
-return sim_disk_detach (uptr);
 }
 
 /* Device bootstrap */

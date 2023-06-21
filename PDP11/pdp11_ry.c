@@ -169,7 +169,6 @@ t_stat ry_boot (int32 unitno, DEVICE *dptr);
 void ry_done (int32 esr_flags, uint8 new_ecode);
 t_stat ry_show_density (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat ry_attach (UNIT *uptr, CONST char *cptr);
-t_stat ry_detach (UNIT *uptr);
 t_stat ry_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 const char *ry_description (DEVICE *dptr);
 
@@ -246,7 +245,7 @@ DEVICE ry_dev = {
     "RY", ry_unit, ry_reg, ry_mod,
     RX_NUMDR, DEV_RDX, 20, 1, DEV_RDX, 8,
     NULL, NULL, &ry_reset,
-    &ry_boot, &ry_attach, &ry_detach,
+    &ry_boot, &ry_attach, NULL,
     &ry_dib, DEV_DISABLE | DEV_DISI | DEV_UBUS | DEV_Q18 | DEV_DISK, 0,
     NULL, NULL, NULL, &ry_help, NULL, NULL,
     &ry_description, NULL, &drv_tab
@@ -600,12 +599,6 @@ return sim_disk_attach_ex (uptr, cptr, uptr->drvtyp->sectsize,
                            sizeof (uint8), TRUE, 0, 
                            uptr->drvtyp->name, 0, 0,
                            NULL);
-}
-
-t_stat ry_detach (UNIT *uptr)
-{
-sim_cancel (uptr);
-return sim_disk_detach (uptr);
 }
 
 /* Show density */

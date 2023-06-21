@@ -1027,7 +1027,6 @@ return SCPE_OK;
 
 t_stat rl_detach (UNIT *uptr)
 {
-sim_cancel (uptr);
 uptr->STAT = RLDS_BHO | RLDS_LOAD;
 return sim_disk_detach (uptr);
 }

@@ -350,7 +350,6 @@ void rk_clr_done (void);
 t_stat rk_boot (int32 unitno, DEVICE *dptr);
 t_stat rk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 t_stat rk_attach (UNIT *uptr, CONST char *cptr);
-t_stat rk_detach (UNIT *uptr);
 const char *rk_description (DEVICE *dptr);
 
 DEBTAB rk_deb[] = {
@@ -419,7 +418,7 @@ DEVICE rk_dev = {
     "RK", rk_unit, rk_reg, rk_mod,
     RK_NUMDR, 8, 24, 1, 8, RKWRDSZ,
     NULL, NULL, &rk_reset,
-    &rk_boot, &rk_attach, &rk_detach,
+    &rk_boot, &rk_attach, NULL,
     &rk_dib, DEV_DISABLE | DEV_UBUS | DEV_Q18 | DEV_DEBUG | RK_DIS | DEV_DISK, 0,
     rk_deb, NULL, NULL, &rk_help, NULL, NULL,
     &rk_description, NULL, &drv_tab
@@ -904,12 +903,6 @@ return sim_disk_attach_ex2 (uptr, cptr, RK_NUMWD * sizeof (uint16),
                             "RK05", 0, 0, 
                             NULL,
                             RK_RSRVSEC);
-}
-
-t_stat rk_detach (UNIT *uptr)
-{
-sim_cancel (uptr);
-return sim_disk_detach (uptr);
 }
 
 /* Device bootstrap */

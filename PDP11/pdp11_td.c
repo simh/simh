@@ -645,7 +645,6 @@ static t_stat td_set_ctrls (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 static t_stat td_show_ctlrs (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 static t_stat td_boot (int32 unitno, DEVICE *dptr);
 static t_stat td_attach (UNIT *uptr, CONST char *cptr);
-static t_stat td_detach (UNIT *uptr);
 static t_stat td_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 static void tdi_set_int (int32 ctlr, t_bool val);
 static int32 tdi_iack (void);
@@ -720,7 +719,7 @@ DEVICE tdc_dev = {
     "TDC", td_unit, td_reg, td_mod,
     2*TD_NUMCTLR, DEV_RDX, 20, 1, DEV_RDX, 8,
     NULL, NULL, &td_reset,
-    &td_boot, &td_attach, &td_detach,
+    &td_boot, &td_attach, NULL,
     &td_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_DISK, 0,
     td_deb, NULL, NULL, &td_help, NULL, NULL,
     &td_description, NULL, &drv_tab
@@ -1521,12 +1520,6 @@ static t_stat td_attach (UNIT *uptr, CONST char *cptr)
 return sim_disk_attach (uptr, cptr, TD_NUMBY, 
                         sizeof (uint16), TRUE, 0, 
                         "TU58", 0, 0);
-}
-
-static t_stat td_detach (UNIT *uptr)
-{
-sim_cancel (uptr);
-return sim_disk_detach (uptr);
 }
 
 /* Device bootstrap */
