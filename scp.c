@@ -10475,10 +10475,11 @@ for (i = 0, j = addr; i < sim_emax; i++, j = j + dptr->aincr) {
     else {
         if (!(uptr->flags & UNIT_ATT))
             return SCPE_UNATT;
-        if ((uptr->dynflags & UNIT_NO_FIO) ||
-            (uptr->fileref == NULL) ||
-            (sim_can_seek (uptr->fileref) == FALSE))
-            return SCPE_NOFNC;
+        if (((uptr->flags & UNIT_BUF) == 0) &&
+             ((uptr->dynflags & UNIT_NO_FIO) ||
+              (uptr->fileref == NULL) ||
+              (sim_can_seek (uptr->fileref) == FALSE)))
+              return sim_messagef (SCPE_NOFNC, "Can't seek on %s - %s\n", sim_uname (uptr), uptr->filename ? uptr->filename : "");
         if ((uptr->flags & UNIT_FIX) && (j >= uptr->capac)) {
             reason = SCPE_NXM;
             break;

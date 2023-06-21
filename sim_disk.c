@@ -3994,7 +3994,8 @@ if (uptr->flags & UNIT_BUFABLE) {                       /* buffer in memory? */
     memcpy (uptr->filebuf2, uptr->filebuf, (size_t)ctx->container_size);/* save initial contents */
     uptr->flags |= UNIT_BUF;                            /* mark as buffered */
     }
-
+if (DK_GET_FMT (uptr) != DKUF_F_STD)
+    uptr->dynflags |= UNIT_NO_FIO;
 return SCPE_OK;
 }
 
@@ -4008,6 +4009,7 @@ char *autozap_filename = NULL;
 
 if (uptr == NULL)
     return SCPE_IERR;
+sim_cancel (uptr);
 if (!(uptr->flags & UNIT_ATT))
     return SCPE_UNATT;
 
@@ -7200,7 +7202,7 @@ for (i = 0; NULL != (dptr = sim_devices[i]); i++) {
             NULL, &sim_disk_show_autosize, NULL, "Display disk autosize on attach setting" }};
     static MTAB autoz[] = {
         { MTAB_XTD|MTAB_VUN,        1,  NULL, "AUTOZAP", 
-            &sim_disk_set_autozap,  NULL, NULL, "Enable disk metadaat removal on detach" },
+            &sim_disk_set_autozap,  NULL, NULL, "Enable disk metadata removal on detach" },
         { MTAB_XTD|MTAB_VUN,        0,  NULL, "NOAUTOZAP", 
             &sim_disk_set_autozap,  NULL, NULL, "Disable disk metadata removal on detach"  },
         { MTAB_XTD|MTAB_VUN,        0,  "AUTOZAP", NULL, 
