@@ -34,7 +34,6 @@ commands may NOT be accurate. This should probably be fixed.
  */
 
 #include "ibm1130_defs.h"
-#include <memory.h>
 
 #define TRACE_DMS_IO                /* define to enable debug of DMS phase IO */
 

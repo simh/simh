@@ -84,7 +84,6 @@
 
 #include "ibm1130_defs.h"
 #include "sim_sock.h"                                       /* include path must include main simh directory */
-#include <ctype.h>
 
 #define DEBUG_SCA_FLUSH         0x0001                      /* debugging options */
 #define DEBUG_SCA_TRANSMIT      0x0002

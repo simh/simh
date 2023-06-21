@@ -83,7 +83,6 @@
  */
 
 #include "ibm1130_defs.h"
-#include <memory.h>
 
 /* #define DEBUG_CONSOLE */
 

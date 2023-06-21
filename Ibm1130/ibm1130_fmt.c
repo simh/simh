@@ -57,11 +57,6 @@
  *      as is standard for vi, notepad, etc.
  *********************************************************************************************/
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <memory.h>
-#include <ctype.h>
-#include <string.h>
 #include "ibm1130_fmt.h"
 #include "sim_defs.h"
 

@@ -15,10 +15,7 @@
 #include "sim_defs.h"                       /* main SIMH defns (include path should include .., or make a copy) */
 #include "sim_console.h"                    /* more SIMH defns (include path should include .., or make a copy) */
 
-#include <setjmp.h>
-#include <stdlib.h>
-
-#if defined(VMS)
+#if defined(__VMS)
     #  include <unistd.h>                   /* to pick up 'unlink' */
 #endif
 

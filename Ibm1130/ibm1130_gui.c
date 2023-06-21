@@ -27,10 +27,6 @@
  * Definitions
  * ------------------------------------------------------------------------ */
 
-#include <stdarg.h>
-#include <ctype.h>
-#include <math.h>
-
 #include "ibm1130_defs.h"
 #include "ibm1130res.h"
 #include "sim_tmxr.h"

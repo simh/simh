@@ -47,7 +47,6 @@
  */
 
 #include "ibm1130_defs.h"
-#include <stdlib.h>             /* needed for atexit, for cgi mode */
 
 /***************************************************************************************
  *  1132 PRINTER 
