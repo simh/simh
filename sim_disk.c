@@ -3976,9 +3976,9 @@ if (uptr->flags & UNIT_BUFABLE) {                       /* buffer in memory? */
     t_stat r = SCPE_OK;
 
     if (uptr->flags & UNIT_MUSTBUF) {                   /* dyn alloc? */
-        uptr->filebuf = calloc ((size_t)(ctx->container_size / ctx->xfer_encode_size), 
+        uptr->filebuf = calloc ((size_t)current_unit_size, 
                                     ctx->xfer_encode_size);       /* allocate */
-        uptr->filebuf2 = calloc ((size_t)(ctx->container_size / ctx->xfer_encode_size), 
+        uptr->filebuf2 = calloc ((size_t)current_unit_size, 
                                     ctx->xfer_encode_size);       /* allocate copy */
         if ((uptr->filebuf == NULL) ||                  /* either failed? */
             (uptr->filebuf2 == NULL)) {
@@ -4041,9 +4041,10 @@ if (NULL == find_dev_from_unit (uptr))
 
 if ((uptr->flags & UNIT_BUF) && (uptr->filebuf)) {
     uint32 cap = (uptr->hwmark + uptr->dptr->aincr - 1) / uptr->dptr->aincr;
+    t_offset current_unit_size = ((t_offset)uptr->capac)*ctx->capac_factor*((uptr->dptr->flags & DEV_SECTORS) ? ctx->sector_size : 1);
 
     if (((uptr->flags & UNIT_RO) == 0) && 
-        (memcmp (uptr->filebuf, uptr->filebuf2, (size_t)ctx->container_size) != 0)) {
+        (memcmp (uptr->filebuf, uptr->filebuf2, (size_t)current_unit_size) != 0)) {
         sim_messagef (SCPE_OK, "%s: writing buffer to file: %s\n", sim_uname (uptr), uptr->filename);
         sim_disk_wrsect (uptr, 0, (uint8 *)uptr->filebuf, NULL, (cap + ctx->sector_size - 1) / ctx->sector_size);
         }
