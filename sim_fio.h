@@ -117,6 +117,8 @@ extern t_bool sim_taddr_64;         /* t_addr is > 32b and Large File Support av
 extern t_bool sim_toffset_64;       /* Large File (>2GB) file I/O support */
 extern t_bool sim_end;              /* TRUE = little endian, FALSE = big endian */
 
+extern const char sim_file_path_separator;  /* Platform specific value \ or / as appropriate */
+
 char *sim_trim_endspc (char *cptr);
 int sim_isspace (int c);
 #ifdef isspace
