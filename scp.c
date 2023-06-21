@@ -3700,7 +3700,8 @@ if ((dptr->modifiers) && (dptr->units)) {   /* handle unit specific modifiers */
         fprint_wrapped (st, buf, 30, gap, extra, 80);
         }
     if (((dptr->flags & DEV_DEBUG) || (dptr->debflags)) &&
-        ((DEV_TYPE(dptr) == DEV_DISK) || (DEV_TYPE(dptr) == DEV_TAPE))) {
+        ((DEV_TYPE(dptr) == DEV_DISK) || (DEV_TYPE(dptr) == DEV_TAPE)) &&
+        (dptr->numunits != 1)) {
         snprintf (buf, sizeof (buf), "set %s DEBUG", unit_spec);
         snprintf (extra, sizeof (extra), "Enables debugging for device unit %s", unit_spec);
         fprint_wrapped (st, buf, 30, gap, extra, 80);
@@ -3819,7 +3820,8 @@ if ((dptr->flags & DEV_DEBUG) || (dptr->debflags)) {
     fprint_wrapped (st, buf, 30, gap, extra, 80);
     }
 if (((dptr->flags & DEV_DEBUG) || (dptr->debflags)) &&
-    ((DEV_TYPE(dptr) == DEV_DISK) || (DEV_TYPE(dptr) == DEV_TAPE))) {
+    ((DEV_TYPE(dptr) == DEV_DISK) || (DEV_TYPE(dptr) == DEV_TAPE)) &&
+    (enabled_units != 1)) {
     sprintf (buf, "show %s DEBUG", unit_spec);
     sprintf (extra, "Displays debugging status for device unit %s", unit_spec);
     fprint_wrapped (st, buf, 30, gap, extra, 80);
@@ -3831,6 +3833,8 @@ if ((dptr->modifiers) && (dptr->units)) {   /* handle unit specific modifiers */
             continue;                                           /* skip device only modifiers */
         if ((!mptr->disp) || (!mptr->pstring))
             continue;
+        if (enabled_units == 1)
+            continue;                                           /* skip when only 1 unit */
         fprint_header (st, &found, header);
         sprintf (buf, "show %s %s%s", unit_spec, mptr->pstring, MODMASK(mptr,MTAB_SHP) ? "=arg" : "");
         fprint_wrapped (st, buf, 30, gap, mptr->help, 80);

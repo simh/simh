@@ -7215,8 +7215,10 @@ for (i = 0; NULL != (dptr = sim_devices[i]); i++) {
     uint32 setters = 0;
     uint32 dumb_autosizers = 0;
     uint32 smart_autosizers = 0;
+    uint32 smart_autosizer = 0;
     uint32 drives = 0;
     uint32 aliases = 0;
+    int32 show_type_entry = -1;
 
     if (((DEV_TYPE (dptr) != DEV_DISK) && (DEV_TYPE (dptr) != DEV_SCSI)) ||
         (dptr->type_ctx == NULL))
@@ -7241,9 +7243,14 @@ for (i = 0; NULL != (dptr = sim_devices[i]); i++) {
               (strcasecmp (mtab[j].mstring, "NOAUTOSIZE") == 0)))) {
              if ((mtab[j].mask & (MTAB_XTD|MTAB_VUN)) == 0)
                  ++dumb_autosizers;             /* Autosize set in unit flags */
-             else
+             else {
                  ++smart_autosizers;            /* Autosize set by modifier */
+                 smart_autosizer = j;
+                 }
             }
+        if ((mtab[j].disp == &sim_disk_show_drive_type) &&
+            (mtab[j].mask == (MTAB_XTD|MTAB_VUN)))
+            show_type_entry = j;
         for (k = 0; drive[k].name != NULL; k++) {
             if ((mtab[j].mstring == NULL) || 
                 (strncasecmp (mtab[j].mstring, drive[k].name, strlen (drive[k].name))))
@@ -7260,12 +7267,6 @@ for (i = 0; NULL != (dptr = sim_devices[i]); i++) {
         }
     nmtab = (MTAB *)calloc (2 + ((smart_autosizers == 0) * (sizeof (autos)/sizeof (autos[0]))) + (1 + (sizeof (autos)/sizeof (autos[0]))) * (drives + aliases + (modifiers - (setters + dumb_autosizers))), sizeof (MTAB));
     l = 0;
-    if (smart_autosizers == 0) {
-        for (k = 0; k < (sizeof (autos)/sizeof (autos[0])); k++)
-            nmtab[l++] = autos[k];
-        for (k = 0; k < (sizeof (autoz)/sizeof (autoz[0])); k++)
-            nmtab[l++] = autoz[k];
-        }
     for (j = 0; mtab[j].mask != 0; j++) {
         if ((((mtab[j].pstring != NULL) && 
               ((strcasecmp (mtab[j].pstring, "AUTOSIZE") == 0)   ||
@@ -7287,6 +7288,10 @@ for (i = 0; NULL != (dptr = sim_devices[i]); i++) {
              (mtab[j].pstring == NULL)             || 
              (strcasecmp (mtab[j].pstring, "TYPE") != 0))) {
             nmtab[l++] = mtab[j];
+            if (smart_autosizer == j) {
+                for (k = 0; k < (sizeof (autoz)/sizeof (autoz[0])); k++)
+                    nmtab[l++] = autoz[k];
+                }
             continue;
             }
         }
@@ -7343,14 +7348,22 @@ for (i = 0; NULL != (dptr = sim_devices[i]); i++) {
                 }
             }
         }
-    nmtab[l].mask = MTAB_XTD|MTAB_VUN;
-    nmtab[l].match = k;
-    nmtab[l].pstring = "TYPE";
-    nmtab[l].mstring = NULL;
-    nmtab[l].valid = NULL;
-    nmtab[l].disp = &sim_disk_show_drive_type;
-    nmtab[l].desc = NULL;
-    nmtab[l].help = "Display device type";
+    if (smart_autosizers == 0) {
+        for (k = 0; k < (sizeof (autos)/sizeof (autos[0])); k++)
+            nmtab[l++] = autos[k];
+        for (k = 0; k < (sizeof (autoz)/sizeof (autoz[0])); k++)
+            nmtab[l++] = autoz[k];
+        }
+    if (show_type_entry == -1) {
+        nmtab[l].mask = MTAB_XTD|MTAB_VUN;
+        nmtab[l].match = k;
+        nmtab[l].pstring = "TYPE";
+        nmtab[l].mstring = NULL;
+        nmtab[l].valid = NULL;
+        nmtab[l].disp = &sim_disk_show_drive_type;
+        nmtab[l].desc = NULL;
+        nmtab[l].help = "Display device type";
+        }
     /* replace the original modifier table with the revised one */
     dptr->modifiers = nmtab;
     }
