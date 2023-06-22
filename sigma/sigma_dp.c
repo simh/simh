@@ -780,7 +780,7 @@ switch (uptr->UCMD) {
             if (CHS_IFERR (st))                         /* channel error? */
                 return dp_chan_err (dva, st);
             }
-        if ((i != DPS_NBY) || (st != CHS_ZBC)) {        /* length error? */
+        if (!DP_Q10B (ctx->dp_ctype) && (st != CHS_ZBC)) { /* 16B only: length error? */
             ctx->dp_flags |= DPF_PGE;                   /* set prog err */
             if (chan_set_chf (dva, CHF_LNTE))           /* do we care? */
                 return SCPE_OK;
