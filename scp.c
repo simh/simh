@@ -653,7 +653,7 @@ static unsigned int sim_stop_sleep_ms = 250;
 static char **sim_argv;
 static int sim_exit_status = EXIT_SUCCESS;              /* optionally set by EXIT command */
 t_value *sim_eval = NULL;
-static t_value sim_last_val;
+static char sim_last_val[CBUFSIZE];
 static t_addr sim_last_addr;
 FILE *sim_log = NULL;                                   /* log file */
 FILEREF *sim_log_ref = NULL;                            /* log file file reference */
@@ -690,6 +690,8 @@ static struct deleted_env_var {
     char *value;
     } *sim_external_env = NULL;
 static int sim_external_env_count = 0;
+static char *sim_tmpnam;
+static FILE *sim_tmpfile = NULL;
 
 t_stat sim_last_cmd_stat;                               /* Command Status */
 struct timespec cmd_time;                               /*  */
@@ -959,7 +961,7 @@ static const char simh_help1[] =
       "++STATE                   all registers in the device\n"
       "++ALL                     all locations in the unit\n"
       "++$                       the last value displayed by an EXAMINE\n"
-      "++++++++                  command interpreted as an address\n"
+      "++++++++                  command\n"
       "3Switches\n"
       " Switches can be used to control the format of display information.\n"
       " The actual interpretation and format of examine and deposit data is\n"
@@ -974,7 +976,8 @@ static const char simh_help1[] =
       "++-o or -8           display as octal\n"
       "++-d or -10          display as decimal\n"
       "++-h or -16          display as hexadecimal\n"
-      "++-2                 display as binary\n\n"
+      "++-2                 display as binary\n"
+      "++-q                 suppress examine output\n\n"
       " The simulators typically accept symbolic input (see documentation with\n"
       " each simulator).\n\n"
       "3Examples\n"
@@ -989,7 +992,9 @@ static const char simh_help1[] =
       "++de all 0                    set main memory to 0\n"
       "++de &77>0 0                  set all addresses whose low order\n"
       "+++++++++                     bits are non-zero to 0\n"
-      "++ex -m @memdump.txt 0-7777   dump memory to file\n\n"
+      "++ex -m @memdump.txt 0-7777   dump memory to file\n"
+      "++ex -q 200                   get the contents of 200 available as $\n"
+      "++dep r0 $                    store what was in 200 in r0\n\n"
       " Note: to terminate an interactive command, simply type a bad value\n"
       "       (eg, XYZ) when input is requested.\n"
 #define HLP_EVALUATE    "*Commands Evaluating_Instructions"
@@ -1022,14 +1027,14 @@ static const char simh_help1[] =
       "3LOAD\n"
       " The LOAD command (abbreviation LO) loads a file in binary loader format:\n\n"
       "++LOAD <filename> {implementation options}\n\n"
-      " The types of formats supported are implementation specific.  Options\n"
-      " (such as load within range) are also implementation specific.\n\n"
+      " The types of formats supported are simulator implementation specific.\n"
+      " Options: (such as load within range) are also implementation specific.\n\n"
 #define HLP_DUMP        "*Commands Loading_and_Saving_Programs DUMP"
       "3DUMP\n"
       " The DUMP command (abbreviation DU) dumps memory in binary loader format:\n\n"
       "++DUMP <filename> {implementation options}\n\n"
-      " The types of formats supported are implementation specific.  Options (such\n"
-      " as dump within range) are also implementation specific.\n"
+      " The types of formats supported are simulator implementation specific.\n"
+      " Options (such as dump within range) are also implementation specific.\n"
        /***************** 80 character line width template *************************/
       "2Saving and Restoring State\n"
 #define HLP_SAVE        "*Commands Saving_and_Restoring_State SAVE"
@@ -2901,6 +2906,32 @@ free (*tmpname);
 #endif
 }
 
+static t_stat sim_snprint_sym (char *buf, size_t bufsize, t_bool vm_flag, t_addr addr, t_value *val, UNIT *uptr, int32 sw, int32 dfltinc, int32 rdx, uint32 width, uint32 fmt)
+{
+t_stat reason;
+size_t s;
+
+rewind (sim_tmpfile);
+if (vm_flag || ((reason = fprint_sym (sim_tmpfile, addr, val, uptr, sw)) > 0)) {
+    fprint_val (sim_tmpfile, val[0], rdx, width, fmt);
+    reason = dfltinc;
+    }
+rewind (sim_tmpfile);
+s = fread (buf, 1, bufsize - 1, sim_tmpfile);
+buf[s] = '\0';
+return reason;
+}
+
+static t_stat sim_fprint_sym (FILE *ofile, t_bool vm_flag, t_addr addr, t_value *val, UNIT *uptr, int32 sw, int32 dfltinc, int32 rdx, uint32 width, uint32 fmt)
+{
+char buf[CBUFSIZE];
+t_stat r;
+
+r = sim_snprint_sym (buf, sizeof (buf), vm_flag, addr, val, uptr, sw, dfltinc, rdx, width, fmt);
+fprintf (ofile, "%s", buf);
+return r;
+}
+
 t_stat process_stdin_commands (t_stat stat, char *argv[], t_bool do_called);
 
 /* Main command loop */
@@ -3033,6 +3064,12 @@ for (i = 0; cmd_table[i].name; i++) {
     free (cmd_name);
     }
 setenv ("SIM_NAME", sim_name, 1);                       /* Publish simulator name */
+sim_tmpfile = fopen_tempfile (&sim_tmpnam);
+if (sim_tmpfile == NULL) {
+    fprintf (stderr, "Can't open working temp file: %s - %s\n", (sim_tmpnam == NULL) ? "" : sim_tmpnam, strerror (errno));
+    free (targv);
+    return EXIT_FAILURE;
+    }
 stop_cpu = FALSE;
 sim_interval = 0;
 sim_time = sim_rtime = 0;
@@ -3211,6 +3248,7 @@ sim_ttclose ();                                         /* close console */
 AIO_CLEANUP;                                            /* Asynch I/O */
 sim_cleanup_sock ();                                    /* cleanup sockets */
 fclose (stdnul);                                        /* close bit bucket file handle */
+fclose_tempfile (sim_tmpfile, &sim_tmpnam);             /* close temporary work file */
 free (targv);                                           /* release any argv copy that was made */
 return sim_exit_status;
 }
@@ -9914,8 +9952,7 @@ if ((dptr != NULL) && (dptr->examine != NULL)) {
         }
     if ((r == SCPE_OK) || (i > 0)) {
         fprintf (st, " (");
-        if (fprint_sym (st, (t_addr) pcval, sim_eval, NULL, SWMASK ('M') | SIM_SW_STOP) > 0)
-            fprint_val (st, sim_eval[0], dptr->dradix, dptr->dwidth, PV_RZRO);
+        sim_fprint_sym (st, FALSE, (t_addr) pcval, sim_eval, NULL, SWMASK ('M') | SIM_SW_STOP, 0, dptr->dradix, dptr->dwidth, PV_RZRO);
         fprintf (st, ")");
         }
     }
@@ -10028,6 +10065,8 @@ cptr = get_glyph (cptr, gbuf, 0);                       /* get list */
 if ((flag == EX_D) && (*cptr == 0))                     /* deposit needs more */
     return SCPE_2FARG;
 ofile = sim_ofile? sim_ofile: stdout;                   /* no ofile? use stdout */
+if (sim_switches & SWMASK ('Q'))                        /* Quiet mode to suppress output */
+    ofile = stdnul;
 
 for (gptr = gbuf, reason = SCPE_OK;
     (*gptr != 0) && (reason == SCPE_OK); gptr = tptr) {
@@ -10154,7 +10193,7 @@ for (rptr = lowr; rptr <= highr; rptr++) {
                         fprintf (ofile, "%s[%d]: same as above\n", rptr->name, val_start+1);
                     }
                 }
-            sim_last_val = last_val = val;
+            last_val = val;
             val_start = idx;
             reason = ex_reg (ofile, val, flag, rptr, idx);
             sim_switches = saved_switches;
@@ -10257,15 +10296,17 @@ sim_eval[0] = val;
 GET_RADIX (rdx, rptr->radix);
 if ((rptr->flags & REG_VMAD) && sim_vm_fprint_addr)
     sim_vm_fprint_addr (ofile, sim_dflt_dev, (t_addr) val);
-else if (!(rptr->flags & REG_VMFLAGS) ||
-    (fprint_sym (ofile, (rptr->flags & REG_UFMASK) | rdx, sim_eval,
-                 NULL, sim_switches | SIM_SW_REG) > 0)) {
-        fprint_val (ofile, val, rdx, rptr->width, rptr->flags & REG_FMT);
-        if (rptr->fields) {
-            fprintf (ofile, "\t");
-            fprint_fields (ofile, val, val, rptr->fields);
-            }
-        }
+else {
+    sim_snprint_sym (sim_last_val, sizeof (sim_last_val), !(rptr->flags & REG_VMFLAGS),
+                     (t_addr)((rptr->flags & REG_UFMASK) | rdx), sim_eval,
+                     NULL, sim_switches | SIM_SW_REG, 0, rdx, rptr->width, 
+                     rptr->flags & REG_FMT);
+    fprintf (ofile, "%s", sim_last_val);
+    }
+if (rptr->fields) {
+    fprintf (ofile, "\t");
+    fprint_fields (ofile, val, val, rptr->fields);
+    }
 if (flag & EX_I)
     fprintf (ofile, "\t");
 else
@@ -10361,6 +10402,8 @@ if (rptr->maxval > 0)                                   /* if a maximum value is
 else                                                    /* otherwise */
     max = width_mask[rptr->width];                      /*   the mask defines the maximum value */
 GET_RADIX (rdx, rptr->radix);
+if (strcmp (cptr, "$") == 0)
+    cptr = sim_last_val;
 if ((rptr->flags & REG_VMAD) && sim_vm_parse_addr) {    /* address form? */
     val = sim_vm_parse_addr (sim_dflt_dev, cptr, &tptr);
     if ((tptr == cptr) || (*tptr != 0) || (val > max))
@@ -10477,10 +10520,8 @@ if (!(flag & EX_E))
     return dfltinc;
 
 GET_RADIX (rdx, dptr->dradix);
-if ((reason = fprint_sym (ofile, addr, sim_eval, uptr, sim_switches)) > 0) {
-    fprint_val (ofile, sim_eval[0], rdx, dptr->dwidth, PV_RZRO);
-    reason = dfltinc;
-    }
+reason = sim_snprint_sym (sim_last_val, sizeof (sim_last_val), FALSE, addr, sim_eval, uptr, sim_switches, dfltinc, rdx, dptr->dwidth, PV_RZRO);
+fprintf (ofile, "%s", sim_last_val);
 if (flag & EX_I)
     fprintf (ofile, "\t");
 else
@@ -10554,7 +10595,7 @@ for (i = 0, j = addr; i < sim_emax; i++, j = j + dptr->aincr) {
                 }
             }
         }
-    sim_last_val = sim_eval[i] = sim_eval[i] & mask;
+    sim_eval[i] = sim_eval[i] & mask;
     }
 if ((reason != SCPE_OK) && (i == 0))
     return reason;
@@ -10604,6 +10645,8 @@ if (uptr->flags & UNIT_RO)                              /* read only? */
 mask = width_mask[dptr->dwidth];
 
 GET_RADIX (rdx, dptr->dradix);
+if (strcmp (cptr, "$") == 0)
+    cptr = sim_last_val;
 if ((reason = parse_sym ((CONST char *)cptr, addr, uptr, sim_eval, sim_switches)) > 0) {
     sim_eval[0] = get_uint (cptr, rdx, mask, &reason);
     if (reason != SCPE_OK)
@@ -10667,17 +10710,14 @@ if (*cptr == 0)
 if ((r = parse_sym ((CONST char *)cptr, 0, dptr->units, sim_eval, sim_switches)) > 0) {
     sim_eval[0] = get_uint (cptr, rdx, width_mask[dptr->dwidth], &r);
     if (r != SCPE_OK)
-        return sim_messagef (r, "%s\nCan't be parsed as an instruction or data\n", cptr);
+        return sim_messagef (r, "'%s' - Can't be parsed as an instruction or data\n", cptr);
     }
 lim = 1 - r;
 for (i = a = 0; a < lim; ) {
     sim_printf ("%d:\t", a);
-    if ((r = fprint_sym (stdout, a, &sim_eval[i], dptr->units, sim_switches)) > 0)
-        r = fprint_val (stdout, sim_eval[i], rdx, dptr->dwidth, PV_RZRO);
-    if (sim_log && (!sim_oline)) {
-        if ((r = fprint_sym (sim_log, a, &sim_eval[i], dptr->units, sim_switches)) > 0)
-            r = fprint_val (sim_log, sim_eval[i], rdx, dptr->dwidth, PV_RZRO);
-        }
+    r = sim_fprint_sym (stdout, FALSE, a, &sim_eval[i], dptr->units, sim_switches, SCPE_OK, rdx, dptr->dwidth, PV_RZRO);
+    if (sim_log && (!sim_oline))
+        r = sim_fprint_sym (sim_log, FALSE, a, &sim_eval[i], dptr->units, sim_switches, SCPE_OK, rdx, dptr->dwidth, PV_RZRO);
     sim_printf ("\n");
     if (r < 0)
         a = a + 1 - r;
@@ -11001,15 +11041,15 @@ return val;
 CONST char *get_range (DEVICE *dptr, CONST char *cptr, t_addr *lo, t_addr *hi,
     uint32 rdx, t_addr max, char term)
 {
-CONST char *tptr;
+CONST char *tptr, *ntptr;
 
-if (max && strncmp (cptr, "ALL", strlen ("ALL")) == 0) {    /* ALL? */
+if (max && strncmp (cptr, "ALL", strlen ("ALL")) == 0) {/* ALL? */
     tptr = cptr + strlen ("ALL");
     *lo = 0;
     *hi = max;
     }
 else {
-    if ((strncmp (cptr, ".", strlen (".")) == 0) &&             /* .? */
+    if ((strncmp (cptr, ".", strlen (".")) == 0) &&     /* .? */
         ((cptr[1] == '\0') || 
          (cptr[1] == '-')  || 
          (cptr[1] == ':')  || 
@@ -11018,37 +11058,45 @@ else {
         *lo = *hi = sim_last_addr;
         }
     else {
-        if (strncmp (cptr, "$", strlen ("$")) == 0) {           /* $? */
-            tptr = cptr + strlen ("$");
-            *hi = *lo = (t_addr)sim_last_val;
-            }
-        else {
-            if (dptr && sim_vm_parse_addr)                      /* get low */
-                *lo = sim_vm_parse_addr (dptr, cptr, &tptr);
-            else
-                *lo = (t_addr) strtotv (cptr, &tptr, rdx);
-            if (cptr == tptr)                                   /* error? */
-                    return NULL;
-            }
+        ntptr = cptr + 1;
+        if (strncmp (cptr, "$", strlen ("$")) == 0)     /* $? */
+            cptr = sim_last_val;
+        if (dptr && sim_vm_parse_addr)                  /* get low */
+            *lo = sim_vm_parse_addr (dptr, cptr, &tptr);
+        else
+            *lo = (t_addr) strtotv (cptr, &tptr, rdx);
+        if (cptr == tptr)                               /* error? */
+                return NULL;
+        if (cptr == sim_last_val)
+            tptr = ntptr;
         }
     if ((*tptr == '-') || (*tptr == ':')) {             /* range? */
         cptr = tptr + 1;
+        ntptr = cptr + 1;
+        if (strncmp (cptr, "$", strlen ("$")) == 0)     /* $? */
+            cptr = sim_last_val;
         if (dptr && sim_vm_parse_addr)                  /* get high */
             *hi = sim_vm_parse_addr (dptr, cptr, &tptr);
-        else *hi = (t_addr) strtotv (cptr, &tptr, rdx);
+        else
+            *hi = (t_addr) strtotv (cptr, &tptr, rdx);
         if (cptr == tptr)
             return NULL;
         if (*lo > *hi)
             return NULL;
+        if (cptr == sim_last_val)
+            tptr = ntptr;
         }
-    else if (*tptr == '/') {                            /* relative? */
-        cptr = tptr + 1;
-        *hi = (t_addr) strtotv (cptr, &tptr, rdx);      /* get high */
-        if ((cptr == tptr) || (*hi == 0))
-            return NULL;
-        *hi = *lo + *hi - 1;
+    else {
+        if (*tptr == '/') {                             /* relative? */
+            cptr = tptr + 1;
+            *hi = (t_addr) strtotv (cptr, &tptr, rdx);  /* get high */
+            if ((cptr == tptr) || (*hi == 0))
+                return NULL;
+            *hi = *lo + *hi - 1;
+            }
+        else
+            *hi = *lo;
         }
-    else *hi = *lo;
     }
 sim_last_addr = *hi;
 if (term && (*tptr++ != term))
