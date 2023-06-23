@@ -56,6 +56,9 @@ goto _check_source
 
 :_got_script
 %2 "%_script_path%" "%4"
+rem if the simulator test(s) fail then this is a failed build 
+rem so delete the simulator binary.
+if ERRORLEVEL 1 del %2 & exit /B 1
 
 :_check_source
 setlocal enabledelayedexpansion
@@ -74,4 +77,4 @@ del %_project_linedeps%
 echo Checking Source in %~n2 simulator...
 %2 %_deps_switches% CheckSourceCode %_deps_line%
 set _deps_line=
-if errorlevel 1 exit /B 1
+if errorlevel 1 del %2 & exit /B 1
