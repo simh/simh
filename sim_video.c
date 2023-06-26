@@ -2144,6 +2144,7 @@ while (vid_active) {
                         }
                     }
                     if (event.user.code == EVENT_REDRAW) {
+                        vptr = vid_get_event_window (&event, event.user.windowID);
                         vid_update (vptr);
                         event.user.code = 0;    /* Mark as done */
                         while (SDL_PeepEvents (&event, 1, SDL_GETEVENT, SDL_USEREVENT, SDL_USEREVENT)) {
@@ -2154,7 +2155,6 @@ while (vid_active) {
                                 event.user.code = 0;    /* Mark as done */
                                 continue;
                                 }
-                            vptr = vid_get_event_window (&event, event.user.windowID);
                             break;
                             }
                         }
