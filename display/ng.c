@@ -25,7 +25,6 @@
  */
 
 #include <string.h>
-#include <assert.h>
 #include "display.h"                    /* XY plot interface */
 #include "ng.h"
 
@@ -123,7 +122,9 @@ int
 ng_init(void *dev, int debug)
 {
   /* Don't change this number. */
-  assert (DISPLAYS == 8);
+#if (DISPLAYS != 8) 
+#error "DISPLAYS is not 8"
+#endif
 
   ng_dptr = dev;
   ng_dbit = debug;

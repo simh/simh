@@ -1093,6 +1093,14 @@ struct MEMFILE {
                                 snprintf(buf, sizeof (buf), "%s failed", #_Expression); \
                                 SIM_SCP_ABORT (buf);                                    \
                                 }
+#if defined(assert)
+#error "Don't use assert().  It is advised to use ASSURE(expression) instead"
+#else
+#define assert(_Expression) do {                                                                                             \
+                                fprintf (stderr, "Don't use assert().  It is advised to use ASSURE(expression) instead.\n"); \
+                                abort();                                                                                     \
+                                } while (1)
+#endif
 
 #if defined(SIM_ASYNCH_IO)
 #define AIO_CHECK_EVENT sim_aio_check_event()

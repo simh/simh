@@ -387,7 +387,10 @@ static void tftp_handle_rrq(Slirp *slirp, struct tftp_t *tp, int pktlen)
   }
 
   if (nb_options > 0) {
-      assert(nb_options <= ARRAY_SIZE(option_name));
+      if (nb_options > ARRAY_SIZE(option_name)) {
+          fprintf (stderr, "option_name array bounds: %d\n", nb_options);
+          abort ();
+      }
       tftp_send_oack(spt, option_name, option_value, nb_options, tp);
       return;
   }

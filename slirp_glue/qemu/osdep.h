@@ -57,7 +57,6 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/time.h>
-#include <assert.h>
 #include <signal.h>
 
 #ifdef __OpenBSD__
