@@ -436,14 +436,11 @@ return "console terminal output";
 
 t_stat clk_svc (UNIT *uptr)
 {
-int32 t;
-
 if (clk_csr & CSR_IE)
     SET_INT (CLK);
-t = sim_rtcn_calb (clk_tps, TMR_CLK);                   /* calibrate clock */
+tmr_poll = sim_rtcn_calb (clk_tps, TMR_CLK);            /* calibrate clock */
 sim_activate_after (uptr, 1000000/clk_tps);             /* reactivate unit */
-tmr_poll = t;                                           /* set tmr poll */
-tmxr_poll = t * TMXR_MULT;                              /* set mux poll */
+tmxr_poll = tmr_poll * TMXR_MULT;                       /* set mux poll */
 AIO_SET_INTERRUPT_LATENCY(tmr_poll*clk_tps);            /* set interrrupt latency */
 return SCPE_OK;
 }
@@ -452,14 +449,11 @@ return SCPE_OK;
 
 t_stat clk_reset (DEVICE *dptr)
 {
-int32 t;
-
 clk_csr = 0;
 CLR_INT (CLK);
-t = sim_rtcn_init_unit (&clk_unit, clk_unit.wait, TMR_CLK);/* init 100Hz timer */
+tmr_poll = sim_rtcn_init_unit (&clk_unit, clk_unit.wait, TMR_CLK);/* init 100Hz timer */
 sim_activate_after (&clk_unit, 1000000/clk_tps);        /* activate 100Hz unit */
-tmr_poll = t;                                           /* set tmr poll */
-tmxr_poll = t * TMXR_MULT;                              /* set mux poll */
+tmxr_poll = tmr_poll * TMXR_MULT;                       /* set mux poll */
 return SCPE_OK;
 }
 

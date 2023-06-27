@@ -568,7 +568,7 @@ tmxr_set_console_units (&tti_unit, &tto_unit);
 tti_buf = 0;
 tti_csr = 0;
 tti_int = 0;
-sim_activate (&tti_unit, tmr_poll);
+sim_activate (&tti_unit, tmxr_poll);
 return SCPE_OK;
 }
 
@@ -735,7 +735,6 @@ tmr_nicr = val;
 t_stat tmr_svc (UNIT *uptr)
 {
 sim_debug (TMR_DB_TICK, &tmr_dev, "tmr_svc()\n");
-tmxr_poll = tmr_poll * TMXR_MULT;                   /* set mux poll */
 if (tmr_iccs & TMR_CSR_DON)                         /* done? set err */
     tmr_iccs = tmr_iccs | TMR_CSR_ERR;
 else
@@ -748,7 +747,6 @@ if (tmr_iccs & TMR_CSR_IE) {                        /* ie? set int req */
     }
 else
     tmr_int = 0;
-AIO_SET_INTERRUPT_LATENCY(tmr_poll*clk_tps);        /* set interrrupt latency */
 return SCPE_OK;
 }
 
@@ -779,14 +777,16 @@ if ((clk_unit.filebuf == NULL) ||                       /* make sure the TODR is
 todr_resync ();
 sim_activate_after (&clk_unit, 10000);
 tmr_poll = sim_rtcn_init_unit (&clk_unit, CLK_DELAY, TMR_CLK);  /* init timer */
+tmxr_poll = tmr_poll * TMXR_MULT;                   /* set mux poll */
 return SCPE_OK;
 }
 
 t_stat clk_svc (UNIT *uptr)
 {
-tmr_poll = sim_rtcn_calb (100, TMR_CLK);
-sim_activate_after (uptr, 10000);
-tmxr_poll = tmr_poll * TMXR_MULT;                       /* set mux poll */
+tmr_poll = sim_rtcn_calb (clk_tps, TMR_CLK);
+sim_activate_after (uptr, 1000000 / clk_tps);       /* 10000 usecs */
+tmxr_poll = tmr_poll * TMXR_MULT;                   /* set mux poll */
+AIO_SET_INTERRUPT_LATENCY(tmr_poll*100);            /* set interrrupt latency */
 return SCPE_OK;
 }
 
