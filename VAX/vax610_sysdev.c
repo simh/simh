@@ -33,7 +33,7 @@
 
 #include "vax_defs.h"
 
-#include "vax_ka610_bin.h" /* Defines BOOT_CODE_FILENAME and BOOT_CODE_ARRAY, etc */
+#include "vax_ka610_bin.h"   /* Defines MicroVAX I and VAXStation I  BOOT_CODE_FILENAME and BOOT_CODE_ARRAY, etc */
 
 /* MicroVAX I boot device definitions */
 
@@ -497,10 +497,48 @@ return cc;
 t_stat cpu_boot (int32 unitno, DEVICE *dptr)
 {
 t_stat r;
+int32 saved_quiet = sim_quiet;
+const char *sysboot = "[SYS0.SYSEXE]SYSBOOT.EXE";
+char cmd[CBUFSIZE];
 
+if ((R[5] & 0x100) != 0)
+    sim_quiet = TRUE;
 r = cpu_load_bootcode (BOOT_CODE_FILENAME, BOOT_CODE_ARRAY, BOOT_CODE_SIZE, FALSE, 0x200, BOOT_CODE_FILEPATH, BOOT_CODE_CHECKSUM);
 if (r != SCPE_OK)
     return r;
+sim_quiet = saved_quiet;
+if ((R[5] & 0x100) == 0) {
+    snprintf (cmd, sizeof (cmd), "\"%%BOOT-F-ERROR, Program image not found DUA\" "
+                                 "ECHO;"
+                                 "BOOT /R5=%X %4.4s",
+                                 R[5] | 0X100, (R[0] == 0) ? "" : (char *)&R[0]);
+    expect_cmd (1, cmd);
+    snprintf (cmd, sizeof (cmd), "\"%%BOOT-F-ERROR, None of the bootable devices contain a program image\" "
+                                 "ECHO;"
+                                 "BOOT /R5=%X %4.4s",
+                                 R[5] | 0X100, (R[0] == 0) ? "" : (char *)&R[0]);
+    expect_cmd (1, cmd);
+    snprintf (cmd, sizeof (cmd), "\"%%BOOT-F-ERROR, Boot device I/O error XQA\" "
+                                 "ECHO;"
+                                 "BOOT /R5=%X %4.4s",
+                                 R[5] | 0X100, (R[0] == 0) ? "" : (char *)&R[0]);
+    expect_cmd (1, cmd);
+    snprintf (cmd, sizeof (cmd), "\"%%BOOT-F-ERROR, No response from load server XQA\" "
+                                 "ECHO;"
+                                 "BOOT /R5=%X %4.4s",
+                                 R[5] | 0X100, (R[0] == 0) ? "" : (char *)&R[0]);
+    expect_cmd (1, cmd);
+    snprintf (cmd, sizeof (cmd), "\"Bootfile:\" SEND \"%s\r\";"
+                                 "CONTINUE", sysboot);
+    expect_cmd (1, cmd);
+    expect_cmd (1, "\"VAX/VMS\" "
+                   "NOEXPECT \"Bootfile:\";"
+                   "NOEXPECT \"%%BOOT-F-ERROR, Program image not found DUA\";"
+                   "NOEXPECT \"%%BOOT-F-ERROR, None of the bootable devices contain a program image\";"
+                   "NOEXPECT \"%%BOOT-F-ERROR, Boot device I/O error XQA\";"
+                   "NOEXPECT \"%%BOOT-F-ERROR, No response from load server XQA\";"
+                   "CONTINUE");
+    }
 SP = PC = 512;
 AP = 1;
 return SCPE_OK;
