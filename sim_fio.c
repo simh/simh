@@ -2284,9 +2284,8 @@ static const char *_check_source_allowed_sysincludes[] = {
 
 static const char *_check_source_platform_defines[] = {
     "_WIN32",
-    "(__ALPHA)",
-    "(__ia64)",
-    "(VMS)",
+    "__ALPHA",
+    "__ia64",
     "__VMS",
     "__unix__",
     "__linux",
@@ -2302,11 +2301,14 @@ static const char *_check_source_platform_defines[] = {
     "__amd64__",
     "__x86_64__",
     "__itanium__",
+    "NDEBUG",
+    "_DEBUG",
     NULL
     };
 
 static const char *_check_source_scp_only_apis[] = {
     "sim_os_ms_sleep",
+    "sim_reset_time",
     "sim_master_sock",
     "sim_accept_conn",
     "sim_accept_conn_ex",
@@ -2347,6 +2349,48 @@ typedef struct FILE_STATS {
     } FILE_STATS;
 
 static char *sim_check_scp_dir = NULL;
+
+static FILE *sim_problem_list = NULL;
+
+static char **sim_exceptions = NULL;
+static int exception_count = 0;
+
+static t_bool _source_problem_emit (const char *RelativePath, const char *problem, int count, char **list)
+{
+int i, j;
+char buf[CBUFSIZE];
+t_bool result = FALSE;
+
+for (i = 0; i < count; i++) {
+    snprintf (buf, sizeof (buf), "%s:%s:%s", RelativePath, problem, list[i]);
+    for (j = 0; j < exception_count; j++)
+        if (strcmp (sim_exceptions[j], buf) == 0)
+            break;
+    if (j < exception_count)
+        continue;
+    result |= TRUE;
+    if (sim_problem_list != NULL)
+        fprintf (sim_problem_list, "%s\r\n", buf);
+    }
+return result;
+}
+
+static t_bool _source_problem_check (FILE_STATS *Stats)
+{
+t_bool result = FALSE;
+
+if ((!Stats->IsInScpDir) && 
+    ((Stats->MissingIncludeCount != 0) || 
+     (Stats->OtherSysIncludeCount != 0) || 
+     (Stats->PlatformDefineCount != 0)  || 
+     (Stats->ScpAPICount != 0))) {
+    result |= _source_problem_emit (Stats->RelativePath, "MissingInclude", Stats->MissingIncludeCount, Stats->MissingIncludes);
+    result |= _source_problem_emit (Stats->RelativePath, "OtherSysInclude", Stats->OtherSysIncludeCount, Stats->OtherSysIncludes);
+    result |= _source_problem_emit (Stats->RelativePath, "PlatformDefine", Stats->PlatformDefineCount, Stats->PlatformDefines);
+    result |= _source_problem_emit (Stats->RelativePath, "ScpAPI", Stats->ScpAPICount, Stats->ScpAPIs);
+    }
+return result;
+}
 
 static void _check_source_check_file (const char *directory, 
                                       const char *filename, 
@@ -2524,7 +2568,14 @@ if (Stats->IsSource) {
             }
         }
     for (platform_define = _check_source_platform_defines; *platform_define != NULL; ++platform_define) {
-        if (strstr (data, *platform_define) != NULL) {
+        const char *found = strstr (data, *platform_define);
+        if (found != NULL) {
+            char before = *(found - 1);
+            char after = *(found + strlen (*platform_define));
+
+            if ((isalpha (before) || (before == '_') || 
+                (isalpha (after)  || (after  == '_'))))
+                continue;
             ++Stats->PlatformDefineCount;
             Stats->PlatformDefines = (char **)realloc (Stats->PlatformDefines, Stats->PlatformDefineCount * sizeof (*Stats->PlatformDefines));
             Stats->PlatformDefines[Stats->PlatformDefineCount - 1] = strdup (*platform_define);
@@ -2538,12 +2589,7 @@ if (Stats->IsSource) {
             Stats->ScpAPIs[Stats->ScpAPICount - 1] = strdup (*scp_api);
             }
         }
-
-    if ((!Stats->IsInScpDir) && 
-        ((Stats->OtherSysIncludeCount != 0) || 
-         (Stats->PlatformDefineCount != 0)  || 
-         (Stats->ScpAPICount != 0)))
-        Stats->ProblemFile = TRUE;
+    Stats->ProblemFile |= _source_problem_check (Stats);
     }
 free (extension);
 free (data);
@@ -2725,11 +2771,11 @@ if (file == Stats->FileCount) {
             }
         }
     else {
-        if (!File->IsInScpDir)
-            File->ProblemFile = TRUE;
         ++File->MissingIncludeCount;
         File->MissingIncludes = (char **)realloc (File->MissingIncludes, File->MissingIncludeCount * sizeof (*File->MissingIncludes));
         File->MissingIncludes[File->MissingIncludeCount - 1] = strdup (include_file);
+        if (!File->IsInScpDir)
+            File->ProblemFile |= _source_problem_check (File);
         }
     sim_free_filelist (&files);
     }
@@ -2797,6 +2843,26 @@ if (sim_switches & SWMASK ('D')) {
         sim_printf (" %s", argv[i]);
     sim_printf ("\n");
     }
+if (sim_switches & SWMASK ('X'))
+    sim_problem_list = fopen("Source.Errors", "ab");
+if (sim_switches & SWMASK ('A')) {
+    FILE *f = fopen ("Source.Exceptions", "r");
+
+    if (f != NULL) {
+        char buf[CBUFSIZE];
+
+        while (fgets (buf, sizeof (buf), f)) {
+            size_t len = strlen (buf);
+
+            while ((len > 0) && isspace (buf[len - 1]))
+                buf[len - 1] = '\0';
+            ++exception_count;
+            sim_exceptions = (char **)realloc (sim_exceptions, exception_count * sizeof (*sim_exceptions));
+            sim_exceptions[exception_count - 1] = strdup (buf);
+            }
+        fclose (f);
+        }
+    }
 free (sim_check_scp_dir);
 sim_check_scp_dir = NULL;
 sim_set_get_filelist_skip_directories (source_skip_dirs);
@@ -2821,5 +2887,9 @@ for (file = 0; file < Stats->FileCount; file++) {
     }
 sim_clear_get_filelist_skip_directories ();
 _flush_filelist_directory_cache ();
+if (sim_problem_list != NULL) {
+    fclose (sim_problem_list);
+    sim_problem_list = NULL;
+    }
 return _sim_check_source_report (Stats);
 }
