@@ -650,7 +650,7 @@ Different Linux distributions have different package management systems:
 
 Ubuntu/Debian:
 
-    # apt-get install gcc libpcap-dev libvdeplug-dev libpcre3-dev libedit-dev libsdl2-dev libpng-dev libsdl2_ttf-dev
+    # apt-get install gcc libpcap-dev libvdeplug-dev libpcre3-dev libedit-dev libsdl2-dev libpng-dev libsdl2-ttf-dev
 
 Fedora/RedHat:
 
