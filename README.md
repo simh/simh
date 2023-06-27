@@ -92,6 +92,9 @@ All Simulator updates on Open SIMH will be present in this repository, and any c
     
     In NOCALIBRATE mode, the operator gets to specify the pseudo execution rate along with the base wall clock time that access to pseudo wall clock accesses returns.
 - All removable devices get detached on a media unload without regard to data access format (SIMH, VHD or RAW).  
+- Various failing bugs in tape detach logic are fixed.
+- Clean building on Android Termux.
+- Proper line editing behavior on all Unix platforms.
 
 #### Changes to the PDP-11 and VAX simulators also not in the Open SIMH repo
 
@@ -111,6 +114,10 @@ All Simulator updates on Open SIMH will be present in this repository, and any c
 - All improvements and fixes to the PDP11 simulator from simh Version 3.12-3 release and beyond.
 - MicroVAX I has unsupported devices (TQ, TS, and VH) removed.
 - VAX750, VAX780, VAX8600 and PDP11 support additional Massbus disks on DEVICE RPB.
+- VAXStation I is now, once again, working.
+- MicroVAX I/VAXStation I has been enhanced to dynamically look for its secondary bootstrap program (SYSBOOT.EXE) from both [SYSEXE]SYSBOOT.EXE and [SYS0.SYSEXE]SYSBOOT.EXE.
+- PDP11 now has working support for RC and RF expandable platter based disk drives.
+- Properly set asynchronous interrupt latency in all VAX simulators.
 
 ### All relevant changes in the simh v3.12-3 release have been merged into this repo
 
