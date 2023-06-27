@@ -879,7 +879,7 @@ if (rtc->hz != ticksper) {                          /* changing tick rate? */
         ticksper = rtc->last_hz;                    /* Use the prior tick rate */
     if (rtc->hz == 0)
         rtc->clock_tick_start_time = sim_timenow_double ();
-    if ((rtc->last_hz != ticksper) && (ticksper != 0))
+    if ((rtc->last_hz != 0) && (rtc->last_hz != ticksper) && (ticksper != 0))
         rtc->currd = (int32)(sim_timer_inst_per_sec () / ticksper);
     rtc->last_hz = rtc->hz;
     rtc->hz = ticksper;
@@ -1133,7 +1133,8 @@ fprintf (st, "Minimum Host Sleep Time:        %d ms (%dHz)\n", sim_os_sleep_min_
 if (sim_os_sleep_min_ms != sim_os_sleep_inc_ms)
     fprintf (st, "Minimum Host Sleep Incr Time:   %d ms\n", sim_os_sleep_inc_ms);
 fprintf (st, "Host Clock Resolution:          %d ms\n", sim_os_clock_resoluton_ms);
-fprintf (st, "Execution Rate:                 %s %s/sec\n", sim_fmt_numeric (inst_per_sec), sim_vm_interval_units);
+if (sim_timer_calib_enabled)
+    fprintf (st, "Execution Rate:                 %s %s/sec\n", sim_fmt_numeric (inst_per_sec), sim_vm_interval_units);
 if (sim_idle_enab) {
     fprintf (st, "Idling:                         Enabled\n");
     fprintf (st, "Time before Idling starts:      %d seconds\n", sim_idle_stable);
@@ -1473,7 +1474,7 @@ if (!sim_timer_calib_enabled)
 if (sim_throt_type != SIM_THROT_NONE)
     return sim_messagef (SCPE_NOFNC, "calibration can't be disabled when throttling\n");
 if (sim_idle_enab)
-    return sim_messagef (SCPE_NOFNC, "calibration can't be disabled when idling\n");
+    return sim_messagef (SCPE_NOFNC, "calibration can't be disabled with idle detection enabled\n");
 if ((cptr == NULL) || (*cptr == '\0')) {
     if (sim_timer_uncalib_base_time.tv_sec == 0)
         sim_rtcn_get_time (&sim_timer_uncalib_base_time, 0);
@@ -1498,12 +1499,15 @@ sim_timer_set_async (0, NULL);
 if (sim_timer_uncalib_base_time.tv_sec == 0)
     sim_rtcn_get_time (&sim_timer_uncalib_base_time, 0);
 sim_timer_calib_enabled = FALSE;
+sim_reset_time ();
 sim_precalibrate_ips = (uint32)(val * units);
 for (tmr=clocks=0; tmr<=SIM_NTIMERS; ++tmr) {
     RTC *rtc = &rtcs[tmr];
 
     if (rtc->hz != 0)
         rtc->initd = rtc->based = rtc->currd = sim_precalibrate_ips / rtc->hz;
+    if (rtc->last_hz != 0)
+        rtc->initd = rtc->based = rtc->currd = sim_precalibrate_ips / rtc->last_hz;
     }
 reset_all_p (0);
 return sim_messagef (SCPE_OK, "calibration disabled running at %s %s per pseudo second\n", 
@@ -2588,7 +2592,10 @@ return SCPE_OK;
   examining the behavior of the clock system (like a diagnostic).  Under 
   these conditions this clock is removed from the potential selection as
   "the" calibrated clock all others are relative to and if necessary, an
-  internal calibrated clock is selected.
+  internal calibrated clock is selected.  Additionally, any timer device
+  which is used in a way where the tick rate changes should never be a
+  calibrated clock.  The logic here will detect that and merely force
+  that clock to use calibration from the underlying calibrated clock.
  */
 static void _rtcn_configure_calibrated_clock (int32 newtmr)
 {
@@ -2601,9 +2608,7 @@ for (tmr=0; tmr<SIM_NTIMERS; tmr++) {
     rtc = &rtcs[tmr];
     if ((rtc->hz) &&                        /* is calibrated AND */
         (rtc->hz <= (uint32)sim_os_tick_hz) && /* slower than OS tick rate AND */
-        (rtc->clock_unit) &&                /* clock has been registered AND */
-        ((rtc->last_hz == 0) ||             /* first calibration call OR */
-         (rtc->last_hz == rtc->hz)))        /* subsequent calibration call with an unchanged tick rate */
+        (rtc->clock_unit))                  /* clock has been registered AND */
         break;
     }
 if (tmr == SIM_NTIMERS) {                   /* None found? */

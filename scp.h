@@ -150,6 +150,7 @@ double sim_activate_time_usecs (UNIT *uptr);
 t_stat sim_run_boot_prep (int32 flag);
 double sim_gtime (void);
 uint32 sim_grtime (void);
+void sim_reset_time (void);
 int32 sim_qcount (void);
 t_stat attach_unit (UNIT *uptr, CONST char *cptr);
 t_stat detach_unit (UNIT *uptr);

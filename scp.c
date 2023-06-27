@@ -1515,7 +1515,7 @@ static const char simh_help1[] =
       " When running in NOCALIBRATE mode, port speed pacing on telnet or serial\n"
       " connections will be affected and on serial connections data out any\n"
       " serial ports will likely get mangled.\n"
-       "4BASE\n"
+      "4BASE\n"
       " When running with calibration disabled, wall clock time within the\n"
       " simulator is not meaningfully related to the real wall clock time.\n"
       " Simulator devices may query what they believe to be the wall clock\n"
@@ -3071,9 +3071,7 @@ if (sim_tmpfile == NULL) {
     return EXIT_FAILURE;
     }
 stop_cpu = FALSE;
-sim_interval = 0;
-sim_time = sim_rtime = 0;
-noqueue_time = 0;
+sim_reset_time ();
 sim_clock_queue = QUEUE_LIST_END;
 sim_is_running = FALSE;
 sim_log = NULL;
@@ -3181,7 +3179,7 @@ if (!sim_quiet) {
     show_version (stdout, NULL, NULL, 0, NULL);
     }
 sim_timer_precalibrate_execution_rate ();
-sim_time = sim_rtime = 0;
+sim_reset_time ();
 show_version (stdnul, NULL, NULL, 1, NULL);             /* Quietly set SIM_OSTYPE */
 #if defined (HAVE_PCRE_H)
 setenv ("SIM_REGEX_TYPE", "PCRE", 1);                   /* Publish regex type */
@@ -9895,8 +9893,7 @@ t_stat r;
 /* reset queue */
 while (sim_clock_queue != QUEUE_LIST_END)
     sim_cancel (sim_clock_queue);
-sim_time = sim_rtime = 0;
-noqueue_time = sim_interval = 0;
+sim_reset_time ();
 r = reset_all (0);
 if ((r == SCPE_OK) && (flag == RU_RUN)) {
     if ((run_cmd_did_reset) && (0 == (sim_switches & SWMASK ('Q')))) {
@@ -12852,6 +12849,13 @@ uint32 sim_grtime (void)
 {
 UPDATE_SIM_TIME;
 return sim_rtime;
+}
+
+void sim_reset_time (void)
+{
+sim_interval = 0;
+sim_time = sim_rtime = 0;
+noqueue_time = 0;
 }
 
 /* sim_qcount - return queue entry count
@@ -17112,8 +17116,7 @@ sim_scp_dev.dctrl = 0xFFFFFFFF;
 /* reset queue */
 while (sim_clock_queue != QUEUE_LIST_END)
     sim_cancel (sim_clock_queue);
-sim_time = sim_rtime = 0;
-noqueue_time = sim_interval = 0;
+sim_reset_time ();
 
 /* queue test unit events */
 for (i = 0; i < dptr->numunits; i++) {
