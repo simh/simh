@@ -75,10 +75,8 @@
 #endif
 #include "pdp11_defs.h"
 #include "sim_disk.h"
-#include <math.h>
 
 #define UNIT_GETP(u)    ((u)->capac / (RC_NUMWD * RC_NUMSC * RC_NUMCY))
-#define UNIT_PLAT       (UNIT_M_PLAT << UNIT_V_PLAT)
 
 /* Constants */
 
@@ -89,10 +87,11 @@
 #define RC_NUMDK        4                               /* disks/controller */
 #define RC_WMASK        (RC_NUMWD * RC_NUMSC - 1)       /* word mask */
 
-#define RC_DRV(d)                                   \
-  { RC_NUMSC, d, RC_NUMCY, RC_NUMCY * RC_NUMSC * d, \
-     #d "P",  RC_NUMWD * 2, 0, NULL, 0, 0, NULL, \
-     "Set to " #d " platter device" }
+#define RC_DRV(d)                                       \
+  { RC_NUMSC, 1, RC_NUMCY * d, RC_NUMCY * RC_NUMSC * d, \
+    #d "P",  RC_NUMWD * sizeof (uint16),                \
+    DRVFL_DETAUTO, NULL,                                \
+    0, 0, NULL, "Set to " #d " platter device" }
 
 static DRVTYP drv_tab[] = {
     RC_DRV(1),
@@ -226,16 +225,16 @@ static const REG rc_reg[] = {
 static const MTAB rc_mod[] = {
     { MTAB_XTD|MTAB_VUN, 0, "PLATTERS", NULL,
         NULL, &sim_disk_show_drive_type, NULL, "Display Platters" },
-    { MTAB_XTD|MTAB_VUN,        1,  NULL, "AUTOSIZE", 
-        &sim_disk_set_autosize,  NULL, NULL, "set platters based on file size at attach" },
-    { MTAB_XTD|MTAB_VUN,        0,  NULL, "NOAUTOSIZE", 
-        &sim_disk_set_autosize,  NULL, NULL, "set platters based explicit platter setting"  },
-    { MTAB_XTD|MTAB_VUN,        0,  "AUTOSIZE", NULL, 
-        NULL, &sim_disk_show_autosize, NULL, "Display disk autosize on attach setting" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0020, "ADDRESS", "ADDRESS",
       &set_addr, &show_addr, NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR,    0, "VECTOR", "VECTOR",
       &set_vec,  &show_vec,  NULL, "Interrupt vector" },
+    { MTAB_XTD|MTAB_VUN,        1,  NULL, "AUTOSIZE", 
+        &sim_disk_set_autosize,  NULL, NULL, "Set platters based on file size at attach" },
+    { MTAB_XTD|MTAB_VUN,        1,  "AUTOSIZE", NULL, 
+        NULL,  &sim_disk_show_autosize, NULL, "Display setting that determines platters based on file size at attach" },
+    { MTAB_XTD|MTAB_VUN,        0,  NULL, "NOAUTOSIZE", 
+        &sim_disk_set_autosize,  NULL, NULL, "Disable setting platters based on size of file at attach"  },
     { 0 }
 };
 

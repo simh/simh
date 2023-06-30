@@ -1,6 +1,6 @@
 /* pdp11_rf.c: RF11 fixed head disk simulator
 
-   Copyright (c) 2006-2017, Robert M Supnik
+   Copyright (c) 2006-2023, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,9 +25,11 @@
 
    rf           RF11 fixed head disk
 
+   18-Jun-23    RMS     Fixed bug in DAE update (Tony Lawrence)
    13-Feb-17    RMS     Fixed CSR address in boot code (Paul Koning)
    23-Oct-13    RMS     Revised for new boot setup routine
    03-Sep-13    RMS     Added explicit void * cast
+                        Added WC to debug printout
    19-Mar-12    RMS     Fixed bug in updating mem addr extension (Peter Schorn)
    25-Dec-06    RMS     Fixed bug in unit mask (John Dundas)
    26-Jun-06    RMS     Cloned from RF08 simulator
@@ -43,14 +45,9 @@
 */
 
 #include "pdp11_defs.h"
-#include <math.h>
+#include "sim_disk.h"
 
-#define UNIT_V_AUTO     (UNIT_V_UF + 0)                 /* autosize */
-#define UNIT_V_PLAT     (UNIT_V_UF + 1)                 /* #platters - 1 */
-#define UNIT_M_PLAT     (RF_NUMDK - 1)
-#define UNIT_GETP(x)    ((((x) >> UNIT_V_PLAT) & UNIT_M_PLAT) + 1)
-#define UNIT_AUTO       (1 << UNIT_V_AUTO)
-#define UNIT_PLAT       (UNIT_M_PLAT << UNIT_V_PLAT)
+#define UNIT_GETP(u)    ((u)->capac / RF_DKSIZE)
 
 /* Constants */
 
@@ -59,6 +56,23 @@
 #define RF_DKSIZE       (RF_NUMTR * RF_NUMWD)           /* words/disk */
 #define RF_NUMDK        8                               /* disks/controller */
 #define RF_WMASK        (RF_NUMWD - 1)                  /* word mask */
+
+#define RF_DRV(d)                                     \
+  { RF_NUMWD, 1, RF_NUMTR * d, RF_DKSIZE * d, #d "P", \
+    sizeof (uint16), DRVFL_DETAUTO, NULL,             \
+    0, 0, NULL, "Set to " #d " platter device"}
+
+static DRVTYP drv_tab[] = {
+    RF_DRV(1),
+    RF_DRV(2),
+    RF_DRV(3),
+    RF_DRV(4),
+    RF_DRV(5),
+    RF_DRV(6),
+    RF_DRV(7),
+    RF_DRV(8),
+    { 0 }
+    };
 
 /* Parameters in the unit descriptor */
 
@@ -111,29 +125,28 @@
 #define GET_POS(x)      ((int) fmod (sim_gtime() / ((double) (x)), \
                         ((double) RF_NUMWD)))
 
-uint32 rf_cs = 0;                                       /* status register */
-uint32 rf_cma = 0;
-uint32 rf_wc = 0;
-uint32 rf_da = 0;                                       /* disk address */
-uint32 rf_dae = 0;
-uint32 rf_dbr = 0;
-uint32 rf_maint = 0;
-uint32 rf_wlk = 0;                                      /* write lock */
-uint32 rf_time = 10;                                    /* inter-word time */
-uint32 rf_burst = 1;                                    /* burst mode flag */
-uint32 rf_stopioe = 1;                                  /* stop on error */
+static uint32 rf_cs = 0;                                       /* status register */
+static uint32 rf_cma = 0;
+static uint32 rf_wc = 0;
+static uint32 rf_da = 0;                                       /* disk address */
+static uint32 rf_dae = 0;
+static uint32 rf_dbr = 0;
+static uint32 rf_maint = 0;
+static uint32 rf_wlk = 0;                                      /* write lock */
+static uint32 rf_time = 10;                                    /* inter-word time */
+static uint32 rf_burst = 1;                                    /* burst mode flag */
+static uint32 rf_stopioe = 1;                                  /* stop on error */
 
-t_stat rf_rd (int32 *data, int32 PA, int32 access);
-t_stat rf_wr (int32 data, int32 PA, int32 access);
-int32 rf_inta (void);
-t_stat rf_svc (UNIT *uptr);
-t_stat rf_reset (DEVICE *dptr);
-t_stat rf_boot (int32 unitno, DEVICE *dptr);
-t_stat rf_attach (UNIT *uptr, CONST char *cptr);
-t_stat rf_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
-uint32 update_rfcs (uint32 newcs, uint32 newdae);
-t_stat rf_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
-const char *rf_description (DEVICE *dptr);
+static t_stat rf_rd (int32 *data, int32 PA, int32 access);
+static t_stat rf_wr (int32 data, int32 PA, int32 access);
+static int32 rf_inta (void);
+static t_stat rf_svc (UNIT *uptr);
+static t_stat rf_reset (DEVICE *dptr);
+static t_stat rf_boot (int32 unitno, DEVICE *dptr);
+static t_stat rf_attach (UNIT *uptr, CONST char *cptr);
+static uint32 update_rfcs (uint32 newcs, uint32 newdae);
+static t_stat rf_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+static const char *rf_description (DEVICE *dptr);
 
 /* RF11 data structures
 
@@ -144,18 +157,15 @@ const char *rf_description (DEVICE *dptr);
 
 #define IOLN_RF         020
 
-DIB rf_dib = {
+static DIB rf_dib = {
     IOBA_AUTO, IOLN_RF, &rf_rd, &rf_wr,
     1, IVCL (RF), VEC_AUTO, {NULL}, IOLN_RF,
     };
 
 
-UNIT rf_unit = {
-    UDATA (&rf_svc, UNIT_FIX+UNIT_ATTABLE+
-           UNIT_BUFABLE+UNIT_MUSTBUF, RF_DKSIZE)
-    };
+static UNIT rf_unit = { 0 };
 
-REG rf_reg[] = {
+static REG rf_reg[] = {
     { ORDATAD (RFCS, rf_cs, 16, "control/status") },
     { ORDATAD (RFWC, rf_wc, 16, "word count") },
     { ORDATAD (RFCMA, rf_cma, 16, "current memory address") },
@@ -176,20 +186,19 @@ REG rf_reg[] = {
     { NULL }
     };
 
-MTAB rf_mod[] = {
-    { UNIT_PLAT, (0 << UNIT_V_PLAT), NULL, "1P", &rf_set_size, NULL, NULL, "set drive to one platter (256K)" },
-    { UNIT_PLAT, (1 << UNIT_V_PLAT), NULL, "2P", &rf_set_size, NULL, NULL, "set drive to two platters (512K)" },
-    { UNIT_PLAT, (2 << UNIT_V_PLAT), NULL, "3P", &rf_set_size, NULL, NULL, "set drive to three platters (768K)" },
-    { UNIT_PLAT, (3 << UNIT_V_PLAT), NULL, "4P", &rf_set_size, NULL, NULL, "set drive to four platters (1024K)" },
-    { UNIT_PLAT, (4 << UNIT_V_PLAT), NULL, "5P", &rf_set_size, NULL, NULL, "set drive to five platters (1280K)" },
-    { UNIT_PLAT, (5 << UNIT_V_PLAT), NULL, "6P", &rf_set_size, NULL, NULL, "set drive to six platters (1536K)" },
-    { UNIT_PLAT, (6 << UNIT_V_PLAT), NULL, "7P", &rf_set_size, NULL, NULL, "set drive to seven platters (1792K)" },
-    { UNIT_PLAT, (7 << UNIT_V_PLAT), NULL, "8P", &rf_set_size, NULL, NULL, "set drive to eight platters (2048K)" },
-    { UNIT_AUTO, UNIT_AUTO, "autosize", "AUTOSIZE", NULL, NULL, NULL, "set drive to autosize platters" },
+static MTAB rf_mod[] = {
+    { MTAB_XTD|MTAB_VUN, 0, "PLATTERS", NULL,
+        NULL, &sim_disk_show_drive_type, NULL, "Display Platters" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 010, "ADDRESS", "ADDRESS",
         &set_addr, &show_addr, NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", "VECTOR",
         &set_vec,  &show_vec,  NULL, "Interrupt vector" },
+    { MTAB_XTD|MTAB_VUN,        1,  NULL, "AUTOSIZE", 
+        &sim_disk_set_autosize,  NULL, NULL, "Set platters based on file size at attach" },
+    { MTAB_XTD|MTAB_VUN,        1,  "AUTOSIZE", NULL, 
+        NULL,  &sim_disk_show_autosize, NULL, "Display setting that determines platters based on file size at attach" },
+    { MTAB_XTD|MTAB_VUN,        0,  NULL, "NOAUTOSIZE", 
+        &sim_disk_set_autosize,  NULL, NULL, "Disable setting platters based on size of file at attach"  },
     { 0 }
     };
 
@@ -198,9 +207,9 @@ DEVICE rf_dev = {
     1, 8, 21, 1, 8, 16,
     NULL, NULL, &rf_reset,
     &rf_boot, &rf_attach, NULL,
-    &rf_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG, 0,
+    &rf_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG | DEV_DISK, 0,
     NULL, NULL, NULL, &rf_help, NULL, NULL,
-    &rf_description
+    &rf_description, NULL, &drv_tab
     };
 
 /* I/O dispatch routine, I/O addresses 17777460 - 17777476 */
@@ -270,8 +279,8 @@ switch ((PA >> 1) & 07) {                               /* decode PA<3:1> */
             rf_cs &= ~(RFCS_WCHK|RFCS_DPAR|RFCS_NED|RFCS_WLK|RFCS_MXFR|RFCS_DONE);
             CLR_INT (RF);
             if (DEBUG_PRS (rf_dev))
-                fprintf (sim_deb, ">>RF start: cs = %o, da = %o, ma = %o\n",
-                    update_rfcs (0, 0), GET_DEX (rf_dae) | rf_da, GET_MEX (rf_cs) | rf_cma);
+                fprintf (sim_deb, ">>RF start: cs = %o, da = %o, ma = %o, wc = %o\n",
+                    update_rfcs (0, 0), GET_DEX (rf_dae) | rf_da, GET_MEX (rf_cs) | rf_cma, rf_wc);
             }
         break;
 
@@ -382,7 +391,7 @@ do {
     } while ((rf_wc != 0) && (rf_burst != 0));          /* brk if wc, no brst */
 
 rf_da = da & DMASK;                                     /* split da */
-rf_dae = (rf_dae & ~RFDAE_DAE) | ((rf_da >> 16) & RFDAE_DAE);
+rf_dae = (rf_dae & ~RFDAE_DAE) | ((da >> 16) & RFDAE_DAE);
 rf_cma = ma & DMASK;                                    /* split ma */
 rf_cs = (rf_cs & ~RFCS_MEX) | ((ma >> (16 - RFCS_V_MEX)) & RFCS_MEX); 
 if ((rf_wc != 0) && ((rf_cs & RFCS_ERR) == 0))          /* more to do? */
@@ -424,6 +433,14 @@ return rf_cs;
 
 t_stat rf_reset (DEVICE *dptr)
 {
+static t_bool inited = FALSE;
+
+if (!inited) {
+    inited = TRUE;
+    rf_unit.action = &rf_svc;
+    rf_unit.flags = UNIT_FIX | UNIT_ATTABLE | UNIT_BUFABLE | UNIT_MUSTBUF | UNIT_BINK;
+    sim_disk_set_drive_type_by_name (&rf_unit, "1P");
+    }
 rf_cs = RFCS_DONE;
 rf_da = rf_dae = 0;
 rf_dbr = 0;
@@ -478,31 +495,8 @@ return SCPE_OK;
 
 t_stat rf_attach (UNIT *uptr, CONST char *cptr)
 {
-uint32 sz, p;
-uint32 ds_bytes = RF_DKSIZE * sizeof (int16);
-
-if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize_name (cptr))) {
-    p = (sz + ds_bytes - 1) / ds_bytes;
-    if (p >= RF_NUMDK)
-        p = RF_NUMDK - 1;
-    uptr->flags = (uptr->flags & ~UNIT_PLAT) |
-        (p << UNIT_V_PLAT);
-    }
-uptr->capac = UNIT_GETP (uptr->flags) * RF_DKSIZE;
-return attach_unit (uptr, cptr);
-}
-
-/* Change disk size */
-
-t_stat rf_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
-{
-if (val < 0)
-    return SCPE_IERR;
-if (uptr->flags & UNIT_ATT)
-    return SCPE_ALATT;
-uptr->capac = UNIT_GETP (val) * RF_DKSIZE;
-uptr->flags = uptr->flags & ~UNIT_AUTO;
-return SCPE_OK;
+return sim_disk_attach_ex (uptr, cptr, sizeof (uint16), sizeof (uint16), 
+                                TRUE, 0, uptr->drvtyp->name, FALSE, 0, NULL);
 }
 
 t_stat rf_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
