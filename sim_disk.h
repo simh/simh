@@ -207,7 +207,9 @@ struct DRVTYP {
 #define DRVFL_SETSIZE   (1u << DRVFL_V_SETSIZE) /* Settable Drive Size/Capacity */
 #define DRVFL_V_NOCHNG  (DRVFL_V_SETSIZE + 1)
 #define DRVFL_NOCHNG    (1u << DRVFL_V_NOCHNG)  /* Can't change drive type once set */
-#define DRVFL_V_NORMV   (DRVFL_V_NOCHNG + 1)
+#define DRVFL_V_DETAUTO (DRVFL_V_NOCHNG + 1)
+#define DRVFL_DETAUTO   (1u << DRVFL_V_DETAUTO) /* Don't Autosize attach, write metadata on detach*/
+#define DRVFL_V_NORMV   (DRVFL_V_DETAUTO + 1)
 #define DRVFL_NORMV     (1u << DRVFL_V_NORMV)   /* Can't change to a removable drive */
 #define DRVFL_V_QICTAPE (DRVFL_V_NORMV + 1)
 #define DRVFL_QICTAPE   (1u << DRVFL_V_QICTAPE) /* drive is a QIC (Quarter Inch Cartridge) tape */

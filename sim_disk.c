@@ -649,7 +649,7 @@ if ((uptr->drvtyp != NULL) &&
     return sim_messagef (SCPE_NOFNC, "%s: Autosizing Tapes is not supported\n", sim_uname (uptr));
 if (cptr != NULL)
     return sim_messagef (SCPE_ARG, "%s: Unexpected autosize argument: %s\n", sim_uname (uptr), cptr);
-if ((uptr->flags & UNIT_ATT) != 0)
+if (((uptr->flags & UNIT_ATT) != 0) && ((uptr->drvtyp == NULL) || ((uptr->drvtyp->flags & DRVFL_DETAUTO) == 0)))
     return sim_messagef (SCPE_ALATT, "%s: Disk already attached, autosizing not changed\n", sim_uname (uptr));
 if (val ^ ((uptr->flags & DKUF_NOAUTOSIZE) != 0))
     return SCPE_OK;
@@ -3070,6 +3070,10 @@ if (uptr->flags & UNIT_RO)
     return SCPE_RO;
 if (ctx == NULL)
     return SCPE_IERR;
+if ((uptr->drvtyp != NULL) && 
+    ((uptr->drvtyp->flags & DRVFL_DETAUTO) != 0) &&
+    ((uptr->flags & DKUF_NOAUTOSIZE) == 0))
+    store_disk_footer (uptr, uptr->drvtyp->name);
 f = ctx->footer;
 if (f == NULL)
     return SCPE_IERR;
@@ -3564,10 +3568,19 @@ if ((DK_GET_FMT (uptr) == DKUF_F_VHD) || (ctx->footer)) {
                     }
                 current_unit_size = ((t_offset)uptr->capac)*ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? ctx->sector_size : 1);
                 if (ctx->container_size > current_unit_size) {
+                    t_lba current_unit_sectors = (t_lba)((dptr->flags & DEV_SECTORS) ? uptr->capac : (uptr->capac*ctx->capac_factor)/ctx->sector_size);
+
                     if ((uptr->flags & UNIT_RO) != 0)                   /* Not Opening read only? */
                         r = sim_messagef (SCPE_OK, "%s: Read Only access to inconsistent drive type allowed\n", sim_uname (uptr));
-                    else
-                        r = sim_messagef (SCPE_INCOMPDSK, "%s: '%s' can only be attached Read Only\n", sim_uname (uptr), cptr);
+                    else {
+                        r = sim_messagef (SCPE_INCOMPDSK, "%s: Too large container having %u sectors, drive has: %u sectors\n", sim_uname (uptr), container_sectors, current_unit_sectors);
+                        if ((uptr->flags & UNIT_ROABLE) == 0) {
+                            r = sim_messagef (SCPE_INCOMPDSK, "%s: Drive type doesn't support Read Only attach\n", sim_uname (uptr));
+                            }
+                        else {
+                            r = sim_messagef (SCPE_INCOMPDSK, "%s: '%s' can only be attached Read Only\n", sim_uname (uptr), cptr);
+                            }
+                        }
                     }
                 }
             else { /* Type already matches, Need to confirm compatibility */
@@ -3961,9 +3974,10 @@ if ((uptr->flags & UNIT_RO) == 0) {     /* Opened Read/Write? */
         }
     sim_quiet = saved_quiet;
     }
-if (dtype && (created                                                       || 
-              (autosized && (ctx->footer == NULL))                          || 
-              (!created && (ctx->container_size == 0) && (ctx->footer == NULL))))
+if (dtype && ((uptr->drvtyp == NULL) ? TRUE : ((uptr->drvtyp->flags & DRVFL_DETAUTO) == 0)) &&
+    (created                                                       || 
+     (autosized && (ctx->footer == NULL))                          || 
+     (!created && (ctx->container_size == 0) && (ctx->footer == NULL))))
     store_disk_footer (uptr, (uptr->drvtyp == NULL) ? dtype : uptr->drvtyp->name);
 
 #if defined (SIM_ASYNCH_IO)
@@ -3993,6 +4007,8 @@ if (uptr->flags & UNIT_BUFABLE) {                       /* buffer in memory? */
     uptr->hwmark = (sectsread * ctx->sector_size) / ctx->xfer_encode_size;
     memcpy (uptr->filebuf2, uptr->filebuf, (size_t)ctx->container_size);/* save initial contents */
     uptr->flags |= UNIT_BUF;                            /* mark as buffered */
+    if ((uptr->hwmark * ctx->xfer_encode_size) < current_unit_size)/* Make sure the container on disk has all the data (zero fill as needed) */
+        sim_disk_wrsect (uptr, 0, (uint8 *)uptr->filebuf, NULL, (t_seccnt)(current_unit_size / ctx->sector_size));
     }
 if (DK_GET_FMT (uptr) != DKUF_F_STD)
     uptr->dynflags |= UNIT_NO_FIO;
@@ -4056,6 +4072,7 @@ free (uptr->filebuf2);
 uptr->filebuf2 = NULL;
 
 update_disk_footer (uptr);                              /* Update meta data if highwater has changed */
+fileref = uptr->fileref;                                /* update local copy used after unit cleanup */
 
 auto_format = ctx->auto_format;                         /* save for update after unit cleanup */
 
@@ -4072,6 +4089,7 @@ free (uptr->filename);
 uptr->filename = NULL;
 uptr->fileref = NULL;
 free (ctx->footer);
+ctx->footer = NULL;
 uptr->drvtyp = ctx->initial_drvtyp;                     /* restore drive type */
 uptr->capac = ctx->initial_capac;                       /* restore drive size */
 free (uptr->disk_ctx);
