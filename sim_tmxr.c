@@ -79,6 +79,7 @@
    tmxr_clear_modem_control_passthru -  disable modem control on a multiplexer
    tmxr_set_port_speed_control -        Declare that tmxr_set_config_line is used
    tmxr_clear_port_speed_control -      Declare that tmxr_set_config_line is not used
+   tmxr_set_backlog -                   set listen backlog
    tmxr_set_line_port_speed_control -   Declare that tmxr_set_config_line is used for line
    tmxr_clear_line_port_speed_control - Declare that tmxr_set_config_line is not used for line
    tmxr_set_get_modem_bits -            set and/or get a line modem bits
@@ -243,15 +244,15 @@
 
      The command syntax for a single line device (MX) is:
 
-        sim> attach MX port{;notelnet}|{;nomessage}
+        sim> attach MX port{;backlog=n}{;notelnet}|{;nomessage}
         sim> attach MX Connect=serN{;config}
         sim> attach MX Connect=COM9{;config}
         sim> attach MX Connect=host:port{;notelnet}|{;nomessage}
 
      The command syntax for ANY multi-line device is:
 
-        sim> attach MX port{;notelnet}|{;nomessage}         ; Defines the master listening port for the mux and optionally allows non-telnet (i.e. raw socket) operation for all lines.
-        sim> attach MX Line=n,port{;notelnet}|{;nomessage}  ; Defines a line specific listen port for a particular line. Each line can have a separate listen port and the mux can have its own as well.  Optionally disable telnet wire protocol (i.e. raw socket)
+        sim> attach MX port{;backlog=n}{;notelnet}|{;nomessage} ; Defines the master listening port for the mux and optionally allows non-telnet (i.e. raw socket) operation for all lines.
+        sim> attach MX Line=n,port{;backlog=n}{;notelnet}|{;nomessage}  ; Defines a line specific listen port for a particular line. Each line can have a separate listen port and the mux can have its own as well.  Optionally disable telnet wire protocol (i.e. raw socket)
         sim> attach MX Line=n,Connect=serN{;config}        ; Connects line n to simh generic serial port N (port list visible with the sim> SHOW SERIAL command), the optional ";config" data specifies the speed, parity and stop bits for the connection
                                                            ; DTR (and RTS) will be raised at attach time and will drop at detach/disconnect time
         sim> attach MX Line=n,Connect=host:port{;notelnet} ; Causes a connection to be established to the designated host:port.  The actual connection will happen in a non-blocking fashion and will be completed and/or re-established by the normal tmxr_poll_conn activities
@@ -915,7 +916,11 @@ if (tptr == NULL)                                       /* no more mem? */
     return tptr;
 
 if (mp->port) {                                         /* copy port */
-    sprintf (growstring(&tptr, 33 + strlen (mp->port)), "%s%s", mp->port, 
+    char backlog[32] = "";
+
+    if (mp->backlog != 0)
+        snprintf (backlog, sizeof (backlog), ";backlog=%u", mp->backlog);
+    sprintf (growstring(&tptr, 33 + strlen (mp->port)), "%s%s%s", mp->port, backlog,
                                                                 mp->notelnet ? ";notelnet" : 
                                                                                (mp->nomessage ? ";nomessage" : 
                                                                                                 ""));
@@ -998,7 +1003,11 @@ if (lp->destination || lp->port || lp->txlogname || (lp->conn == TMXR_LINE_DISAB
     if (lp->mp->packet != lp->packet)
         sprintf (growstring(&tptr, 8), ",Packet");
     if (lp->port) {
-        sprintf (growstring(&tptr, 32 + strlen (lp->port)), ",%s%s%s", lp->port, 
+        char backlog[32] = "";
+
+        if (lp->backlog != 0)
+            snprintf (backlog, sizeof (backlog), ";backlog=%u", lp->backlog);
+        sprintf (growstring(&tptr, 64 + strlen (lp->port)), ",%s%s%s%s", lp->port, backlog,
                                                                        ((lp->mp->notelnet != lp->notelnet) && (!lp->datagram)) ? (lp->notelnet ? ";notelnet" : ";telnet") : "", 
                                                                        ((lp->mp->nomessage != lp->nomessage) && (!lp->datagram)) ? (lp->nomessage ? ";nomessage" : ";message") : "");
         if (lp->acl) {                                      /* copy acl in pieces */
@@ -1216,6 +1225,8 @@ if (mp->master) {
                 lp = mp->ldsc + i;                          /* get line desc */
                 lp->conn = TRUE;                            /* record connection */
                 lp->sock = newsock;                         /* save socket */
+                free (address);
+                sim_getnames_sock (lp->sock, NULL, &address);
                 lp->ipad = address;                         /* ip address */
                 tmxr_init_line (lp);                        /* init line */
                 lp->notelnet = mp->notelnet;                /* apply mux default telnet setting */
@@ -1709,6 +1720,16 @@ mp->port_speed_control = FALSE;
 for (i=0; i<mp->lines; ++i)
     mp->ldsc[i].port_speed_control = mp->port_speed_control;
 sim_debug (TMXR_DBG_CFG, mp->dptr, "Speed Mode: Disabled\n");
+return SCPE_OK;
+}
+
+/* Specify a non-default listen backlog.
+
+   The default listen backlog is 0.  This API overrides that default.
+*/
+t_stat tmxr_set_backlog (TMXR *mp, int32 backlog)
+{
+mp->backlog = backlog;
 return SCPE_OK;
 }
 
@@ -2899,6 +2920,7 @@ SOCKET sock;
 SERHANDLE serport;
 CONST char *tptr = cptr;
 t_bool nolog, notelnet, listennotelnet, nomessage, listennomessage, modem_control, loopback, datagram, packet, disabled;
+int32 listenbacklog;
 TMLN *lp;
 t_stat r = SCPE_OK;
 
@@ -2914,6 +2936,7 @@ for (i = 0; i < mp->lines; i++) {               /* initialize lines */
     }
 notelnet = listennotelnet = mp->notelnet;
 nomessage = listennomessage = mp->nomessage;
+listenbacklog = mp->backlog;
 mp->ring_sock = INVALID_SOCKET;
 free (mp->ring_ipad);
 mp->ring_ipad = NULL;
@@ -3099,7 +3122,7 @@ while (*tptr) {
             cptr = init_cptr;
             }
         cptr = get_glyph_nc (cptr, port, ';');
-        sock = sim_master_sock (port, &r);                      /* make master socket to validate port */
+        sock = sim_master_sock (port, &r);                  /* make master socket to validate port */
         if (r)
             return sim_messagef (SCPE_ARG, "Invalid Port Specifier: %s\n", port);
         if (sock == INVALID_SOCKET)                             /* open error */
@@ -3140,7 +3163,13 @@ while (*tptr) {
                                     strlcat (acl, option + 7, sizeof (acl));
                                     }
                                 else
-                                    return sim_messagef (SCPE_ARG, "Invalid Specifier: %s\n", option);
+                                    if (0 == memcmp (option, "BACKLOG=", 8)) {
+                                        listenbacklog = (int32) get_uint (option + 8, 10, SOMAXCONN, &r);
+                                        if (r)
+                                            return sim_messagef (SCPE_ARG, "Invalid Listen Backlog: %s\n", option + 8);
+                                        }
+                                    else
+                                        return sim_messagef (SCPE_ARG, "Invalid Specifier: %s\n", option);
             cptr = get_glyph (cptr, option, ';');
             }
         }
@@ -3298,7 +3327,11 @@ while (*tptr) {
         if (lp->framer)
             continue;                                       /* skip framer lines */
         if ((listen[0]) && (!datagram)) {
-            sock = sim_master_sock (listen, &r);            /* make master socket */
+            sock = sim_master_sock_ex (listen, &r,          /* make master socket */
+                                       ((sim_switches & SWMASK ('U')) ? SIM_SOCK_OPT_REUSEADDR : 0) |
+                                       (mp->packet ? SIM_SOCK_OPT_NODELAY : 0)                      |
+                                       SIM_SOCK_OPT_SET_BACKLOG(listenbacklog));
+
             if (r)
                 return sim_messagef (SCPE_ARG, "Invalid network listen port: %s\n", listen);
             if (sock == INVALID_SOCKET)                     /* open error */
@@ -3319,6 +3352,7 @@ while (*tptr) {
             mp->ring_start_time = 0;
             mp->notelnet = listennotelnet;                  /* save desired telnet behavior flag */
             mp->nomessage = listennomessage;                /* save desired telnet behavior flag */
+            mp->backlog = listenbacklog;                    /* save desired listening port backlog */
             if (acl[0])
                 mp->acl = strdup (acl);                     /* save specified access control list */
             for (i = 0; i < mp->lines; i++) {               /* initialize lines */
@@ -3517,7 +3551,14 @@ while (*tptr) {
         if ((listen[0]) && (!datagram)) {
             if ((mp->lines == 1) && (mp->master))
                 return sim_messagef (SCPE_ARG, "Single Line MUX can have either line specific OR MUX listener but NOT both\n");
-            sock = sim_master_sock (listen, &r);            /* make master socket */
+            if (listenbacklog != mp->backlog)
+                lp->backlog = listenbacklog;
+            else
+                lp->backlog = mp->backlog;
+            sock = sim_master_sock_ex (listen, &r,          /* make master socket */
+                                       ((sim_switches & SWMASK ('U')) ? SIM_SOCK_OPT_REUSEADDR : 0) |
+                                       (lp->packet ? SIM_SOCK_OPT_NODELAY : 0)                      |
+                                       SIM_SOCK_OPT_SET_BACKLOG(lp->backlog));
             if (r)
                 return sim_messagef (SCPE_ARG, "Invalid Listen Specification: %s\n", listen);
             if (sock == INVALID_SOCKET)                     /* open error */
@@ -4326,7 +4367,7 @@ if (single_line) {          /* Single Line Multiplexer */
         fprintf (st, "passing port configuration information and modem signals.\n");
         }
     fprintf (st, "A Telnet listening port can be configured with:\n\n");
-    fprintf (st, "   sim> ATTACH %s {interface:}port\n\n", dptr->name);
+    fprintf (st, "   sim> ATTACH %s {interface:}port{;backlog=n}\n\n", dptr->name);
     fprintf (st, "Connections to the specified port, by default, will be unrestricted.\n");
     fprintf (st, "Connections from particular IPv4 or IPv6 addresses can be restricted\n");
     fprintf (st, "or allowed based on rules you can add to the \"{interface:}port\"\n");
@@ -4502,7 +4543,7 @@ else {
     fprintf (st, "   sim> ATTACH -V %s Line=n,Connect=SerN\n\n", dptr->name);
     fprintf (st, "Line specific tcp listening ports are supported.  These are configured\n");
     fprintf (st, "using commands of the form:\n\n");
-    fprintf (st, "   sim> ATTACH %s Line=n,{interface:}port{;notelnet}|{;nomessage}\n\n", dptr->name);
+    fprintf (st, "   sim> ATTACH %s Line=n,{interface:}port{;notelnet}{;nomessage}{;backlog=n}\n\n", dptr->name);
     fprintf (st, "Connections to the specified port, by default, will be unrestricted.\n");
     fprintf (st, "Connections from particular IPv4 or IPv6 addresses can be restricted\n");
     fprintf (st, "or allowed based on rules you can add to the \"{interface:}port\"\n");

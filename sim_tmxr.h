@@ -136,6 +136,7 @@ struct tmln {
     SOCKET              master;                         /* line specific master socket */
     char                *port;                          /* line specific listening port */
     char                *acl;                           /* Access control list (CIDR) to accept or reject connects from */
+    uint32              backlog;                        /* line specific listening backlog */
     int32               acl_accepted_sessions;          /* count of ACL accepted tcp connections */
     int32               acl_rejected_sessions;          /* count of ACL rejected tcp connections */
     int32               sessions;                       /* count of tcp connections received */
@@ -218,6 +219,7 @@ struct tmxr {
     char                *acl;                           /* Access control list (CIDR) to accept or reject connects from */
     int32               acl_accepted_sessions;          /* count of ACL accepted tcp connections */
     int32               acl_rejected_sessions;          /* count of ACL rejected tcp connections */
+    uint32              backlog;                        /* listen backlog */
     UNIT                *uptr;                          /* polling unit (connection) */
     char                logfiletmpl[FILENAME_MAX];      /* template logfile name */
     int32               txcount;                        /* count of transmit bytes */
@@ -265,6 +267,7 @@ t_stat tmxr_set_nomessage (TMXR *mp);
 t_stat tmxr_clear_nomessage (TMXR *mp);
 t_stat tmxr_set_port_speed_control (TMXR *mp);
 t_stat tmxr_clear_port_speed_control (TMXR *mp);
+t_stat tmxr_set_backlog (TMXR *mp, int32 backlog);
 t_stat tmxr_set_line_port_speed_control (TMXR *mp, int line);
 t_stat tmxr_clear_line_port_speed_control (TMXR *mp, int line);
 t_stat tmxr_set_get_modem_bits (TMLN *lp, int32 bits_to_set, int32 bits_to_clear, int32 *incoming_bits);
