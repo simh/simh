@@ -33,11 +33,11 @@
    The MM-103 uses the Motorola MC6860L digital modem chip. This device does
    not have the ability to emulate the modulation and demodulation functions
    or the ability to connect to a phone line. All modem features, such as
-   switch hook, dialtone detection, and dialing, are emulated in such a way
+   switch hook, dial tone detection, and dialing, are emulated in such a way
    that most software written for the MM-103 should function in some useful
    fashion.
 
-   To provide any useful funcationality, this device need to be attached to
+   To provide any useful functionality, this device need to be attached to
    a socket or serial port. Enter "HELP PMMI" at the "simh>" prompt for
    additional information.
 */
@@ -222,10 +222,10 @@ static REG pmmi_reg[] = {
 };
 
 DEVICE pmmi_dev = {
-    PMMI_SNAME,  /* name */
-    pmmi_unit,   /* unit */
-    pmmi_reg,    /* registers */
-    pmmi_mod,    /* modifiers */
+    PMMI_SNAME,   /* name */
+    pmmi_unit,    /* unit */
+    pmmi_reg,     /* registers */
+    pmmi_mod,     /* modifiers */
     1,            /* # units */
     10,           /* address radix */
     31,           /* address width */
@@ -236,18 +236,18 @@ DEVICE pmmi_dev = {
     NULL,         /* deposit routine */
     &pmmi_reset,  /* reset routine */
     NULL,         /* boot routine */
-    &pmmi_attach,         /* attach routine */
-    &pmmi_detach,         /* detach routine */
-    &pmmi_ctx,           /* context */
-    (DEV_DISABLE | DEV_DIS | DEV_DEBUG | DEV_MUX),  /* flags */
-    0,                            /* debug control */
-    pmmi_dt,                           /* debug flags */
-    NULL,                                 /* mem size routine */
-    NULL,                                 /* logical name */
-    NULL,                                 /* help */
-    NULL,                                 /* attach help */
-    NULL,                                 /* context for help */
-    &pmmi_description                    /* description */
+    &pmmi_attach, /* attach routine */
+    &pmmi_detach, /* detach routine */
+    &pmmi_ctx,    /* context */
+    (DEV_DISABLE | DEV_DIS | DEV_DEBUG | DEV_MUX), /* flags */
+    0,            /* debug control */
+    pmmi_dt,      /* debug flags */
+    NULL,         /* mem size routine */
+    NULL,         /* logical name */
+    NULL,         /* help */
+    NULL,         /* attach help */
+    NULL,         /* context for help */
+    &pmmi_description /* description */
 };
 
 static const char* pmmi_description(DEVICE *dptr)
@@ -266,7 +266,7 @@ static t_stat pmmi_reset(DEVICE *dptr)
     /* Set DEVICE for this UNIT */
     dptr->units[0].dptr = dptr;
 
-    /* Enable TMXR modem control passthru */
+    /* Enable TMXR modem control passthrough */
     tmxr_set_modem_control_passthru(pmmi_ctx.tmxr);
 
     /* Reset status registers */
@@ -571,7 +571,7 @@ static t_stat pmmi_config_line(UNIT *uptr)
     ** to run irrelevant, old software, that use TMXR and
     ** rely on some semblance of timing (Remote CP/M, BYE,
     ** RBBS, PCGET/PUT, Xmodem, MEX, Modem7, or most
-    ** other communications software), on contemprary
+    ** other communications software), on contemporary
     ** hardware.
     **
     ** Serial ports are self-limiting and sockets will run
@@ -626,8 +626,8 @@ static int32 pmmi_reg0(int32 io, int32 data)
     } else { pmmi_ctx.oreg0 = data; /* Set UART configuration */
         pmmi_config_line(&pmmi_dev.units[0]);
 
-        if (data & PMMI_SH) {    /* If off-hook, clear dialtone bit (active low) */
-            pmmi_ctx.dtimer = sim_os_msec() + 500;  /* Dialtone in 500ms */
+        if (data & PMMI_SH) {    /* If off-hook, clear dial tone bit (active low) */
+            pmmi_ctx.dtimer = sim_os_msec() + 500;  /* Dial tone in 500ms */
             if (pmmi_ctx.oreg0 & PMMI_SH) {
                 pmmi_ctx.ireg2 &= ~PMMI_AP;   /* Answer Phone Bit (active low) */
             }

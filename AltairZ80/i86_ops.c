@@ -78,7 +78,7 @@ extern uint32 in(const uint32 Port);
   to the 256 byte-"opcodes" found on the 8086.  The table which
   dispatches this is found in the files optab.[ch].
 
-  Each opcode proc has a comment preceeding it which gives it's table
+  Each opcode proc has a comment preceding it which gives it's table
   address.  Several opcodes are missing (undefined) in the table.
 
   Each proc includes information for decoding (DECODE_PRINTF and
@@ -3100,7 +3100,7 @@ static void i86op_movs_byte(PC_ENV *m)
      inc = 1;
    if (m->sysmode & (SYSMODE_PREFIX_REPE | SYSMODE_PREFIX_REPNE))
        {
-      /* dont care whether REPE or REPNE */
+      /* don't care whether REPE or REPNE */
       /* move them until CX is ZERO. */
       while (m->R_CX != 0)
         {
@@ -3133,7 +3133,7 @@ static void i86op_movs_word(PC_ENV *m)
      inc = 2;
    if (m->sysmode & (SYSMODE_PREFIX_REPE | SYSMODE_PREFIX_REPNE))
        {
-      /* dont care whether REPE or REPNE */
+      /* don't care whether REPE or REPNE */
       /* move them until CX is ZERO. */
       while (m->R_CX != 0)
         {
@@ -3291,7 +3291,7 @@ static void i86op_stos_byte(PC_ENV *m)
      inc = 1;
    if (m->sysmode & (SYSMODE_PREFIX_REPE | SYSMODE_PREFIX_REPNE))
        {
-      /* dont care whether REPE or REPNE */
+      /* don't care whether REPE or REPNE */
       /* move them until CX is ZERO. */
       while (m->R_CX != 0)
         {
@@ -3319,7 +3319,7 @@ static void i86op_stos_word(PC_ENV *m)
      inc = 2;
    if (m->sysmode & (SYSMODE_PREFIX_REPE | SYSMODE_PREFIX_REPNE))
        {
-      /* dont care whether REPE or REPNE */
+      /* don't care whether REPE or REPNE */
       /* move them until CX is ZERO. */
       while (m->R_CX != 0)
         {
@@ -3347,7 +3347,7 @@ static void i86op_lods_byte(PC_ENV *m)
      inc = 1;
    if (m->sysmode & (SYSMODE_PREFIX_REPE | SYSMODE_PREFIX_REPNE))
        {
-      /* dont care whether REPE or REPNE */
+      /* don't care whether REPE or REPNE */
       /* move them until CX is ZERO. */
       while (m->R_CX != 0)
         {
@@ -3375,7 +3375,7 @@ static void i86op_lods_word(PC_ENV *m)
      inc = 2;
    if (m->sysmode & (SYSMODE_PREFIX_REPE | SYSMODE_PREFIX_REPNE))
        {
-      /* dont care whether REPE or REPNE */
+      /* don't care whether REPE or REPNE */
       /* move them until CX is ZERO. */
       while (m->R_CX != 0)
         {

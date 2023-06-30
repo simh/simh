@@ -111,7 +111,7 @@ typedef struct {
 typedef struct {
     uint8 dd;       /* Controls density on write DD=1 for double density and DD=0 for single density. */
     uint8 ss;       /* Specifies the side of a double-sided diskette. The bottom side (and only side of a single-sided diskette) is selected when SS=0. The second (top) side is selected when SS=1. */
-    uint8 dp;       /* has shared use. During stepping operations, DP=O specifies a step out and DP=1 specifies a step in. During write operations, write procompensation is invoked if and only if DP=1. */
+    uint8 dp;       /* has shared use. During stepping operations, DP=O specifies a step out and DP=1 specifies a step in. During write operations, write precompensation is invoked if and only if DP=1. */
     uint8 st;       /* controls the level of the head step signal to the disk drives. */
     uint8 pst;      /* value of step signal (st) on previous order */
     uint8 ds;       /* is the drive select field, encoded as follows: */
@@ -270,7 +270,7 @@ static DEBTAB mdsad_dt[] = {
     { "STATUS",     STATUS_MSG,         "Status messages"       },
     { "ORDERS",     ORDERS_MSG,         "Orders messages"       },
     { "RDDETAIL",   RD_DATA_DETAIL_MSG, "Read detail messages"  },
-    { "WRDETAIL",   WR_DATA_DETAIL_MSG, "Write detail messags"  },
+    { "WRDETAIL",   WR_DATA_DETAIL_MSG, "Write detail messages" },
     { NULL,         0                                           }
 };
 

@@ -1,6 +1,6 @@
 /*  m68kcpmsim.c: CP/M for Motorola 68000 definitions
 
- Copyright (c) 2014, Peter Schorn
+ Copyright (c) 2014 - 2023, Peter Schorn
 
  Permission is hereby granted, free of charge, to any person obtaining a
  copy of this software and associated documentation files (the "Software"),
@@ -48,7 +48,7 @@
  sector number to the sector register. This write triggers the requested
  operation. The status of the operation can be determined by reading the
  status register.
- A zero indicates that no error occured.
+ A zero indicates that no error occurred.
 
  Note that these operations invoke read() and write() system calls directly
  so that they will alter the image on the hard disk. KEEP BACKUPS!
@@ -98,7 +98,7 @@
 
 /* Memory-mapped IO ports */
 
-/* 6850 serial port like thing. Implements a reduced set of functionallity. */
+/* 6850 serial port like thing. Implements a reduced set of functionality. */
 #define MC6850_STAT     0xff1000L   // command/status register
 #define MC6850_DATA     0xff1002L   // receive/transmit data register
 
@@ -335,7 +335,7 @@ static int MC6850_device_ack(void) {
 
 static void MC6850_data_write(uint32 value) {
     sim_putchar(value);
-    if ((m68k_MC6850_control & 0x60) == 0x20) { // transmit interupt enabled?
+    if ((m68k_MC6850_control & 0x60) == 0x20) { // transmit interrupt enabled?
         int_controller_clear(IRQ_MC6850);
         int_controller_set(IRQ_MC6850);
     }

@@ -483,7 +483,7 @@ static uint8 SS1_Write(const uint32 Addr, uint8 cData)
 
     switch(Addr & 0x0F) {
         case SS1_S8259_L:
-            sel_pic = SLAVE_PIC;    /* intentional falltrough */
+            sel_pic = SLAVE_PIC;    /* intentional fallthrough */
         case SS1_M8259_L:
             if(cData & 0x10) {
                 sim_debug(PIC_MSG, &ss1_dev, "SS1: " ADDRESS_FORMAT

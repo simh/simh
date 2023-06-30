@@ -973,7 +973,7 @@ static DEBTAB dj2d_dt[] = {
     { "WRITE",      WR_DATA_MSG,        "Write messages"        },
     { "STATUS",     STATUS_MSG,         "Status messages"       },
     { "RDDETAIL",   RD_DATA_DETAIL_MSG, "Read detail messages"  },
-    { "WRDETAIL",   WR_DATA_DETAIL_MSG, "Write detail messags"  },
+    { "WRDETAIL",   WR_DATA_DETAIL_MSG, "Write detail messages" },
     { "VERBOSE",    VERBOSE_MSG,        "Verbose messages"      },
     { "DEBUG",      DEBUG_MSG,          "Debug messages"        },
     { NULL,         0                                           }
@@ -2075,7 +2075,7 @@ static uint32 DJ2D_WriteSector(UNIT *uptr, uint8 track, uint8 sector, uint8 *buf
     }
 
     rtn = sim_fwrite(buffer, 1, len, uptr->fileref);
- 
+
     sim_debug(WR_DATA_MSG, &dj2d_dev, DJ2D_SNAME ": WRITESEC track %03d sector %03d at offset %08llX len %d rtn=%d\n", track, sector, sec_offset, len, rtn);
 
     return rtn;

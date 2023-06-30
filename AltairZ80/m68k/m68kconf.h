@@ -140,7 +140,7 @@
  * the exception occurs normally.
  * The callback looks like int callback(int opcode)
  * You should put OPT_SPECIFY_HANDLER here if you cant to use it, otherwise it will
- * use a dummy default handler and you'll have to call m68k_set_illg_instr_callback explicitely
+ * use a dummy default handler and you'll have to call m68k_set_illg_instr_callback explicitly
  */
 #define M68K_ILLG_HAS_CALLBACK      OPT_OFF
 #define M68K_ILLG_CALLBACK(opcode)  op_illg(opcode)
@@ -199,7 +199,7 @@
  */
 
 
-/* If ON, the enulation core will use 64-bit integers to speed up some
+/* If ON, the emulation core will use 64-bit integers to speed up some
  * operations.
 */
 #define M68K_USE_64_BIT  OPT_ON

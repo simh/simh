@@ -529,7 +529,7 @@ static uint8 DJHDC_Write(const uint32 Addr, uint8 cData)
     /* Point IOPB to new link */
     djhdc_info->link_addr = next_link;
 
-    /* Read remaineder of IOPB */
+    /* Read remainder of IOPB */
     for(i = 0; i < DJHDC_IOPB_LEN-3; i++) {
         djhdc_info->iopb[i] = GetByteDMA((djhdc_info->link_addr) + i);
     }

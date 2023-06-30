@@ -190,7 +190,7 @@ static REG scp300f_reg[] = {
     { HRDATAD(SPIC_OCW2,   scp300f_pic[SLAVE_PIC].OCW2,     8,  "Slave OCW2 register"),     },
     { HRDATAD(SPIC_OCW3,   scp300f_pic[SLAVE_PIC].OCW3,     8,  "Slave OCW3 register"),     },
 
-    { HRDATAD(9513_HUND,   data9513[0],                     8,  "9513 Hundreths"),          },
+    { HRDATAD(9513_HUND,   data9513[0],                     8,  "9513 Hundredths"),         },
     { HRDATAD(9513_SS,     data9513[1],                     8,  "9513 Seconds"),            },
     { HRDATAD(9513_MM,     data9513[2],                     8,  "9513 Minutes"),            },
     { HRDATAD(9513_HH,     data9513[3],                     8,  "9513 Hours"),              },
@@ -709,7 +709,7 @@ static uint8 SCP300F_Write(const uint32 Addr, uint8 cData)
 
     switch(Addr & SCP300F_IO_MASK) {
         case SCP300F_SPIC_0:
-            sel_pic = SLAVE_PIC;    /* intentional falltrough */
+            sel_pic = SLAVE_PIC;    /* intentional fallthrough */
         case SCP300F_MPIC_0:
             if (cData & 0x10) {
                 sim_debug(PIC_MSG, &scp300f_dev, "SCP300F: " ADDRESS_FORMAT

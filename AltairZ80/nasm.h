@@ -11,8 +11,6 @@
 #ifndef NASM_NASM_H
 #define NASM_NASM_H
 
-#include <stdio.h>
-
 #ifndef NULL
 #define NULL 0
 #endif

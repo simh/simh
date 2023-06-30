@@ -65,7 +65,7 @@
    We get many calls on how to interface terminals to the 2SIO. The
    problem is that the Asynchronous Communications Interface Adapter's
    (ACIA) handshaking signals make interfacing with the 2SIO a
-   somewhat complicated matter. An explaination of the signals and
+   somewhat complicated matter. An explanation of the signals and
    their function should make the job easier. The three handshaking
    signals--Data Carrier Detect (DCD), Request to Send (RTS) and
    Clear to Send (CTS)--permit limited control of a modem or
@@ -79,8 +79,8 @@
    section is inhibited and no data can be received by the ACIA.
 
    Information from the two input signals, CTS and DCD, is present in
-   the ACIA status register. Bit 2 represents *DCD, and bit 3 repre-
-   sents *CTS. When bit 2 is high, DCD is inactive. When bit 3 is high,
+   the ACIA status register. Bit 2 represents *DCD, and bit 3
+   represents *CTS. When bit 2 is high, DCD is inactive. When bit 3 is high,
    CTS is inactive. When bit 2 goes low, valid data is sent to the ACIA.
    When bit 3 goes low, data can be transmitted.
 
@@ -395,7 +395,7 @@ static t_stat m2sio_reset(DEVICE *dptr, int32 (*routine)(const int32, const int3
     c = getClockFrequency() / 5;
     dptr->units[0].wait = (c && c < 1000) ? c : 1000;
 
-    /* Enable TMXR modem control passthru */
+    /* Enable TMXR modem control passthrough */
     tmxr_set_modem_control_passthru(xptr->tmxr);
 
     /* Reset status registers */
@@ -665,7 +665,7 @@ static t_stat m2sio_config_line(UNIT *uptr)
         ** to run irrelevant, old software, that use TMXR and
         ** rely on some semblance of timing (Remote CP/M, BYE,
         ** RBBS, PCGET/PUT, Xmodem, MEX, Modem7, or most
-        ** other communications software), on contemprary
+        ** other communications software), on contemporary
         ** hardware.
         **
         ** Serial ports are self-limiting and sockets will run

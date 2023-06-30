@@ -1,6 +1,6 @@
 /*  altairz80_cpu.c: MITS Altair CPU (8080 and Z80)
 
-    Copyright (c) 2002-2014, Peter Schorn
+    Copyright (c) 2002-2023, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -451,7 +451,7 @@ REG cpu_reg[] = {
     }, /* 65 M68K, PREF_ADDR            */
     { HRDATAD (M68K_PREF_DATA,  m68k_registers[M68K_REG_PREF_DATA], 32, "M68K Last Prefetch Data register"),
     }, /* 66 M68K, PREF_DATA            */
-    { HRDATAD (M68K_PPC,         m68k_registers[M68K_REG_PPC],      32, "M68K Previous Proram Counter register"),
+    { HRDATAD (M68K_PPC,         m68k_registers[M68K_REG_PPC],      32, "M68K Previous Program Counter register"),
     }, /* 67 M68K, PPC                  */
     { HRDATAD (M68K_IR,          m68k_registers[M68K_REG_IR],       32, "M68K Instruction Register"),
     }, /* 68 M68K, IR                   */
@@ -6384,7 +6384,7 @@ static t_stat sim_instr_mmu (void) {
 
 /*
  * This sequence of instructions is a mix that mimics
- * a resonable instruction set that is a close estimate
+ * a reasonable instruction set that is a close estimate
  * to the calibrated result.
  */
 

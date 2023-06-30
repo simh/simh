@@ -398,7 +398,7 @@ typedef uint32 uint64;
 
 /* ----------------------------- Configuration ---------------------------- */
 
-/* These defines are dependant on the configuration defines in m68kconf.h */
+/* These defines are dependent on the configuration defines in m68kconf.h */
 
 /* Disable certain comparisons if we're not using all CPU types */
 #if M68K_EMULATE_040
@@ -2015,7 +2015,7 @@ static inline void m68ki_exception_illegal(void)
     USE_CYCLES(CYC_EXCEPTION[EXCEPTION_ILLEGAL_INSTRUCTION_M68K] - CYC_INSTRUCTION[REG_IR]);
 }
 
-/* Exception for format errror in RTE */
+/* Exception for format error in RTE */
 static inline void m68ki_exception_format_error(void)
 {
     uint sr = m68ki_init_exception();
@@ -2052,7 +2052,7 @@ static inline void m68ki_exception_address_error(void)
 
     /* Use up some clock cycles. Note that we don't need to undo the
     instruction's cycles here as we've longjmp:ed directly from the
-    instruction handler without passing the part of the excecute loop
+    instruction handler without passing the part of the execute loop
     that deducts instruction cycles */
     USE_CYCLES(CYC_EXCEPTION[EXCEPTION_ADDRESS_ERROR]);
 }

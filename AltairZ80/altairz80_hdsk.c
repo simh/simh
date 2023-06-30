@@ -1,6 +1,6 @@
 /*  altairz80_hdsk.c: simulated hard disk device to increase capacity
 
-    Copyright (c) 2002-2014, Peter Schorn
+    Copyright (c) 2002-2023, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -419,7 +419,7 @@ static DISK_INFO* hdsk_imd[HDSK_NUMBER];
 static REG hdsk_reg[] = {
     { DRDATAD (HDCMD,   hdskLastCommand,        32, "Last command"),
         REG_RO  },
-    { DRDATAD (HDPOS,   hdskCommandPosition,    32, "Commmand position"),
+    { DRDATAD (HDPOS,   hdskCommandPosition,    32, "Command position"),
         REG_RO  },
     { DRDATAD (HDDSK,   selectedDisk,           32, "Selected disk"),
         REG_RO  },
@@ -605,7 +605,7 @@ static t_stat hdsk_attach(UNIT *uptr, CONST char *cptr) {
     }
     ASSURE((uptr -> HDSK_SECTORS_PER_TRACK) && (uptr -> HDSK_SECTOR_SIZE) && (uptr -> HDSK_FORMAT_TYPE >= 0));
 
-    /* Step 4: Number of tracks is smallest number to accomodate capacity                               */
+    /* Step 4: Number of tracks is smallest number to accommodate capacity                                */
     uptr -> HDSK_NUMBER_OF_TRACKS = (uptr -> capac + uptr -> HDSK_SECTORS_PER_TRACK *
                                      uptr -> HDSK_SECTOR_SIZE - 1) / (uptr -> HDSK_SECTORS_PER_TRACK * uptr -> HDSK_SECTOR_SIZE);
     ASSURE( ( (t_addr) ((uptr -> HDSK_NUMBER_OF_TRACKS - 1) * uptr -> HDSK_SECTORS_PER_TRACK *

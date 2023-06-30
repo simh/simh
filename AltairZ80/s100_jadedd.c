@@ -1,8 +1,8 @@
 /*  s100_jadedd.c: Jade Double D Disk Controller
-  
+
     Created by Patrick Linstruth (patrick@deltecent.com)
     Based on s100_mdsa.c written by Mike Douglas
-  
+
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
     to deal in the Software without restriction, including without limitation
@@ -31,7 +31,7 @@
     and memory address space.
 
     While the Double D is capable to loading many different operating systems,
-    this emulator is centered around Digital Reasearch's CP/M 2 operating
+    this emulator is centered around Digital Research's CP/M 2 operating
     system as it was released by Jade.
 
     The process of booting CP/M with the DD is a bit more complicated than
@@ -60,9 +60,9 @@
     When the DDBOOT PROM sees that the DD has halted, it checks for errors
     and then moves BIOS from memory bank 1 to the address stored in the
     Command Block. DDBOOT PROM then jumps to the BIOS cold start address.
-  
+
     ** NOTE **
- 
+
     This emulator does not actually execute Z80 code injected on the DD. The
     functionality of the code is only emulated. Changing the DD modules on the
     attached disk image, such as running DCMGEN, will not change the functionality
@@ -301,7 +301,7 @@ static uint8 jade_prom[JADE_PROM_SIZE] = {
     0xdb,0x80,0xdb,0x07,0xa9,0x77,0x23,0x1b,0x7a,0xb3,0xc2,0x8a,0x00,0xdb,0x04,0xa9,
     0xe6,0x9c,0xc2,0xaa,0x00,0xcd,0x50,0x00,0xc3,0x03,0x04,0x3e,0x02,0xc3,0xb1,0x00,
     0x3e,0x04,0xc3,0xb1,0x00,0x3e,0x01,0x32,0x76,0x03,0xaf,0xd3,0x00,0xdb,0x10,0x76,
-    0x3e,0xdc,0x3d,0x00,0xc2,0xbc,0x00,0x1b,0x7a,0xb3,0xc2,0xba,0x00,0xc9 
+    0x3e,0xdc,0x3d,0x00,0xc2,0xbc,0x00,0x1b,0x7a,0xb3,0xc2,0xba,0x00,0xc9
 };
 
 #define JADE_STAT_HLT_MSK   0x01
@@ -312,7 +312,7 @@ static uint8 jade_prom[JADE_PROM_SIZE] = {
 #define CMD_MD0             0x01    /* Select DD bank 0             */
 #define CMD_MD1             0x03    /* Select DD bank 1             */
 #define CMD_SOT             0x00    /* Switch DD mem out of system  */
-#define CMD_INT             0x02    /* Isssue DD Z80A interrupt     */
+#define CMD_INT             0x02    /* Issue DD Z80A interrupt      */
 #define CMD_BGN             0x80    /* Reset Z80 and execute        */
 
 #define DC_LOG              0x00    /* Log on diskette              */
@@ -494,7 +494,7 @@ static DEBTAB jade_dt[] = {
     { "WRITE",      WR_DATA_MSG,        "Write messages"        },
     { "STATUS",     STATUS_MSG,         "Status messages"       },
     { "RDDETAIL",   RD_DATA_DETAIL_MSG, "Read detail messages"  },
-    { "WRDETAIL",   WR_DATA_DETAIL_MSG, "Write detail messags"  },
+    { "WRDETAIL",   WR_DATA_DETAIL_MSG, "Write detail messages" },
     { NULL,         0                                           }
 };
 
@@ -901,7 +901,7 @@ static uint8 JADE_Out(uint32 Addr, int32 Data)
 
         case CMD_BGN:    /* Reset and Execute */
             /*
-            ** Card has been reset and the host boot PROM 
+            ** Card has been reset and the host boot PROM
             ** has loaded the DCM injector module onto the DD.
             ** This modules reads the DCM from track 0 starting
             ** at sector 13 into memory bank 1. After the DCM
@@ -1200,7 +1200,7 @@ static uint8 DCM_Format(uint8 drive, uint8 track)
     memset(sbuf, 0xe5, sizeof(sbuf));
 
     jade_info->dt[drive].flg = 0;
-    
+
     /*
     ** Are we formatting double density?
     */

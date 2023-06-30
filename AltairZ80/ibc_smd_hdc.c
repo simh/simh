@@ -232,7 +232,7 @@ static t_stat ibc_smd_attach(UNIT *uptr, CONST char *cptr)
     /* Defaults for the Quantum 2020 Drive */
     pDrive->ready = 0;
     if (pDrive->ncyls == 0) {
-        /* If geometry was not specified, default to Quantun 2020 */
+        /* If geometry was not specified, default to Quantum 2020 */
         pDrive->ncyls = 512;
         pDrive->nheads = 4;
         pDrive->nsectors = 16;

@@ -261,7 +261,7 @@ static t_stat hdc1001_attach(UNIT *uptr, CONST char *cptr)
     /* Defaults for the Quantum 2020 Drive */
     pDrive->ready = 0;
     if (pDrive->ncyls == 0) {
-        /* If geometry was not specified, default to Quantun 2020 */
+        /* If geometry was not specified, default to Quantum 2020 */
         pDrive->ncyls = 512;
         pDrive->nheads = 4;
         pDrive->nsectors = 16;
@@ -448,7 +448,7 @@ static uint8 HDC1001_Write(const uint32 Addr, uint8 cData)
                 break;
             case 2:
                 sim_debug(ERROR_MSG, &hdc1001_dev,DEV_NAME "%d: " ADDRESS_FORMAT
-                    " Invalid sector size specified in SDH registrer.\n", hdc1001_info->sel_drive, PCX);
+                    " Invalid sector size specified in SDH register.\n", hdc1001_info->sel_drive, PCX);
                 pDrive->cur_sectsize = 512;
                 break;
             case 3:
@@ -458,7 +458,7 @@ static uint8 HDC1001_Write(const uint32 Addr, uint8 cData)
 
         if (pDrive->sectsize != pDrive->cur_sectsize) {
             sim_debug(ERROR_MSG, &hdc1001_dev,DEV_NAME "%d: " ADDRESS_FORMAT
-                " Sector size specified in SDH registrer (0x%x) does not match disk geometry (0x%x.)\n",
+                " Sector size specified in SDH register (0x%x) does not match disk geometry (0x%x.)\n",
                 hdc1001_info->sel_drive, PCX, pDrive->cur_sectsize, pDrive->sectsize);
         }
             /* fall through */

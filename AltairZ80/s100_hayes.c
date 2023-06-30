@@ -27,7 +27,7 @@
    This device emulates D.C. Hayes 80-103A and Micromodem 100 communications
    adapters.
 
-   To provide any useful funcationality, this device need to be attached to
+   To provide any useful functionality, this device need to be attached to
    a socket or serial port. Enter "HELP HAYES" at the "simh>" prompt for
    additional information.
 */
@@ -199,32 +199,32 @@ static REG hayes_reg[] = {
 };
 
 DEVICE hayes_dev = {
-    HAYES_SNAME,  /* name */
-    hayes_unit,   /* unit */
-    hayes_reg,    /* registers */
-    hayes_mod,    /* modifiers */
-    1,            /* # units */
-    10,           /* address radix */
-    31,           /* address width */
-    1,            /* address increment */
-    8,            /* data radix */
-    8,            /* data width */
-    NULL,         /* examine routine */
-    NULL,         /* deposit routine */
+    HAYES_SNAME,   /* name */
+    hayes_unit,    /* unit */
+    hayes_reg,     /* registers */
+    hayes_mod,     /* modifiers */
+    1,             /* # units */
+    10,            /* address radix */
+    31,            /* address width */
+    1,             /* address increment */
+    8,             /* data radix */
+    8,             /* data width */
+    NULL,          /* examine routine */
+    NULL,          /* deposit routine */
     &hayes_reset,  /* reset routine */
-    NULL,         /* boot routine */
-    &hayes_attach,         /* attach routine */
-    &hayes_detach,         /* detach routine */
-    &hayes_ctx,           /* context */
-    (DEV_DISABLE | DEV_DIS | DEV_DEBUG | DEV_MUX),  /* flags */
-    0,                            /* debug control */
-    hayes_dt,                           /* debug flags */
-    NULL,                                 /* mem size routine */
-    NULL,                                 /* logical name */
-    NULL,                                 /* help */
-    NULL,                                 /* attach help */
-    NULL,                                 /* context for help */
-    &hayes_description                    /* description */
+    NULL,          /* boot routine */
+    &hayes_attach, /* attach routine */
+    &hayes_detach, /* detach routine */
+    &hayes_ctx,    /* context */
+    (DEV_DISABLE | DEV_DIS | DEV_DEBUG | DEV_MUX), /* flags */
+    0,             /* debug control */
+    hayes_dt,      /* debug flags */
+    NULL,          /* mem size routine */
+    NULL,          /* logical name */
+    NULL,          /* help */
+    NULL,          /* attach help */
+    NULL,          /* context for help */
+    &hayes_description /* description */
 };
 
 static const char* hayes_description(DEVICE *dptr)
@@ -243,7 +243,7 @@ static t_stat hayes_reset(DEVICE *dptr)
     /* Set DEVICE for this UNIT */
     dptr->units[0].dptr = dptr;
 
-    /* Enable TMXR modem control passthru */
+    /* Enable TMXR modem control passthrough */
     tmxr_set_modem_control_passthru(hayes_ctx.tmxr);
 
     /* Reset status registers */
@@ -505,7 +505,7 @@ static t_stat hayes_config_line(UNIT *uptr)
     ** to run irrelevant, old software, that use TMXR and
     ** rely on some semblance of timing (Remote CP/M, BYE,
     ** RBBS, PCGET/PUT, Xmodem, MEX, Modem7, or most
-    ** other communications software), on contemprary
+    ** other communications software), on contemporary
     ** hardware.
     **
     ** Serial ports are self-limiting and sockets will run

@@ -77,7 +77,7 @@ void cpu8086_intr(uint8 intrnum);
 
 /* this file includes subroutines which do:
    stuff involving decoding instruction formats.
-   stuff involving accessess of immediate data via IP.
+   stuff involving accesses of immediate data via IP.
    etc.
 */
 
@@ -675,7 +675,7 @@ uint8 fetch_data_byte(PC_ENV *m, uint16 offset)
        refer to addresses relative to the SS.  So, at the minimum,
        all decodings of addressing modes would have to set/clear
        a bit describing whether the access is relative to DS or SS.
-       That is the function of the cpu-state-varible  m->sysmode.
+       That is the function of the cpu-state-variable  m->sysmode.
        There are several potential states:
        repe prefix seen  (handled elsewhere)
        repne prefix seen  (ditto)
@@ -683,7 +683,7 @@ uint8 fetch_data_byte(PC_ENV *m, uint16 offset)
        ds segment override
        es segment override
        ss segment override
-       ds/ss select (in absense of override)
+       ds/ss select (in absence of override)
        Each of the above 7 items are handled with a bit in the sysmode
        field.
        The latter 5 can be implemented as a simple state machine:

@@ -1,7 +1,7 @@
 /*  s100_tarbell.c: Tarbell 1011/2022 Disk Controller
-  
+
     Created by Patrick Linstruth (patrick@deltecent.com)
-  
+
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
     to deal in the Software without restriction, including without limitation
@@ -332,7 +332,7 @@ static DEBTAB tarbell_dt[] = {
     { "WRITE",      WR_DATA_MSG,        "Write messages"        },
     { "STATUS",     STATUS_MSG,         "Status messages"       },
     { "RDDETAIL",   RD_DATA_DETAIL_MSG, "Read detail messages"  },
-    { "WRDETAIL",   WR_DATA_DETAIL_MSG, "Write detail messags"  },
+    { "WRDETAIL",   WR_DATA_DETAIL_MSG, "Write detail messages" },
     { NULL,         0                                           }
 };
 
@@ -672,7 +672,7 @@ static void showdata(int32 isRead) {
             sim_debug(isRead ? RD_DATA_DETAIL_MSG : WR_DATA_DETAIL_MSG, &tarbell_dev, "\n\t");
         }
     }
-    sim_debug(RD_DATA_DETAIL_MSG|WR_DATA_DETAIL_MSG, &tarbell_dev, "\n"); 
+    sim_debug(RD_DATA_DETAIL_MSG|WR_DATA_DETAIL_MSG, &tarbell_dev, "\n");
 }
 
 static uint32 secs_per_track(uint8 track)

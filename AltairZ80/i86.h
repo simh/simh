@@ -35,7 +35,7 @@
        EAX & 0xff  === AL
        EAX & 0xffff == AX
 
-   etc.  The result is that alot of the calculations can then be
+   etc.  The result is that a lot of the calculations can then be
    done using the native instruction set fully.
 */
 
@@ -196,7 +196,7 @@ struct  pc_env
    struct i386_general_regs Gn_regs;
    struct i386_special_regs Sp_regs;
    struct i386_segment_regs Sg_regs;
-   /* our flags structrure.  This contains information on
+   /* our flags structure.  This contains information on
            REPE prefix           2 bits  repe,repne
            SEGMENT overrides     5 bits  normal,DS,SS,CS,ES
            Delayed flag set      3 bits  (zero, signed, parity)

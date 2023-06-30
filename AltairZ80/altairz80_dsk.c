@@ -1,6 +1,6 @@
 /*  altairz80_dsk.c: MITS Altair 88-DISK Simulator
 
-    Copyright (c) 2002-2014, Peter Schorn
+    Copyright (c) 2002-2023, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -109,12 +109,12 @@
     ----------------------------------------------------------
 
     5/22/2014 - Updated by Mike Douglas to support the Altair Minidisk.
-                This disk uses 35 (vs 70) tracks of 16 (vs 32) sectors 
+                This disk uses 35 (vs 70) tracks of 16 (vs 32) sectors
                 of 137 bytes each.
 
-    6/30/2014 - When the disk is an Altair Minidisk, load the head as 
+    6/30/2014 - When the disk is an Altair Minidisk, load the head as
                 soon as the disk is enabled, and ignore the head
-                unload command (both like the real hardware). 
+                unload command (both like the real hardware).
 
     7/13/2014 - This code previously returned zero when the sector position
                 register was read with the head not loaded. This zero looks
@@ -125,9 +125,9 @@
 
     7/13/2014   Some software for the Altair skips a sector by verifying
                 that "Sector True" goes false. Previously, this code
-                returned "Sector True" every time the sector register 
+                returned "Sector True" every time the sector register
                 was read. Now the flag alternates true and false on
-                subsequent reads of the sector register. 
+                subsequent reads of the sector register.
 */
 
 #include "altairz80_defs.h"
@@ -555,7 +555,7 @@ int32 dsk10(const int32 port, const int32 io, const int32 data) {
             if (current_track[current_disk] == 0)   /* track 0? */
                 current_flag[current_disk] |= 0x40; /* yes, set track 0 true as well */
             if (sectors_per_track[current_disk] == MINI_DISK_SECT)  /* drive enable loads head for Minidisk */
-                current_flag[current_disk] |= 0x84;  
+                current_flag[current_disk] |= 0x84;
         }
     }
     return 0;   /* ignored since OUT */

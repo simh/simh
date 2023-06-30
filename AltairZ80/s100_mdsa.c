@@ -190,7 +190,7 @@ static DEBTAB mdsa_dt[] = {
     { "WRITE",      WR_DATA_MSG,        "Write messages"        },
     { "STATUS",     STATUS_MSG,         "Status messages"       },
     { "RDDETAIL",   RD_DATA_DETAIL_MSG, "Read detail messages"  },
-    { "WRDETAIL",   WR_DATA_DETAIL_MSG, "Write detail messags"  },
+    { "WRDETAIL",   WR_DATA_DETAIL_MSG, "Write detail messages" },
     { NULL,         0                                           }
 };
 

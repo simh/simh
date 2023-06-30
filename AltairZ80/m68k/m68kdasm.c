@@ -156,7 +156,7 @@ uint  read_imm_8(void);
 uint  read_imm_16(void);
 uint  read_imm_32(void);
 
-/* Read data at the PC but don't imcrement the PC */
+/* Read data at the PC but don't increment the PC */
 uint  peek_imm_8(void);
 uint  peek_imm_16(void);
 uint  peek_imm_32(void);
@@ -3721,7 +3721,7 @@ static void build_opcode_table(void)
 /* ================================= API ================================== */
 /* ======================================================================== */
 
-/* Disasemble one instruction at pc and store in str_buff */
+/* Disassemble one instruction at pc and store in str_buff */
 unsigned int m68k_disassemble(char* str_buff, unsigned int pc, unsigned int cpu_type)
 {
     if(!g_initialized)

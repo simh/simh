@@ -186,7 +186,7 @@ uint8 xor_0x3_tab[] = { 0, 1, 1, 0 };
 
     By inspection, one gets:  cc = ab +  r'(a + b)
 
-    That represents alot of operations, but NO CHOICE....
+    That represents a lot of operations, but NO CHOICE....
 
 BORROW CHAIN CALCULATION.
    The following table represents the
@@ -498,7 +498,7 @@ uint8 neg_byte(PC_ENV *m, uint8 s)
     CONDITIONAL_SET_FLAG(res & 0x80, m, F_SF);
     CONDITIONAL_SET_FLAG(parity_tab[res], m, F_PF);
     /* calculate the borrow chain --- modified such that d=0.
-       substitutiing d=0 into     bc= res&(~d|s)|(~d&s);
+       substituting d=0 into     bc= res&(~d|s)|(~d&s);
        (the one used for sub) and simplifying, since ~d=0xff...,
        ~d|s == 0xffff..., and res&0xfff... == res.  Similarly
        ~d&s == s.  So the simplified result is:*/
@@ -518,7 +518,7 @@ uint16 neg_word(PC_ENV *m, uint16 s)
     CONDITIONAL_SET_FLAG(res & 0x8000, m, F_SF);
     CONDITIONAL_SET_FLAG(parity_tab[res&0xff], m, F_PF);
     /* calculate the borrow chain --- modified such that d=0.
-       substitutiing d=0 into     bc= res&(~d|s)|(~d&s);
+       substituting d=0 into     bc= res&(~d|s)|(~d&s);
        (the one used for sub) and simplifying, since ~d=0xff...,
        ~d|s == 0xffff..., and res&0xfff... == res.  Similarly
        ~d&s == s.  So the simplified result is:*/
@@ -793,7 +793,7 @@ uint16 rcr_word(PC_ENV *m, uint16 d, uint16 s)
         if (cnt==1)
         {
             cf = d & 0x1;
-            /* see note above on teh byte version */
+            /* see note above on the byte version */
             ocf = ACCESS_FLAG(m,F_CF) != 0;
         }
         else
@@ -1310,7 +1310,7 @@ void test_byte(PC_ENV *m, uint8 d, uint8 s)
     CONDITIONAL_SET_FLAG(res&0x80, m, F_SF);
     CONDITIONAL_SET_FLAG(res==0, m, F_ZF);
     CONDITIONAL_SET_FLAG(parity_tab[res&0xff], m, F_PF);
-    /* AF == dont care*/
+    /* AF == don't care*/
     CLEAR_FLAG(m, F_CF);
 }
 
@@ -1322,7 +1322,7 @@ void test_word(PC_ENV *m, uint16 d, uint16 s)
     CONDITIONAL_SET_FLAG(res&0x8000, m, F_SF);
     CONDITIONAL_SET_FLAG(res==0, m, F_ZF);
     CONDITIONAL_SET_FLAG(parity_tab[res&0xff], m, F_PF);
-    /* AF == dont care*/
+    /* AF == don't care*/
     CLEAR_FLAG(m, F_CF);
 }
 

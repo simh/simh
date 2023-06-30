@@ -1091,7 +1091,7 @@ static uint8 Do1793Command(uint8 cCommand)
             sdata.raw[wd179x_info->fdc_dataindex] = wd179x_info->fdc_data;
 
             if (wd179x_info->external_fifo_len) {
-                /* For external FIFO, write the sector immediately, as the sofware pre-fills a FIFO, which is then read out into the FDC using DRQ */
+                /* For external FIFO, write the sector immediately, as the software pre-fills a FIFO, which is then read out into the FDC using DRQ */
                 wd179x_info->fdc_status &= ~(WD179X_STAT_DRQ | WD179X_STAT_BUSY);       /* Clear DRQ, BUSY */
                 wd179x_info->drq = 0;
                 wd179x_info->intrq = 1;

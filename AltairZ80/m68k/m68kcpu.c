@@ -973,7 +973,7 @@ int m68k_execute(int num_cycles)
         do
         {
             int i;
-            /* Set tracing accodring to T1. (T0 is done inside instruction) */
+            /* Set tracing according to T1. (T0 is done inside instruction) */
             m68ki_trace_t1(); /* auto-disable (see m68kcpu.h) */
 
             /* Set the address space for reads */
@@ -1037,7 +1037,7 @@ void m68k_end_timeslice(void)
 
 /* ASG: rewrote so that the int_level is a mask of the IPL0/IPL1/IPL2 bits */
 /* KS: Modified so that IPL* bits match with mask positions in the SR
- *     and cleaned out remenants of the interrupt controller.
+ *     and cleaned out remnants of the interrupt controller.
  */
 void m68k_set_irq(unsigned int int_level)
 {

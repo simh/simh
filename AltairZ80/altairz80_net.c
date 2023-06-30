@@ -1,6 +1,6 @@
 /*  altairz80_net.c: networking capability
 
-    Copyright (c) 2002-2014, Peter Schorn
+    Copyright (c) 2002-2023, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -295,7 +295,7 @@ int32 netData(const int32 port, const int32 io, const int32 data) {
                 }
                 sim_debug(IN_MSG, &net_dev, "NET: " ADDRESS_FORMAT "  IN(%i)=%03xh (%c)\n", PCX, port, (result & 0xff), (32 <= (result & 0xff)) && ((result & 0xff) <= 127) ? (result & 0xff) : '?');
                 return result;
-            } else {          /* OUT  */
+            } else {        /* OUT  */
                 if (serviceDescriptor[i].outputSize == BUFFER_LENGTH) {
                     sim_printf("over-write %i to %i\n", data, port);
                     serviceDescriptor[i].outputBuffer[serviceDescriptor[i].outputPosWrite > 0 ?

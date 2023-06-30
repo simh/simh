@@ -258,7 +258,7 @@ DEVICE cromfdc_dev = {
 };
 
 /* This is the CROMFDC RDOS-II ROM.
- * The CROMFDC has a single 8K ROM; however ths simulation includes
+ * The CROMFDC has a single 8K ROM; however this simulation includes
  * two different versions of RDOS:
  * RDOS 2.52 and RDOS 3.12
  * RDOS 2.52 is the default, but RDOS 3.12 can be

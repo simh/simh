@@ -78,8 +78,8 @@ typedef struct {
     uint8   sel_drive;  /* Currently selected drive */
     uint8   head_sel;   /* Head select (signals to drive itself) */
     uint8   head;       /* Head set by write to the HEAD register */
-    uint8   cyl;        /* Cyl that the current operation is targetting */
-    uint8   sector;     /* Sector the current READ/WRITE operation is targetting */
+    uint8   cyl;        /* Cyl that the current operation is targeting */
+    uint8   sector;     /* Sector the current READ/WRITE operation is targeting */
     uint8   hdr_sector; /* Current sector for WRITE_HEADER */
     uint8   ctl_attn;
     uint8   ctl_run;
@@ -152,11 +152,11 @@ static REG disk2_reg[] = {
     { HRDATAD (SEL_DRIVE,  disk2_info_data.sel_drive, 3,
                "Currently selected drive"),                             },
     { HRDATAD (CYL,        disk2_info_data.cyl,       8,
-               "Cylinder that the current operation is targetting"),    },
+               "Cylinder that the current operation is targeting"),     },
     { HRDATAD (HEAD,       disk2_info_data.head,      8,
-               "Head that the current operation is targetting"),        },
+               "Head that the current operation is targeting"),         },
     { HRDATAD (SECTOR,     disk2_info_data.sector,    8,
-               "Sector that the current operation is targetting"),      },
+               "Sector that the current operation is targeting"),       },
 
     { NULL }
 };
@@ -575,7 +575,7 @@ static uint8 DISK2_Write(const uint32 Addr, uint8 cData)
                                       " READ_HEADER: sim_fseek error.\n", PCX);
                         }
                         selchan_dma(sdata.raw, 3);
-                        
+
                         break;
                     default:
                         sim_printf("DISK2: " ADDRESS_FORMAT " Unknown CMD=%d\n", PCX, disk2_info->ctl_op);

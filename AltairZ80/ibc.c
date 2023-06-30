@@ -142,10 +142,10 @@ static const char* ibc_description(DEVICE *dptr);
 
 /* IBC Middi Cadet I/O Ports */
 #define IBC_SIO                 0x04    /* 0x04-0x13: UARTs (using AltairZ80 SIO.)  UARTS 0x00-0x03 are using 2sio. */
-#define IBC_FDC_DATA            0x28    /* FDC Data Regster */
-#define IBC_PARAM               0x2a    /* FDC PARAM register */
+#define IBC_FDC_DATA            0x28    /* FDC Data Register */
+#define IBC_PARAM               0x2a    /* FDC PARAM Register */
 #define IBC_DIPSWE              0x3c    /* CPU Board DIP Switch E */
-#define IBC_BANKSEL             0x38    /* Bank Select register */
+#define IBC_BANKSEL             0x38    /* Bank Select Register */
 #define IBC_FIFO_CTRL           0x3e    /* FDC FIFO Control */
 #define IBC_ROM_CTRL            0x3f    /* ROM Control Register */
 #define IBC_SCC_BANKSEL         0x58    /* Bank Select register */
@@ -252,7 +252,7 @@ static DEBTAB ibc_dt[] = {
     { "SBD",        SBD_MSG,            "System Board messages"     },
     { "UART",       UART_MSG,           "UART messages"             },
     { "CACHE",      CACHE_MSG,          "CACHE messages"            },
-    { "UIO",        UNHANDLED_IO_MSG,   "Unsuported I/O Ports"      },
+    { "UIO",        UNHANDLED_IO_MSG,   "Unsupported I/O Ports"     },
     { "FIFO",       FIFO_MSG,           "FDC FIFO messages"         },
     { "DIPSW",      DIPSW_MSG,          "DIP Switch messages"       },
     { NULL,         0,                  NULL                        }
@@ -1817,7 +1817,7 @@ static int32 ibc_banksel(const int32 port, const int32 io, const int32 data)
              * 0xff: Boot from floppy (All off.)
              * Switch 1 - 0xfe: Boot into ROM monitor (Switch 1 on.)
              * Switch 2 - 0xfd: Boot from hard disk (Switch 2 on.)
-             * Switch 7 - 0xbe: OFF = Use FDC Interupts, ON = Poll FDC instead.
+             * Switch 7 - 0xbe: OFF = Use FDC Interrupts, ON = Poll FDC instead.
              */
             result = ibc_info->dipsw_E;
 
