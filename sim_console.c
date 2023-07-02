@@ -2639,13 +2639,23 @@ else
 return SCPE_OK;
 }
 
-/* Start telnet session/window to console */
+/* Start telnet session/window to console or optionally an arbitrary TCP port on the local system */
 
 t_stat sim_set_cons_connect (int32 flg, CONST char *cptr)
 {
-if (sim_con_tmxr.port == NULL)
-    return sim_messagef (SCPE_ARG, "Console not listening for telnet connections\n");
-return sim_os_connect_telnet (atoi (sim_con_tmxr.port));
+if ((cptr != NULL) && (*cptr != '\0')) {
+    t_stat r;
+    uint32 port = (uint32)get_uint (cptr, 10, 65535, &r);
+
+    if ((port == 0) || (r != SCPE_OK))
+        return sim_messagef (SCPE_ARG, "Invalid TCP port for telnet connection: %s\n", cptr);
+    }
+else
+    if (sim_con_tmxr.port == NULL)
+        return sim_messagef (SCPE_ARG, "Console not listening for telnet connections\n");
+    else
+        cptr = sim_con_tmxr.port;
+return sim_os_connect_telnet (atoi (cptr));
 }
 
 
