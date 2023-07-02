@@ -1,7 +1,7 @@
 #ifndef ROM_logo_lda_H
 #define ROM_logo_lda_H 0
 /*
-   PDP11/pdp11_11logo_rom.h         produced at Sat Jun 17 18:17:48 2023
+   PDP11/pdp11_11logo_rom.h         produced at Sun Jul  2 10:12:01 2023
    from PDP11/11logo/11logo.lda which was last modified at Sat Apr 29 15:56:36 2023
    file size: 26009 (0x6599) - checksum: 0xFFDD77F7
    This file is a generated file and should NOT be edited or changed by hand.
@@ -17,7 +17,8 @@
 #define BOOT_CODE_ARRAY logo_lda
 #endif
 #define BOOT_CODE_URL NULL
-#elif !defined(BOOT_CODE_SIZE_1)
+#endif
+#if !defined(BOOT_CODE_SIZE_1)
 #define BOOT_CODE_SIZE_1 0x6599
 #define BOOT_CODE_CHECKSUM_1 0xFFDD77F7
 #define BOOT_CODE_FILENAME_1 "11logo.lda"

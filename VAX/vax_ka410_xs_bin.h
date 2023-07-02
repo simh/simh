@@ -1,7 +1,7 @@
 #ifndef ROM_vax_ka410_xs_bin_H
 #define ROM_vax_ka410_xs_bin_H 0
 /*
-   VAX/vax_ka410_xs_bin.h         produced at Sat Jun 17 18:14:30 2023
+   VAX/vax_ka410_xs_bin.h         produced at Sun Jul  2 10:11:55 2023
    from VAX/ka410_xs.bin which was last modified at Sat Apr 29 15:56:37 2023
    file size: 32768 (0x8000) - checksum: 0xFFD8BD83
    This file is a generated file and should NOT be edited or changed by hand.
@@ -17,7 +17,8 @@
 #define BOOT_CODE_ARRAY vax_ka410_xs_bin
 #endif
 #define BOOT_CODE_URL NULL
-#elif !defined(BOOT_CODE_SIZE_1)
+#endif
+#if !defined(BOOT_CODE_SIZE_1)
 #define BOOT_CODE_SIZE_1 0x8000
 #define BOOT_CODE_CHECKSUM_1 0xFFD8BD83
 #define BOOT_CODE_FILENAME_1 "ka410_xs.bin"

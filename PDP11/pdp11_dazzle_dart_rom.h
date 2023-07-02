@@ -1,7 +1,7 @@
 #ifndef ROM_dazzle_lda_H
 #define ROM_dazzle_lda_H 0
 /*
-   PDP11/pdp11_dazzle_dart_rom.h         produced at Sat Jun 17 18:17:48 2023
+   PDP11/pdp11_dazzle_dart_rom.h         produced at Sun Jul  2 10:12:01 2023
    from PDP11/dazzledart/dazzle.lda which was last modified at Sat Apr 29 15:56:36 2023
    file size: 6096 (0x17D0) - checksum: 0xFFF83848
    This file is a generated file and should NOT be edited or changed by hand.
@@ -17,7 +17,8 @@
 #define BOOT_CODE_ARRAY dazzle_lda
 #endif
 #define BOOT_CODE_URL NULL
-#elif !defined(BOOT_CODE_SIZE_1)
+#endif
+#if !defined(BOOT_CODE_SIZE_1)
 #define BOOT_CODE_SIZE_1 0x17D0
 #define BOOT_CODE_CHECKSUM_1 0xFFF83848
 #define BOOT_CODE_FILENAME_1 "dazzle.lda"

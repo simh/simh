@@ -1,8 +1,8 @@
 #ifndef ROM_vax_ka610_bin_H
 #define ROM_vax_ka610_bin_H 0
 /*
-   VAX/vax_ka610_bin.h         produced at Sat Jun 17 18:17:47 2023
-   from VAX/ka610.bin which was last modified at Sat Jun 17 18:17:17 2023
+   VAX/vax_ka610_bin.h         produced at Sun Jul  2 10:11:30 2023
+   from VAX/ka610.bin which was last modified at Mon Jun 19 10:44:59 2023
    file size: 16384 (0x4000) - checksum: 0xFFEF3312
    This file is a generated file and should NOT be edited or changed by hand.
 */
@@ -17,7 +17,8 @@
 #define BOOT_CODE_ARRAY vax_ka610_bin
 #endif
 #define BOOT_CODE_URL NULL
-#elif !defined(BOOT_CODE_SIZE_1)
+#endif
+#if !defined(BOOT_CODE_SIZE_1)
 #define BOOT_CODE_SIZE_1 0x4000
 #define BOOT_CODE_CHECKSUM_1 0xFFEF3312
 #define BOOT_CODE_FILENAME_1 "ka610.bin"
