@@ -1579,7 +1579,7 @@ ifneq (,$(and $(findstring 3.,$(GNUMakeVERSION)),$(BUILD_SEPARATE)))
     $(error of GNU make.  A GNU make version 4 or later is required.)
   endif
 endif
-MAKEIT = @$(MAKE) -f $(MAKEFILE_LIST) TARGET="$@" DEPS="$^"
+MAKEIT = @+$(MAKE) -f $(MAKEFILE_LIST) TARGET="$@" DEPS="$^"
 
 #
 # Emulator source files and compile time options
