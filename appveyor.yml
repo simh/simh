@@ -58,6 +58,8 @@ build_script:
           $id_name_pos = $id_line.line.IndexOf("SIM_GIT_COMMIT_ID")
           $id = $id_line.Line.SubString($id_name_pos + 18, 8)
           $datetime = Get-Date -Format "yyyy-mm-dd_hh-mm-ss"
+          rm -rf BIN/buildtools
+          rm -rf BIN/*-build
           Compress-Archive -Path BIN/* -DestinationPath PACKAGES/simh-4.0-Current-$platform-$datetime-$id.zip
         }
 
