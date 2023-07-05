@@ -3773,7 +3773,7 @@ unsigned int m68k_disassemble(char* str_buff, unsigned int pc, unsigned int cpu_
 
 char* m68ki_disassemble_quick(unsigned int pc, unsigned int cpu_type)
 {
-    static char buff[100];
+    static char buff[200];
     buff[0] = 0;
     m68k_disassemble(buff, pc, cpu_type);
     return buff;
