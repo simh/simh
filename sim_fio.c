@@ -367,19 +367,19 @@ return TRUE;
 static char *_sim_expand_homedir (const char *file, char *dest, size_t dest_size)
 {
 uint8 *without_quotes = NULL;
-uint32 dsize = 0;
 
 errno = 0;
 if (((*file == '"') && (file[strlen (file) - 1] == '"')) ||
     ((*file == '\'') && (file[strlen (file) - 1] == '\''))) {
+    size_t offset = 1;
+    const char *end = &file[strlen (file) - 1];
+    char quote = *file;
+
     without_quotes = (uint8*)malloc (strlen (file) + 1);
     if (without_quotes == NULL)
         return NULL;
-    if (SCPE_OK != sim_decode_quoted_string (file, without_quotes, &dsize)) {
-        free (without_quotes);
-        errno = EINVAL;
-        return NULL;
-    }
+    strcpy (without_quotes, file + 1);
+    without_quotes[strlen (without_quotes) - 1] = '\0';
     file = (const char*)without_quotes;
 }
 
