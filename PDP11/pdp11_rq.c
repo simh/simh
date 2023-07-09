@@ -726,8 +726,8 @@ x  RA73 70(+1)  21      2667+   21      1       ?       3920490
 #define KLESI_BUSES     CBUS_QBUS+CBUS_UNIBUS
 
 #define RUX50_CTYPE     2               // UNIBUS RX50-only controller
-#define RUX50_UQPM      2
-#define RUX50_MODEL     2
+#define RUX50_UQPM      10
+#define RUX50_MODEL     10
 #define RUX50_BUSES     CBUS_UNIBUS
 
 #define UDA50_CTYPE     3               // UNIBUS SDI (RAxx) controller
@@ -756,8 +756,8 @@ x  RA73 70(+1)  21      2667+   21      1       ?       3920490
 #define KRU50_BUSES     CBUS_UNIBUS
 
 #define RQDX1_CTYPE     8               // QBUS RX50/RDxx first generation controller
-#define RQDX1_UQPM      0
-#define RQDX1_MODEL     0
+#define RQDX1_UQPM      7
+#define RQDX1_MODEL     7
 #define RQDX1_BUSES     CBUS_QBUS
 
 
