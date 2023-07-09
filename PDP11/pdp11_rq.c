@@ -714,6 +714,8 @@ x  RA73 70(+1)  21      2667+   21      1       ?       3920490
 #define RF73_FLGS       RQDF_DSSI                       /* DSSI drive */
 
 /* Controller parameters */
+#define CBUS_QBUS       1
+#define CBUS_UNIBUS     2
 
 #define DEFAULT_CTYPE   0
 
@@ -721,30 +723,42 @@ x  RA73 70(+1)  21      2667+   21      1       ?       3920490
 #define KLESI_CTYPE     1               // RC25 controller (UNIBUS and QBUS both)
 #define KLESI_UQPM      1
 #define KLESI_MODEL     1
+#define KLESI_BUSES     CBUS_QBUS+CBUS_UNIBUS
 
 #define RUX50_CTYPE     2               // UNIBUS RX50-only controller
 #define RUX50_UQPM      2
 #define RUX50_MODEL     2
+#define RUX50_BUSES     CBUS_UNIBUS
 
 #define UDA50_CTYPE     3               // UNIBUS SDI (RAxx) controller
 #define UDA50_UQPM      6
 #define UDA50_MODEL     6
+#define UDA50_BUSES     CBUS_UNIBUS
 
 #define RQDX3_CTYPE     4               // QBUS RX50/RDxx controller
 #define RQDX3_UQPM      19
 #define RQDX3_MODEL     19
+#define RQDX3_BUSES     CBUS_QBUS
 
 #define KDA50_CTYPE     5               // QBUS SDI (RAxx) controller
 #define KDA50_UQPM      13
 #define KDA50_MODEL     13
+#define KDA50_BUSES     CBUS_QBUS
 
 #define KRQ50_CTYPE     6               // QBUS RRD40/50 CDROM controller
 #define KRQ50_UQPM      16
 #define KRQ50_MODEL     16
+#define KRQ50_BUSES     CBUS_QBUS
 
 #define KRU50_CTYPE     7               // UNIBUS RRD40/50 CDROM controller
 #define KRU50_UQPM      26
 #define KRU50_MODEL     26
+#define KRU50_BUSES     CBUS_UNIBUS
+
+#define RQDX1_CTYPE     8               // QBUS RX50/RDxx first generation controller
+#define RQDX1_UQPM      0
+#define RQDX1_MODEL     0
+#define RQDX1_BUSES     CBUS_QBUS
 
 
 #define RQ_DRV(d) \
@@ -795,14 +809,15 @@ static DRVTYP drv_tab[] = {
 struct ctlrtyp {
     uint32      uqpm;                                   /* port model */
     uint16      model;                                  /* controller model */
+    uint16      buses;                                  /* supported bus(es) */
     const char  *name;                                  /* name */
     };
 
 #define RQ_CTLR(d) \
-    { d##_UQPM, d##_MODEL, #d }
+    { d##_UQPM, d##_MODEL, d##_BUSES, #d }
 
 static struct ctlrtyp ctlr_tab[] = {
-    { 0, 0, "DEFAULT" },
+    { 0, 0, 0, "DEFAULT" },
     RQ_CTLR (KLESI),
     RQ_CTLR (RUX50),
     RQ_CTLR (UDA50),
@@ -810,6 +825,7 @@ static struct ctlrtyp ctlr_tab[] = {
     RQ_CTLR (KDA50),
     RQ_CTLR (KRQ50),
     RQ_CTLR (KRU50),
+    RQ_CTLR (RQDX1),
     { 0 }
     };
 
@@ -1030,6 +1046,8 @@ MTAB rq_mod[] = {
       NULL, &rq_show_ctrl, NULL, "Display all unit queues" },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO, RQ_SH_ALL, "ALL", NULL,
       NULL, &rq_show_ctrl, NULL, "Display complete controller state" },
+    { MTAB_XTD|MTAB_VDV, RQDX1_CTYPE, NULL, "RQDX1",
+      &rq_set_ctype, NULL, NULL, "Set RQDX1 (QBUS RX50/RDnn) Controller Type" },
     { MTAB_XTD|MTAB_VDV, RQDX3_CTYPE, NULL, "RQDX3",
       &rq_set_ctype, NULL, NULL, "Set RQDX3 (QBUS RX50/RDnn) Controller Type" },
     { MTAB_XTD|MTAB_VDV, UDA50_CTYPE, NULL, "UDA50",
@@ -2806,6 +2824,8 @@ MSC *cp = rq_ctxmap[uptr->cnum];
 
 if (val < 0)
     return SCPE_ARG;
+if ((ctlr_tab[val].buses & (UNIBUS? CBUS_UNIBUS : CBUS_QBUS)) == 0)
+return sim_messagef (SCPE_ARG, "%s: %s controller not valid on a %s system\n", uptr->dptr->name, ctlr_tab[val].name, (UNIBUS? "Unibus" : "Qbus" ));
 cp->ctype = val;
 return SCPE_OK;
 }
@@ -2874,8 +2894,18 @@ if (cidx < 0)                                           /* not found??? */
     return SCPE_IERR;
 cp = rq_ctxmap[cidx];                                   /* get context */
 cp->cnum = cidx;                                        /* init index */
+
 if (cp->ctype == DEFAULT_CTYPE)
+#if defined (VAX_610)
+    cp->ctype = RQDX1_CTYPE;
+#else
     cp->ctype = (UNIBUS? UDA50_CTYPE : RQDX3_CTYPE);
+#endif
+
+if ((ctlr_tab[cp->ctype].buses & (UNIBUS? CBUS_UNIBUS : CBUS_QBUS)) == 0) {
+    sim_messagef (SCPE_OK, "%s: %s controller not valid on a %s system, changing to %s\n", dptr->name, ctlr_tab[cp->ctype].name, (UNIBUS? "Unibus" : "Qbus" ), (UNIBUS? "UDA50" : "RQDX3" ));
+    cp->ctype = (UNIBUS? UDA50_CTYPE : RQDX3_CTYPE);
+    }
 
 if (!plugs_inited ) {
 #if !defined (VM_VAX)
@@ -3200,9 +3230,9 @@ fprintf (st, "UDA50 MSCP Disk Controller (%s)\n\n", dptr->name);
 fprintf (st, "The simulator implements four MSCP disk controllers, RQ, RQB, RQC, RQD.\n");
 fprintf (st, "Initially, RQB, RQC, and RQD are disabled.  Each RQ controller simulates\n");
 fprintf (st, "an MSCP disk controller with four drives.  The MSCP controller type can be\n");
-fprintf (st, "specified as one of RQDX3, UDA50, KDA50, KRQ50, KLESI or RUX50.  RQ options\n");
-fprintf (st, "include the ability to set units write enabled or write locked, and to set\n");
-fprintf (st, "the drive type to one of many disk types:\n");
+fprintf (st, "specified as one of RQDX1, RQDX3, UDA50, KDA50, KRQ50, KLESI or RUX50.\n");
+fprintf (st, "RQ options include the ability to set units write enabled or write locked,\n");
+fprintf (st, "and to set the drive type to one of many disk types:\n");
 fprint_set_help (st, dptr);
 fprintf (st, "set RQn RAUSER{=n}        Set disk type to RA82 with n MB's\n");
 fprintf (st, "                          (1MB is 1000000 bytes)\n");
