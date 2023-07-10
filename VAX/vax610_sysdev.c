@@ -531,13 +531,14 @@ if ((R[5] & 0x100) == 0) {
     snprintf (cmd, sizeof (cmd), "\"Bootfile:\" SEND \"%s\r\";"
                                  "CONTINUE", sysboot);
     expect_cmd (1, cmd);
-    expect_cmd (1, "\"VAX/VMS\" "
+    expect_cmd (1, "-r \"MicroVMS|VAX\\/VMS\" "
                    "NOEXPECT \"Bootfile:\";"
                    "NOEXPECT \"%%BOOT-F-ERROR, Program image not found DUA\";"
                    "NOEXPECT \"%%BOOT-F-ERROR, None of the bootable devices contain a program image\";"
                    "NOEXPECT \"%%BOOT-F-ERROR, Boot device I/O error XQA\";"
                    "NOEXPECT \"%%BOOT-F-ERROR, No response from load server XQA\";"
                    "CONTINUE");
+    sim_switches &= ~SWMASK('R');
     }
 SP = PC = 512;
 AP = 1;

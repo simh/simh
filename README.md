@@ -118,6 +118,7 @@ All Simulator updates on Open SIMH will be present in this repository, and any c
 - MicroVAX I/VAXStation I has been enhanced to dynamically look for its secondary bootstrap program (SYSBOOT.EXE) from both [SYSEXE]SYSBOOT.EXE and [SYS0.SYSEXE]SYSBOOT.EXE.
 - PDP11 now has working support for RC and RF expandable platter based disk drives.
 - Properly set asynchronous interrupt latency in all VAX simulators.
+- MicroVAX I simulator boots from oldest MicroVMS media due to the addition of RQDX1 disk controller type.
 
 ### All relevant changes in the simh v3.12-3 release have been merged into this repo
 
