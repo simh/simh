@@ -13842,14 +13842,18 @@ for (i=0; i < exp->size; i++) {
         rc = pcre_exec (ep->regex, NULL, cbuf, exp->buf_ins, 0, PCRE_NOTBOL, ovector, 3 * (ep->re_nsub + 1));
         if (rc >= 0) {
             size_t j;
-            char *buf = (char *)malloc (1 + exp->buf_ins);
+            char *buf = (char *)malloc (1 + exp->buf_ins);  /* largest buf needed is current expect data + NUL */
 
             for (j=0; j < (size_t)rc; j++) {
                 char env_name[32];
+                int end_offs = ovector[2 * j + 1], start_offs = ovector[2 * j];
 
                 sprintf (env_name, "_EXPECT_MATCH_GROUP_%d", (int)j);
-                memcpy (buf, &cbuf[ovector[2 * j]], ovector[2 * j + 1] - ovector[2 * j]);
-                buf[ovector[2 * j + 1] - ovector[2 * j]] = '\0';
+                if ((start_offs >= 0) && (end_offs >= start_offs))/* cover the potential case when no substring returned */
+                    memcpy (buf, &cbuf[start_offs], end_offs - start_offs);
+                else
+                    start_offs = end_offs = 0;                    /* no substring is an empty string */
+                buf[end_offs - start_offs] = '\0';
                 setenv (env_name, buf, 1);      /* Make the match and substrings available as environment variables */
                 sim_debug (exp->dbit, exp->dptr, "%s=%s\n", env_name, buf);
                 }
