@@ -2252,7 +2252,7 @@ return 0;
 const char *vid_version(void)
 {
 static char SDLVersion[160];
-SDL_version compiled, running;
+SDL_version compiled = { 0}, running = { 0};
 
 SDL_GetVersion(&running);
 
