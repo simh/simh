@@ -6,6 +6,10 @@ image:
 platform:
   - x86
 
+environment:
+  access_token:
+    secure: Me2UWjTL1G91AfTT9ruasivTMxtSO0SZbv3wIFRS2RygMiZhU8r9sSQ3a9QB7h70wnl2W2Cv8o1v0Z2hONpltyxKxlSP4OqXeIIIx0ssRMgg8rkm2qlDWcCzZur3tM4v
+
 matrix:
   fast_finish: true
 
@@ -33,18 +37,13 @@ before_build:
 build_script:
   - cmd: |
          "C:\Program Files (x86)\Microsoft Visual Studio 9.0\VC\vcvarsall.bat"
-         cd "Visual Studio Projects" & vcbuild /M%NUMBER_OF_PROCESSORS% /useenv /rebuild Simh.sln "Release|Win32"
+         cd "Visual Studio Projects" & vcbuild /M%NUMBER_OF_PROCESSORS% /useenv /rebuild simh.sln "Release|Win32" &           cd ..
   - ps: |
         if ($isWindows) {
-          cd ..
-          mkdir PACKAGES
           $platform = 'Windows'
-          $id_line = Select-String -Path 'Visual Studio Projects\.git-commit-id.h' -Pattern 'SIM_GIT_COMMIT_ID'
-          $id_name_pos = $id_line.line.IndexOf("SIM_GIT_COMMIT_ID")
-          $id = $id_line.Line.SubString($id_name_pos + 18, 8)
-          $datetime = Get-Date -Format "yyyy-mm-dd_hh-mm-ss"
-          Compress-Archive -Path BIN\NT\Win32-Release\*.exe -DestinationPath PACKAGES\simh-4.0-Current-$platform-$datetime-$id.zip
+          $commit_id_file = 'Visual Studio Projects\.git-commit-id.h' 
         } else {
+          make QUIET=1 $parallel
           $platform = uname -s
           if ($platform -eq 'Linux') {
             $ncpus = nproc
@@ -52,20 +51,37 @@ build_script:
           } else {
             $platform = 'macOS'
           }
-          make QUIET=1 $parallel
-          mkdir PACKAGES
-          $id_line = Select-String -Path '.git-commit-id' -Pattern 'SIM_GIT_COMMIT_ID'
-          $id_name_pos = $id_line.line.IndexOf("SIM_GIT_COMMIT_ID")
-          $id = $id_line.Line.SubString($id_name_pos + 18, 8)
-          $datetime = Get-Date -Format "yyyy-mm-dd_hh-mm-ss"
-          rm -rf BIN/buildtools
-          rm -rf BIN/*-build
-          Compress-Archive -Path BIN/* -DestinationPath PACKAGES/simh-4.0-Current-$platform-$datetime-$id.zip
+          $commit_id_file = '.git-commit-id' 
         }
+        $id_line = Select-String -Path $commit_id_file -Pattern 'SIM_GIT_COMMIT_ID'
+        $id = $id_line.Line.SubString($id_line.line.IndexOf("SIM_GIT_COMMIT_ID") + 18, 8)
+        $datetime = Get-Date -Format "yyyy-mm-dd_hh-mm-ss"
+        $version_major = (Select-String -Path 'sim_rev.h' -Pattern '#define\s+SIM_MAJOR\s+(\d+)').Matches.Groups[1].Value
+        $version_minor = (Select-String -Path 'sim_rev.h' -Pattern '#define\s+SIM_MINOR\s+(\d+)').Matches.Groups[1].Value
+        $version_mode =  (Select-String -Path 'sim_rev.h' -Pattern '#define\s+SIM_VERSION_MODE\s+"(.+?)"').Matches.Groups[1].Value
 
-artifacts:
-  - path: PACKAGES\*.zip
-
+on_success:
+  - git config --global credential.helper store
+  - ps: Set-Content -Path "$HOME\.git-credentials" -Value "https://$($env:access_token):x-oauth-basic@github.com`n" -NoNewline
+  - git config --global credential.helper store
+  - git config --global user.email "mark@infocomm.com"
+  - git config --global user.name "Mark Pizzolato"
+  - git clone "https://github.com/simh/Development-Binaries"
+  - ps: |
+        cd Development-Binaries
+        $pkg_filename = "simh-$datetime-$platform-$version_major.$version_minor-$version_mode-$id"
+        if ($isWindows) {
+          Compress-Archive -Path ..\BIN\NT\Win32-Release\*.exe -DestinationPath "$pkg_filename.zip"
+        } else {
+          pushd ../BIN
+          tar -cvzf ../Development-Binaries/$pkg_filename.tgz --exclude=buildtools '--exclude=*-build' ../BIN *
+          popd
+        }
+        "Build results on $datetime for simh Commit: https://github.com/simh/simh/commit/$id" | Out-File -FilePath ../pkg_commit_message -Encoding ascii
+  - git add *
+  - git commit -F ../pkg_commit_message
+  - git push -u origin master
+  
 notifications:
   - provider: Email
     to:
