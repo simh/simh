@@ -43,7 +43,6 @@ build_script:
           $platform = 'Windows'
           $commit_id_file = 'Visual Studio Projects\.git-commit-id.h' 
         } else {
-          make QUIET=1 $parallel
           $platform = uname -s
           if ($platform -eq 'Linux') {
             $ncpus = nproc
@@ -52,15 +51,17 @@ build_script:
             $platform = 'macOS'
           }
           $commit_id_file = '.git-commit-id' 
+          make QUIET=1 $parallel
         }
+
+on_success:
+  - ps: |
         $id_line = Select-String -Path $commit_id_file -Pattern 'SIM_GIT_COMMIT_ID'
         $id = $id_line.Line.SubString($id_line.line.IndexOf("SIM_GIT_COMMIT_ID") + 18, 8)
         $datetime = Get-Date -Format "yyyy-mm-dd_hh-mm-ss"
         $version_major = (Select-String -Path 'sim_rev.h' -Pattern '#define\s+SIM_MAJOR\s+(\d+)').Matches.Groups[1].Value
         $version_minor = (Select-String -Path 'sim_rev.h' -Pattern '#define\s+SIM_MINOR\s+(\d+)').Matches.Groups[1].Value
         $version_mode =  (Select-String -Path 'sim_rev.h' -Pattern '#define\s+SIM_VERSION_MODE\s+"(.+?)"').Matches.Groups[1].Value
-
-on_success:
   - git config --global credential.helper store
   - ps: Set-Content -Path "$HOME\.git-credentials" -Value "https://$($env:access_token):x-oauth-basic@github.com`n" -NoNewline
   - git config --global credential.helper store
@@ -77,7 +78,7 @@ on_success:
           tar -cvzf ../Development-Binaries/$pkg_filename.tgz --exclude=buildtools '--exclude=*-build' ../BIN *
           popd
         }
-        "Build results on $datetime for simh Commit: https://github.com/simh/simh/commit/$id" | Out-File -FilePath ../pkg_commit_message -Encoding ascii
+        "$platform Build results for simh Commit: https://github.com/simh/simh/commit/$id" | Out-File -FilePath ../pkg_commit_message -Encoding ascii
   - git add *
   - git commit -F ../pkg_commit_message
   - git push -u origin master
