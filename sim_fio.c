@@ -366,7 +366,7 @@ return TRUE;
 
 static char *_sim_expand_homedir (const char *file, char *dest, size_t dest_size)
 {
-uint8 *without_quotes = NULL;
+char *without_quotes = NULL;
 
 errno = 0;
 if (((*file == '"') && (file[strlen (file) - 1] == '"')) ||
@@ -375,7 +375,7 @@ if (((*file == '"') && (file[strlen (file) - 1] == '"')) ||
     const char *end = &file[strlen (file) - 1];
     char quote = *file;
 
-    without_quotes = (uint8*)malloc (strlen (file) + 1);
+    without_quotes = (char *)malloc (strlen (file) + 1);
     if (without_quotes == NULL)
         return NULL;
     strcpy (without_quotes, file + 1);
