@@ -2660,8 +2660,8 @@ endif
 ifneq (${WIN32},)
 	del $(BIN)\ibm1130.o
 endif
-ifneq (,$(call find_test,${IBM1130D},ibm1130))
-	$@ $(call find_test,${IBM1130D},ibm1130) ${TEST_ARG}
+ifneq (,$(call find_test,Ibm1130))
+	$@ $(call find_test,Ibm1130) ${TEST_ARG}
 endif
 else
 	$(info ibm1130 can not be built using C++)
@@ -2927,8 +2927,10 @@ else # end of primary make recipies
   endif
 
   # Extract source directories from the dependencies
-    
-  D1 = $(sort $(foreach dir,$(DEPS),$(dir $(dir))))
+  D0 = $(foreach dir,$(DEPS),$(dir $(dir)))
+  # Isolate the directory of the first dependency
+  PRIMARY_SRC = $(word 1, $(D0))
+  D1 = $(sort $(D0))
 
   # Extract potential source code directories from the -I specifiers in the options
 
@@ -2938,24 +2940,24 @@ else # end of primary make recipies
   # split the options with -I at the beginning of each element
   D3=$(subst ^-I,$(space)^-I,$(D2))
   # strip out includes for known support directories (system/dependenty includes 
-  # starting with /, slirp, display, etc - with or without spaces between the 
+  # starting with /, slirp, slirp_glue, display, etc - with or without spaces between the 
   # -I and the directory)
-  D4=$(filter-out ^-I/%,$(filter-out ^-I^/%,$(filter-out ^-Islirp%,$(filter-out ^-I^slirp%,$(filter-out ^-Idisplay%,$(filter-out ^-I^display%,$(D3)))))))
+  D4=$(filter-out ^-I/%,$(filter-out ^-I^/%,$(filter-out ^-Islirp%,$(filter-out ^-I^slirp%,$(filter-out ^-Islirp_glue%,$(filter-out ^-I^slirp_glue%,$(filter-out ^-Idisplay%,$(filter-out ^-I^display%,$(D3)))))))))
   # remove leading element if it isn't an include
   D5=$(filter ^-I%,$(D4))
   # strip off the leading -I include specifier
   D6=$(foreach include,$(D5),$(patsubst ^-I%,%,$(include)))
   # chop off any extra options beyond the include directory
   D7=$(foreach include,$(D6),$(word 1,$(subst ^,$(space),$(include))))
-  DIRS = $(strip $(D1) $(D7))
-
+  PRIMARY_INC = $(word 1, $(D7))
+  DIRS = $(strip $(D7) $(D1))
   ifneq ($(WIN32),)
     pathfix = $(subst /,\,$(1))
   else
     pathfix = $(1)
   endif
 
-  find_test = $(if $(findstring 0,$(TESTS)),, RegisterSanityCheck $(abspath $(wildcard $(1)/tests/$(2)_test.ini)) </dev/null)
+  find_test = $(if $(findstring 0,$(TESTS)),, RegisterSanityCheck $(if $(abspath $(wildcard $(PRIMARY_SRC)/tests/$(1)_test.ini)),$(abspath $(wildcard $(PRIMARY_SRC)/tests/$(1)_test.ini)),$(abspath $(wildcard $(PRIMARY_INC)/tests/$(1)_test.ini))) </dev/null)
 
   TARGETNAME = $(basename $(notdir $(TARGET)))
   BIN = $(dir $(TARGET))
@@ -3104,9 +3106,9 @@ $(TARGET): $(DEPS)
 	copy $(TARGET) $(@D)\$(ALTNAME)${EXE}
       endif
     endif
-    ifneq (,$(call find_test,$(word 2,$(DIRS)),$(TEST_NAME)))
+    ifneq (,$(call find_test,$(TEST_NAME)))
     # invoke the just built simulator to engage its test activities
-	$@ $(call find_test,$(word 2,$(DIRS)),$(TEST_NAME)) ${TEST_ARG}
+	$@ $(call find_test,$(TEST_NAME)) ${TEST_ARG}
     endif
     ifneq (,$(SOURCE_CHECK))
 	  $@ $(SOURCE_CHECK_SWITCHES) CheckSourceCode $(DEPS)
