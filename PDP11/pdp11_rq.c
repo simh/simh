@@ -721,8 +721,8 @@ x  RA73 70(+1)  21      2667+   21      1       ?       3920490
 
 // AFAIK the UNIBUS KLESI and QBUS KLESI used the same controller type ...
 #define KLESI_CTYPE     1               // RC25 controller (UNIBUS and QBUS both)
-#define KLESI_UQPM      1
-#define KLESI_MODEL     1
+#define KLESI_UQPM      3
+#define KLESI_MODEL     3
 #define KLESI_BUSES     CBUS_QBUS+CBUS_UNIBUS
 
 #define RUX50_CTYPE     2               // UNIBUS RX50-only controller
@@ -759,6 +759,12 @@ x  RA73 70(+1)  21      2667+   21      1       ?       3920490
 #define RQDX1_UQPM      7
 #define RQDX1_MODEL     7
 #define RQDX1_BUSES     CBUS_QBUS
+
+#define KDB50_CTYPE     9               // QBUS SDI (RAxx) controller
+#define KDB50_UQPM      18
+#define KDB50_MODEL     18
+#define KDB50_BUSES     CBUS_QBUS
+
 
 
 #define RQ_DRV(d) \
@@ -826,6 +832,7 @@ static struct ctlrtyp ctlr_tab[] = {
     RQ_CTLR (KRQ50),
     RQ_CTLR (KRU50),
     RQ_CTLR (RQDX1),
+    RQ_CTLR (KDB50),
     { 0 }
     };
 
