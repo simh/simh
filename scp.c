@@ -692,6 +692,7 @@ static struct deleted_env_var {
 static int sim_external_env_count = 0;
 static char *sim_tmpnam;
 static FILE *sim_tmpfile = NULL;
+static int sim_editline_version = 0;
 
 t_stat sim_last_cmd_stat;                               /* Command Status */
 struct timespec cmd_time;                               /*  */
@@ -7048,6 +7049,11 @@ if (flag) {
 #endif
     fprintf (st, "\n        OS clock resolution: %dms", os_tick_size);
     fprintf (st, "\n        Time taken by msleep(1): %dms", os_ms_sleep_1);
+    if (sim_editline_version != 0)
+        if (sim_editline_version > 0xFFFF)
+            fprintf (st, "\n        WinEditLine Version: %d.%d%02X", sim_editline_version >> 16, (sim_editline_version >> 8) & 0xFF, sim_editline_version & 0xFF);
+        else
+            fprintf (st, "\n        EditLine Version: %d.%d", (sim_editline_version >> 8) & 0xFF, sim_editline_version & 0xFF);
     if (eth_version ())
         fprintf (st, "\n        Ethernet packet info: %s", eth_version());
 #if defined(__VMS)
@@ -10793,6 +10799,7 @@ if (prompt && (!initialized)) {
 #if defined(HAVE_LIBEDIT)
     p_readline = (readline_func)&readline;
     p_add_history = (add_history_func)&add_history;
+    sim_editline_version = RL_READLINE_VERSION;
 #if !defined(RL_READLINE_VERSION)
     p_free_line = (free_line_func)&rl_free;
 #else
@@ -10812,6 +10819,7 @@ if (prompt && (!initialized)) {
             p_free_line = (free_line_func)((size_t)dlsym(handle, "rl_free"));
             if (p_free_line == NULL)
                 p_free_line = (free_line_func)&free;
+            sim_editline_version = *((int *)dlsym(handle, "rl_readline_version"));
             }
         }
 #endif /* defined(SIM_DLOPEN_EXTENSION) */
