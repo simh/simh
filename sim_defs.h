@@ -178,6 +178,11 @@ extern "C" {
 #define CONST const
 #endif
 
+/* Stringify macro value */
+
+#define __STR_QUOTE(tok) #tok
+#define __STR(tok) __STR_QUOTE(tok)
+
 /* Length specific integer declarations */
 
 /* Handle the special/unusual cases first with everything else leveraging stdints.h */

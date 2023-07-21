@@ -6349,9 +6349,7 @@ uuid_gen (void *uuidaddr)
 void (*uuid_generate_c) (void *) = NULL;
 void *handle;
 
-#define S__STR_QUOTE(tok) #tok
-#define S__STR(tok) S__STR_QUOTE(tok)
-    handle = dlopen("libuuid." S__STR(SIM_HAVE_DLOPEN), RTLD_NOW|RTLD_GLOBAL);
+    handle = dlopen("libuuid." __STR(SIM_HAVE_DLOPEN), RTLD_NOW|RTLD_GLOBAL);
     if (handle)
         uuid_generate_c = (void (*)(void *))((size_t)dlsym(handle, "uuid_generate"));
     if (uuid_generate_c)

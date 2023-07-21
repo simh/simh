@@ -1261,8 +1261,6 @@ static void *hLib = 0;                      /* handle to Library */
 #endif
 static int lib_loaded = 0;                  /* 0=not loaded, 1=loaded, 2=library load failed, 3=Func load failed */
 
-#define __STR_QUOTE(tok) #tok
-#define __STR(tok) __STR_QUOTE(tok)
 static const char* lib_name =
 #if defined(_WIN32) || defined(__CYGWIN__)
                           "wpcap.dll";
@@ -1280,8 +1278,6 @@ static char no_pcap[PCAP_ERRBUF_SIZE] =
 #else
     "libpcap." __STR(SIM_HAVE_DLOPEN) " failed to load, install libpcap to use pcap networking";
 #endif
-#undef __STR
-#undef __STR_QUOTE
 
 /* define pointers to pcap functions needed */
 static void    (*p_pcap_close) (pcap_t *);

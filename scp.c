@@ -10768,9 +10768,12 @@ return read_line_p (NULL, cptr, size, stream);
 #define RTLD_LOCAL 0
 #endif
 #define EDIT_DEFAULT_LIB "edit."
-#define SIM_HAVE_DLOPEN DLL
+#define SIM_DLOPEN_EXTENSION DLL
 #else /* !defined(_WIN32) */
 #define EDIT_DEFAULT_LIB "libedit."
+#if defined(SIM_HAVE_DLOPEN)
+#define SIM_DLOPEN_EXTENSION SIM_HAVE_DLOPEN
+#endif
 #endif /* defined(_WIN32) */
 
 char *read_line_p (const char *prompt, char *cptr, int32 size, FILE *stream)
@@ -10796,15 +10799,13 @@ if (prompt && (!initialized)) {
     p_free_line = (free_line_func)&free;
 #endif
 #else /* !defined(HAVE_LIBEDIT) */
-#if defined(SIM_HAVE_DLOPEN)
+#if defined(SIM_DLOPEN_EXTENSION)
     if (!p_readline) {   /* libedit not available at compile time, try OS shared object? */
         void *handle;
 
-#define S__STR_QUOTE(tok) #tok
-#define S__STR(tok) S__STR_QUOTE(tok)
-        handle = dlopen(EDIT_DEFAULT_LIB S__STR(SIM_HAVE_DLOPEN), RTLD_NOW|RTLD_GLOBAL);
+        handle = dlopen(EDIT_DEFAULT_LIB __STR(SIM_DLOPEN_EXTENSION), RTLD_NOW|RTLD_GLOBAL);
         if (!handle)
-            handle = dlopen(EDIT_DEFAULT_LIB S__STR(SIM_HAVE_DLOPEN) ".2", RTLD_NOW|RTLD_GLOBAL);
+            handle = dlopen(EDIT_DEFAULT_LIB __STR(SIM_DLOPEN_EXTENSION) ".2", RTLD_NOW|RTLD_GLOBAL);
         if (handle) {
             p_readline = (readline_func)((size_t)dlsym(handle, "readline"));
             p_add_history = (add_history_func)((size_t)dlsym(handle, "add_history"));
@@ -10813,7 +10814,7 @@ if (prompt && (!initialized)) {
                 p_free_line = (free_line_func)&free;
             }
         }
-#endif /* defined(SIM_HAVE_DLOPEN) */
+#endif /* defined(SIM_DLOPEN_EXTENSION) */
 #endif /* defined(HAVE_LIBEDIT) */
     }
 
@@ -13849,10 +13850,7 @@ for (i=0; i < exp->size; i++) {
                 int end_offs = ovector[2 * j + 1], start_offs = ovector[2 * j];
 
                 sprintf (env_name, "_EXPECT_MATCH_GROUP_%d", (int)j);
-                if ((start_offs >= 0) && (end_offs >= start_offs))/* cover the potential case when no substring returned */
-                    memcpy (buf, &cbuf[start_offs], end_offs - start_offs);
-                else
-                    start_offs = end_offs = 0;                    /* no substring is an empty string */
+                memcpy (buf, &cbuf[start_offs], end_offs - start_offs);
                 buf[end_offs - start_offs] = '\0';
                 setenv (env_name, buf, 1);      /* Make the match and substrings available as environment variables */
                 sim_debug (exp->dbit, exp->dptr, "%s=%s\n", env_name, buf);
@@ -13861,7 +13859,7 @@ for (i=0; i < exp->size; i++) {
                 char env_name[32];
 
                 sprintf (env_name, "_EXPECT_MATCH_GROUP_%d", (int)j);
-                setenv (env_name, "", 1);      /* Remove previous extra environment variables */
+                unsetenv (env_name);            /* Remove previous extra environment variables */
                 }
             sim_exp_match_sub_count = ep->re_nsub;
             free (ovector);
