@@ -96,6 +96,7 @@ Simulator binaries for x86 Linus, x86 macOS, and Windows for all recent changes 
 - Various failing bugs in tape detach logic are fixed.
 - Clean building on Android Termux.
 - Proper line editing behavior on all Unix platforms.
+- Simulators with video displays have a working SCREENSHOT command.
 
 #### Changes to the PDP-11 and VAX simulators also not in the Open SIMH repo
 

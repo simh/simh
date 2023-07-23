@@ -239,10 +239,6 @@
 #include <fcntl.h>
 #endif
 
-#if defined(SIM_HAVE_DLOPEN)                                /* Dynamic Readline support */
-#include <dlfcn.h>
-#endif
-
 #ifndef MAX
 #define MAX(a,b)  (((a) >= (b)) ? (a) : (b))
 #endif
@@ -693,6 +689,16 @@ static int sim_external_env_count = 0;
 static char *sim_tmpnam;
 static FILE *sim_tmpfile = NULL;
 static int sim_editline_version = 0;
+static t_bool sim_pcre_regex_available = FALSE;
+/* Dynamically loaded pcre support */
+#if !defined(HAVE_PCRE_H)
+pcre *(*pcre_compile) (const char *, int, const char **, int *, const unsigned char *);
+const char *(*pcre_version) (void);
+void (*pcre_free) (void *);
+int (*pcre_fullinfo) (const pcre *, const pcre_extra *, int, void *);
+int (*pcre_exec) (const pcre *, const pcre_extra *, const char *, int, int, int, int *, int);
+#endif
+static void sim_exp_initialize (void);
 
 t_stat sim_last_cmd_stat;                               /* Command Status */
 struct timespec cmd_time;                               /*  */
@@ -3036,8 +3042,10 @@ AIO_INIT;                                               /* init Asynch I/O */
 sim_finit ();                                           /* init fio package */
 sim_disk_init ();                                       /* init disk package */
 sim_tape_init ();                                       /* init tape package */
+sim_exp_initialize ();                                  /* init expect package regex support */
 if ((argc > 2) && 
     (sim_strcasecmp (argv[1], "CheckSourceCode") == 0)) {
+    if (sim_pcre_regex_available)
         return sim_check_source (argc - 1, argv + 1);
     sim_messagef (SCPE_NOFNC, "Missing PCRE support.\n");
     sim_messagef (SCPE_NOFNC, "Install the Perl Compatible Regular Expression (PCRE) package for\n");
@@ -3187,9 +3195,6 @@ if (!sim_quiet) {
 sim_timer_precalibrate_execution_rate ();
 sim_reset_time ();
 show_version (stdnul, NULL, NULL, 1, NULL);             /* Quietly set SIM_OSTYPE */
-#if defined (HAVE_PCRE_H)
-setenv ("SIM_REGEX_TYPE", "PCRE", 1);                   /* Publish regex type */
-#endif
 sim_argv = argv;
 
 if (sim_switches & SWMASK ('T'))                        /* Command Line -T switch */
@@ -7047,18 +7052,18 @@ if (flag) {
     fprintf (st, "\n        Memory Pointer Size: %d bits", (int)sizeof(dptr)*8);
     fprintf (st, "\n        %s", sim_toffset_64 ? "Large File (>2GB) support" : "No Large File support");
     fprintf (st, "\n        SDL Video support: %s", vid_version());
-#if defined (HAVE_PCRE_H)
-    fprintf (st, "\n        PCRE RegEx (Version %s) support for EXPECT commands", pcre_version());
-#else
-    fprintf (st, "\n        No RegEx support for EXPECT commands");
-#endif
+    if (sim_pcre_regex_available)
+        fprintf (st, "\n        PCRE RegEx (Version %s) support for EXPECT commands", pcre_version());
+    else
+        fprintf (st, "\n        No RegEx support for EXPECT commands");
     fprintf (st, "\n        OS clock resolution: %dms", os_tick_size);
     fprintf (st, "\n        Time taken by msleep(1): %dms", os_ms_sleep_1);
-    if (sim_editline_version != 0)
+    if (sim_editline_version != 0) {
         if (sim_editline_version > 0xFFFF)
             fprintf (st, "\n        WinEditLine Version: %d.%d%02X", sim_editline_version >> 16, (sim_editline_version >> 8) & 0xFF, sim_editline_version & 0xFF);
         else
             fprintf (st, "\n        EditLine Version: %d.%d", (sim_editline_version >> 8) & 0xFF, sim_editline_version & 0xFF);
+        }
     if (eth_version ())
         fprintf (st, "\n        Ethernet packet info: %s", eth_version());
 #if defined(__VMS)
@@ -10769,22 +10774,9 @@ return read_line_p (NULL, cptr, size, stream);
 #include <editline/readline.h>
 #endif
 #if defined(_WIN32)
-#define dlopen(X,Y)    LoadLibraryA((X))
-#define dlsym(X,Y)     GetProcAddress((HINSTANCE)(X),(Y))
-#define dlclose(X)     FreeLibrary((X))
-#ifndef RTLD_NOW
-#define RTLD_NOW 0
-#endif
-#ifndef RTLD_LOCAL
-#define RTLD_LOCAL 0
-#endif
 #define EDIT_DEFAULT_LIB "edit."
-#define SIM_DLOPEN_EXTENSION DLL
 #else /* !defined(_WIN32) */
 #define EDIT_DEFAULT_LIB "libedit."
-#if defined(SIM_HAVE_DLOPEN)
-#define SIM_DLOPEN_EXTENSION SIM_HAVE_DLOPEN
-#endif
 #endif /* defined(_WIN32) */
 
 char *read_line_p (const char *prompt, char *cptr, int32 size, FILE *stream)
@@ -13458,6 +13450,7 @@ return msg;
 
    The package contains the following public routines:
 
+        sim_exp_initialize      initialize the expect facility regex sypport
         sim_set_expect          expect command parser and intializer
         sim_set_noexpect        noexpect command parser
         sim_exp_init            initialize an expect context
@@ -13468,6 +13461,40 @@ return msg;
         sim_exp_showall         show all expect rules
         sim_exp_check           test for rule match
 */
+
+/* Optionally dynamically locate and load pcre support */
+
+void sim_exp_initialize (void)
+{
+#if defined (SIM_HAVE_DLOPEN) && !defined (HAVE_PCRE_H)
+static void *hPCRELib = 0;                  /* handle to Library */
+/* generic function pointer used when loading shared object */
+typedef int (*_func)();
+
+hPCRELib = dlopen("libpcre." __STR(SIM_DLOPEN_EXTENSION), RTLD_NOW|RTLD_GLOBAL);
+if (!hPCRELib)
+    hPCRELib = dlopen("libpcre." __STR(SIM_DLOPEN_EXTENSION) ".2", RTLD_NOW|RTLD_GLOBAL);
+if (!hPCRELib)
+    hPCRELib = dlopen("libpcre." __STR(SIM_DLOPEN_EXTENSION) ".3", RTLD_NOW|RTLD_GLOBAL);
+
+#define _load_function(function)  *((_func **)&function) = (_func *)((size_t)dlsym(hPCRELib, __STR(function)))
+
+_load_function(pcre_compile);
+_load_function(pcre_version);
+_load_function(pcre_free);
+_load_function(pcre_fullinfo);
+_load_function(pcre_exec);
+sim_pcre_regex_available = (pcre_compile != NULL);
+if (sim_pcre_regex_available)
+    *((_func *)&pcre_free) = *((_func *)pcre_free); /* Fixup initially indirect pointer */
+#else
+#if defined (HAVE_PCRE_H)
+sim_pcre_regex_available = TRUE;
+#endif
+#endif /* defined (SIM_HAVE_DLOPEN) && !defined (HAVE_PCRE_H) */
+if (sim_pcre_regex_available)
+    setenv ("SIM_REGEX_TYPE", "PCRE", 1);               /* Publish regex type */
+}
 
 /*   Initialize an expect context. */
 
@@ -13565,10 +13592,8 @@ if (!ep)                                                /* not there? ok */
 free (ep->match);                                       /* deallocate match string */
 free (ep->match_pattern);                               /* deallocate the display format match string */
 free (ep->act);                                         /* deallocate action */
-#if defined(USE_REGEX)
 if (ep->switches & EXP_TYP_REGEX)
     pcre_free (ep->regex);                              /* release compiled regex */
-#endif
 exp->size -= 1;                                         /* decrement count */
 for (i=ep-exp->rules; i<exp->size; i++)                 /* shuffle up remaining rules */
     exp->rules[i] = exp->rules[i+1];
@@ -13600,10 +13625,8 @@ for (i=0; i<exp->size; i++) {
     free (exp->rules[i].match);                         /* deallocate match string */
     free (exp->rules[i].match_pattern);                 /* deallocate display format match string */
     free (exp->rules[i].act);                           /* deallocate action */
-#if defined(USE_REGEX)
     if (exp->rules[i].switches & EXP_TYP_REGEX)
         pcre_free (exp->rules[i].regex);                /* release compiled regex */
-#endif
     }
 free (exp->rules);
 exp->rules = NULL;
@@ -13628,8 +13651,7 @@ int i;
 match_buf = (uint8 *)calloc (strlen (match) + 1, 1);
 if (!match_buf)
     return SCPE_MEM;
-if (switches & EXP_TYP_REGEX) {
-#if !defined (USE_REGEX)
+if ((switches & EXP_TYP_REGEX) && !sim_pcre_regex_available) {
     free (match_buf);
     sim_messagef (SCPE_ARG, "RegEx support is not available\n");
     sim_messagef (SCPE_ARG, "The necessary components for expect command regular expression\n");
@@ -13637,7 +13659,7 @@ if (switches & EXP_TYP_REGEX) {
     sim_messagef (SCPE_ARG, "Install the Perl Compatible Regular Expression (PCRE) package for\n");
     return sim_messagef (SCPE_ARG, "your system and try again.\n");
     }
-#else   /* USE_REGEX */
+if (switches & EXP_TYP_REGEX) {
     pcre *re;
     const char *errmsg;
     int erroffset, re_nsub;
@@ -13650,11 +13672,10 @@ if (switches & EXP_TYP_REGEX) {
         free (match_buf);
         return SCPE_ARG|SCPE_NOMESSAGE;
         }
-    (void)pcre_fullinfo(re, NULL, PCRE_INFO_CAPTURECOUNT, &re_nsub);
+    (void)pcre_fullinfo (re, NULL, PCRE_INFO_CAPTURECOUNT, &re_nsub);
     sim_debug (exp->dbit, exp->dptr, "Expect Regular Expression: \"%s\" has %d sub expressions\n", match_buf, re_nsub);
     pcre_free (re);
     }
-#endif
 else {
     if (switches & EXP_TYP_REGEX_I) {
         free (match_buf);
@@ -13691,15 +13712,13 @@ if ((match_buf == NULL) || (ep->match_pattern == NULL)) {
     return SCPE_MEM;
     }
 if (switches & EXP_TYP_REGEX) {
-#if defined(USE_REGEX)
     const char *errmsg;
     int erroffset;
 
     memcpy (match_buf, match+1, strlen(match)-2);      /* extract string without surrounding quotes */
     match_buf[strlen(match)-2] = '\0';
     ep->regex = pcre_compile ((char *)match_buf, (switches & EXP_TYP_REGEX_I) ? PCRE_CASELESS : 0, &errmsg, &erroffset, NULL);
-    (void)pcre_fullinfo(ep->regex, NULL, PCRE_INFO_CAPTURECOUNT, &ep->re_nsub);
-#endif
+    (void)pcre_fullinfo (ep->regex, NULL, PCRE_INFO_CAPTURECOUNT, &ep->re_nsub);
     free (match_buf);
     match_buf = NULL;
     }
@@ -13830,7 +13849,6 @@ if (exp->buf_data < exp->buf_size)
 for (i=0; i < exp->size; i++) {
     ep = &exp->rules[i];
     if (ep->switches & EXP_TYP_REGEX) {
-#if defined (USE_REGEX)
         int *ovector = NULL;
         int rc;
         char *cbuf = (char *)exp->buf;
@@ -13885,7 +13903,6 @@ for (i=0; i < exp->size; i++) {
             break;
             }
         free (ovector);
-#endif
         }
     else {
         if (exp->buf_data < ep->size)                           /* Too little data to match yet? */

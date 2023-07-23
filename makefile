@@ -718,11 +718,13 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
   # Find PCRE RegEx library.
   ifneq (,$(call find_include,pcre))
     ifneq (,$(call find_lib,pcre))
-      OS_CCDEFS += -DHAVE_PCRE_H
-      OS_LDFLAGS += -lpcre
       $(info using libpcre: $(call find_lib,pcre) $(call find_include,pcre))
-      ifeq ($(LD_SEARCH_NEEDED),$(call need_search,pcre))
-        OS_LDFLAGS += -L$(dir $(call find_lib,pcre))
+      ifneq (,$(ALL_DEPENDENCIES))
+        OS_CCDEFS += -DHAVE_PCRE_H
+        OS_LDFLAGS += -lpcre
+        ifeq ($(LD_SEARCH_NEEDED),$(call need_search,pcre))
+          OS_LDFLAGS += -L$(dir $(call find_lib,pcre))
+        endif
       endif
     else
       NEEDED_PKGS += DPKG_PCRE
@@ -733,14 +735,16 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
   # Find libedit BSD licensed library for readline support.
   ifneq (,$(call find_lib,edit))
     ifneq (,$(call find_include,editline/readline))
-      OS_CCDEFS += -DHAVE_LIBEDIT
-      OS_LDFLAGS += -ledit
       $(info using libedit: $(call find_lib,edit) $(call find_include,editline/readline))
-      ifneq (,$(call find_lib,termcap))
-        OS_LDFLAGS += -ltermcap
-      endif
-      ifeq ($(LD_SEARCH_NEEDED),$(call need_search,edit))
-        OS_LDFLAGS += -L$(dir $(call find_lib,edit))
+      ifneq (,$(ALL_DEPENDENCIES))
+        OS_CCDEFS += -DHAVE_LIBEDIT
+        OS_LDFLAGS += -ledit
+        ifneq (,$(call find_lib,termcap))
+          OS_LDFLAGS += -ltermcap
+        endif
+        ifeq ($(LD_SEARCH_NEEDED),$(call need_search,edit))
+          OS_LDFLAGS += -L$(dir $(call find_lib,edit))
+        endif
       endif
     else
       NEEDED_PKGS += DPKG_EDITLINE
@@ -802,14 +806,18 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
   endif
   ifneq (,$(call find_include,png))
     ifneq (,$(call find_lib,png))
-      OS_CCDEFS += -DHAVE_LIBPNG
-      OS_LDFLAGS += -lpng
       $(info using libpng: $(call find_lib,png) $(call find_include,png))
+      OS_CCDEFS += -DHAVE_LIBPNG
+      ifneq (,$(ALL_DEPENDENCIES))
+        OS_LDFLAGS += -lpng
+      endif
       ifneq (,$(call find_include,zlib))
         ifneq (,$(call find_lib,z))
-          OS_CCDEFS += -DHAVE_ZLIB
-          OS_LDFLAGS += -lz
           $(info using zlib: $(call find_lib,z) $(call find_include,zlib))
+          OS_CCDEFS += -DHAVE_ZLIB
+          ifneq (,$(ALL_DEPENDENCIES))
+            OS_LDFLAGS += -lz
+          endif
         else
           NEEDED_PKGS += DPKG_ZLIB
         endif

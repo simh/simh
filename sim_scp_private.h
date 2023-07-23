@@ -37,14 +37,144 @@ extern "C" {
 
 #include "sim_sock.h"
 
-#ifdef USE_REGEX
-#undef USE_REGEX
+#if defined(_WIN32)
+#define dlopen(X,Y)    LoadLibraryA((X))
+#define dlsym(X,Y)     GetProcAddress((HINSTANCE)(X),(Y))
+#define dlclose(X)     FreeLibrary((X))
+#define SIM_DLOPEN_EXTENSION DLL
+#else /* !defined(_WIN32) */
+#if defined(SIM_HAVE_DLOPEN)
+#include <dlfcn.h>
+#define SIM_DLOPEN_EXTENSION SIM_HAVE_DLOPEN
 #endif
+#endif /* defined(_WIN32) */
+
 #if defined(HAVE_PCRE_H)
 #include <pcre.h>
-#define USE_REGEX 1
+#else /* !defined(HAVE_PCRE_H) */
+/* Dynamically loaded PCRE support */
+#if !defined(PCRE_DYNAMIC_SETUP)
+#define PCRE_DYNAMIC_SETUP
+typedef void pcre;
+typedef void pcre_extra;
+#ifndef PCRE_INFO_CAPTURECOUNT
+#define PCRE_INFO_CAPTURECOUNT 2
+#define PCRE_ERROR_NOMATCH          (-1)
 #endif
+#ifndef PCRE_NOTBOL
+#define PCRE_NOTBOL             0x00000080  /*    E D J */
+#endif
+#ifndef PCRE_CASELESS
+#define PCRE_CASELESS           0x00000001  /* C1       */
+#endif
+/* Pointers to useful PCRE functions */
+extern pcre *(*pcre_compile) (const char *, int, const char **, int *, const unsigned char *);
+extern const char *(*pcre_version) (void);
+extern void (*pcre_free) (void *);
+extern int (*pcre_fullinfo) (const pcre *, const pcre_extra *, int, void *);
+extern int (*pcre_exec) (const pcre *, const pcre_extra *, const char *, int, int, int, int *, int);
+#endif /* PCRE_DYNAMIC_SETUP */
+#endif /* HAVE_PCRE_H */
 
+/* Dynamically loaded PNG support */
+#if defined(PNG_H)  /* This symbol has been defined by png.h since png 1.0.7 in 2000 */
+#if !defined(PNG_ROUTINE)
+#if PNG_LIBPNG_VER < 10600
+#define png_const_structrp png_structp
+#define png_structrp png_structp
+#define png_const_inforp png_infop
+#define png_inforp png_infop
+#define png_const_colorp png_colorp
+#define png_const_bytep png_bytep
+#undef PNG_SETJMP_SUPPORTED
+#endif
+/* Pointers to useful PNG functions */
+#if defined(_WIN32) || defined(ALL_DEPENDENCIES)     /* This would be appropriate anytime libpng is specifically listed at link time */
+#define PNG_ROUTINE(_type, _name, _args) _type (*p_##_name) _args = &_name;
+#else
+#define PNG_ROUTINE(_type, _name, _args) _type (*p_##_name) _args;
+#endif
+#else /* !defined(PNG_ROUTINE) */
+#undef PNG_ROUTINE
+static struct PNG_Entry {
+    const char *entry_name;
+    void **entry_pointer;
+    } libpng_entries[] = {
+#define DEFINING_PNG_ARRAY 1
+#define PNG_ROUTINE(_type, _name, _args) {#_name, (void **)&p_##_name},
+#endif
+/* Return the user pointer associated with the I/O functions */
+PNG_ROUTINE(png_voidp, png_get_io_ptr, (png_const_structrp png_ptr))
+/* Allocate and initialize png_ptr struct for reading, and any other memory. */
+PNG_ROUTINE(png_structp, png_create_read_struct,
+    (png_const_charp user_png_ver, png_voidp error_ptr,
+    png_error_ptr error_fn, png_error_ptr warn_fn))
+/* Allocate and initialize png_ptr struct for writing, and any other memory */
+PNG_ROUTINE(png_structp, png_create_write_struct,
+    (png_const_charp user_png_ver, png_voidp error_ptr, png_error_ptr error_fn, png_error_ptr warn_fn))
+/* Allocate and initialize the info structure */
+PNG_ROUTINE(png_infop, png_create_info_struct, (png_const_structrp png_ptr))
+/* Free any memory associated with the png_struct and the png_info_structs */
+PNG_ROUTINE(void, png_destroy_read_struct, (png_structpp png_ptr_ptr,
+    png_infopp info_ptr_ptr, png_infopp end_info_ptr_ptr))
+/* Free any memory associated with the png_struct and the png_info_structs */
+PNG_ROUTINE(void, png_destroy_write_struct, (png_structpp png_ptr_ptr, png_infopp info_ptr_ptr))
+/* Replace the default data output functions with a user supplied one(s).
+ * If buffered output is not used, then output_flush_fn can be set to NULL.
+ * If PNG_WRITE_FLUSH_SUPPORTED is not defined at libpng compile time
+ * output_flush_fn will be ignored (and thus can be NULL).
+ * It is probably a mistake to use NULL for output_flush_fn if
+ * write_data_fn is not also NULL unless you have built libpng with
+ * PNG_WRITE_FLUSH_SUPPORTED undefined, because in this case libpng's
+ * default flush function, which uses the standard *FILE structure, will
+ * be used.
+ */
+PNG_ROUTINE(void, png_set_write_fn, (png_structrp png_ptr, png_voidp io_ptr,
+    png_rw_ptr write_data_fn, png_flush_ptr output_flush_fn))
+PNG_ROUTINE(void, png_set_PLTE, (png_structrp png_ptr,
+    png_inforp info_ptr, png_const_colorp palette, int num_palette))
+PNG_ROUTINE(void, png_set_IHDR, (png_const_structrp png_ptr,
+    png_inforp info_ptr, png_uint_32 width, png_uint_32 height, int bit_depth,
+    int color_type, int interlace_method, int compression_method,
+    int filter_method))
+/* Use blue, green, red order for pixels. */
+PNG_ROUTINE(void, png_set_bgr, (png_structrp png_ptr))
+PNG_ROUTINE(void, png_write_info,
+    (png_structrp png_ptr, png_const_inforp info_ptr))
+/* Write a row of image data */
+PNG_ROUTINE(void, png_write_row, (png_structrp png_ptr,
+    png_const_bytep row))
+/* Write the image data */
+PNG_ROUTINE(void, png_write_image, (png_structrp png_ptr, png_bytepp image))
+/* Write the end of the PNG file. */
+PNG_ROUTINE(void, png_write_end, (png_structrp png_ptr,
+    png_inforp info_ptr))
+#if defined(PNG_SETJMP_SUPPORTED)
+/* This function returns the jmp_buf built in to *png_ptr.  It must be
+ * supplied with an appropriate 'longjmp' function to use on that jmp_buf
+ * unless the default error function is overridden in which case NULL is
+ * acceptable.  The size of the jmp_buf is checked against the actual size
+ * allocated by the library - the call will return NULL on a mismatch
+ * indicating an ABI mismatch.
+ */
+PNG_ROUTINE(jmp_buf*, png_set_longjmp_fn, (png_structrp png_ptr,
+    png_longjmp_ptr longjmp_fn, size_t jmp_buf_size))
+#endif /* PNG_SETJMP_SUPPORTED */
+PNG_ROUTINE(png_const_charp, png_get_libpng_ver,
+    (png_const_structrp png_ptr))
+#if defined(ZLIB_VERSION)
+PNG_ROUTINE(png_const_charp, zlibVersion,
+    (void))
+#endif
+#if defined(DEFINING_PNG_ARRAY)
+    {0},
+    };
+#undef DEFINING_PNG_ARRAY
+#else /* !defined(DEFINING_PNG_ARRAY) */
+#undef SIM_SCP_PRIVATE_H_
+#include "sim_scp_private.h" /* recurse to generate libpng_entries array */
+#endif /* !defined(DEFINING_PNG_ARRAY) */
+#endif /* PNG_H */
 
 /* Asynch/Threaded I/O support */
 
@@ -234,6 +364,8 @@ extern int32 sim_asynch_inst_latency;
 
 /* Private SCP only structures */
 
+#if !defined(SIM_SCP_PRIVATE_DONT_REPEAT)
+#define SIM_SCP_PRIVATE_DONT_REPEAT
 /* Expect rule */
 
 struct EXPTAB {
@@ -248,10 +380,8 @@ struct EXPTAB {
 #define EXP_TYP_REGEX           (SWMASK ('R'))      /* rule pattern is a regular expression */
 #define EXP_TYP_REGEX_I         (SWMASK ('I'))      /* regular expression pattern matching should be case independent */
 #define EXP_TYP_TIME            (SWMASK ('T'))      /* halt delay is in microseconds instead of instructions */
-#if defined(USE_REGEX)
     pcre                *regex;                         /* compiled regular expression */
     int                 re_nsub;                        /* regular expression sub expression count */
-#endif
     char                *act;                           /* action string */
     };
 
@@ -282,6 +412,7 @@ struct SEND {
     int32               insoff;                         /* insert offset */
     int32               extoff;                         /* extra offset */
     };
+#endif /* defined(SIM_SCP_PRIVATE_DONT_REPEAT) */
 
 #ifdef  __cplusplus
 }

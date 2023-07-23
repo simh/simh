@@ -28,8 +28,17 @@
 */
 
 #if defined(HAVE_LIBPNG) && defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
+/* 
+    png.h is included here (before sim_video.h) since some older
+    versions of png.h report errors when included after setjmp.h 
+    which is included in sim_defs.h.
+*/
 #include <png.h>
+#if defined(HAVE_ZLIB)
+#include <zlib.h>
 #endif
+#endif
+
 #include "sim_video.h"
 #include "scp.h"
 
@@ -45,6 +54,7 @@ static VID_QUIT_CALLBACK vid_quit_callback = NULL;
 static VID_GAMEPAD_CALLBACK motion_callback[10];
 static VID_GAMEPAD_CALLBACK button_callback[10];
 static int vid_gamepad_inited = 0;
+static t_bool sim_libpng_available = FALSE;
 
 t_stat vid_register_quit_callback (VID_QUIT_CALLBACK callback)
 {
@@ -155,9 +165,10 @@ static char tmp_key_name[40];
  *
  * This code is free software, available under zlib/libpng license.
  * http://www.libpng.org/pub/png/src/libpng-LICENSE.txt
+ * This code has been slightly modified to leverage indirect pointers 
+ * to the various png routines.
  */
 #include <SDL.h>
-#include <zlib.h>
 
 #define SUCCESS 0
 #define ERROR -1
@@ -183,7 +194,7 @@ static void png_error_SDL(png_structp ctx, png_const_charp str)
 }
 static void png_write_SDL(png_structp png_ptr, png_bytep data, png_size_t length)
 {
-    SDL_RWops *rw = (SDL_RWops*)png_get_io_ptr(png_ptr);
+    SDL_RWops *rw = (SDL_RWops*)p_png_get_io_ptr(png_ptr);
     SDL_RWwrite(rw, data, sizeof(png_byte), length);
 }
 
@@ -230,30 +241,31 @@ static int SDL_SavePNG_RW(SDL_Surface *surface, SDL_RWops *dst, int freedst)
         if (freedst) SDL_RWclose(dst);
         return (ERROR);
     }
-    png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, png_error_SDL, NULL); /* err_ptr, err_fn, warn_fn */
+    png_ptr = p_png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, png_error_SDL, NULL); /* err_ptr, err_fn, warn_fn */
     if (!png_ptr) 
     {
         SDL_SetError("Unable to png_create_write_struct on %s\n", PNG_LIBPNG_VER_STRING);
         if (freedst) SDL_RWclose(dst);
         return (ERROR);
     }
-    info_ptr = png_create_info_struct(png_ptr);
+    info_ptr = p_png_create_info_struct(png_ptr);
     if (!info_ptr)
     {
         SDL_SetError("Unable to png_create_info_struct\n");
-        png_destroy_write_struct(&png_ptr, NULL);
+        p_png_destroy_write_struct(&png_ptr, NULL);
         if (freedst) SDL_RWclose(dst);
         return (ERROR);
     }
-    if (setjmp(png_jmpbuf(png_ptr)))    /* All other errors, see also "png_error_SDL" */
+#if defined(PNG_SETJMP_SUPPORTED)
+    if (setjmp(*p_png_set_longjmp_fn(png_ptr, longjmp, sizeof (jmp_buf))))    /* All other errors, see also "png_error_SDL" */
     {
-        png_destroy_write_struct(&png_ptr, &info_ptr);
+        p_png_destroy_write_struct(&png_ptr, &info_ptr);
         if (freedst) SDL_RWclose(dst);
         return (ERROR);
     }
-
+#endif
     /* Setup our RWops writer */
-    png_set_write_fn(png_ptr, dst, png_write_SDL, NULL); /* w_ptr, write_fn, flush_fn */
+    p_png_set_write_fn(png_ptr, dst, png_write_SDL, NULL); /* w_ptr, write_fn, flush_fn */
 
     /* Prepare chunks */
     colortype = PNG_COLOR_MASK_COLOR;
@@ -268,13 +280,13 @@ static int SDL_SavePNG_RW(SDL_Surface *surface, SDL_RWops *dst, int freedst)
             pal_ptr[i].green = pal->colors[i].g;
             pal_ptr[i].blue  = pal->colors[i].b;
         }
-        png_set_PLTE(png_ptr, info_ptr, pal_ptr, pal->ncolors);
+        p_png_set_PLTE(png_ptr, info_ptr, pal_ptr, pal->ncolors);
         free(pal_ptr);
     }
     else if (surface->format->BytesPerPixel > 3 || surface->format->Amask)
         colortype |= PNG_COLOR_MASK_ALPHA;
 
-    png_set_IHDR(png_ptr, info_ptr, surface->w, surface->h, 8, colortype,
+    p_png_set_IHDR(png_ptr, info_ptr, surface->w, surface->h, 8, colortype,
         PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
 
 //    png_set_packing(png_ptr);
@@ -283,24 +295,24 @@ static int SDL_SavePNG_RW(SDL_Surface *surface, SDL_RWops *dst, int freedst)
     if (surface->format->Rmask == bmask
     && surface->format->Gmask == gmask
     && surface->format->Bmask == rmask)
-        png_set_bgr(png_ptr);
+        p_png_set_bgr(png_ptr);
 
     /* Write everything */
-    png_write_info(png_ptr, info_ptr);
+    p_png_write_info(png_ptr, info_ptr);
 #ifdef USE_ROW_POINTERS
     row_pointers = (png_bytep*) malloc(sizeof(png_bytep)*surface->h);
     for (i = 0; i < surface->h; i++)
         row_pointers[i] = (png_bytep)(Uint8*)surface->pixels + i * surface->pitch;
-    png_write_image(png_ptr, row_pointers);
+    p_png_write_image(png_ptr, row_pointers);
     free(row_pointers);
 #else
     for (i = 0; i < surface->h; i++)
-        png_write_row(png_ptr, (png_bytep)(Uint8*)surface->pixels + i * surface->pitch);
+        p_png_write_row(png_ptr, (png_bytep)(Uint8*)surface->pixels + i * surface->pitch);
 #endif
-    png_write_end(png_ptr, info_ptr);
+    p_png_write_end(png_ptr, info_ptr);
 
     /* Done */
-    png_destroy_write_struct(&png_ptr, &info_ptr);
+    p_png_destroy_write_struct(&png_ptr, &info_ptr);
     if (freedst) SDL_RWclose(dst);
     return (SUCCESS);
 }
@@ -467,6 +479,8 @@ switch (ev->type) {
         break;
     case SDL_USEREVENT:
         uev = (SDL_UserEvent *)ev;
+        if (uev->code == EVENT_SCREENSHOT)
+            return &vid_first;      /* Currently only support screenshot of the first windown */
         sim_messagef (SCPE_OK, "Unrecognized user event.\n");
         sim_messagef (SCPE_OK, "  type = %u\n", uev->type);
         sim_messagef (SCPE_OK, "  timestamp = %u\n", uev->timestamp);
@@ -480,10 +494,12 @@ switch (ev->type) {
         break;
     }
 
-sim_messagef (SCPE_OK,
-"\nSIMH has encountered a bug in SDL2.  An upgrade to SDL2\n"
-"version 2.0.14 should fix this problem.\n");
-
+sim_messagef (SCPE_IERR,
+              "\nSIMH has encountered a bug in SDL2 (or in SIMH's use of SDL2).\n");
+sim_messagef (SCPE_IERR, 
+              "Create an issue at https://github.com/simh/simh/issues and report\n");
+sim_messagef (SCPE_IERR, 
+              "your simulator setup and the above details\n");
 return NULL;
 }
 
@@ -590,7 +606,7 @@ user_event.user.data1 = vptr;
 user_event.user.data2 = NULL;
 SDL_PushEvent (&user_event);
 
-while ((!vptr->vid_ready) && (++wait_count < 20))
+while ((!vptr->vid_ready) && (++wait_count < 100))  /* Wait up to 10 seconds for video startup */
     sim_os_ms_sleep (100);
 if (!vptr->vid_ready) {
     vid_close ();
@@ -619,7 +635,7 @@ if (vid_thread_handle == NULL) {
     vid_close ();
     return SCPE_OPENERR;
     }
-while ((!vptr->vid_ready) && (++wait_count < 20))
+while ((!vptr->vid_ready) && (++wait_count < 100))  /* Wait up to 10 seconds for video startup */
     sim_os_ms_sleep (100);
 if (!vptr->vid_ready) {
     vid_close ();
@@ -2249,11 +2265,40 @@ SDL_Quit ();
 return 0;
 }
 
+/* Optionally dynamically locate and load png support */
+#if defined(SIM_HAVE_DLOPEN)
+#include <dlfcn.h>
+#endif
+
 const char *vid_version(void)
 {
-static char SDLVersion[160];
+static char SDLVersion[200];
 SDL_version compiled = { 0}, running = { 0};
 
+if (SDLVersion[0] != '\0')              /* If we already did this, */
+    return (const char *)SDLVersion;    /*  the result will be the same */
+
+#if defined(SIM_DLOPEN_EXTENSION) && defined(HAVE_LIBPNG)
+if (1) {
+    struct PNG_Entry *p;
+    void *hPNGLib = 0;                 /* handle to Library */
+
+#if defined(SIM_DLOPEN_EXTENSION)
+    hPNGLib = dlopen("libpng." __STR(SIM_DLOPEN_EXTENSION), RTLD_NOW|RTLD_GLOBAL);
+    if (!hPNGLib)
+        hPNGLib = dlopen("libpng." __STR(SIM_DLOPEN_EXTENSION) ".2", RTLD_NOW|RTLD_GLOBAL);
+    if (!hPNGLib)
+        hPNGLib = dlopen("libpng." __STR(SIM_DLOPEN_EXTENSION) ".3", RTLD_NOW|RTLD_GLOBAL);
+#endif
+
+    for (p = libpng_entries; p->entry_name != NULL; p++) {
+        if (*p->entry_pointer == NULL)
+            *p->entry_pointer = dlsym(hPNGLib, p->entry_name);
+        }
+    }
+#endif /* defined(SIM_DLOPEN_EXTENSION) && defined(HAVE_LIBPNG) */
+
+sim_libpng_available = (*libpng_entries->entry_pointer != NULL);
 SDL_GetVersion(&running);
 
 SDL_VERSION(&compiled);
@@ -2269,26 +2314,31 @@ else
                         compiled.major, compiled.minor, compiled.patch,
                         running.major, running.minor, running.patch);
 #if defined (HAVE_LIBPNG)
-if (1) {
-    png_structp png = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+if (sim_libpng_available) {
+    png_structp png = p_png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
 
-    if (strcmp (PNG_LIBPNG_VER_STRING, png_get_libpng_ver (png)))
+    if (strcmp (PNG_LIBPNG_VER_STRING, p_png_get_libpng_ver (png))) {
         snprintf(&SDLVersion[strlen (SDLVersion)], sizeof (SDLVersion) - (strlen (SDLVersion) + 1), 
-                            ", PNG Version (Compiled: %s, Runtime: %s)", 
-                            PNG_LIBPNG_VER_STRING, png_get_libpng_ver (png));
+                            ", PNG Version (Compiled: %s, Runtime: %s - png screenshots disabled)", 
+                            PNG_LIBPNG_VER_STRING, p_png_get_libpng_ver (png));
+        sim_libpng_available = FALSE;
+        }
     else
         snprintf(&SDLVersion[strlen (SDLVersion)], sizeof (SDLVersion) - (strlen (SDLVersion) + 1), 
                             ", PNG Version %s", PNG_LIBPNG_VER_STRING);
-    png_destroy_read_struct(&png, NULL, NULL);
+    p_png_destroy_read_struct(&png, NULL, NULL);
 #if defined (ZLIB_VERSION)
-    if (strcmp (ZLIB_VERSION, zlibVersion ()))
+    if (strcmp (ZLIB_VERSION, p_zlibVersion ()))
         snprintf(&SDLVersion[strlen (SDLVersion)], sizeof (SDLVersion) - (strlen (SDLVersion) + 1), 
-                            ", zlib: (Compiled: %s, Runtime: %s)", ZLIB_VERSION, zlibVersion ());
+                            ", zlib: (Compiled: %s, Runtime: %s)", ZLIB_VERSION, p_zlibVersion ());
     else
         snprintf(&SDLVersion[strlen (SDLVersion)], sizeof (SDLVersion) - (strlen (SDLVersion) + 1), 
                             ", zlib: %s", ZLIB_VERSION);
 #endif
     }
+else
+    snprintf(&SDLVersion[strlen (SDLVersion)], sizeof (SDLVersion) - (strlen (SDLVersion) + 1), 
+                        ", PNG Not currently available");
 #endif
 return (const char *)SDLVersion;
 }
@@ -2594,19 +2644,20 @@ if (1) {
     SDL_Surface *sshot = sim_end ? SDL_CreateRGBSurface(0, vptr->vid_width, vptr->vid_height, 32, 0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000) :
                                    SDL_CreateRGBSurface(0, vptr->vid_width, vptr->vid_height, 32, 0x0000ff00, 0x000ff000, 0xff000000, 0x000000ff) ;
     SDL_RenderReadPixels(vptr->vid_renderer, NULL, SDL_PIXELFORMAT_ARGB8888, sshot->pixels, sshot->pitch);
-#if defined(HAVE_LIBPNG)
-    if (!match_ext (filename, "bmp")) {
-        sprintf (fullname, "%s%s", filename, match_ext (filename, "png") ? "" : ".png");
-        stat = SDL_SavePNG(sshot, fullname);
+    if (sim_libpng_available) {
+        if (!match_ext (filename, "bmp")) {
+            sprintf (fullname, "%s%s", filename, match_ext (filename, "png") ? "" : ".png");
+            stat = SDL_SavePNG(sshot, fullname);
+            }
+        else {
+            sprintf (fullname, "%s", filename);
+            stat = SDL_SaveBMP(sshot, fullname);
+            }
         }
     else {
-        sprintf (fullname, "%s", filename);
+        sprintf (fullname, "%s%s", filename, match_ext (filename, "bmp") ? "" : ".bmp");
         stat = SDL_SaveBMP(sshot, fullname);
         }
-#else
-    sprintf (fullname, "%s%s", filename, match_ext (filename, "bmp") ? "" : ".bmp");
-    stat = SDL_SaveBMP(sshot, fullname);
-#endif /* defined(HAVE_LIBPNG) */
     SDL_FreeSurface(sshot);
     }
 if (stat) {
@@ -2828,8 +2879,8 @@ return;
 const char *vid_version (void)
 {
 #if defined(HAVE_LIBSDL)
-static char SDLVersion[160];
-SDL_version compiled, running;
+static char SDLVersion[200] = "";
+SDL_version compiled = { 0}, running = { 0};
 
 SDL_GetVersion(&running);
 

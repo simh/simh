@@ -373,6 +373,9 @@
 #include "sim_ether.h"
 #include "sim_sock.h"
 #include "sim_timer.h"
+
+#include "sim_scp_private.h"
+
 #if defined(_WIN32)
 #include <direct.h>
 #else
@@ -1245,10 +1248,6 @@ extern "C" {
 #include <winreg.h>
 #endif
 
-#ifdef SIM_HAVE_DLOPEN
-#include <dlfcn.h>
-#endif
-
 #if defined(USE_SHARED) && (defined(_WIN32) || defined(SIM_HAVE_DLOPEN))
 /* Dynamic DLL loading technique and modified source comes from
    Etherial/WireShark capture_pcap.c */
@@ -1267,7 +1266,7 @@ static const char* lib_name =
 #elif defined(__APPLE__)
                           "/usr/lib/libpcap.A.dylib";
 #else
-                          "libpcap." __STR(SIM_HAVE_DLOPEN);
+                          "libpcap." __STR(SIM_DLOPEN_EXTENSION);
 #endif
 
 static char no_pcap[PCAP_ERRBUF_SIZE] =
@@ -1276,7 +1275,7 @@ static char no_pcap[PCAP_ERRBUF_SIZE] =
 #elif defined(__APPLE__)
     "/usr/lib/libpcap.A.dylib failed to load, install libpcap to use pcap networking";
 #else
-    "libpcap." __STR(SIM_HAVE_DLOPEN) " failed to load, install libpcap to use pcap networking";
+    "libpcap." __STR(SIM_DLOPEN_EXTENSION) " failed to load, install libpcap to use pcap networking";
 #endif
 
 /* define pointers to pcap functions needed */
