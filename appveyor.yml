@@ -1,7 +1,7 @@
 image:
-  - macos-monterey
+#  - macos-monterey
   - Ubuntu2004
-  - Visual Studio 2015
+#  - Visual Studio 2015
 
 platform:
   - x86
@@ -37,6 +37,7 @@ before_build:
 build_script:
   - cmd: |
          "C:\Program Files (x86)\Microsoft Visual Studio 9.0\VC\vcvarsall.bat"
+         echo Building with %NUMBER_OF_PROCESSORS% processors
          cd "Visual Studio Projects" & vcbuild /M%NUMBER_OF_PROCESSORS% /useenv /rebuild simh.sln "Release|Win32" &           cd ..
   - ps: |
         if ($isWindows) {
@@ -47,6 +48,7 @@ build_script:
           if ($platform -eq 'Linux') {
             $ncpus = nproc
             $parallel = '-j' + $ncpus
+            Write-Host "Building with $ncpus processors"
           } else {
             $platform = 'macOS'
           }
@@ -72,13 +74,16 @@ on_success:
         cd Development-Binaries
         $pkg_filename = "simh-$datetime-$platform-$version_major.$version_minor-$version_mode-$id"
         if ($isWindows) {
-          Compress-Archive -Path ..\BIN\NT\Win32-Release\*.exe -DestinationPath "$pkg_filename.zip"
+          $pkg_filename = $pkg_filename + '.zip'
+          Compress-Archive -Path ..\BIN\NT\Win32-Release\*.exe -DestinationPath "$pkg_filename"
         } else {
+          $pkg_filename = $pkg_filename + '.tgz'
           pushd ../BIN
-          tar -cvzf ../Development-Binaries/$pkg_filename.tgz --exclude=buildtools '--exclude=*-build' *
+          tar -cvzf ../Development-Binaries/$pkg_filename --exclude=buildtools '--exclude=*-build' *
           popd
         }
         "$platform Build results for simh Commit: https://github.com/simh/simh/commit/$id" | Out-File -FilePath ../pkg_commit_message -Encoding ascii
+        (Get-Content README.md) -replace ('(\['+$platform+' is here\]\(https\:\/\/github\.com\/simh\/Development-Binaries\/blob\/master\/)([a-zA-Z0-9._-]+)(.+\.)'),('$1'+$pkg_filename+'$3') | Out-File -FilePath README.md
   - git add *
   - git commit -F ../pkg_commit_message
   - git push -u origin master
