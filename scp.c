@@ -7126,11 +7126,15 @@ if (flag) {
             }
         strlcpy (os_type, "Windows", sizeof (os_type));
         strlcpy (tarversion, _get_tool_version ("tar"), sizeof (tarversion));
-        if (tarversion[0])
+        if (tarversion[0]) {
             fprintf (st, "\n        tar tool: %s", tarversion);
+            setenv ("SIM_TAR_CMD_AVAILABLE", "TRUE", 1);
+            }
         strlcpy (curlversion, _get_tool_version ("curl"), sizeof (curlversion));
-        if (curlversion[0])
+        if (curlversion[0]) {
             fprintf (st, "\n        curl tool: %s", curlversion);
+            setenv ("SIM_CURL_CMD_AVAILABLE", "TRUE", 1);
+            }
         }
 #else
     if (1) {
@@ -7213,11 +7217,15 @@ if (flag) {
             }
 #endif
         strlcpy (tarversion, _get_tool_version ("tar"), sizeof (tarversion));
-        if (tarversion[0])
+        if (tarversion[0]) {
             fprintf (st, "\n        tar tool: %s", tarversion);
+            setenv ("SIM_TAR_CMD_AVAILABLE", "TRUE", 1);
+            }
         strlcpy (curlversion, _get_tool_version ("curl"), sizeof (curlversion));
-        if (curlversion[0])
+        if (curlversion[0]) {
             fprintf (st, "\n        curl tool: %s", curlversion);
+            setenv ("SIM_CURL_CMD_AVAILABLE", "TRUE", 1);
+            }
         }
 #endif
     if ((!strcmp (os_type, "Unknown")) && (getenv ("OSTYPE")))

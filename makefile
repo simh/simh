@@ -303,16 +303,16 @@ DPKG_ZLIB      = 8
 DPKG_SDL_TTF   = 9
 DPKG_GMAKE     = 10
 ifneq (3,${SIM_MAJOR})
-  # Platform Pkg Names  COMPILER PCAP          VDE            PCRE         EDITLINE      SDL           PNG            ZLIB       SDL_TTF           GMAKE
-  PKGS_SRC_HOMEBREW   = -        -             vde            pcre         libedit       sdl2          libpng         zlib       sdl2_ttf          make
-  PKGS_SRC_MACPORTS   = -        -             vde2           pcre         libedit       libsdl2       libpng         zlib       libsdl2_ttf       gmake
-  PKGS_SRC_APT        = gcc      libpcap-dev   libvdeplug-dev libpcre3-dev libedit-dev   libsdl2-dev   libpng-dev     -          libsdl2-ttf-dev   -
-  PKGS_SRC_YUM        = gcc      libpcap-devel -              pcre-devel   libedit-devel SDL2-devel    libpng-devel   zlib-devel SDL2_ttf-devel    -
-  PKGS_SRC_ZYPPER     = gcc      libpcap-devel -              pcre-devel   libedit-devel libSDL2-devel libpng16-devel zlib-devel libSDL2_ttf-devel make
-  PKGS_SRC_PKGSRC     = -        -             -              pcre         editline      SDL2          png            zlib       SDL2_ttf          gmake
-  PKGS_SRC_PKGBSD     = -        -             -              pcre         libedit       sdl2          png            -          sdl2_ttf          gmake
-  PKGS_SRC_PKGADD     = -        -             -              pcre         -             sdl2          png            -          sdl2-ttf          gmake
-  PKGS_SRC_TERMUX     = -        libpcap       -              -            -             sdl2          -              -          -                 -
+  # Platform Pkg Names  COMPILER PCAP          VDE            PCRE         EDITLINE      SDL           PNG            ZLIB       SDL_TTF           GMAKE CURL
+  PKGS_SRC_HOMEBREW   = -        -             vde            pcre         libedit       sdl2          libpng         zlib       sdl2_ttf          make  -
+  PKGS_SRC_MACPORTS   = -        -             vde2           pcre         libedit       libsdl2       libpng         zlib       libsdl2_ttf       gmake -
+  PKGS_SRC_APT        = gcc      libpcap-dev   libvdeplug-dev libpcre3-dev libedit-dev   libsdl2-dev   libpng-dev     -          libsdl2-ttf-dev   -     curl
+  PKGS_SRC_YUM        = gcc      libpcap-devel -              pcre-devel   libedit-devel SDL2-devel    libpng-devel   zlib-devel SDL2_ttf-devel    -     -
+  PKGS_SRC_ZYPPER     = gcc      libpcap-devel -              pcre-devel   libedit-devel libSDL2-devel libpng16-devel zlib-devel libSDL2_ttf-devel make  -
+  PKGS_SRC_PKGSRC     = -        -             -              pcre         editline      SDL2          png            zlib       SDL2_ttf          gmake -
+  PKGS_SRC_PKGBSD     = -        -             -              pcre         libedit       sdl2          png            -          sdl2_ttf          gmake -
+  PKGS_SRC_PKGADD     = -        -             -              pcre         -             sdl2          png            -          sdl2-ttf          gmake -
+  PKGS_SRC_TERMUX     = -        libpcap       -              -            -             sdl2          -              -          -                 -     -
   ifneq (0,$(TESTS))
     ifneq (,${TEST_ARG})
       export TEST_ARG
@@ -1395,7 +1395,7 @@ ifneq (,$(and $(findstring APT,$(PKG_MGR)),$(USEFUL_PACKAGES)))
 endif
 ifneq (,$(and $(findstring TERMUX,$(PKG_MGR)),$(USEFUL_PACKAGES)))
   ifeq (,$(shell $(SHELL) -c 'read -p "[Enter Y or N, Default is Y] " answer; echo $$answer' | grep -i n))
-    $(info Enter:    $$ sudo pkg install $(USEFUL_PACKAGES))
+    $(info Enter:    $$ pkg install $(USEFUL_PACKAGES))
     $(info when that completes)
     $(info re-enter: $$ $(MAKE) $(MAKECMDGOALS) $(EXTRAS))
     $(error )
