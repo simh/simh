@@ -994,29 +994,6 @@ t_stat sim_ether_test (DEVICE *dptr, const char *cptr)
   {return SCPE_OK;}
 #else    /* endif unimplemented */
 
-const char *eth_capabilities(void)
- {
-#if defined (USE_READER_THREAD)
- return "Threaded "
-#else
- return "Polled "
-#endif
-     "Ethernet Packet transports"
-#if defined (HAVE_PCAP_NETWORK)
-     ":PCAP"
-#endif
-#if defined (HAVE_TAP_NETWORK)
-     ":TAP"
-#endif
-#if defined (HAVE_VDE_NETWORK)
-     ":VDE"
-#endif
-#if defined (HAVE_SLIRP_NETWORK)
-     ":NAT"
-#endif
-     ":UDP";
- }
-
 #if (defined (xBSD) || defined (__APPLE__)) && (defined (HAVE_TAP_NETWORK) || defined (HAVE_PCAP_NETWORK))
 #include <sys/ioctl.h>
 #include <net/bpf.h>
@@ -1126,6 +1103,77 @@ for (i=0; i<used; i++) {
 return used;
 }
 
+#ifdef HAVE_TAP_NETWORK
+#if defined(__linux) || defined(__linux__)
+#include <sys/ioctl.h> 
+#include <net/if.h> 
+#include <linux/if_tun.h> 
+#elif defined(HAVE_BSDTUNTAP)
+#include <sys/types.h>
+#include <net/if_types.h>
+#include <net/if.h>
+#else /* We don't know how to do this on the current platform */
+#undef HAVE_TAP_NETWORK
+#endif
+#endif /* HAVE_TAP_NETWORK */
+
+#ifdef HAVE_VDE_NETWORK
+#ifdef  __cplusplus
+extern "C" {
+#endif
+#include <libvdeplug.h>
+/* support for dynamic loading */
+static void load_vde (void);
+static VDECONN *(*p_vde_open_real)(char *vde_url,char *descr,int interface_version, struct vde_open_args *open_args) = NULL;
+static ssize_t (*p_vde_recv)(VDECONN *conn,void *buf,size_t len,int flags) = NULL;
+static ssize_t (*p_vde_send)(VDECONN *conn,const void *buf,size_t len,int flags) = NULL;
+static int (*p_vde_datafd)(VDECONN *conn) = NULL;
+static int (*p_vde_close)(VDECONN *conn) = NULL;
+static t_bool eth_vde_network_available = FALSE;
+#ifdef  __cplusplus
+}
+#endif
+#endif /* HAVE_VDE_NETWORK */
+
+#ifdef HAVE_SLIRP_NETWORK
+#include "sim_slirp.h"
+#endif /* HAVE_SLIRP_NETWORK */
+
+/* Allows windows to look up user-defined adapter names */
+#if defined(_WIN32)
+#include <winreg.h>
+#endif
+
+const char *eth_capabilities(void)
+ {
+ static char capabilities[CBUFSIZE] = "";
+
+ if (capabilities[0] != '\0')
+     return capabilities;
+#if defined (USE_READER_THREAD)
+ strlcat (capabilities, "Threaded ", sizeof (capabilities));
+#else
+ strlcat (capabilities, "Polled ", sizeof (capabilities));
+#endif
+ strlcat (capabilities, "Ethernet Packet transports", sizeof (capabilities));
+#if defined (HAVE_PCAP_NETWORK)
+ strlcat (capabilities, ":PCAP", sizeof (capabilities));
+#endif
+#if defined (HAVE_TAP_NETWORK)
+ strlcat (capabilities, ":TAP", sizeof (capabilities));
+#endif
+#if defined (HAVE_VDE_NETWORK)
+ load_vde();
+ if (eth_vde_network_available)
+   strlcat (capabilities, ":VDE", sizeof (capabilities));
+#endif
+#if defined (HAVE_SLIRP_NETWORK)
+ strlcat (capabilities, ":NAT", sizeof (capabilities));
+#endif
+ strlcat (capabilities, ":UDP", sizeof (capabilities));
+ return capabilities;
+ }
+
 int eth_devices(int max, ETH_LIST* list, ETH_BOOL framers)
 {
 int used = 0;
@@ -1188,7 +1236,7 @@ if (used < max) {
   }
 #endif
 #ifdef HAVE_VDE_NETWORK
-if (used < max) {
+if (eth_vde_network_available && (used < max)) {
   sprintf(list[used].name, "%s", "vde:device{:switch-port-number}");
   sprintf(list[used].desc, "%s", "Integrated VDE support");
   list[used].eth_api = ETH_API_VDE;
@@ -1214,39 +1262,6 @@ if (used < max) {
 /* return device count */
 return used;
 }
-
-#ifdef HAVE_TAP_NETWORK
-#if defined(__linux) || defined(__linux__)
-#include <sys/ioctl.h> 
-#include <net/if.h> 
-#include <linux/if_tun.h> 
-#elif defined(HAVE_BSDTUNTAP)
-#include <sys/types.h>
-#include <net/if_types.h>
-#include <net/if.h>
-#else /* We don't know how to do this on the current platform */
-#undef HAVE_TAP_NETWORK
-#endif
-#endif /* HAVE_TAP_NETWORK */
-
-#ifdef HAVE_VDE_NETWORK
-#ifdef  __cplusplus
-extern "C" {
-#endif
-#include <libvdeplug.h>
-#ifdef  __cplusplus
-}
-#endif
-#endif /* HAVE_VDE_NETWORK */
-
-#ifdef HAVE_SLIRP_NETWORK
-#include "sim_slirp.h"
-#endif /* HAVE_SLIRP_NETWORK */
-
-/* Allows windows to look up user-defined adapter names */
-#if defined(_WIN32)
-#include <winreg.h>
-#endif
 
 #if defined(USE_SHARED) && (defined(_WIN32) || defined(SIM_HAVE_DLOPEN))
 /* Dynamic DLL loading technique and modified source comes from
@@ -1317,7 +1332,7 @@ static void load_function(const char* function, _func* func_ptr) {
   }
 }
 
-/* load wpcap.dll as required */
+/* load wpcap.dll or libpcap as required */
 int load_pcap(void) {
   switch(lib_loaded) {
     case 0:                  /* not loaded */
@@ -1544,6 +1559,31 @@ int pcap_setnonblock(pcap_t* a, int nonblock, char *errbuf) {
     return 0;
   }
 }
+
+#if defined(HAVE_VDE_NETWORK)
+/* Dynamic VDE loading */
+static void load_vde (void)
+{
+  void *handle;
+
+  handle = dlopen("libvdeplug." __STR(SIM_DLOPEN_EXTENSION), RTLD_NOW|RTLD_GLOBAL);
+  if (handle == NULL)
+      handle = dlopen("libvdeplug." __STR(SIM_DLOPEN_EXTENSION) ".2", RTLD_NOW|RTLD_GLOBAL);
+  if (handle != NULL) {
+#define _load_function(function)  *((_func **)&p_##function) = (_func *)((size_t)dlsym(handle, __STR(function)))
+    _load_function(vde_open_real);
+    _load_function(vde_datafd);
+    _load_function(vde_recv);
+    _load_function(vde_send);
+    _load_function(vde_close);
+#undef _load_function
+    }
+  eth_vde_network_available = (p_vde_open_real != NULL);
+}
+
+#endif
+
+
 #endif /* defined(USE_SHARED) && (defined(_WIN32) || defined(SIM_HAVE_DLOPEN)) */
 
 /* Some platforms have always had pcap_sendpacket */
@@ -2046,7 +2086,7 @@ while (dev->handle) {
           u_char buf[ETH_MAX_JUMBO_FRAME];
 
           memset(&header, 0, sizeof(header));
-          len = vde_recv((VDECONN *)dev->handle, buf, sizeof(buf), 0);
+          len = p_vde_recv((VDECONN *)dev->handle, buf, sizeof(buf), 0);
           if (len > 0) {
             status = 1;
             header.caplen = header.len = len;
@@ -2336,34 +2376,38 @@ if (0 == strncmp("tap:", savname, 4)) {
 else { /* !tap: */
   if (0 == strncmp("vde:", savname, 4)) {
 #if defined(HAVE_VDE_NETWORK)
-    char vdeswitch_s[CBUFSIZE]; /* VDE switch name */
-    char vdeport_s[CBUFSIZE];   /* VDE switch port (optional), numeric */
+    if (eth_vde_network_available) {
+      char vdeswitch_s[CBUFSIZE]; /* VDE switch name */
+      char vdeport_s[CBUFSIZE];   /* VDE switch port (optional), numeric */
       
-    struct vde_open_args voa;
-    const char *devname = savname + 4;
+      struct vde_open_args voa;
+      const char *devname = savname + 4;
 
-    memset(&voa, 0, sizeof(voa));
-    if (!strcmp(savname, "vde:vdedevice"))
-      return sim_messagef (SCPE_OPENERR, "Eth: Must specify actual vde device name (i.e. vde:/tmp/switch)\n");
-    while (isspace(*devname))
-      ++devname;
-    devname = get_glyph_nc (devname, vdeswitch_s, ':'); /* Extract switch name          */
-    devname = get_glyph_nc (devname, vdeport_s, 0);     /* Extract optional port number */
+      memset(&voa, 0, sizeof(voa));
+      if (!strcmp(savname, "vde:vdedevice"))
+        return sim_messagef (SCPE_OPENERR, "Eth: Must specify actual vde device name (i.e. vde:/tmp/switch)\n");
+      while (isspace(*devname))
+        ++devname;
+      devname = get_glyph_nc (devname, vdeswitch_s, ':'); /* Extract switch name          */
+      devname = get_glyph_nc (devname, vdeport_s, 0);     /* Extract optional port number */
 
-    if (vdeport_s[0]) {                                 /* port provided? */
-      t_stat r;
+      if (vdeport_s[0]) {                                 /* port provided? */
+        t_stat r;
 
-      voa.port = (int)get_uint (vdeport_s, 10, 255, &r);
-      if (r != SCPE_OK)
-          return sim_messagef (SCPE_OPENERR, "Eth: Invalid vde port number: %s in %s\n", vdeport_s, savname);
+        voa.port = (int)get_uint (vdeport_s, 10, 255, &r);
+        if (r != SCPE_OK)
+            return sim_messagef (SCPE_OPENERR, "Eth: Invalid vde port number: %s in %s\n", vdeport_s, savname);
+        }
+
+      if (!(*handle = (void*) p_vde_open_real((char *)vdeswitch_s, (char *)"simh", LIBVDEPLUG_INTERFACE_VERSION, &voa)))
+        strlcpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE);
+      else {
+        *eth_api = ETH_API_VDE;
+        *fd_handle = (SOCKET)p_vde_datafd((VDECONN*)(*handle));
+        }
       }
-
-    if (!(*handle = (void*) vde_open((char *)vdeswitch_s, (char *)"simh", &voa)))
-      strlcpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE);
-    else {
-      *eth_api = ETH_API_VDE;
-      *fd_handle = (SOCKET)vde_datafd((VDECONN*)(*handle));
-      }
+    else
+      strlcpy(errbuf, "No support for vde: network devices", PCAP_ERRBUF_SIZE);
 #else
     strlcpy(errbuf, "No support for vde: network devices", PCAP_ERRBUF_SIZE);
 #endif /* defined(HAVE_VDE_NETWORK) */
@@ -2632,7 +2676,7 @@ switch (eth_api) {
 #endif
 #ifdef HAVE_VDE_NETWORK
   case ETH_API_VDE:
-    vde_close((VDECONN*)pcap);
+    p_vde_close((VDECONN*)pcap);
     break;
 #endif
 #ifdef HAVE_SLIRP_NETWORK
@@ -2697,7 +2741,7 @@ return SCPE_OK;
 
 const char *eth_version (void)
 {
-static char version[300];
+static char version[300] = "";
 
 if (version[0] != '\0') 
   return version;
@@ -2712,9 +2756,11 @@ if (version[0] != '\0')
 strlcat (version, "TAP", sizeof (version));
 #endif
 #if defined(HAVE_VDE_NETWORK)
-if (version[0] != '\0')
-  strlcat (version, ", ", sizeof (version));
-strlcat (version, "VDE", sizeof (version));
+if (eth_vde_network_available) {
+  if (version[0] != '\0')
+    strlcat (version, ", ", sizeof (version));
+  strlcat (version, "VDE", sizeof (version));
+  }
 #endif
 if (version[0] != '\0')
   strlcat (version, ", ", sizeof (version));
@@ -2749,7 +2795,8 @@ fprintf (st, "    eth0   en0                                  (No description av
 fprintf (st, "    eth1   tap:tapN                             (Integrated Tun/Tap support)\n");
 #endif
 #if defined(HAVE_VDE_NETWORK)
-fprintf (st, "    eth2   vde:device{:switch-port-number}      (Integrated VDE support)\n");
+if (eth_vde_network_available)
+  fprintf (st, "    eth2   vde:device{:switch-port-number}      (Integrated VDE support)\n");
 #endif
 #if defined(HAVE_SLIRP_NETWORK)
 fprintf (st, "    eth3   nat:{optional-nat-parameters}        (Integrated NAT (SLiRP) support)\n");
@@ -3082,7 +3129,7 @@ if ((packet->len >= ETH_MIN_PACKET) && (packet->len <= ETH_MAX_PACKET)) {
 #endif
 #ifdef HAVE_VDE_NETWORK
     case ETH_API_VDE:
-      status = vde_send((VDECONN*)dev->handle, (void *)packet->msg, packet->len, 0);
+      status = p_vde_send((VDECONN*)dev->handle, (void *)packet->msg, packet->len, 0);
       if ((status == (int)packet->len) || (status == 0))
         status = 0;
       else
@@ -3905,7 +3952,7 @@ do {
         u_char buf[ETH_MAX_JUMBO_FRAME];
 
         memset(&header, 0, sizeof(header));
-        len = vde_recv((VDECONN*)dev->handle, buf, sizeof(buf), 0);
+        len = p_vde_recv((VDECONN*)dev->handle, buf, sizeof(buf), 0);
         if (len > 0) {
           status = 1;
           header.caplen = header.len = len;
