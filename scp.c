@@ -6940,8 +6940,6 @@ const char *cpp = "";
 const char *build = "";
 const char *arch = "";
 
-#define S_xstr(a) S_str(a)
-#define S_str(a) #a
 if (cptr && (*cptr != 0))
     return SCPE_2MARG;
 sprintf (vmaj_s, "%d", vmaj);
@@ -6962,7 +6960,7 @@ if (vdelt) {
     }
 #if defined (SIM_VERSION_MODE)
 if (1) {
-    char mode[] = S_xstr(SIM_VERSION_MODE);
+    char mode[] = __STR(SIM_VERSION_MODE);
 
     if (NULL != strchr (mode, '\"')) {          /* Quoted String? */
         mode[strlen (mode) - 1] = '\0';         /* strip quotes */
@@ -7011,7 +7009,7 @@ if (flag) {
 #elif defined (__DECC_VER)
     fprintf (st, "\n        Compiler: DEC C %c%d.%d-%03d", ("T SV")[((__DECC_VER/10000)%10)-6], __DECC_VER/10000000, (__DECC_VER/100000)%100, __DECC_VER%10000);
 #elif defined (SIM_COMPILER)
-    fprintf (st, "\n        Compiler: %s", S_xstr(SIM_COMPILER));
+    fprintf (st, "\n        Compiler: %s", __STR(SIM_COMPILER));
 #endif
 #if defined(__GNUC__)
 #if defined(__OPTIMIZE__)
@@ -7040,11 +7038,11 @@ if (flag) {
 #if !defined (SIM_BUILD_OS)
     fprintf (st, "\n        Simulator Compiled as %s%s%s on %s at %s", cpp, arch, build, __DATE__, __TIME__);
 #else
-    fprintf (st, "\n        Simulator Compiled as %s%s%s on %s at %s %s", cpp, arch, build, __DATE__, __TIME__, S_xstr(SIM_BUILD_OS));
+    fprintf (st, "\n        Simulator Compiled as %s%s%s on %s at %s %s", cpp, arch, build, __DATE__, __TIME__, __STR(SIM_BUILD_OS));
 #endif
 #endif
 #if defined (SIM_BUILD_TOOL)
-    fprintf (st, "\n        Build Tool: %s", S_xstr(SIM_BUILD_TOOL));
+    fprintf (st, "\n        Build Tool: %s", __STR(SIM_BUILD_TOOL));
 #else
     fprintf (st, "\n        Build Tool: undefined (probably cmake)");
 #endif
@@ -7145,7 +7143,7 @@ if (flag) {
         char *c;
         const char *run_context = "";
 #if defined(SIM_BUILD_OS_VERSION)
-        char buildosversion[2*PATH_MAX+1] = S_xstr(SIM_BUILD_OS_VERSION);
+        char buildosversion[2*PATH_MAX+1] = __STR(SIM_BUILD_OS_VERSION);
 
         /* compress multiple spaces to one */
         c = buildosversion;
@@ -7234,41 +7232,39 @@ if (flag) {
     }
 #if defined(SIM_GIT_COMMIT_ID)
 if (1) {
-    const char *extras = strchr (S_xstr(SIM_GIT_COMMIT_ID), '+');
+    const char *extras = strchr (__STR(SIM_GIT_COMMIT_ID), '+');
 
-    fprintf (st, "%sgit commit id: %8.8s%s", flag ? "\n        " : "        ", S_xstr(SIM_GIT_COMMIT_ID), extras ? extras : "");
-    setenv ("SIM_GIT_COMMIT_ID", S_xstr(SIM_GIT_COMMIT_ID), 1);
+    fprintf (st, "%sgit commit id: %8.8s%s", flag ? "\n        " : "        ", __STR(SIM_GIT_COMMIT_ID), extras ? extras : "");
+    setenv ("SIM_GIT_COMMIT_ID", __STR(SIM_GIT_COMMIT_ID), 1);
     }
 #if defined(SIM_GIT_COMMIT_TIME)
-setenv ("SIM_GIT_COMMIT_TIME", S_xstr(SIM_GIT_COMMIT_TIME), 1);
+setenv ("SIM_GIT_COMMIT_TIME", __STR(SIM_GIT_COMMIT_TIME), 1);
 if (flag)
-    fprintf (st, "%sgit commit time: %s", "\n        ", S_xstr(SIM_GIT_COMMIT_TIME));
+    fprintf (st, "%sgit commit time: %s", "\n        ", __STR(SIM_GIT_COMMIT_TIME));
 #endif
 #else
 #if defined(SIM_ARCHIVE_GIT_COMMIT_ID)
-if (NULL == strchr (S_xstr(SIM_ARCHIVE_GIT_COMMIT_ID), '$')) {
-    const char *extras = strchr (S_xstr(SIM_ARCHIVE_GIT_COMMIT_ID), '+');
+if (NULL == strchr (__STR(SIM_ARCHIVE_GIT_COMMIT_ID), '$')) {
+    const char *extras = strchr (__STR(SIM_ARCHIVE_GIT_COMMIT_ID), '+');
 
-    fprintf (st, "%ssimh git commit id: %8.8s%s", flag ? "\n        " : "        ", S_xstr(SIM_ARCHIVE_GIT_COMMIT_ID), extras ? extras : "");
-    setenv ("SIM_ARCHIVE_GIT_COMMIT_ID", S_xstr(SIM_ARCHIVE_GIT_COMMIT_ID), 1);
+    fprintf (st, "%ssimh git commit id: %8.8s%s", flag ? "\n        " : "        ", __STR(SIM_ARCHIVE_GIT_COMMIT_ID), extras ? extras : "");
+    setenv ("SIM_ARCHIVE_GIT_COMMIT_ID", __STR(SIM_ARCHIVE_GIT_COMMIT_ID), 1);
     }
 #if defined(SIM_ARCHIVE_GIT_COMMIT_TIME)
-if (NULL == strchr (S_xstr(SIM_ARCHIVE_GIT_COMMIT_TIME), '$')) {
-    setenv ("SIM_ARCHIVE_GIT_COMMIT_TIME", S_xstr(SIM_ARCHIVE_GIT_COMMIT_TIME), 1);
+if (NULL == strchr (__STR(SIM_ARCHIVE_GIT_COMMIT_TIME), '$')) {
+    setenv ("SIM_ARCHIVE_GIT_COMMIT_TIME", __STR(SIM_ARCHIVE_GIT_COMMIT_TIME), 1);
     if (flag)
-        fprintf (st, "%ssimh git commit time: %s", "\n        ", S_xstr(SIM_ARCHIVE_GIT_COMMIT_TIME));
+        fprintf (st, "%ssimh git commit time: %s", "\n        ", __STR(SIM_ARCHIVE_GIT_COMMIT_TIME));
     }
 #endif
 #endif
 #endif
 #if defined(SIM_BUILD)
-fprintf (st, "%sBuild: %s", flag ? "\n        " : "        ", S_xstr(SIM_BUILD));
+fprintf (st, "%sBuild: %s", flag ? "\n        " : "        ", __STR(SIM_BUILD));
 #endif
 fprintf (st, "\n");
 if (sim_vm_release_message != NULL)                    /* if a release message string is defined */
     fprintf (st, "\n%s", sim_vm_release_message);      /*   then display it */
-#undef S_str
-#undef S_xstr
 return SCPE_OK;
 }
 
@@ -9054,11 +9050,7 @@ fprintf (sfile, "%s\n%s\n%s\n%s\n%s\n%.0f\n",
     sim_time);                                          /* [V3.2] sim time */
 WRITE_I (sim_rtime);                                    /* [V2.6] sim rel time */
 #if defined(SIM_GIT_COMMIT_ID)
-#define S_xstr(a) S_str(a)
-#define S_str(a) #a
-fprintf (sfile, "git commit id: %8.8s\n", S_xstr(SIM_GIT_COMMIT_ID));
-#undef S_str
-#undef S_xstr
+fprintf (sfile, "git commit id: %8.8s\n", __STR(SIM_GIT_COMMIT_ID));
 #else
 fprintf (sfile, "git commit id: unknown\n");
 #endif
@@ -9282,15 +9274,11 @@ READ_I (sim_rtime);                                     /* [V2.6+] sim rel time 
 if (v40) {
     READ_S (buf);                                       /* read git commit id */
 #if defined(SIM_GIT_COMMIT_ID)
-#define S_xstr(a) S_str(a)
-#define S_str(a) #a
-    if ((memcmp (buf, "git commit id: " S_xstr(SIM_GIT_COMMIT_ID), 23)) && 
+    if ((memcmp (buf, "git commit id: " __STR(SIM_GIT_COMMIT_ID), 23)) && 
         (!sim_quiet) && (!suppress_warning)) {
-        sim_printf ("warning - different simulator git versions.\nSaved commit id: %8.8s, Running commit id: %8.8s\n", buf + 15, S_xstr(SIM_GIT_COMMIT_ID));
+        sim_printf ("warning - different simulator git versions.\nSaved commit id: %8.8s, Running commit id: %8.8s\n", buf + 15, __STR(SIM_GIT_COMMIT_ID));
         warned = TRUE;
         }
-#undef S_str
-#undef S_xstr
 #endif
     }
 if (!dont_detach_attach)
@@ -13492,6 +13480,7 @@ _load_function(pcre_version);
 _load_function(pcre_free);
 _load_function(pcre_fullinfo);
 _load_function(pcre_exec);
+#undef _load_function
 sim_pcre_regex_available = (pcre_compile != NULL);
 if (sim_pcre_regex_available)
     *((_func *)&pcre_free) = *((_func *)pcre_free); /* Fixup initially indirect pointer */
