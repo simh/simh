@@ -1,6 +1,6 @@
 image:
   - macos-bigsur
-  - Ubuntu2016
+  - Ubuntu1604
   - Visual Studio 2015
 
 platform:
