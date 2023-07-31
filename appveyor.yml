@@ -42,9 +42,11 @@ build_script:
   - ps: |
         if ($isWindows) {
           $platform = 'Windows'
+          $arch = 'Win32'
           $commit_id_file = 'Visual Studio Projects\.git-commit-id.h' 
         } else {
           $platform = uname -s
+          $arch = arch
           if ($platform -eq 'Linux') {
             $ncpus = nproc
             $parallel = '-j' + $ncpus
@@ -72,7 +74,7 @@ on_success:
   - git clone "https://github.com/simh/Development-Binaries"
   - ps: |
         cd Development-Binaries
-        $pkg_filename = "simh-$datetime-$platform-$version_major.$version_minor-$version_mode-$id"
+        $pkg_filename = "simh-$datetime-$platform-$arch-$version_major.$version_minor-$version_mode-$id"
         if ($isWindows) {
           $pkg_filename = $pkg_filename + '.zip'
           Compress-Archive -Path ..\BIN\NT\Win32-Release\*.exe -DestinationPath "$pkg_filename"
@@ -83,7 +85,7 @@ on_success:
           popd
         }
         "$platform Build results for simh Commit: https://github.com/simh/simh/commit/$id" | Out-File -FilePath ../pkg_commit_message -Encoding ascii
-        (Get-Content README.md) -replace ('(\['+$platform+' is here\]\(https\:\/\/github\.com\/simh\/Development-Binaries\/blob\/master\/)([a-zA-Z0-9._-]+)(.+\.)'),('$1'+$pkg_filename+'$3') | Out-File -FilePath README.md
+        (Get-Content README.md) -replace ('(\['+$platform+' is here\]\(https\:\/\/github\.com\/simh\/Development-Binaries\/blob\/master\/)([a-zA-Z0-9._-]+)(.+\.)'),('$1'+$pkg_filename+'$3') | Out-File -FilePath README.md -Encoding ascii
   - git add *
   - git commit -F ../pkg_commit_message
   - git push -u origin master
