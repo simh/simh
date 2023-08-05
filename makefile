@@ -51,12 +51,12 @@
 # otherwise detected and will also take significantly longer to 
 # complete.  Additionally, non debug builds default to build with an
 # optimization level of -O2.  This optimization level can be changed 
-# by invoking GNU OPTIMIZE=-O3 (or whatever optimize value you want) 
-# on the command line if desired.
+# by invoking GNU make with OPTIMIZE=-O3 (or whatever optimize value 
+# you want) on the command line if desired.
 #
 # The default setup will fail simulator build(s) if the compile 
 # produces any warnings.  These should be cleaned up before new 
-# or changd code is accepted into the code base.  This option 
+# or changed code is accepted into the code base.  This option 
 # can be overridden if GNU make is invoked with WARNINGS=ALLOWED
 # on the command line.
 #
@@ -1359,7 +1359,6 @@ ifneq (,$(USEFUL_PACKAGES))
   $(info *** functionality $(USEFUL_MULTIPLE) package$(USEFUL_PLURAL) provide$(if $(USEFUL_PLURAL),,s), or stopping now to install)
   $(info *** $(USEFUL_MULTIPLE) package$(USEFUL_PLURAL).)
   $(info )
-  $(info Do you want to install $(USEFUL_MULTIPLE) package$(USEFUL_PLURAL) before building $(MAKECMDGOALS_DESCRIPTION)?)
 endif
 ifneq (,$(BUILD_SEPARATE))
   EXTRAS:=BUILD_SEPARATE=$(BUILD_SEPARATE)
@@ -1368,7 +1367,12 @@ ifneq (,$(QUIET))
   EXTRAS+= QUIET=$(QUIET)
 endif
 ifneq (,$(and $(findstring HOMEBREW,$(PKG_MGR)),$(USEFUL_PACKAGES)))
-  ifeq (,$(shell bash -c 'read -p "[Enter Y or N, Default is Y] " answer; echo $$answer' | grep -i n))
+  ifneq (,$(AUTO_RUN_BREW))
+    $(info Running brew now to install $(USEFUL_MULTIPLE) package$(USEFUL_PLURAL) before building $(MAKECMDGOALS_DESCRIPTION)?)
+  else
+    $(info Do you want to install $(USEFUL_MULTIPLE) package$(USEFUL_PLURAL) before building $(MAKECMDGOALS_DESCRIPTION)?)
+  endif
+  ifeq (,$(if $(AUTO_RUN_BREW),,$(shell bash -c 'read -p "[Enter Y or N, Default is Y] " answer; echo $$answer' | grep -i n)))
     BREW_RESULT = $(shell brew install $(USEFUL_PACKAGES) 1>&2)
     $(info $(BREW_RESULT))
     $(info *** rerunning this make to perform your desired build...)
@@ -1376,6 +1380,7 @@ ifneq (,$(and $(findstring HOMEBREW,$(PKG_MGR)),$(USEFUL_PACKAGES)))
     $(error Done: $(MAKE_RESULT))
   endif
 else
+  $(info Do you want to install $(USEFUL_MULTIPLE) package$(USEFUL_PLURAL) before building $(MAKECMDGOALS_DESCRIPTION)?)
   ifneq (,$(and $(findstring MACPORTS,$(PKG_MGR)),$(USEFUL_PACKAGES)))
     ifeq (,$(shell $(SHELL) -c 'read -p "[Enter Y or N, Default is Y] " answer; echo $$answer' | grep -i n))
       $(info Enter:    $$ sudo port install $(USEFUL_PACKAGES))
