@@ -175,11 +175,11 @@ else
   SIM_MAJOR=$(shell for /F "tokens=3" %%i in ('findstr /c:"SIM_MAJOR" sim_rev.h') do echo %%i)
 endif
 # Assure that only BUILD_SEPARATE=1 will cause separate compiles
-ifneq (1,$(BUILD_SEPARATE))
+ifeq (,$(BUILD_SEPARATE))
   override BUILD_SEPARATE=
 endif
 export BUILD_SEPARATE
-ifneq (1,$(QUIET))
+ifeq (,$(QUIET))
   override QUIET=
 endif
 export QUIET
@@ -1380,7 +1380,9 @@ ifneq (,$(and $(findstring HOMEBREW,$(PKG_MGR)),$(USEFUL_PACKAGES)))
     $(error Done: $(MAKE_RESULT))
   endif
 else
-  $(info Do you want to install $(USEFUL_MULTIPLE) package$(USEFUL_PLURAL) before building $(MAKECMDGOALS_DESCRIPTION)?)
+  ifneq (,$(USEFUL_PACKAGES))
+    $(info Do you want to install $(USEFUL_MULTIPLE) package$(USEFUL_PLURAL) before building $(MAKECMDGOALS_DESCRIPTION)?)
+  endif
   ifneq (,$(and $(findstring MACPORTS,$(PKG_MGR)),$(USEFUL_PACKAGES)))
     ifeq (,$(shell $(SHELL) -c 'read -p "[Enter Y or N, Default is Y] " answer; echo $$answer' | grep -i n))
       $(info Enter:    $$ sudo port install $(USEFUL_PACKAGES))
@@ -2948,7 +2950,7 @@ else # end of primary make recipies
     $(error ERROR ***  Missing build options.)
   endif
 
-  ifeq (1,$(QUIET))
+  ifneq (,$(QUIET))
     CC := @$(CC)
   endif
 
@@ -3011,49 +3013,49 @@ endef
 
 $(BLDDIR)/%.o : $(word 1,$(DIRS))/%.c
 	-@$(MKDIR) $(call pathfix,$(dir $@))
-  ifeq (1,$(QUIET))
+  ifneq (,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : $(word 1,$(DIRS))/*/%.c
 	-@$(MKDIR) $(call pathfix,$(dir $@))
-  ifeq (1,$(QUIET))
+  ifneq (,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : $(word 1,$(DIRS))/*/*/%.c
 	-@$(MKDIR) $(call pathfix,$(dir $@))
-  ifeq (1,$(QUIET))
+  ifneq (,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : display/%.c
 	-@$(MKDIR) $(call pathfix,$(dir $@))
-  ifeq (1,$(QUIET))
+  ifneq (,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : slirp/%.c
 	-@$(MKDIR) $(call pathfix,$(dir $@))
-  ifeq (1,$(QUIET))
+  ifneq (,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : slirp_glue/%.c
 	-@$(MKDIR) $(call pathfix,$(dir $@))
-  ifeq (1,$(QUIET))
+  ifneq (,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : %.c
 	-@$(MKDIR) $(call pathfix,$(dir $@))
-  ifeq (1,$(QUIET))
+  ifneq (,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
@@ -3061,42 +3063,42 @@ $(BLDDIR)/%.o : %.c
 ifneq (,$(word 2,$(DIRS)))
 $(BLDDIR)/%.o : $(word 2,$(DIRS))/%.c
 	-@$(MKDIR) $(call pathfix,$(dir $@))
-  ifeq (1,$(QUIET))
+  ifneq (,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : $(word 2,$(DIRS))/*/%.c
 	@$(MKDIR) $(call pathfix,$(dir $@))
-  ifeq (1,$(QUIET))
+  ifneq (,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : $(word 2,$(DIRS))/*/*/%.c
 	@$(MKDIR) $(call pathfix,$(dir $@))
-  ifeq (1,$(QUIET))
+  ifneq (,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
 ifneq (,$(word 3,$(DIRS)))
 $(BLDDIR)/%.o : $(word 3,$(DIRS))/%.c
 	@$(MKDIR) $(call pathfix,$(dir $@))
-  ifeq (1,$(QUIET))
+  ifneq (,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : $(word 3,$(DIRS))/*/%.c
 	@$(MKDIR) $(call pathfix,$(dir $@))
-  ifeq (1,$(QUIET))
+  ifneq (,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : $(word 3,$(DIRS))/*/*/%.c
 	@$(MKDIR) $(call pathfix,$(dir $@))
-  ifeq (1,$(QUIET))
+  ifneq (,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
@@ -3112,7 +3114,7 @@ endif
 # Multiple Separate compiles for each input
 $(TARGET): $(OBJS)
 	$(MKDIRBIN)
-    ifeq (1,$(QUIET))
+    ifneq (,$(QUIET))
 	  @echo Linking $(TARGET)
     endif
 	  ${CC} $(OBJS) ${OPTS} ${LNK_OPTS} -o $@ ${LDFLAGS}
@@ -3120,7 +3122,7 @@ $(TARGET): $(OBJS)
 # Single Compile and Link of all inputs
 $(TARGET): $(DEPS)
 	$(MKDIRBIN)
-    ifeq (1,$(QUIET))
+    ifneq (,$(QUIET))
 	  @echo Compile and Linking $(DEPS) into $(TARGET)
     endif
 	${CC} $(DEPS) ${OPTS} ${LNK_OPTS} -o $@ ${LDFLAGS}
