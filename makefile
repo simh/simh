@@ -690,24 +690,24 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
   endif
   ifneq (,$(call find_include,pthread))
     ifneq (,$(call find_lib,pthread))
-      OS_CCDEFS += -DUSE_READER_THREAD -DSIM_ASYNCH_IO 
-      OS_LDFLAGS += -lpthread
+      PTHREAD_CCDEFS += -DSIM_ASYNCH_IO 
+      PTHREAD_LDFLAGS += -lpthread
       $(info using libpthread: $(call find_lib,pthread) $(call find_include,pthread))
     else
       LIBEXTSAVE := ${LIBEXT}
       LIBEXT = a
       ifneq (,$(call find_lib,pthread))
-        OS_CCDEFS += -DUSE_READER_THREAD -DSIM_ASYNCH_IO 
-        OS_LDFLAGS += -lpthread
+        PTHREAD_CCDEFS += -DSIM_ASYNCH_IO 
+        PTHREAD_LDFLAGS += -lpthread
         $(info using libpthread: $(call find_lib,pthread) $(call find_include,pthread))
       else
         ifneq (,$(findstring Haiku,$(OSTYPE)))
-          OS_CCDEFS += -DUSE_READER_THREAD -DSIM_ASYNCH_IO 
+          PTHREAD_CCDEFS += -DUSE_READER_THREAD -DSIM_ASYNCH_IO 
           $(info using libpthread: $(call find_include,pthread))
         else
           ifeq (Darwin,$(OSTYPE))
-            OS_CCDEFS += -DUSE_READER_THREAD -DSIM_ASYNCH_IO 
-            OS_LDFLAGS += -lpthread
+            PTHREAD_CCDEFS += -DUSE_READER_THREAD -DSIM_ASYNCH_IO 
+            PTHREAD_LDFLAGS += -lpthread
             $(info using macOS libpthread: $(call find_include,pthread))
           endif
         endif
@@ -807,16 +807,16 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
   ifneq (,$(call find_include,png))
     ifneq (,$(call find_lib,png))
       $(info using libpng: $(call find_lib,png) $(call find_include,png))
-      OS_CCDEFS += -DHAVE_LIBPNG
+      PNG_CCDEFS += -DHAVE_LIBPNG
       ifneq (,$(ALL_DEPENDENCIES))
-        OS_LDFLAGS += -lpng
+        PNG_LDFLAGS += -lpng
       endif
       ifneq (,$(call find_include,zlib))
         ifneq (,$(call find_lib,z))
           $(info using zlib: $(call find_lib,z) $(call find_include,zlib))
-          OS_CCDEFS += -DHAVE_ZLIB
+          PNG_CCDEFS += -DHAVE_ZLIB
           ifneq (,$(ALL_DEPENDENCIES))
-            OS_LDFLAGS += -lz
+            PNG_LDFLAGS += -lz
           endif
         else
           NEEDED_PKGS += DPKG_ZLIB
@@ -827,13 +827,13 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
     else
       # some systems may name the png library libpng16
       ifneq (,$(call find_lib,png16))
-        OS_CCDEFS += -DHAVE_LIBPNG
-        OS_LDFLAGS += -lpng16
+        PNG_CCDEFS += -DHAVE_LIBPNG
+        PNG_LDFLAGS += -lpng16
         $(info using libpng: $(call find_lib,png16) $(call find_include,png))
         ifneq (,$(call find_include,zlib))
           ifneq (,$(call find_lib,z))
-            OS_CCDEFS += -DHAVE_ZLIB
-            OS_LDFLAGS += -lz
+            PNG_CCDEFS += -DHAVE_ZLIB
+            PNG_LDFLAGS += -lz
             $(info using zlib: $(call find_lib,z) $(call find_include,zlib))
           else
             NEEDED_PKGS += DPKG_ZLIB
@@ -875,8 +875,8 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
           SDLX_CONFIG = sdl2-config
         endif
         ifneq (,$(SDLX_CONFIG))
-          VIDEO_CCDEFS += -DHAVE_LIBSDL `$(SDLX_CONFIG) --cflags`
-          VIDEO_LDFLAGS += `$(SDLX_CONFIG) --libs`
+          VIDEO_CCDEFS += -DHAVE_LIBSDL `$(SDLX_CONFIG) --cflags` $(PNG_CCDEFS)
+          VIDEO_LDFLAGS += `$(SDLX_CONFIG) --libs` $(PNG_LDFLAGS)
           VIDEO_FEATURES = - video capabilities provided by libSDL2 (Simple Directmedia Layer)
           DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/sim_ws.c
           DISPLAYVT = ${DISPLAYD}/vt11.c
@@ -905,6 +905,10 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
         endif
       else
         NEEDED_PKGS += DPKG_SDL_TTF
+      endif
+      ifneq (,$(and $(VIDEO_CCDEFS),$(PTHREAD_CCDEFS)))
+        VIDEO_CCDEFS += $(PTHREAD_CCDEFS)
+        VIDEO_LDFLAGS += $(PTHREAD_LDFLAGS)
       endif
     endif
   endif
@@ -1087,6 +1091,10 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
       NETWORK_CCDEFS += -I slirp -I slirp_glue -I slirp_glue/qemu -DHAVE_SLIRP_NETWORK -DUSE_SIMH_SLIRP_DEBUG 
       NETWORK_DEPS += slirp/*.c slirp_glue/*.c
       NETWORK_LAN_FEATURES += NAT(SLiRP)
+    endif
+    ifneq (,$(and $(NETWORK_CCDEFS),$(PTHREAD_CCDEFS)))
+      NETWORK_CCDEFS += -DUSE_READER_THREAD $(PTHREAD_CCDEFS)
+      NETWORK_LDFLAGS += $(PTHREAD_LDFLAGS)
     endif
     NETWORK_OPT = $(NETWORK_CCDEFS)
   endif
