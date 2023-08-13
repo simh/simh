@@ -41,7 +41,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories="../imlac/;./;../;../../windows-build/include;;../../windows-build/include/SDL2"
-				PreprocessorDefinitions="USE_DISPLAY;SIM_BUILD_TOOL=simh-Visual-Studio-Project;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;PTW32_STATIC_LIB;SIM_ASYNCH_IO;USE_READER_THREAD;SIM_NEED_GIT_COMMIT_ID;HAVE_PCRE_H;PCRE_STATIC;USE_SIM_VIDEO;HAVE_LIBSDL;HAVE_LIBPNG;HAVE_LIBEDIT"
+				PreprocessorDefinitions="USE_DISPLAY;SIM_BUILD_TOOL=simh-Visual-Studio-Project;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;PTW32_STATIC_LIB;SIM_NEED_GIT_COMMIT_ID;HAVE_PCRE_H;PCRE_STATIC;USE_SIM_VIDEO;HAVE_LIBSDL;HAVE_LIBPNG;HAVE_LIBEDIT"
 				KeepComments="false"
 				BasicRuntimeChecks="0"
 				RuntimeLibrary="1"
@@ -127,7 +127,7 @@
 				OmitFramePointers="true"
 				WholeProgramOptimization="true"
 				AdditionalIncludeDirectories="../imlac/;./;../;../../windows-build/include;;../../windows-build/include/SDL2"
-				PreprocessorDefinitions="USE_DISPLAY;SIM_BUILD_TOOL=simh-Visual-Studio-Project;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;PTW32_STATIC_LIB;SIM_ASYNCH_IO;USE_READER_THREAD;SIM_NEED_GIT_COMMIT_ID;HAVE_PCRE_H;PCRE_STATIC;USE_SIM_VIDEO;HAVE_LIBSDL;HAVE_LIBPNG;HAVE_LIBEDIT"
+				PreprocessorDefinitions="USE_DISPLAY;SIM_BUILD_TOOL=simh-Visual-Studio-Project;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;PTW32_STATIC_LIB;SIM_NEED_GIT_COMMIT_ID;HAVE_PCRE_H;PCRE_STATIC;USE_SIM_VIDEO;HAVE_LIBSDL;HAVE_LIBPNG;HAVE_LIBEDIT"
 				StringPooling="true"
 				RuntimeLibrary="0"
 				EnableFunctionLevelLinking="true"
@@ -230,29 +230,6 @@
 			<File
 				RelativePath="..\imlac\imlac_tty.c"
 				>
-			</File>
-			<File
-				RelativePath="..\..\windows-build\pthreads\pthread.c"
-				>
-				<FileConfiguration
-					Name="Debug|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						PreprocessorDefinitions="HAVE_CONFIG_H;PTW32_BUILD_INLINED;PTW32_STATIC_LIB;__CLEANUP_C;$(NOINHERIT)"
-						CompileAs="1"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						WholeProgramOptimization="false"
-						PreprocessorDefinitions="HAVE_CONFIG_H;PTW32_BUILD_INLINED;PTW32_STATIC_LIB;__CLEANUP_C;$(NOINHERIT)"
-						CompileAs="1"
-					/>
-				</FileConfiguration>
 			</File>
 			<File
 				RelativePath="..\scp.c"
