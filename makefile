@@ -263,9 +263,11 @@ find_include = $(abspath $(strip $(firstword $(foreach dir,$(strip ${INCPATH}),$
 ifeq (Darwin,$(OSTYPE))
   ifeq (/usr/local/bin/brew,$(call find_exe,brew))
     PKG_MGR = HOMEBREW
+    PKG_CMD = brew install
   else
     ifeq (/opt/local/bin/port,$(call find_exe,port))
       PKG_MGR = MACPORTS
+      PKG_CMD = port install
     endif
   endif
 endif
@@ -275,21 +277,31 @@ ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,apt-get)))
   else
     PKG_MGR = TERMUX
   endif
+  PKG_CMD = apt-get install
 endif
 ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,yum)))
   PKG_MGR = YUM
+  PKG_CMD = yum install
 endif
 ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,zypper)))
   PKG_MGR = ZYPPER
+  PKG_CMD = zypper install
 endif
 ifneq (,$(and $(findstring NetBSD,$(OSTYPE)),$(call find_exe,pkgin)))
   PKG_MGR = PKGSRC
+  PKG_CMD = pkgin install
+  PKG_NO_SUDO = YES
 endif
 ifneq (,$(and $(findstring FreeBSD,$(OSTYPE)),$(call find_exe,pkg)))
   PKG_MGR = PKGBSD
+  PKG_CMD = pkg install
+  PKG_NO_SUDO = YES
 endif
 ifneq (,$(and $(findstring OpenBSD,$(OSTYPE)),$(call find_exe,pkg_add)))
   PKG_MGR = PKGADD
+  PKG_CMD = pkg_add
+  PKG_NO_SUDO = YES
+  PKG_SHELL_READ_CANT_PROMPT = YES
 endif
 # Dependent packages
 DPKG_COMPILER  = 1
@@ -335,6 +347,14 @@ else
   PKGS_SRC_PKGADD     = -        -             -              -            -             -           -            -          -         -
 endif
 ifeq (${WIN32},)  #*nix Environments (&& cygwin)
+  # OSNAME is used in messages to indicate the source of libpcap components
+  OSNAME = $(OSTYPE)
+  ifeq (SunOS,$(OSTYPE))
+    export TEST = /bin/test
+  else
+    export TEST = test
+  endif
+  override AUTO_INSTALL_PACKAGES:=$(and $(AUTO_INSTALL_PACKAGES),$(or $(findstring HOMEBREW,$(PKG_MGR)),$(shell if $(TEST) -r /dev/mem; then echo running_as_root; fi)))
   ifeq (${GCC},)
     ifeq (,$(call find_exe,gcc))
       ifneq (clang,$(findstring clang,$(and $(call find_exe,cc),$(shell cc -v /dev/null 2>&1 | grep 'clang'))))
@@ -346,13 +366,6 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
     else
       GCC = gcc
     endif
-  endif
-  # OSNAME is used in messages to indicate the source of libpcap components
-  OSNAME = $(OSTYPE)
-  ifeq (SunOS,$(OSTYPE))
-    export TEST = /bin/test
-  else
-    export TEST = test
   endif
   ifeq (CYGWIN,$(findstring CYGWIN,$(OSTYPE))) # uname returns CYGWIN_NT-n.n-ver
     OSTYPE = cygwin
@@ -1363,10 +1376,12 @@ ifneq (,$(USEFUL_PACKAGES))
   $(info *** Info ***     $(USEFUL_PACKAGES))
   $(info *** Info *** package$(USEFUL_PLURAL) $(USEFUL_MULTIPLE_HIST) available on your system.)
   $(info )
-  $(info *** You have the option of building $(MAKECMDGOALS_DESCRIPTION) without the)
-  $(info *** functionality $(USEFUL_MULTIPLE) package$(USEFUL_PLURAL) provide$(if $(USEFUL_PLURAL),,s), or stopping now to install)
-  $(info *** $(USEFUL_MULTIPLE) package$(USEFUL_PLURAL).)
-  $(info )
+  ifeq (,$(AUTO_INSTALL_PACKAGES))
+    $(info *** You have the option of building $(MAKECMDGOALS_DESCRIPTION) without the)
+    $(info *** functionality $(USEFUL_MULTIPLE) package$(USEFUL_PLURAL) provide$(if $(USEFUL_PLURAL),,s), or stopping now to install)
+    $(info *** $(USEFUL_MULTIPLE) package$(USEFUL_PLURAL).)
+    $(info )
+  endif
 endif
 ifneq (,$(BUILD_SEPARATE))
   EXTRAS:=BUILD_SEPARATE=$(BUILD_SEPARATE)
@@ -1374,15 +1389,15 @@ endif
 ifneq (,$(QUIET))
   EXTRAS+= QUIET=$(QUIET)
 endif
-ifneq (,$(and $(findstring HOMEBREW,$(PKG_MGR)),$(USEFUL_PACKAGES)))
-  ifneq (,$(AUTO_RUN_BREW))
-    $(info Running brew now to install $(USEFUL_MULTIPLE) package$(USEFUL_PLURAL) before building $(MAKECMDGOALS_DESCRIPTION)?)
+ifneq (,$(and $(AUTO_INSTALL_PACKAGES),$(PKG_CMD),$(USEFUL_PACKAGES)))
+  ifneq (,$(AUTO_INSTALL_PACKAGES))
+    $(info Running $(word 1,$(PKG_CMD)) now to install $(USEFUL_MULTIPLE) package$(USEFUL_PLURAL) before building $(MAKECMDGOALS_DESCRIPTION)?)
   else
     $(info Do you want to install $(USEFUL_MULTIPLE) package$(USEFUL_PLURAL) before building $(MAKECMDGOALS_DESCRIPTION)?)
   endif
-  ifeq (,$(if $(AUTO_RUN_BREW),,$(shell bash -c 'read -p "[Enter Y or N, Default is Y] " answer; echo $$answer' | grep -i n)))
-    BREW_RESULT = $(shell brew install $(USEFUL_PACKAGES) 1>&2)
-    $(info $(BREW_RESULT))
+  ifeq (,$(if $(AUTO_INSTALL_PACKAGES),,$(shell $(SHELL) -c 'read -p "[Enter Y or N, Default is Y] " answer; echo $$answer' | grep -i n)))
+    INSTALLER_RESULT = $(shell $(PKG_CMD) $(USEFUL_PACKAGES) 1>&2)
+    $(info $(INSTALLER_RESULT))
     $(info *** rerunning this make to perform your desired build...)
     MAKE_RESULT = $(shell $(MAKE) $(MAKECMDGOALS) $(EXTRAS) 1>&2)
     $(error Done: $(MAKE_RESULT))
@@ -1390,85 +1405,36 @@ ifneq (,$(and $(findstring HOMEBREW,$(PKG_MGR)),$(USEFUL_PACKAGES)))
 else
   ifneq (,$(USEFUL_PACKAGES))
     $(info Do you want to install $(USEFUL_MULTIPLE) package$(USEFUL_PLURAL) before building $(MAKECMDGOALS_DESCRIPTION)?)
-  endif
-  ifneq (,$(and $(findstring MACPORTS,$(PKG_MGR)),$(USEFUL_PACKAGES)))
-    ifeq (,$(shell $(SHELL) -c 'read -p "[Enter Y or N, Default is Y] " answer; echo $$answer' | grep -i n))
-      $(info Enter:    $$ sudo port install $(USEFUL_PACKAGES))
-      $(info when that completes)
-      $(info re-enter: $$ $(MAKE) $(MAKECMDGOALS) $(EXTRAS))
-      $(error )
+    ifeq (,$(PKG_SHELL_READ_CANT_PROMPT))
+      ANSWER := $(shell $(SHELL) -c 'read -p "[Enter Y or N, Default is Y] " answer; echo $$answer' | grep -i n)
+    else
+      $(info [Enter Y or N, Default is Y])
+      ANSWER := $(shell $(SHELL) -c 'read answer; echo $$answer' | grep -i n)
     endif
-  endif
-endif
-ifneq (,$(and $(findstring APT,$(PKG_MGR)),$(USEFUL_PACKAGES)))
-  ifeq (,$(shell $(SHELL) -c 'read -p "[Enter Y or N, Default is Y] " answer; echo $$answer' | grep -i n))
-    $(info Enter:    $$ sudo apt-get install $(USEFUL_PACKAGES))
-    $(info when that completes)
-    $(info re-enter: $$ $(MAKE) $(MAKECMDGOALS) $(EXTRAS))
-    $(error )
-  endif
-endif
-ifneq (,$(and $(findstring TERMUX,$(PKG_MGR)),$(USEFUL_PACKAGES)))
-  ifeq (,$(shell $(SHELL) -c 'read -p "[Enter Y or N, Default is Y] " answer; echo $$answer' | grep -i n))
-    $(info Enter:    $$ pkg install $(USEFUL_PACKAGES))
-    $(info when that completes)
-    $(info re-enter: $$ $(MAKE) $(MAKECMDGOALS) $(EXTRAS))
-    $(error )
-  endif
-endif
-ifneq (,$(and $(findstring YUM,$(PKG_MGR)),$(USEFUL_PACKAGES)))
-  ANSWER = $(shell $(SHELL) -c 'read -p "[Enter Y or N, Default is Y] " answer; echo $$answer' | grep -i n)
-  ifneq (n,$(ANSWER))
-    $(info Enter:    $$ sudo yum install $(USEFUL_PACKAGES))
-    $(info when that completes)
-    $(info re-enter: $$ $(MAKE) $(MAKECMDGOALS) $(EXTRAS))
-    $(error )
-  endif
-endif
-ifneq (,$(and $(findstring ZYPPER,$(PKG_MGR)),$(USEFUL_PACKAGES)))
-  ANSWER = $(shell $(SHELL) -c 'read -p "[Enter Y or N, Default is Y] " answer; echo $$answer' | grep -i n)
-  ifneq (n,$(ANSWER))
-    $(info Enter:    $$ sudo zypper install $(USEFUL_PACKAGES))
-    $(info when that completes)
-    $(info re-enter: $$ $(MAKE) $(MAKECMDGOALS) $(EXTRAS))
-    $(error )
-  endif
-endif
-ifneq (,$(and $(findstring PKGSRC,$(PKG_MGR)),$(USEFUL_PACKAGES)))
-  ifeq (,$(shell $(SHELL) -c 'read -p "[Enter Y or N, Default is Y] " answer; echo $$answer' | grep -i n))
-    $(info Enter:    $$ su)
-    hash := \#
-    $(info Enter:    Password: <type-root-password>)
-    $(info Enter:    $(hash) pkgin install $(USEFUL_PACKAGES))
-    $(info when that completes)
-    $(info Enter:    $(hash) exit)
-    $(info re-enter: $$ $(MAKE) $(MAKECMDGOALS) $(EXTRAS))
-    $(error )
-  endif
-endif
-ifneq (,$(and $(findstring PKGBSD,$(PKG_MGR)),$(USEFUL_PACKAGES)))
-  ifeq (,$(shell $(SHELL) -c 'read -p "[Enter Y or N, Default is Y] " answer; echo $$answer' | grep -i n))
-    $(info Enter:    $$ su)
-    hash := \#
-    $(info Enter:    Password: <type-root-password>)
-    $(info Enter:    $(hash) pkg install $(USEFUL_PACKAGES))
-    $(info when that completes)
-    $(info Enter:    $(hash) exit)
-    $(info re-enter: $$ $(MAKE) $(MAKECMDGOALS) $(EXTRAS))
-    $(error )
-  endif
-endif
-ifneq (,$(and $(findstring PKGADD,$(PKG_MGR)),$(USEFUL_PACKAGES)))
-  $(info [Enter Y or N, Default is Y])
-  ifeq (,$(shell $(SHELL) -c 'read answer; echo $$answer' | grep -i n))
-    $(info Enter:    $$ su)
-    hash := \#
-    $(info Enter:    Password: <type-root-password>)
-    $(info Enter:    $(hash) pkg_add $(USEFUL_PACKAGES))
-    $(info when that completes)
-    $(info Enter:    $(hash) exit)
-    $(info re-enter: $$ $(MAKE) $(MAKECMDGOALS) $(EXTRAS))
-    $(error )
+    ifeq (,$(ANSWER))
+      ANSWER := Y
+    else
+      ifeq (y,$(ANSWER))
+        ANSWER := Y
+      endif
+    endif
+    ifeq (Y,$(ANSWER))
+      ifeq (,$(PKG_NO_SUDO))
+        $(info Enter:    $$ sudo $(PKG_CMD) $(USEFUL_PACKAGES))
+        $(info when that completes)
+        $(info re-enter: $$ $(MAKE) $(MAKECMDGOALS) $(EXTRAS))
+        $(error )
+      else
+        hash := \#
+        $(info Enter:    $$ su)
+        $(info Enter:    Password: <type-root-password>)
+        $(info Enter:    $(hash) $(PKG_CMD) $(USEFUL_PACKAGES))
+        $(info when that completes)
+        $(info Enter:    $(hash) exit)
+        $(info re-enter: $$ $(MAKE) $(MAKECMDGOALS) $(EXTRAS))
+        $(error )
+      endif
+    endif
   endif
 endif
 ifneq (,$(GIT_COMMIT_ID))
