@@ -71,6 +71,7 @@ on_success:
   - git config --global credential.helper store
   - git config --global user.email "mark@infocomm.com"
   - git config --global user.name "Mark Pizzolato"
+  - git config --global core.autocrlf false
   - git clone "https://github.com/simh/Development-Binaries"
   - ps: |
         cd Development-Binaries
@@ -88,8 +89,12 @@ on_success:
         (Get-Content README.md) -replace ('(\['+$platform+' is here\]\(https\:\/\/github\.com\/simh\/Development-Binaries\/blob\/master\/)([a-zA-Z0-9._-]+)(.+\.)'),('$1'+$pkg_filename+'$3') | Out-File -FilePath README.md -Encoding ascii
   - git add *
   - git commit -F ../pkg_commit_message
-  - git push -u origin master
-  
+  - ps: |
+        # Don't update simh/DevelopmentBinaries during CI/CD processing of pull requests
+        if (($env:APPVEYOR_REPO_NAME -eq 'simh/simh') -or ($env:APPVEYOR_REPO_NAME -eq 'markpizz/simh')) {
+          git push -u origin master
+        }
+
 notifications:
   - provider: Email
     to:
