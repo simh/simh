@@ -1,6 +1,6 @@
 image:
-  - macos-bigsur
-  - Ubuntu1604
+#  - macos-bigsur
+#  - Ubuntu1604
   - Visual Studio 2015
 
 platform:
@@ -90,10 +90,11 @@ on_success:
   - git add *
   - git commit -F ../pkg_commit_message
   - ps: |
-        # Don't update simh/DevelopmentBinaries during CI/CD processing of pull requests
-        if (($env:APPVEYOR_REPO_NAME -eq 'simh/simh') -or ($env:APPVEYOR_REPO_NAME -eq 'markpizz/simh')) {
-          git push -u origin master
+        # Don't update simh/Development-Binaries during CI/CD processing of pull requests
+        if ("$env:APPVEYOR_PULL_REQUEST_NUMBER" -ne "") {
+          Exit-AppVeyorBuild
         }
+  - git push -u origin master
 
 notifications:
   - provider: Email
