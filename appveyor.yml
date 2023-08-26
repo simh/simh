@@ -15,6 +15,7 @@ matrix:
 
 cache:
   - ../windows-build
+  - ../Development-Binaries
 
 skip_commits:
   files:
@@ -24,21 +25,22 @@ skip_commits:
     
 before_build:
   - ps: |
-      $platform = uname -s
-      if ($platform -eq 'Linux') {
-        sudo apt-get update -yqqm
-        sudo apt-get install -ym gcc libpcap-dev libvdeplug-dev libpcre3-dev libedit-dev libsdl2-dev libpng-dev libsdl2-ttf-dev
-      } else {
-        if ($platform -eq 'Darwin') {
-          brew install vde pcre libedit sdl2 libpng zlib sdl2_ttf make
+        $platform = uname -s
+        if ($platform -eq 'Linux') {
+          sudo apt-get update -yqqm
+          sudo apt-get install -ym gcc libpcap-dev libvdeplug-dev libpcre3-dev libedit-dev libsdl2-dev libpng-dev libsdl2-ttf-dev git-lfs
+        } else {
+          if ($platform -eq 'Darwin') {
+            brew install vde pcre libedit sdl2 libpng zlib sdl2_ttf make git-lfs
+          }
         }
-      }
+        git lfs install
 
 build_script:
   - cmd: |
          "C:\Program Files (x86)\Microsoft Visual Studio 9.0\VC\vcvarsall.bat"
          echo Building with %NUMBER_OF_PROCESSORS% processors
-         cd "Visual Studio Projects" & vcbuild /M%NUMBER_OF_PROCESSORS% /useenv /rebuild simh.sln "Release|Win32" &           cd ..
+         cd "Visual Studio Projects" & vcbuild /M%NUMBER_OF_PROCESSORS% /useenv /rebuild simh.sln "Release|Win32" & cd ..
   - ps: |
         if ($isWindows) {
           $platform = 'Windows'
@@ -72,27 +74,39 @@ on_success:
   - git config --global user.email "mark@infocomm.com"
   - git config --global user.name "Mark Pizzolato"
   - git config --global core.autocrlf false
-  - git clone "https://github.com/simh/Development-Binaries"
   - ps: |
-        cd Development-Binaries
+        if (Test-Path -Path ../Development-Binaries -PathType Container) {
+          pushd ../Development-Binaries
+          git pull
+        } else {
+          pushd ..
+          git clone -q "https://github.com/simh/Development-Binaries"
+        }
+        popd
+        cd ../Development-Binaries
         $pkg_filename = "simh-$datetime-$platform-$arch-$version_major.$version_minor-$version_mode-$id"
         if ($isWindows) {
           $pkg_filename = $pkg_filename + '.zip'
-          Compress-Archive -Path ..\BIN\NT\Win32-Release\*.exe -DestinationPath "$pkg_filename"
+          Compress-Archive -Path $env:APPVEYOR_BUILD_FOLDER\BIN\NT\Win32-Release\*.exe -DestinationPath "$pkg_filename"
         } else {
           $pkg_filename = $pkg_filename + '.tgz'
-          pushd ../BIN
-          tar -cvzf ../Development-Binaries/$pkg_filename --exclude=buildtools '--exclude=*-build' *
+          pushd $env:APPVEYOR_BUILD_FOLDER/BIN
+          tar -cvzf ../../Development-Binaries/$pkg_filename --exclude=buildtools '--exclude=*-build' *
           popd
         }
-        "$platform Build results for simh Commit: https://github.com/simh/simh/commit/$id" | Out-File -FilePath ../pkg_commit_message -Encoding ascii
-        (Get-Content README.md) -replace ('(\['+$platform+' is here\]\(https\:\/\/github\.com\/simh\/Development-Binaries\/blob\/master\/)([a-zA-Z0-9._-]+)(.+\.)'),('$1'+$pkg_filename+'$3') | Out-File -FilePath README.md -Encoding ascii
-  - git add *
-  - git commit -F ../pkg_commit_message
+        "$platform Build results for simh Commit: https://github.com/simh/simh/commit/$id" | Out-File -FilePath ../pkg_commit_message -Encoding Ascii
+        (Get-Content README.md) -replace ('(\['+$platform+' is here\]\(https\:\/\/github\.com\/simh\/Development-Binaries\/blob\/master\/)([a-zA-Z0-9._-]+)(.+\.)'),('$1'+$pkg_filename+'$3') | Out-File -FilePath README.md -Encoding Ascii
   - ps: |
-        # Don't update simh/DevelopmentBinaries during CI/CD processing of pull requests
-        if (($env:APPVEYOR_REPO_NAME -eq 'simh/simh') -or ($env:APPVEYOR_REPO_NAME -eq 'markpizz/simh')) {
+        if ("$env:APPVEYOR_PULL_REQUEST_NUMBER" -eq "") {
+          # Only update the https://github.com/simh/DevelopmentBinaries repository 
+          # during CI/CD processing of direct commits pushed to the 
+          # https://github.com/simh/simh repository
+          git add *
+          git commit -F ../pkg_commit_message
           git push -u origin master
+        } else {
+          # clean up the un-committed pieces so the cache is maintained correctly
+          git reset --hard
         }
 
 notifications:
