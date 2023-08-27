@@ -74,15 +74,22 @@ on_success:
   - git config --global user.email "mark@infocomm.com"
   - git config --global user.name "Mark Pizzolato"
   - git config --global core.autocrlf false
-  - ps: |
-        if (Test-Path -Path ../Development-Binaries -PathType Container) {
+# Linux & macOS use the shell to address this, Windows uses cmd. Poweshell on Windows doesn't like git output to stderr
+  - sh: |
+        if test -d ../Development-Binaries
+        then
           pushd ../Development-Binaries
-          git pull
-        } else {
+          git pull origin master
+          popd
+        else
           pushd ..
-          git clone -q "https://github.com/simh/Development-Binaries"
-        }
-        popd
+          git clone -q "https://github.com/simh/Development-Binaries" Development-Binaries
+          popd
+        fi
+  - cmd: |
+         if NOT EXIST Development-Binaries pushd .. & git clone -q "https://github.com/simh/Development-Binaries" Development-Binaries & popd
+         pushd ..\Development-Binaries & git pull origin master & popd
+  - ps: |
         cd ../Development-Binaries
         $pkg_filename = "simh-$datetime-$platform-$arch-$version_major.$version_minor-$version_mode-$id"
         if ($isWindows) {
@@ -96,18 +103,29 @@ on_success:
         }
         "$platform Build results for simh Commit: https://github.com/simh/simh/commit/$id" | Out-File -FilePath ../pkg_commit_message -Encoding Ascii
         (Get-Content README.md) -replace ('(\['+$platform+' is here\]\(https\:\/\/github\.com\/simh\/Development-Binaries\/blob\/master\/)([a-zA-Z0-9._-]+)(.+\.)'),('$1'+$pkg_filename+'$3') | Out-File -FilePath README.md -Encoding Ascii
-  - ps: |
-        if ("$env:APPVEYOR_PULL_REQUEST_NUMBER" -eq "") {
+# Linux & macOS use the shell to address this, Windows uses cmd. Poweshell on Windows doesn't like git output to stderr
+  - sh: |
+        if "$APPVEYOR_PULL_REQUEST_NUMBER" = ""
+        then
           # Only update the https://github.com/simh/DevelopmentBinaries repository 
           # during CI/CD processing of direct commits pushed to the 
           # https://github.com/simh/simh repository
           git add *
           git commit -F ../pkg_commit_message
           git push -u origin master
-        } else {
+        else
           # clean up the un-committed pieces so the cache is maintained correctly
           git reset --hard
-        }
+        fi
+  - cmd: |
+         rem Only update the https://github.com/simh/DevelopmentBinaries repository 
+         rem during CI/CD processing of direct commits pushed to the 
+         rem https://github.com/simh/simh repository
+         if "%APPVEYOR_PULL_REQUEST_NUMBER%"=="" git add *
+         if "%APPVEYOR_PULL_REQUEST_NUMBER%"=="" git commit -F ../pkg_commit_message
+         if "%APPVEYOR_PULL_REQUEST_NUMBER%"=="" git push -u origin master
+         rem clean up the un-committed pieces so the cache is maintained correctly
+         if NOT "%APPVEYOR_PULL_REQUEST_NUMBER%"=="" git reset --hard
 
 notifications:
   - provider: Email
