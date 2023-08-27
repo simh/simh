@@ -28,7 +28,7 @@ before_build:
         $platform = uname -s
         if ($platform -eq 'Linux') {
           sudo apt-get update -yqqm
-          sudo apt-get install -ym gcc libpcap-dev libvdeplug-dev libpcre3-dev libedit-dev libsdl2-dev libpng-dev libsdl2-ttf-dev git-lfs
+          sudo apt-get install -ym gcc libpcap-dev libvdeplug-dev libpcre3-dev libedit-dev libsdl2-dev libpng-dev libsdl2-ttf-dev
         } else {
           if ($platform -eq 'Darwin') {
             brew install vde pcre libedit sdl2 libpng zlib sdl2_ttf make git-lfs
