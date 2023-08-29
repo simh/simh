@@ -197,6 +197,8 @@ extern volatile t_bool sim_idle_wait;
 extern int32 sim_asynch_check;
 extern int32 sim_asynch_latency;
 extern int32 sim_asynch_inst_latency;
+extern DEVICE sim_scp_dev;
+#define SIM_DBG_INIT        0x00200000      /* initialization activities */
 
 /* Thread local storage */
 #if defined(thread_local)

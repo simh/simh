@@ -335,6 +335,7 @@ static DEBTAB scp_debug[] = {
   {"DO",        SIM_DBG_DO,         "Do Command/Expansion Activities"},
   {"SAVE",      SIM_DBG_SAVE,       "Save Activities"},
   {"RESTORE",   SIM_DBG_RESTORE,    "Restore Activities"},
+  {"INIT",      SIM_DBG_INIT,       "Initialization Activities"},
   {0}
 };
 
@@ -2979,6 +2980,18 @@ if (argc > 1) {                                         /* Check for special arg
 if (argc > 1) {                                         /* Check for special argument to invoke device unit tests */
     if (sim_strcasecmp (argv[1], "DeviceUnitTests") == 0) {
         device_unit_tests = TRUE;
+        /* Remove special argument to avoid confusion later */
+        for (i = 1; i < argc; i++)
+            argv[i] = argv[i+1];
+        --argc;
+        }
+    }
+if (argc > 1) {                                         /* Check for special argument to turn on debug during initialization code */
+    if (sim_strcasecmp (argv[1], "DebugInit") == 0) {
+        sim_scp_dev.dctrl = SIM_DBG_INIT;
+        sim_switches |= SWMASK ('F');
+        sim_set_debon (1, "STDOUT");
+        sim_switches &= ~SWMASK ('F');
         /* Remove special argument to avoid confusion later */
         for (i = 1; i < argc; i++)
             argv[i] = argv[i+1];
