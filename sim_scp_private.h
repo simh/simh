@@ -197,8 +197,6 @@ extern volatile t_bool sim_idle_wait;
 extern int32 sim_asynch_check;
 extern int32 sim_asynch_latency;
 extern int32 sim_asynch_inst_latency;
-extern DEVICE sim_scp_dev;
-#define SIM_DBG_INIT        0x00200000      /* initialization activities */
 
 /* Thread local storage */
 #if defined(thread_local)
@@ -368,6 +366,11 @@ extern DEVICE sim_scp_dev;
 
 #if !defined(SIM_SCP_PRIVATE_DONT_REPEAT)
 #define SIM_SCP_PRIVATE_DONT_REPEAT
+
+/* Internal SCP declarations */
+extern DEVICE sim_scp_dev;
+#define SIM_DBG_INIT        0x00200000      /* initialization activities */
+
 /* Expect rule */
 
 struct EXPTAB {
@@ -414,6 +417,7 @@ struct SEND {
     int32               insoff;                         /* insert offset */
     int32               extoff;                         /* extra offset */
     };
+
 #endif /* defined(SIM_SCP_PRIVATE_DONT_REPEAT) */
 
 #ifdef  __cplusplus
