@@ -7299,7 +7299,7 @@ if ((sim_scp_dev.dctrl & SIM_DBG_INIT) && sim_deb) {
     else
         strlcpy (mstring, "NULL", sizeof (mstring));
     if (mptr->desc)
-        snprintf (desc, sizeof (desc), "\"%s\"", mptr->desc);
+        snprintf (desc, sizeof (desc), "\"%s\"", (char *)mptr->desc);
     else
         strlcpy (desc, "NULL", sizeof (desc));
     if (mptr->help)
