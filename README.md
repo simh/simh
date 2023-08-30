@@ -95,8 +95,11 @@ Simulator binaries for x86 Linus, x86 macOS, and Windows for all recent changes 
 - All removable devices get detached on a media unload without regard to data access format (SIMH, VHD or RAW).  
 - Various failing bugs in tape detach logic are fixed.
 - Clean building on Android Termux.
-- Proper line editing behavior on all Unix platforms.
+- Proper line editing and tab filename completion behavior on all Unix and Windows platforms.
 - Simulators with video displays have a working SCREENSHOT command.
+- VHD Support for Differencing Disks has been corrected.
+- Attach time disk container copy support between dissimilar storage formats (VHD<->SIMH).  Previously container copy operations were only supported between identical format containers (SIMH<->SIMH, and VHD<->VHD).
+- DISKINFO command provides more useful metadata information and file system verification with full support for VHD Differencing Disks.
 
 #### Changes to the PDP-11 and VAX simulators also not in the Open SIMH repo
 
@@ -121,6 +124,7 @@ Simulator binaries for x86 Linus, x86 macOS, and Windows for all recent changes 
 - PDP11 now has working support for RC and RF expandable platter based disk drives.
 - Properly set asynchronous interrupt latency in all VAX simulators.
 - MicroVAX I simulator boots from oldest MicroVMS media due to the addition of RQDX1 disk controller type.
+- MSCP Media-Id information is available for all attached disk containers.
 
 ### All relevant changes in the simh v3.12-3 release have been merged into this repo
 

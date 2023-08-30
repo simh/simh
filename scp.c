@@ -2660,8 +2660,14 @@ static const char simh_help2[] =
       " Disk Containers that have metadata will have that metadata removed and\n"
       " the container's last write time reflected in the file timestamp and the\n"
       " container's size will shrink back to the further of the file's size when\n"
-      " the metadat was added or the furthest write point in the container.\n"
-      " Disk Containers that don't have metadata will not be modified\n\n";
+      " the metadata was added or the furthest write point in the container.\n"
+      " Disk Containers that don't have metadata will not be modified\n\n"
+      "3Switches\n"
+      " Switches can be used to influence the behavior of the ZAPTYPE command\n\n"
+      "4-z\n"
+      " The -z switch will cause all zero containing sectors to be trimmed from the\n"
+      " end of the container file, even if they were present when the metadata\n"
+      " was added.\n\n";
 
 
 static CTAB cmd_table[] = {
