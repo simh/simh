@@ -87,7 +87,7 @@ on_success:
           popd
         fi
   - cmd: |
-         if NOT EXIST Development-Binaries pushd .. & git clone -q "https://github.com/simh/Development-Binaries" Development-Binaries & popd
+         if NOT EXIST ..\Development-Binaries pushd .. & git clone -q "https://github.com/simh/Development-Binaries" Development-Binaries & popd
          pushd ..\Development-Binaries & git pull origin master & popd
   - ps: |
         cd ../Development-Binaries
