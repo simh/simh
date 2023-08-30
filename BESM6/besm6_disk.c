@@ -706,6 +706,13 @@ void disk_io (int ctlr, uint32 cmd)
     GRP &= ~c->mask_grp;
 }
 
+int has_debug(int ctlr) {
+    return md_dev[ctlr*4].dctrl & DEB_OPS |
+        md_dev[ctlr*4+1].dctrl & DEB_OPS |
+        md_dev[ctlr*4+2].dctrl & DEB_OPS |
+        md_dev[ctlr*4+3].dctrl & DEB_OPS;
+}
+
 /*
  * Управление диском: команда 00 033 0023(0024).
  */
@@ -714,7 +721,7 @@ void disk_ctl (int ctlr, uint32 cmd)
     KMD *c = &controller [ctlr];
     UNIT *u = c->dev < 0 ? &md_unit[0] : &md_unit [c->dev];
 
-    if ((md_dev[ctlr].dctrl & DEB_OPS || (c->dev != -1 && u->dptr->dctrl & DEB_OPS)) && cmd & BBIT(13)) {
+    if (cmd & BBIT(13) && (has_debug(ctlr) || (u && u->dptr->dctrl & DEB_OPS))) {
         besm6_debug ("::: КМД %c: bit 13 + %04o",
                      ctlr + '3', cmd & 07777);
     }
@@ -812,18 +819,28 @@ void disk_ctl (int ctlr, uint32 cmd)
     } else if (cmd & BBIT(9)) {
         /* Group selection, LSB of track #, interrupt */
         if ((cmd & 01774) == 01400) {
+            // Understood with or without bit 13
             int prev = c->group;
             c->group = cmd & 3;
-            c->dev = (c->dev & ~030) | (c->group << 3);
-            if (u->dptr->dctrl & DEB_OPS && c->group != prev)
+            c->dev = -1; // (c->dev & ~030) | (c->group << 3);
+            // u = &md_unit[c->dev];
+            if (has_debug(ctlr))
                 besm6_debug ("::: КМД %c: selected group %d",
                              ctlr + '3', c->group);
         }        
         GRP |= c->mask_grp;
+    } else if (cmd == 011050) {
+        // Release the currently selected group (reset back to 0),
+        // with no device selected
+        c->group = 0;
+        c->dev = -1;
+        if (has_debug(ctlr))
+            besm6_debug ("::: КМД %c: reset group", ctlr + '3');
+        GRP &= ~c->mask_grp;
+        sim_activate(&md_unit[(c-controller)*32], 20*USEC); // any unit would do
     } else if (cmd & BBIT(8)) {
         besm6_debug ("::: КМД %c: cmd = %08o\n",
                      ctlr + '3', cmd);
-
     } else {
         /* Команда, выдаваемая в КМД. */
         switch (cmd & 077) {
@@ -879,15 +896,23 @@ void disk_ctl (int ctlr, uint32 cmd)
             break;
         case 010: /* гашение PC */
 #if 1
-            if (u->dptr->dctrl & DEB_OPS)
+            if (has_debug(ctlr))
                 besm6_debug ("::: КМД %c: гашение регистра состояния",
                              ctlr + '3');
 #endif
             c->status = 0;
             break;
         case 011: /* опрос 1÷12 разрядов PC */
+            if (c->dev == -1) {
+                c->status = ~0;
+                if (has_debug(ctlr)) {
+                    besm6_debug ("::: КМД %c: status low req with no selection",
+                                 ctlr + '3');
+                }
+                break;
+            }
             c->status = 0;
-            if (c->dev != -1 && md_unit[c->dev].flags & UNIT_ATT)
+            if (md_unit[c->dev].flags & UNIT_ATT)
                 c->status = STATUS_READY;
 #if 1
             if (u->dptr->dctrl & DEB_STA)
@@ -896,6 +921,13 @@ void disk_ctl (int ctlr, uint32 cmd)
 #endif
             break;
         case 031: /* опрос 13÷24 разрядов РС */
+            if (c->dev == -1) {
+                if (has_debug(ctlr)) {
+                    besm6_debug ("::: КМД %c: status high req with no selection",
+                                 ctlr + '3');
+                }
+                break;
+            }
             c->status = 0;
             if (c->dev < 0 || md_unit[c->dev].flags & UNIT_DISABLE)
                 c->status |= STATUS_ABSENT;
@@ -936,8 +968,8 @@ int disk_state (int ctlr)
         md_dev[ctlr*4+1].dctrl & DEB_RRD ||
         md_dev[ctlr*4+2].dctrl & DEB_RRD ||
         md_dev[ctlr*4+3].dctrl & DEB_RRD)
-        besm6_debug ("::: КМД %c: опрос состояния = %04o",
-                     ctlr + '3', c->status);
+        besm6_debug ("::: КМД %c: линейка %d, опрос состояния = %04o",
+                     ctlr + '3', c->group, c->status);
     return c->status;
 }
 
@@ -964,3 +996,4 @@ int disk_errors ()
 #endif
     return disk_fail;
 }
+
