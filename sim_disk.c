@@ -6515,7 +6515,7 @@ if (1) { /* CHS Calculation */
             cylinderTimesHeads = totalSectors / sectorsPerTrack;
             }
         }
-    cylinders = cylinderTimesHeads / heads;
+    cylinders = (totalSectors + sectorsPerTrack * heads - 1) / (sectorsPerTrack * heads);
     Footer.DiskGeometry = NtoHl ((cylinders<<16)|(heads<<8)|sectorsPerTrack);
     }
 Footer.Checksum = NtoHl (CalculateVhdFooterChecksum(&Footer, sizeof(Footer)));
