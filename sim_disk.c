@@ -77,6 +77,7 @@ Internal routines:
    sim_vhd_disk_create_diff  platform independent create differencing virtual disk file
    sim_vhd_disk_close        platform independent close virtual disk file
    sim_vhd_disk_size         platform independent virtual disk size
+   sim_vhd_CHS               platform independent virtual disk size CHS value
    sim_vhd_disk_parent_path  platform independent differencing virtual disk parent path
    sim_vhd_disk_rdsect       platform independent read virtual disk sectors
    sim_vhd_disk_wrsect       platform independent write virtual disk sectors
@@ -374,12 +375,15 @@ static FILE *sim_vhd_disk_merge (const char *szVHDPath, char **ParentVHD);
 static int sim_vhd_disk_close (FILE *f);
 static void sim_vhd_disk_flush (FILE *f);
 static t_offset sim_vhd_disk_size (FILE *f);
+static uint32 sim_vhd_CHS (FILE *f);
 static const char *sim_vhd_disk_parent_path (FILE *f);
 static t_stat sim_vhd_disk_rdsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectsread, t_seccnt sects);
 static t_stat sim_vhd_disk_wrsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectswritten, t_seccnt sects);
 static t_stat sim_vhd_disk_clearerr (UNIT *uptr);
 static t_stat sim_vhd_disk_set_dtype (FILE *f, const char *dtype, uint32 SectorSize, uint32 xfer_encode_size, uint32 media_id, const char *device_name, uint32 data_width);
-static const char *sim_vhd_disk_get_dtype (FILE *f, uint32 *SectorSize, uint32 *xfer_encode_size, char sim_name[64], time_t *creation_time, uint32 *media_id, char device_name[16], uint32 *data_width);
+static const char *sim_vhd_disk_get_dtype (FILE *f, uint32 *SectorSize, uint32 *xfer_encode_size, char sim_name[64], time_t *creation_time, uint32 *media_id, char device_name[16], uint32 *data_width, uint32 *vhd_chs);
+static uint32 sim_SectorsToCHS (uint32 totalSectors);
+static uint32 sim_CHStoSectors (uint32 CHS);
 static t_stat sim_os_disk_implemented_raw (void);
 static FILE *sim_os_disk_open_raw (const char *rawdevicename, const char *openmode);
 static int sim_os_disk_close_raw (FILE *f);
@@ -2882,21 +2886,29 @@ switch (DK_GET_FMT (uptr)) {                            /* case on format */
     case DKUF_F_VHD:                                    /* VHD format */
         if (1) {
             time_t creation_time;
+            uint32 vhd_chs;
 
             /* Construct a pseudo simh disk footer*/
             memcpy (f->Signature, "simh", 4);
             f->FooterVersion = FOOTER_VERSION;
             memset (f->DriveType, 0, sizeof (f->DriveType));
-            strlcpy ((char *)f->DriveType, sim_vhd_disk_get_dtype (uptr->fileref, &f->SectorSize, &f->ElementEncodingSize, (char *)f->CreatingSimulator, &creation_time, &f->MediaID, (char *)f->DeviceName, &f->DataWidth), sizeof (f->DriveType));
+            strlcpy ((char *)f->DriveType, sim_vhd_disk_get_dtype (uptr->fileref, &f->SectorSize, &f->ElementEncodingSize, (char *)f->CreatingSimulator, &creation_time, &f->MediaID, (char *)f->DeviceName, &f->DataWidth, &vhd_chs), sizeof (f->DriveType));
+            if (ctx->sector_size == 0)
+                ctx->sector_size = f->SectorSize;
+            if (ctx->media_id == 0)
+                ctx->media_id = f->MediaID;
+            if (ctx->xfer_encode_size == 0)
+                ctx->xfer_encode_size = f->ElementEncodingSize;
             f->DataWidth = NtoHl (f->DataWidth);
             f->SectorSize = NtoHl (f->SectorSize);
             f->MediaID = NtoHl (f->MediaID);
             f->ElementEncodingSize = NtoHl (f->ElementEncodingSize);
             if ((f->SectorSize == 0)                  ||      /* Old or mangled format VHD footer */
                 (NtoHl (f->SectorSize) == 0x00020000) ||
-                (NtoHl (f->MediaID) == 0)) {
-                sim_vhd_disk_set_dtype (uptr->fileref, uptr->drvtyp->name, ctx->sector_size, ctx->xfer_encode_size, ctx->media_id, uptr->dptr->name, uptr->dptr->dwidth);
-                sim_vhd_disk_get_dtype (uptr->fileref, &f->SectorSize, &f->ElementEncodingSize, (char *)f->CreatingSimulator, NULL, &f->MediaID, (char *)f->DeviceName, &f->DataWidth);
+                (NtoHl (f->MediaID) == 0)             ||
+                (vhd_chs != sim_SectorsToCHS ((uint32)(sim_vhd_disk_size (uptr->fileref)/ctx->sector_size)))) {
+                sim_vhd_disk_set_dtype (uptr->fileref, uptr->drvtyp ? uptr->drvtyp->name : f->DriveType, ctx->sector_size, ctx->xfer_encode_size, ctx->media_id, uptr->dptr->name, uptr->dptr->dwidth);
+                sim_vhd_disk_get_dtype (uptr->fileref, &f->SectorSize, &f->ElementEncodingSize, (char *)f->CreatingSimulator, NULL, &f->MediaID, (char *)f->DeviceName, &f->DataWidth, NULL);
                 f->DataWidth = NtoHl (f->DataWidth);
                 f->SectorSize = NtoHl (f->SectorSize);
                 f->MediaID = NtoHl (f->MediaID);
@@ -3541,7 +3553,7 @@ else {                                                  /* normal */
 if ((DK_GET_FMT (uptr) == DKUF_F_VHD) || (ctx->footer)) {
     uint32 container_sector_size = 0, container_xfer_encode_size = 0, container_sectors = 0;
     char created_name[64];
-    const char *container_dtype = ctx->footer ? (char *)ctx->footer->DriveType : sim_vhd_disk_get_dtype (uptr->fileref, &container_sector_size, &container_xfer_encode_size, created_name, NULL, NULL, NULL, NULL);
+    const char *container_dtype = ctx->footer ? (char *)ctx->footer->DriveType : sim_vhd_disk_get_dtype (uptr->fileref, &container_sector_size, &container_xfer_encode_size, created_name, NULL, NULL, NULL, NULL, NULL);
 
     if (ctx->footer) {
         container_sector_size = NtoHl (ctx->footer->SectorSize);
@@ -3990,9 +4002,9 @@ if ((uptr->flags & UNIT_RO) == 0) {     /* Opened Read/Write? */
         }
     sim_quiet = saved_quiet;
     }
-if (dtype && ((uptr->drvtyp == NULL) ? TRUE : ((uptr->drvtyp->flags & DRVFL_DETAUTO) == 0)) &&
-    (created                                                       || 
-     (autosized && (ctx->footer == NULL))                          || 
+if (dtype && ((uptr->drvtyp == NULL) ? TRUE : ((uptr->drvtyp->flags & DRVFL_DETAUTO) == 0)) && ((uptr->flags & DKUF_NOAUTOSIZE) == 0) &&
+    (created                                                                                  || 
+     ((ctx->footer == NULL) && (autosized || (current_unit_size == container_size)))          || 
      (!created && (ctx->container_size == 0) && (ctx->footer == NULL))))
     store_disk_footer (uptr, (uptr->drvtyp == NULL) ? dtype : uptr->drvtyp->name);
 
@@ -5356,6 +5368,11 @@ static t_offset sim_vhd_disk_size (FILE *f)
 return (t_offset)-1;
 }
 
+static uint32 sim_vhd_CHS (FILE *f)
+{
+return 0;
+}
+
 static FILE *sim_vhd_disk_parent_path (FILE *f)
 {
 return NULL;
@@ -5383,7 +5400,7 @@ static t_stat sim_vhd_disk_set_dtype (FILE *f, const char *dtype, uint32 SectorS
 return SCPE_NOFNC;
 }
 
-static const char *sim_vhd_disk_get_dtype (FILE *f, uint32 *SectorSize, uint32 *xfer_encode_size, char sim_name[64], time_t *creation_time, uint32 *media_id                f->DataWidth = NtoHl (f->DataWidth)
+static const char *sim_vhd_disk_get_dtype (FILE *f, uint32 *SectorSize, uint32 *xfer_encode_size, char sim_name[64], time_t *creation_time, uint32 *media_id, char device_name[16], uint32 *data_width, uint32 *vhd_chs)
 {
 *SectorSize = *xfer_encode_size = 0;
 return NULL;
@@ -6033,19 +6050,22 @@ memset (hVHD->Footer.DriveType, '\0', sizeof hVHD->Footer.DriveType);
 memcpy (hVHD->Footer.DriveType, dtype, ((1+strlen (dtype)) < sizeof (hVHD->Footer.DriveType)) ? (1+strlen (dtype)) : sizeof (hVHD->Footer.DriveType));
 hVHD->Footer.DriveSectorSize = NtoHl (SectorSize);
 hVHD->Footer.DriveElementEncodingSize = NtoHl (xfer_encode_size);
-hVHD->Footer.CreatingSimulator[sizeof (hVHD->Footer.CreatingSimulator) - 1] = '\0';  /* Force NUL termination */
-memset (hVHD->Footer.CreatingSimulator, 0, sizeof (hVHD->Footer.CreatingSimulator));
-strlcpy ((char *)hVHD->Footer.CreatingSimulator, sim_name, sizeof (hVHD->Footer.CreatingSimulator));
+if (hVHD->Footer.CreatingSimulator[0] == 0) {
+    memset (hVHD->Footer.CreatingSimulator, 0, sizeof (hVHD->Footer.CreatingSimulator));
+    strlcpy ((char *)hVHD->Footer.CreatingSimulator, sim_name, sizeof (hVHD->Footer.CreatingSimulator));
+    }
 hVHD->Footer.MediaId = NtoHl (media_id);
-memset (hVHD->Footer.DeviceName, 0, sizeof (hVHD->Footer.DeviceName));
-strlcpy ((char *)hVHD->Footer.DeviceName, device_name ? device_name : "", sizeof (hVHD->Footer.DeviceName));
+if (device_name) {
+    memset (hVHD->Footer.DeviceName, 0, sizeof (hVHD->Footer.DeviceName));
+    strlcpy ((char *)hVHD->Footer.DeviceName, device_name, sizeof (hVHD->Footer.DeviceName));
+    }
 hVHD->Footer.DataWidth = NtoHl (data_width);
+hVHD->Footer.DiskGeometry = NtoHl (sim_SectorsToCHS ((uint32)(NtoHll (hVHD->Footer.CurrentSize) / NtoHl (hVHD->Footer.DriveSectorSize))));
 hVHD->Footer.Checksum = 0;
 hVHD->Footer.Checksum = NtoHl (CalculateVhdFooterChecksum (&hVHD->Footer, sizeof(hVHD->Footer)));
 
 if (hVHD->Writable == 0) {
     fclose (hVHD->File);
-    sim_set_file_times (hVHD->VHDPath, statb.st_atime, statb.st_mtime);
     hVHD->File = sim_fopen (hVHD->VHDPath, "rb+");
     }
 if (NtoHl (hVHD->Footer.DiskType) == VHD_DT_Fixed) {
@@ -6095,7 +6115,7 @@ else {
 return SCPE_OK;
 }
 
-static const char *sim_vhd_disk_get_dtype (FILE *f, uint32 *SectorSize, uint32 *xfer_encode_size, char sim_name[64], time_t *creation_time, uint32 *media_id, char device_name[16], uint32 *data_width)
+static const char *sim_vhd_disk_get_dtype (FILE *f, uint32 *SectorSize, uint32 *xfer_encode_size, char sim_name[64], time_t *creation_time, uint32 *media_id, char device_name[16], uint32 *data_width, uint32 *vhd_chs)
 {
 VHDHANDLE hVHD  = (VHDHANDLE)f;
 
@@ -6113,6 +6133,8 @@ if (device_name)
     memcpy (device_name, hVHD->Footer.DeviceName, 16);
 if (data_width)
     *data_width = NtoHl (hVHD->Footer.DataWidth);
+if (vhd_chs)
+    *vhd_chs = NtoHl (hVHD->Footer.DiskGeometry);
 return (char *)(&hVHD->Footer.DriveType[0]);
 }
 
@@ -6358,6 +6380,13 @@ VHDHANDLE hVHD = (VHDHANDLE)f;
 return (t_offset)(NtoHll (hVHD->Footer.CurrentSize));
 }
 
+static uint32 sim_vhd_CHS (FILE *f)
+{
+VHDHANDLE hVHD = (VHDHANDLE)f;
+
+return NtoHl (hVHD->Footer.DiskGeometry);
+}
+
 static const char *sim_vhd_disk_parent_path (FILE *f)
 {
 VHDHANDLE hVHD = (VHDHANDLE)f;
@@ -6424,6 +6453,56 @@ _rand_uuid_gen (uuidaddr);
 }
 #endif
 
+/* CHS Calculation */
+static uint32 sim_SectorsToCHS (uint32 totalSectors)
+{
+uint32 cylinders;                                          /* Number of cylinders present on the disk */
+uint32 heads;                                              /* Number of heads present on the disk */
+uint32 sectorsPerTrack;                                    /* Sectors per track on the disk */
+uint32 cylinderTimesHeads;                                 /* Cylinders x heads */
+
+if (totalSectors > 65535 * 16 * 255)
+    totalSectors = 65535 * 16 * 255;
+
+if (totalSectors >= 65535 * 16 * 63) {
+    sectorsPerTrack = 255;
+    heads = 16;
+    cylinderTimesHeads = totalSectors / sectorsPerTrack;
+    }
+else {
+    sectorsPerTrack = 17;
+    cylinderTimesHeads = totalSectors / sectorsPerTrack;
+
+    heads = (cylinderTimesHeads + 1023) / 1024;
+
+    if (heads < 4)
+        heads = 4;
+    if (cylinderTimesHeads >= (heads * 1024) || heads > 16) {
+        sectorsPerTrack = 31;
+        heads = 16;
+        cylinderTimesHeads = totalSectors / sectorsPerTrack;
+        }
+    if (cylinderTimesHeads >= (heads * 1024)) {
+        sectorsPerTrack = 63;
+        heads = 16;
+        cylinderTimesHeads = totalSectors / sectorsPerTrack;
+        }
+    }
+cylinders = (totalSectors + sectorsPerTrack * heads - 1) / (sectorsPerTrack * heads);
+return (cylinders<<16) | (heads<<8) | sectorsPerTrack;
+}
+
+uint32 sim_CHStoSectors (uint32 CHS)
+    {
+    uint32 cylinders, heads, sectorsPerTrack;
+    
+    cylinders = CHS >>16;
+    heads = (CHS >> 8) & 0xFF;
+    sectorsPerTrack = CHS & 0xFF;
+    return cylinders * heads * sectorsPerTrack;
+    }
+
+
 static VHDHANDLE
 sim_CreateVirtualDisk(const char *szVHDPath,
                       uint32 SizeInSectors,
@@ -6478,46 +6557,7 @@ Footer.OriginalSize = NtoHll (SizeInBytes);
 Footer.CurrentSize = NtoHll (SizeInBytes);
 uuid_gen (Footer.UniqueID);
 Footer.DiskType = NtoHl (bFixedVHD ? VHD_DT_Fixed : VHD_DT_Dynamic);
-Footer.DiskGeometry = NtoHl (0xFFFF10FF);
-if (1) { /* CHS Calculation */
-    uint32 totalSectors = (uint32)(SizeInBytes/BytesPerSector);/* Total data sectors present in the disk image */
-    uint32 cylinders;                                          /* Number of cylinders present on the disk */
-    uint32 heads;                                              /* Number of heads present on the disk */
-    uint32 sectorsPerTrack;                                    /* Sectors per track on the disk */
-    uint32 cylinderTimesHeads;                                 /* Cylinders x heads */
-
-    if (totalSectors > 65535 * 16 * 255)
-        totalSectors = 65535 * 16 * 255;
-
-    if (totalSectors >= 65535 * 16 * 63) {
-        sectorsPerTrack = 255;
-        heads = 16;
-        cylinderTimesHeads = totalSectors / sectorsPerTrack;
-        }
-    else {
-        sectorsPerTrack = 17;
-        cylinderTimesHeads = totalSectors / sectorsPerTrack;
-
-        heads = (cylinderTimesHeads + 1023) / 1024;
-
-        if (heads < 4)
-            heads = 4;
-        if (cylinderTimesHeads >= (heads * 1024) || heads > 16)
-            {
-            sectorsPerTrack = 31;
-            heads = 16;
-            cylinderTimesHeads = totalSectors / sectorsPerTrack;
-            }
-        if (cylinderTimesHeads >= (heads * 1024))
-            {
-            sectorsPerTrack = 63;
-            heads = 16;
-            cylinderTimesHeads = totalSectors / sectorsPerTrack;
-            }
-        }
-    cylinders = (totalSectors + sectorsPerTrack * heads - 1) / (sectorsPerTrack * heads);
-    Footer.DiskGeometry = NtoHl ((cylinders<<16)|(heads<<8)|sectorsPerTrack);
-    }
+Footer.DiskGeometry = NtoHl (sim_SectorsToCHS ((uint32)(SizeInBytes/BytesPerSector)));
 Footer.Checksum = NtoHl (CalculateVhdFooterChecksum(&Footer, sizeof(Footer)));
 
 if (bFixedVHD) {
@@ -7649,27 +7689,30 @@ if (info->flag) {        /* zap disk type */
             highwater = (highwater + (sector_size - 1)) & (~(t_offset)(sector_size - 1));
             if (sim_switches & SWMASK ('Z'))    /* Unless -Z switch specified */
                 highwater = 0;                  /* then removes all trailing zero sectors */
-            sector_data = (uint8 *)malloc (sector_size * sizeof (*sector_data));
-            zero_sector = (uint8 *)calloc (sector_size, sizeof (*sector_data));
             container_size -= sizeof (*f);
             initial_container_size = container_size;
             stop_cpu = FALSE;
-            sim_messagef (SCPE_OK, "Trimming trailing zero containing blocks back to lbn: %u\n", (uint32)(highwater / sector_size));
-            while ((container_size > highwater) &&
-                   (!stop_cpu)) {
-                if ((sim_fseeko (container, container_size - sector_size, SEEK_SET) != 0) ||
-                    (sector_size != sim_fread (sector_data, 1, sector_size, container))   ||
-                    (0 != memcmp (sector_data, zero_sector, sector_size)))
-                    break;
-                if ((0 == (container_size % 1024*1024)))
-                    sim_messagef (SCPE_OK, "Trimming trailing zero containing blocks at lbn: %u         \r", (uint32)(container_size / sector_size));
-                container_size -= sector_size;
+            if (container_size > highwater) {
+                sector_data = (uint8 *)malloc (sector_size * sizeof (*sector_data));
+                zero_sector = (uint8 *)calloc (sector_size, sizeof (*sector_data));
+                sim_messagef (SCPE_OK, "Trimming trailing zero containing blocks back to lbn: %u\n", (uint32)(highwater / sector_size));
+                while ((container_size > highwater) &&
+                       (!stop_cpu)) {
+                    if ((sim_fseeko (container, container_size - sector_size, SEEK_SET) != 0) ||
+                        (sector_size != sim_fread (sector_data, 1, sector_size, container))   ||
+                        (0 != memcmp (sector_data, zero_sector, sector_size)))
+                        break;
+                    if ((0 == (container_size % 1024*1024)))
+                        sim_messagef (SCPE_OK, "Trimming trailing zero containing blocks at lbn: %u         \r", (uint32)(container_size / sector_size));
+                    container_size -= sector_size;
+                    }
+                free (sector_data);
+                free (zero_sector);
                 }
-            free (sector_data);
-            free (zero_sector);
             if (!stop_cpu) {
-                if (container_size == initial_container_size)
-                    sim_messagef (SCPE_OK, "No zero containing block found beyond lbn: %u          \n", (uint32)(highwater / sector_size));
+                if (container_size == initial_container_size) {
+                    sim_messagef (SCPE_OK, "The container was previously completely written with user data\n");
+                    }
                 else {
                     sim_messagef (SCPE_OK, "Last zero containing block found at lbn: %u          \n", (uint32)(container_size / sector_size));
                     sim_messagef (SCPE_OK, "Trimmed %u zero containing sectors\n", (uint32)((initial_container_size - container_size) / sector_size));
@@ -7704,6 +7747,7 @@ if (info->flag == 0) {  /* DISKINFO */
     int32 saved_switches = sim_switches;
     char indent[CBUFSIZE] = "";
 
+    memset (&device, 0, sizeof (device));
     memset (&unit, 0, sizeof (unit));
     memset (&disk_ctx, 0, sizeof (disk_ctx));
     sim_switches |= SWMASK ('E') | SWMASK ('R');   /* Must exist, Read Only */
@@ -7751,14 +7795,21 @@ if (info->flag == 0) {  /* DISKINFO */
                             indent, NtoHl (f->SectorCount), 
                             indent, _disk_tranfer_encoding (NtoHl (f->ElementEncodingSize)), 
                             indent, fmts[f->AccessFormat].name, 
-                            ((parent_path_function != NULL) && (*parent_path_function (container) == '\0')) ? "" : " - Differencing Disk", 
+                            ((parent_path_function == NULL) || (*parent_path_function (container) == '\0')) ? "" : " - Differencing Disk", 
                             indent, f->CreationTime);
+                if (ctime (&filestat->st_mtime))
+                    sim_printf ("%s   ModifyTime:          %s", indent, ctime (&filestat->st_mtime));
                 if (f->DeviceName[0] != '\0')
                     sim_printf ("%s   DeviceName:          %s\n", indent, (char *)f->DeviceName);
                 if (f->DataWidth != 0)
                     sim_printf ("%s   DataWidth:           %d bits\n", indent, NtoHl(f->DataWidth));
                 if (f->MediaID != 0)
                     sim_printf ("%s   MediaID:             0x%08X (%s)\n", indent, NtoHl(f->MediaID), sim_disk_decode_mediaid (NtoHl(f->MediaID)));
+                if (f->AccessFormat == DKUF_F_VHD) {
+                    uint32 CHS = sim_vhd_CHS (uptr->fileref);
+
+                    sim_printf ("%s   CHS:                 %u Cylinders, %u Heads, %u Sectors\n", indent, CHS >> 16, (CHS >> 8) & 0xFF, CHS & 0xFF);
+                    }
                 if (highwater_sector > 0)
                     sim_printf ("%s   HighwaterSector:     %u\n", indent, (uint32)highwater_sector);
                 sim_printf ("%sContainer Size: %s bytes\n", indent, sim_fmt_numeric ((double)ctx->container_size));
