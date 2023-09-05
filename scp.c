@@ -7743,6 +7743,11 @@ if (strcmp (ctx->LastDir, directory)) {
 local = localtime (&filestat->st_mtime);
 if (local)
     sim_printf ("%02d/%02d/%04d  %02d:%02d %s ", local->tm_mon+1, local->tm_mday, 1900+local->tm_year, local->tm_hour%12, local->tm_min, (local->tm_hour >= 12) ? "PM" : "AM");
+else {
+    local = localtime (&filestat->st_ctime);
+    if (local)
+        sim_printf ("%02d/%02d/%04d  %02d:%02d %s ", local->tm_mon+1, local->tm_mday, 1900+local->tm_year, local->tm_hour%12, local->tm_min, (local->tm_hour >= 12) ? "PM" : "AM");
+    }
 if (filestat->st_mode & S_IFDIR) {
     ++ctx->DirCount;
     ++ctx->TotalDirs;
