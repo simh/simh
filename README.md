@@ -81,7 +81,7 @@ Simulator binaries for x86 Linus, x86 macOS, and Windows for all recent changes 
 - Fix occasional hang of IBM1130 simulator while building with Visual Studio.
 - Building with the simh makefile can optionally compile each source file separately and store the compiled result.   This approach lends itself to quicker building for folks who are developing new simulators or new simulator modules.  This was requested and discussed in #697.  Invoking make with BUILD_SEPARATE=1 on the make command line or as an exported environment variable will achieve separate compiles.  Invoking make with QUIET=1 on the make command line or as an exported environment variable will summary output of activities being performed instead of full compiler commands.
 - TAPE and SCSI libraries have been extended to fully support partial record reads of fixed sized records which may contain multiple records in recorded data.  Images of this type are common for QIC tape archives generally available on bitsavers and elsewhere.  Attach time checking on simulated QIC tape devices reports possible problems that may occur.
-- Github CI Actions builds of all simulators for Linux, macOS and Windows platforms.
+- Appveyor CI/CD builds of all simulators for Linux, macOS and Windows platforms.
 - All the available simulator defined environment variables are documented in the help and sim_doc document file.
 - SET CONSOLE TELNET=CONNECT will start a telnet session to the simulator console in a separate window.
 - Support for building on systems with the gameoftrees.org (got) source control system.
@@ -124,9 +124,9 @@ Simulator binaries for x86 Linus, x86 macOS, and Windows for all recent changes 
 - PDP11 now has working support for RC and RF expandable platter based disk drives.
 - Properly set asynchronous interrupt latency in all VAX simulators.
 - MicroVAX I simulator boots from oldest MicroVMS media due to the addition of RQDX1 disk controller type.
-- MSCP Media-Id information is available for all attached disk containers.
+- MSCP Media-Id information and drive geometry information is available for all attached disk containers.
 
-### All relevant changes in the simh v3.12-3 release have been merged into this repo
+### All relevant changes in the simh v3.12-4 release have been merged into this repo
 
 ### Bill Beech has made significant enhancements and bug fixes to the SWTP simulators along with a new disk controller from Roberto Sancho Villa
 
