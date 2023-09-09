@@ -258,7 +258,7 @@ x  RD33 17      7       1170    ?       ?       ?       138565
 
    RA60 42(+1)  6       1600    6       1       1008    400176
 x  RA70 33(+1)  11      1507+   11      1       ?       547041
-   RA80 31      14      546      ?      ?       ?       237212
+   RA80 31      14      559      ?      ?       ?       237212
    RA81 51(+1)  14      1258    14      1       2856    891072
    RA82 57(+1)  15      1435    15      1       3420    1216665
    RA71 51(+1)  14      1921    14      1       1428    1367310         
@@ -573,7 +573,7 @@ x  RA73 70(+1)  21      2667+   21      1       ?       3920490
 
 #define RA80_SECT       31                              /* +1 spare/track */
 #define RA80_SURF       14
-#define RA80_CYL        546                             /*  */
+#define RA80_CYL        559                             /* Taken from RM80  */
 #define RA80_TPG        RA80_SURF
 #define RA80_GPC        1
 #define RA80_XBN        0                               /*  */
@@ -655,13 +655,13 @@ x  RA73 70(+1)  21      2667+   21      1       ?       3920490
 
 #define RF35_SECT       57                              /* +1 spare/track */
 #define RF35_SURF       14
-#define RF35_CYL        1861                            /* 0-1860 user */
+#define RF35_CYL        2086                            /* 0-1860 user */
 #define RF35_TPG        RF35_SURF
 #define RF35_GPC        1
-#define RF35_XBN        1456                            /* cyl 1917-1918? */
-#define RF35_DBN        1456                            /* cyl 1919-1920? */
-#define RF35_LBN        1664628                         /* 57*14*1861 */
-#define RF35_RCTS       1428                            /* cyl 1915-1916? */
+#define RF35_XBN        1917                            /* cyl 1917-1918? */
+#define RF35_DBN        1919                            /* cyl 1919-1920? */
+#define RF35_LBN        1664628                         /* 57*14*2086 */
+#define RF35_RCTS       1915                            /* cyl 1915-1916? */
 #define RF35_RCTC       1
 #define RF35_RBN        26810                           /* 1 *14*1915 */
 #define RF35_MOD        27
@@ -2286,6 +2286,7 @@ t_bool rq_dte (MSC *cp, UNIT *uptr, uint16 err)
 {
 uint16 pkt, tpkt;
 uint16 lu, ccyl, csurf, csect;
+uint32 dcyls;   /* drive cylinders computed to accomodate RAUSER variable drive size */
 uint32 lbn, t;
 
 sim_debug (DBG_TRC, rq_devmap[cp->cnum], "rq_dte\n");
@@ -2297,11 +2298,12 @@ if (!rq_deqf (cp, &pkt))                                /* get log pkt */
 tpkt = uptr->cpkt;                                      /* rw pkt */
 lu = cp->pak[tpkt].d[CMD_UN];                           /* unit # */
 lbn = GETP32 (tpkt, RW_WBLL);                           /* recent LBN */
+dcyls = (uint32)((uptr->capac + (uptr->drvtyp->sect * uptr->drvtyp->surf) - 1) / (uptr->drvtyp->sect * uptr->drvtyp->surf));
 if (uptr->drvtyp->flags & RQDF_SDI)                     /* SDI? ovhd @ end */
     t = 0;
 else t = (uptr->drvtyp->xbn + uptr->drvtyp->dbn) /      /* ovhd cylinders */
     (uptr->drvtyp->sect * uptr->drvtyp->surf);
-ccyl = (uint16)(t + (lbn / uptr->drvtyp->cyl));         /* curr real cyl */
+ccyl = (uint16)(t + (lbn / dcyls));                 /* curr real cyl */
 t = lbn % uptr->drvtyp->cyl;                            /* trk relative blk */
 csurf = (uint16)(t / uptr->drvtyp->surf);               /* curr surf */
 csect = (uint16)(t % uptr->drvtyp->surf);               /* curr sect */

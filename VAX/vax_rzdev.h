@@ -37,7 +37,7 @@
 #define RZ23_LBN        204864
 #define RZ23_SECTS      33
 #define RZ23_SURFS      4
-#define RZ23_CYLS       776
+#define RZ23_CYLS       1552
 #define RZ23_MANU       "DEC"
 #define RZ23_DESC       "RZ23     (C) DEC"
 #define RZ23_REV        "0A18"
