@@ -31,8 +31,6 @@
 #endif
 
 #if (NUM_DEVS_TEN11 > 0)
-#include <fcntl.h>
-#include <sys/types.h>
 
 /* Rubin 10-11 pager. */
 static uint64 ten11_pager[256];
