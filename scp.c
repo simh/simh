@@ -3059,8 +3059,20 @@ sim_on_inherit = sim_switches & SWMASK ('O');           /* -o means inherit on s
 sim_init_sock ();                                       /* init socket capabilities */
 AIO_INIT;                                               /* init Asynch I/O */
 sim_finit ();                                           /* init fio package */
-sim_disk_init ();                                       /* init disk package */
-sim_tape_init ();                                       /* init tape package */
+if (sim_disk_init () != SCPE_OK) {                      /* init disk package */
+    fprintf (stderr, "Fatal sim_disk initialization error\n");
+    if (sim_ttisatty())
+        read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
+    free (targv);
+    return EXIT_FAILURE;
+    }
+if (sim_tape_init () != SCPE_OK) {                      /* init tape package */
+    fprintf (stderr, "Fatal sim_tape initialization error\n");
+    if (sim_ttisatty())
+        read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
+    free (targv);
+    return EXIT_FAILURE;
+    }
 sim_exp_initialize ();                                  /* init expect package regex support */
 if ((argc > 2) && 
     (sim_strcasecmp (argv[1], "CheckSourceCode") == 0)) {
