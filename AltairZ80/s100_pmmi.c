@@ -297,7 +297,7 @@ static t_stat pmmi_reset(DEVICE *dptr)
 static t_stat pmmi_svc(UNIT *uptr)
 {
     int32 c,s,ireg2;
-    t_stat r;
+    t_stat r = SCPE_OK;
     uint32 ms;
 
     /* Check for new incoming connection */
@@ -358,12 +358,14 @@ static t_stat pmmi_svc(UNIT *uptr)
     /* TX data */
     if (pmmi_ctx.txp) {
         if (uptr->flags & UNIT_ATT) {
-            if (!(pmmi_ctx.ireg2 & PMMI_CTS)) {    /* Active low */
+            /*
+            ** If CTS active low, send byte
+            ** otherwise, toss character
+            */
+            if (!(pmmi_ctx.ireg2 & PMMI_CTS)) {
                 r = tmxr_putc_ln(pmmi_ctx.tmln, pmmi_ctx.oreg1);
-                pmmi_ctx.txp = 0;               /* Reset TX Pending */
-            } else {
-                r = SCPE_STALL;
             }
+            pmmi_ctx.txp = 0;               /* Reset TX Pending */
         } else {
             r = sim_putchar(pmmi_ctx.oreg1);
             pmmi_ctx.txp = 0;               /* Reset TX Pending */
@@ -558,27 +560,12 @@ static t_stat pmmi_config_line(UNIT *uptr)
 
     sprintf(config, "%d-%c%c%c", pmmi_ctx.baud, b,p,s);
 
+    sim_debug(STATUS_MSG, uptr->dptr, "setting port configuration to '%s'.\n", config);
+
     r = tmxr_set_config_line(pmmi_ctx.tmln, config);
 
-    sim_debug(STATUS_MSG, uptr->dptr, "port configuration set to '%s'.\n", config);
-
-    /*
-    ** AltairZ80 and TMXR refuse to want to play together
-    ** nicely when the CLOCK register is set to anything
-    ** other than 0.
-    **
-    ** This work-around is for those of us that may wish
-    ** to run irrelevant, old software, that use TMXR and
-    ** rely on some semblance of timing (Remote CP/M, BYE,
-    ** RBBS, PCGET/PUT, Xmodem, MEX, Modem7, or most
-    ** other communications software), on contemporary
-    ** hardware.
-    **
-    ** Serial ports are self-limiting and sockets will run
-    ** at the clocked CPU speed.
-    */
-    pmmi_ctx.tmln->txbps = 0;   /* Get TMXR's rate-limiting out of our way */
-    pmmi_ctx.tmln->rxbps = 0;   /* Get TMXR's rate-limiting out of our way */
+    pmmi_ctx.tmln->txbps = 0;   /* Get TMXR out of our way */
+    pmmi_ctx.tmln->rxbps = 0;   /* Get TMXR out of our way */
 
     return r;
 }
@@ -702,15 +689,15 @@ static int32 pmmi_reg3(int32 io, int32 data)
         /* Set/Clear DTR */
         s = TMXR_MDM_DTR | ((pmmi_dev.units[0].flags & UNIT_PMMI_RTS) ? TMXR_MDM_RTS : 0);
         if (data & PMMI_DTR) {
+            sim_debug(STATUS_MSG, &pmmi_dev, "setting DTR HIGH.\n");
             tmxr_set_get_modem_bits(pmmi_ctx.tmln, s, 0, NULL);
             if (pmmi_ctx.oreg0 & PMMI_SH) {
                 pmmi_ctx.ireg2 &= ~PMMI_AP;   /* Answer Phone Bit (active low) */
             }
-            sim_debug(STATUS_MSG, &pmmi_dev, "set DTR HIGH.\n");
         } else {
+            sim_debug(STATUS_MSG, &pmmi_dev, "setting DTR LOW.\n");
             tmxr_set_get_modem_bits(pmmi_ctx.tmln, 0, s, NULL);
             pmmi_ctx.ireg2 |= PMMI_AP;
-            sim_debug(STATUS_MSG, &pmmi_dev, "set DTR LOW.\n");
         }
     }
     return 0x00;

@@ -547,6 +547,10 @@ static MTAB cpu_mod[] = {
         NULL, "Sets CPU switcher port for 8080 / Z80 / 8086"   },
     { UNIT_CPU_SWITCHER,    0,                  "NOSWITCHER",   "NOSWITCHER",   &cpu_reset_switcher, &cpu_show_switcher,
         NULL, "Resets CPU switcher port for 8080 / Z80 / 8086" },
+    { UNIT_CPU_PO,     UNIT_CPU_PO,              "PO",          "PO",           NULL, NULL,
+        NULL, "Enable programmed output messages"     },
+    { UNIT_CPU_PO,          0,                   "NOPO",        "NOPO",         NULL, NULL,
+        NULL, "Disable programmed output messages"             },
     { MTAB_XTD | MTAB_VDV,  0,                  NULL,           "AZ80",         &cpu_set_ramtype,
         NULL, NULL, "Sets the RAM type to AltairZ80 RAM for 8080 / Z80 / 8086"  },
     { MTAB_XTD | MTAB_VDV,  1,                  NULL,           "HRAM",         &cpu_set_ramtype,
@@ -2352,9 +2356,6 @@ static t_stat sim_instr_mmu (void) {
         }
 
         PCX = PC;
-        INCR(1);
-
-        op = RAM_PP(PC);
 
         /* 8080 INT/Z80 Interrupt Mode 0
            Instruction to execute (ex. RST0-7) is on the data bus
@@ -2377,6 +2378,9 @@ static t_stat sim_instr_mmu (void) {
 
             sim_debug(INT_MSG, &cpu_dev, ADDRESS_FORMAT
                 " INT(mode=0 vectorInterrupt=%X intVector=%d op=%02X)\n", PCX, vectorInterrupt, intVector, op);
+        } else {
+            INCR(1);
+            op = RAM_PP(PC);
         }
 
         switch(op) {

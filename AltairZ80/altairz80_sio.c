@@ -1168,7 +1168,17 @@ int32 nulldev(const int32 port, const int32 io, const int32 data) {
 }
 
 int32 sr_dev(const int32 port, const int32 io, const int32 data) {
-    return io == 0 ? SR : 0;
+    if (io == 0) {
+        return SR;
+    }
+
+    /* Simulate IMSAI functionality of displaying the A */
+    /* register on the Programmed Output front panel LEDs */
+    if (cpu_unit.flags & UNIT_CPU_PO) {
+        sim_printf("PO: %02X\n", data & 0xff);
+    }
+
+    return 0;
 }
 
 static int32 toBCD(const int32 x) {
