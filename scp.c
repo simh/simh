@@ -5552,7 +5552,7 @@ else {
             else
                 addr = (t_addr) strtotv (gbuf, &gptr, sim_dfdev ? sim_dfdev->dradix : sim_dflt_dev->dradix);
             if (gbuf == gptr)                               /* not register? */
-                return SCPE_NXREG;
+                return sim_messagef (SCPE_NXREG, "Non-existant register: %s\n", gbuf);
             }
         if (*gptr != 0)                                     /* more? must be search */
             get_glyph (gptr, gbuf, 0);
@@ -10119,9 +10119,9 @@ for (gptr = gbuf, reason = SCPE_OK;
     if (strncmp (gptr, "STATE", strlen ("STATE")) == 0) {
         tptr = gptr + strlen ("STATE");
         if (*tptr && (*tptr++ != ','))
-            return SCPE_ARG;
+            return sim_messagef (SCPE_ARG, "Invalid Argument: %s\n", (tptr - 1));
         if ((lowr = sim_dfdev->registers) == NULL)
-            return SCPE_NXREG;
+            return sim_messagef (SCPE_NXREG, "Non existant register: %s\n", tptr);
         for (highr = lowr; highr->name != NULL; highr++) ;
         sim_switches = sim_switches | SIM_SW_HIDE;
         reason = exdep_reg_loop (ofile, sim_schrptr, flag, cptr,
@@ -10139,21 +10139,21 @@ for (gptr = gbuf, reason = SCPE_OK;
         if ((*tptr == '-') || (*tptr == ':')) {
             highr = find_reg (tptr + 1, &tptr, tdptr);
             if (highr == NULL)
-                return SCPE_NXREG;
+                return sim_messagef (SCPE_NXREG, "Non existant register: %s\n", tptr + 1);
             }
         else {
             highr = lowr;
             if (*tptr == '[') {
                 if (lowr->depth <= 1)
-                    return SCPE_ARG;
+                    return sim_messagef (SCPE_ARG, "Invalid register depth specification: %s\n", tptr);
                 tptr = get_range (NULL, tptr + 1, &low, &high,
                     10, lowr->depth - 1, ']');
                 if (tptr == NULL)
-                    return SCPE_ARG;
+                    return sim_messagef (SCPE_ARG, "Invalid register depth specification: %s\n", tptr);
                 }
             }
         if (*tptr && (*tptr++ != ','))
-            return SCPE_ARG;
+            return sim_messagef (SCPE_ARG, "Invalid Argument: %s\n", (tptr - 1));
         reason = exdep_reg_loop (ofile, sim_schrptr, flag, cptr,
             lowr, highr, (uint32) low, (uint32) high);
         if ((flag & EX_E) && (!sim_oline) && (sim_log && (ofile == stdout)))
@@ -10173,9 +10173,9 @@ for (gptr = gbuf, reason = SCPE_OK;
         (((sim_dfunit->capac == 0) || (flag == EX_E))? 0:
         sim_dfunit->capac - sim_dfdev->aincr), 0);
     if (tptr == NULL)
-        return (tstat ? tstat : SCPE_ARG);
+        return (tstat ? tstat : sim_messagef (SCPE_ARG, "Invalid argument: %s\n", gptr));
     if (*tptr && (*tptr++ != ','))
-        return SCPE_ARG;
+        return sim_messagef (SCPE_ARG, "Invalid Argument: %s\n", (tptr - 1));
     reason = exdep_addr_loop (ofile, sim_schaptr, flag, cptr, low, high,
         sim_dfdev, sim_dfunit);
     if ((flag & EX_E) && (!sim_oline) && (sim_log && (ofile == stdout)))
