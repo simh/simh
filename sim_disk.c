@@ -7412,7 +7412,10 @@ for (i = 0; NULL != (dptr = sim_devices[i]); i++) {
         if (drive[drives].name_alias != NULL)
             ++aliases;
         /* Validate Geometry parameters */
-        if (((drive[drives].size & DRVFL_SETSIZE) == 0) &&
+        if (((drive[drives].flags & DRVFL_SETSIZE) == 0) &&
+            ((DRVFL_GET_IFTYPE(&drive[drives]) != DRVFL_TYPE_SCSI) ||
+             (drive[drives].devtype != SCSI_TAPE)) &&
+            ((drive[drives].flags & DRVFL_QICTAPE) == 0) &&
             (drive[drives].size > (drive[drives].sect * drive[drives].surf * drive[drives].cyl))) {
             stat = sim_messagef (SCPE_IERR, "Device %s drive type %s has unreasonable geometry values:\n", 
                                             dptr->name, drive[drives].name);
@@ -8044,7 +8047,7 @@ fprintf (st, "%s", uptr->drvtyp->name);
 if ((uptr->flags & UNIT_ATT) != 0) {
     if (sim_disk_get_mediaid (uptr))
         fprintf (st, ", MediaID=(%s)", sim_disk_decode_mediaid (sim_disk_get_mediaid (uptr)));
-    fprintf (st, "%ssectorspertrack=%u, heads=%u, cylinders=%u, sectorsize=%u", SEP,
+    fprintf (st, "%ssectors=%u, heads=%u, cylinders=%u, sectorsize=%u", SEP,
                 uptr->drvtyp->sect, uptr->drvtyp->surf, uptr->drvtyp->cyl, uptr->drvtyp->sectsize);
     toks += 3;
     if (sim_switches & SWMASK ('D')) {

@@ -215,11 +215,11 @@ struct DRVTYP {
 #define DRVFL_QICTAPE   (1u << DRVFL_V_QICTAPE) /* drive is a QIC (Quarter Inch Cartridge) tape */
 
 /* DRVTYP Initializer for SCSI disk and/or tape */
-#define DRV_SCSI(typ, pq, ver, rmv, bsz, lbn, man, prd, rev, nm, gap, txt) \
-    46, 9, 1549, lbn, nm, bsz,                                             \
-    DRVFL_TYPE_SCSI | ((rmv == TRUE) ? DRVFL_RMV|DRVFL_QICTAPE : 0),       \
-    NULL, 0, 0, NULL, txt,                                                 \
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,                                          \
+#define DRV_SCSI(typ, pq, ver, rmv, bsz, sect, surf, cyl, lbn, man, prd, rev, nm, gap, txt) \
+    sect, surf, cyl, lbn, nm, bsz,                                                          \
+    DRVFL_TYPE_SCSI | ((rmv == TRUE) ? DRVFL_RMV|DRVFL_QICTAPE : 0),                        \
+    NULL, 0, 0, NULL, txt,                                                                  \
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,                                                           \
     typ, pq, ver, man, prd, rev, gap
 
 #define DRV_MINC       512                             /* min cap LBNs */

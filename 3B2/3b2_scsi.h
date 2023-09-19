@@ -140,6 +140,9 @@
 #define SD155_PQUAL      0x00
 #define SD155_SCSI       1
 #define SD155_BLK        512
+#define SD155_SECT       35
+#define SD155_SURF       9
+#define SD155_CYL        964
 #define SD155_LBN        303660
 #define SD155_TEXT       "Set 155MB Disk Type"
 #define SD155_MANU       "AT&T"
@@ -150,6 +153,9 @@
 #define SD300_PQUAL      0x00
 #define SD300_SCSI       1
 #define SD300_BLK        512
+#define SD300_SECT       43
+#define SD300_SURF       9
+#define SD300_CYL        1515
 #define SD300_LBN        585937
 #define SD300_TEXT       "Set 300MB Disk Type"
 #define SD300_MANU       "AT&T"
@@ -160,6 +166,9 @@
 #define SD327_PQUAL      0x00
 #define SD327_SCSI       1
 #define SD327_BLK        512
+#define SD327_SECT       46
+#define SD327_SURF       9
+#define SD327_CYL        1547
 #define SD327_LBN        640458
 #define SD327_TEXT       "Set 327MB Disk Type"
 #define SD327_MANU       "AT&T"
@@ -170,6 +179,9 @@
 #define SD630_PQUAL      0x00
 #define SD630_SCSI       1
 #define SD630_BLK        512
+#define SD630_SECT       56
+#define SD630_SURF       16
+#define SD630_CYL        1447
 #define SD630_LBN        1296512
 #define SD630_TEXT       "Set 630MB Disk Type"
 #define SD630_MANU       "AT&T"
@@ -188,12 +200,14 @@
 
 #define HA_DISK(d)      {    DRV_SCSI(                       \
         SCSI_DISK, d##_PQUAL, d##_SCSI,  FALSE,     d##_BLK, \
+        d##_SECT,  d##_SURF,  d##_CYL,                       \
         d##_LBN,   d##_MANU,  d##_DESC,  d##_REV,   #d,   0, \
         d##_TEXT)                                            \
     }
 
 #define HA_TAPE(d)      {    DRV_SCSI(                       \
         SCSI_TAPE, d##_PQUAL, d##_SCSI,  TRUE,      d##_BLK, \
+        0,         0,         0,                             \
         d##_LBN,   d##_MANU,  d##_DESC,  d##_REV,   #d,   0, \
         d##_TEXT)                                            \
     }
