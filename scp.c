@@ -10173,7 +10173,7 @@ for (gptr = gbuf, reason = SCPE_OK;
         (((sim_dfunit->capac == 0) || (flag == EX_E))? 0:
         sim_dfunit->capac - sim_dfdev->aincr), 0);
     if (tptr == NULL)
-        return (tstat ? tstat : sim_messagef (SCPE_ARG, "Invalid argument: %s\n", gptr));
+        return (tstat ? tstat : sim_messagef (SCPE_ARG, "Non existant register: %s\n", gptr));
     if (*tptr && (*tptr++ != ','))
         return sim_messagef (SCPE_ARG, "Invalid Argument: %s\n", (tptr - 1));
     reason = exdep_addr_loop (ofile, sim_schaptr, flag, cptr, low, high,
