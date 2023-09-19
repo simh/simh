@@ -10144,12 +10144,14 @@ for (gptr = gbuf, reason = SCPE_OK;
         else {
             highr = lowr;
             if (*tptr == '[') {
+                const char *stptr = tptr;
+
                 if (lowr->depth <= 1)
                     return sim_messagef (SCPE_ARG, "Invalid register depth specification: %s\n", tptr);
                 tptr = get_range (NULL, tptr + 1, &low, &high,
                     10, lowr->depth - 1, ']');
                 if (tptr == NULL)
-                    return sim_messagef (SCPE_ARG, "Invalid register depth specification: %s\n", tptr);
+                    return sim_messagef (SCPE_ARG, "Invalid register depth specification: %s\n", stptr);
                 }
             }
         if (*tptr && (*tptr++ != ','))
