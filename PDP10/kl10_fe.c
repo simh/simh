@@ -1793,7 +1793,7 @@ t_stat dtei_svc (UNIT *uptr)
     }
 
     /* If Monitor input, place in buffer */
-    if ((optr->STATUS & (DTE_SEC|DTE_MON)) == (DTE_SEC|DTE_MON) &&
+    if ((optr->STATUS & (DTE_SEC|DTE_MON)) != 0 &&
          not_empty(&cty_in) && M[SEC_DTMTI + base] == 0) {
         ch = cty_in.buff[cty_in.out_ptr];
         inco(&cty_in);
