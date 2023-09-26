@@ -6598,6 +6598,9 @@ unasign:
                   if ((IR & 04) == 0)
                       break;
                   goto ldb_ptr;
+              } else {
+                  if ((IR & 04) == 0)
+                      break;
               }
               /* Fall through */
 
@@ -8834,19 +8837,6 @@ jrstf:
                   break;
               }
 
-              /* Check if access to register */
-#if KL
-              if (AB < 020 && ((QKLB &&
-                      (glb_sect == 0 || sect == 0 || (glb_sect && sect == 1))) || !QKLB)) {
-                  AR = AB; /* direct map */
-                  if (flag1)                 /* U */
-                     AR |= SMASK;            /* BIT0 */
-                  AR |= BIT2|BIT3|BIT4|BIT8;
-                  set_reg(AC, AR);
-                  break;
-              }
-#endif
-
               /* Handle KI paging odditiy */
               if (!flag1 && !t20_page && (f & 0740) == 0340) {
                   /* Pages 340-377 via UBT */
@@ -10904,7 +10894,7 @@ skip_op:
     case 0774: case 0775: case 0776: case 0777:
 #if KI | KL
               if (!pi_cycle && ((((FLAGS & (USER|USERIO)) == USER) && (IR & 040) == 0)
-                    || ((FLAGS & (USER|PUBLIC)) == PUBLIC))) {
+                    || (((FLAGS & (USER|PUBLIC)) == PUBLIC) && (IR & 076) != 0))) {
 
 #elif PDP6
               if ((FLAGS & USER) != 0 && user_io == 0 && !pi_cycle) {
@@ -12235,7 +12225,7 @@ last:
             /* Check if I/O, then check if IRQ was raised */
             if ((IR & 0700) == 0700) {
                 if (check_irq_level()) {
-                   pi_vect = 040 | (pi_enc << 1) | maoff;
+                    pi_vect = 040 | (pi_enc << 1) | maoff;
                 }
             }
 #endif
