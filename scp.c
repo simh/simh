@@ -3397,7 +3397,7 @@ t_stat set_prompt (int32 flag, CONST char *cptr)
 char gbuf[CBUFSIZE], *gptr;
 
 if ((!cptr) || (*cptr == '\0'))
-    return SCPE_ARG;
+    return SCPE_IERR;
 
 cptr = get_glyph_nc (cptr, gbuf, '"');                  /* get quote delimited token */
 if (gbuf[0] == '\0') {                                  /* Token started with quote */
@@ -4313,7 +4313,7 @@ if ((*cptr == '"') || (*cptr == '\'')) {
     if (*cptr != '\0')
         return SCPE_2MARG;              /* No more arguments */
     if (SCPE_OK != sim_decode_quoted_string (gbuf, dbuf, &dsize))
-        return sim_messagef (SCPE_ARG, "Invalid String\n");
+        return sim_messagef (SCPE_ARG, "Invalid Quoted String: %s\n", gbuf);
     dbuf[dsize] = 0;
     cptr = (char *)dbuf;
     }
@@ -10207,7 +10207,7 @@ int32 saved_switches = sim_switches;
 if ((lowr == NULL) || (highr == NULL))
     return SCPE_IERR;
 if (lowr > highr)
-    return SCPE_ARG;
+    return sim_messagef (SCPE_ARG, "%s is > than %s\n", lowr->name, highr->name);
 for (rptr = lowr; rptr <= highr; rptr++) {
     if ((sim_switches & SIM_SW_HIDE) &&
         (rptr->flags & REG_HIDDEN))
@@ -11186,12 +11186,12 @@ uint8 *ostart = optr;
 if ((strlen(iptr) == 1) || 
     (iptr[0] != iptr[strlen(iptr)-1]) ||
     ((iptr[strlen(iptr)-1] != '"') && (iptr[strlen(iptr)-1] != '\'')))
-    return SCPE_ARG;            /* String must be quote delimited */
+    return sim_messagef (SCPE_ARG, "String must be quote delimited: %s\n", iptr);
 quote_char = *iptr++;           /* Save quote character */
 while (iptr[1]) {               /* Skip trailing quote */
     if (*iptr != '\\') {
         if (*iptr == quote_char)
-            return SCPE_ARG;    /* Imbedded quotes must be escaped */
+            return sim_messagef (SCPE_ARG, "Imbedded quotes must be escaped: %s\n", iptr);
         *(optr++) = (uint8)(*(iptr++));
         continue;
         }
@@ -11259,7 +11259,7 @@ while (iptr[1]) {               /* Skip trailing quote */
                 }
             break;
         default:
-            return SCPE_ARG;    /* Invalid escape */
+            return sim_messagef (SCPE_ARG, "Invalid escape: \\%s\n", iptr);
         }
     }
 *optr = '\0';
@@ -11743,7 +11743,7 @@ while (*cptr) {                                         /* loop through modifier
         cptr = get_glyph (cptr + 1, gbuf, 0);
         sim_ofile = sim_fopen (gbuf, "a");              /* open for append */
         if (sim_ofile == NULL) {                        /* open failed? */
-            *st = SCPE_OPENERR;
+            *st = sim_messagef (SCPE_OPENERR, "Can't open: %s - %s\n", gbuf, strerror (errno));
             return NULL;
             }
         sim_opt_out |= CMD_OPT_OF;                      /* got output file */
@@ -12300,7 +12300,7 @@ if (!buffer)
     return strlen(dbuf+d);
 *buffer = '\0';
 if (width < strlen(dbuf+d))
-    return SCPE_IOERR;
+return sim_messagef (SCPE_IOERR, "Invalid width (%u) for buffer size (%u)\n", width, (uint32)strlen(dbuf+d));
 strcpy(buffer, dbuf+d);
 return SCPE_OK;
 }
