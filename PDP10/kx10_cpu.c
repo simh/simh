@@ -446,28 +446,28 @@ UNIT cpu_unit[] = { { UDATA (&rtc_srv,
 REG cpu_reg[] = {
     { ORDATAD (PC, PC, 18, "Program Counter") },
     { ORDATAD (FLAGS, FLAGS, 18, "Flags") },
-    { ORDATAD (FM0, FM[00], 36, "Fast Memory") },       /* addr in memory */
-    { ORDATA (FM1, FM[01], 36) },                       /* modified at exit */
-    { ORDATA (FM2, FM[02], 36) },                       /* to SCP */
-    { ORDATA (FM3, FM[03], 36) },
-    { ORDATA (FM4, FM[04], 36) },
-    { ORDATA (FM5, FM[05], 36) },
-    { ORDATA (FM6, FM[06], 36) },
-    { ORDATA (FM7, FM[07], 36) },
-    { ORDATA (FM10, FM[010], 36) },
-    { ORDATA (FM11, FM[011], 36) },
-    { ORDATA (FM12, FM[012], 36) },
-    { ORDATA (FM13, FM[013], 36) },
-    { ORDATA (FM14, FM[014], 36) },
-    { ORDATA (FM15, FM[015], 36) },
-    { ORDATA (FM16, FM[016], 36) },
-    { ORDATA (FM17, FM[017], 36) },
+    { ORDATAD (FM0, FM[00], 36, "Fast Memory"), REG_VMIO },       /* addr in memory */
+    { ORDATA (FM1, FM[01], 36), REG_VMIO },                       /* modified at exit */
+    { ORDATA (FM2, FM[02], 36), REG_VMIO },                       /* to SCP */
+    { ORDATA (FM3, FM[03], 36), REG_VMIO },
+    { ORDATA (FM4, FM[04], 36), REG_VMIO },
+    { ORDATA (FM5, FM[05], 36), REG_VMIO },
+    { ORDATA (FM6, FM[06], 36), REG_VMIO },
+    { ORDATA (FM7, FM[07], 36), REG_VMIO },
+    { ORDATA (FM10, FM[010], 36), REG_VMIO },
+    { ORDATA (FM11, FM[011], 36), REG_VMIO },
+    { ORDATA (FM12, FM[012], 36), REG_VMIO },
+    { ORDATA (FM13, FM[013], 36), REG_VMIO },
+    { ORDATA (FM14, FM[014], 36), REG_VMIO },
+    { ORDATA (FM15, FM[015], 36), REG_VMIO },
+    { ORDATA (FM16, FM[016], 36), REG_VMIO },
+    { ORDATA (FM17, FM[017], 36), REG_VMIO },
 #if KL | KS
-    { BRDATA (FM, FM, 8, 36, 128)},
+    { BRDATA (FM, FM, 8, 36, 128), REG_VMIO},
 #elif KI
-    { BRDATA (FM, FM, 8, 36, 64)},
+    { BRDATA (FM, FM, 8, 36, 64), REG_VMIO},
 #else
-    { BRDATA (FM, FM, 8, 36, 16)},
+    { BRDATA (FM, FM, 8, 36, 16), REG_VMIO},
 #endif
     { ORDATAD (PIR, PIR, 8, "Priority Interrupt Request") },
     { ORDATAD (PIH, PIH, 8, "Priority Interrupt Hold") },
