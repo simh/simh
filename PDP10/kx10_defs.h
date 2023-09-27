@@ -843,6 +843,12 @@ extern UNIT     auxcpu_unit[];
 //int slave_write (t_addr addr, uint64);
 //extern UNIT     slave_unit[];
 #endif
+#if NUM_DEVS_III
+extern uint32 iii_keyboard_line (void *);
+#endif
+#if NUM_DEVS_DD
+extern uint32 dd_keyboard_line (void *);
+#endif
 
 #if PIDP10
 void pi_panel_start();

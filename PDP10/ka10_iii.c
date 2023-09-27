@@ -635,6 +635,12 @@ skip_up:
      return SCPE_OK;
 }
 
+uint32 iii_keyboard_line (void *p)
+{
+    /* III keyboards are 0 to 5, but only one is supported now. */
+    return 0;
+}
+
 t_stat iii_reset (DEVICE *dptr)
 {
     if (dptr->flags & DEV_DIS) {

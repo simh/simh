@@ -44,8 +44,8 @@
 #define CHAR              001777
 #define SHFT              000100
 #define TOP               000200
-#define META              000400
-#define CTRL              001000
+#define CTRL              000400
+#define META              001000
 
 #define STATUS            u3
 #define DATA              u4
@@ -53,6 +53,7 @@
 #define LINE              u6
 
 t_stat dkb_devio(uint32 dev, uint64 *data);
+t_stat dkb_svc(UNIT *uptr);
 int dkb_keyboard (SIM_KEY_EVENT *kev);
 t_stat dkb_reset(DEVICE *dptr);
 t_stat dkb_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
@@ -64,8 +65,7 @@ int dkb_kmod = 0;
 DIB dkb_dib = { DKB_DEVNUM, 1, dkb_devio, NULL};
 
 UNIT dkb_unit[] = {
-    {UDATA (NULL, UNIT_IDLE, 0) },
-    { 0 }
+    {UDATA (&dkb_svc, UNIT_IDLE, 0) },
     };
 
 
@@ -75,7 +75,7 @@ MTAB dkb_mod[] = {
 
 DEVICE dkb_dev = {
     "DKB", dkb_unit, NULL, dkb_mod,
-    2, 10, 31, 1, 8, 8,
+    1, 10, 31, 1, 8, 8,
     NULL, NULL, dkb_reset,
     NULL, NULL, NULL, &dkb_dib, DEV_DEBUG | DEV_DISABLE | DEV_DIS, 0, dev_debug,
     NULL, NULL, &dkb_help, NULL, NULL, &dkb_description
@@ -127,11 +127,11 @@ int dkb_modifiers (SIM_KEY_EVENT *kev)
             return 1;
         case SIM_KEY_WIN_L:
         case SIM_KEY_WIN_R:
-            dkb_kmod |= META;
+            dkb_kmod |= TOP;
             return 1;
         case SIM_KEY_ALT_L:
         case SIM_KEY_ALT_R:
-            dkb_kmod |= TOP;
+            dkb_kmod |= META;
             return 1;
         }
         return 0;
@@ -149,11 +149,11 @@ int dkb_modifiers (SIM_KEY_EVENT *kev)
             return 1;
         case SIM_KEY_WIN_L:
         case SIM_KEY_WIN_R:
-            dkb_kmod &= ~META;
+            dkb_kmod &= ~TOP;
             return 1;
         case SIM_KEY_ALT_L:
         case SIM_KEY_ALT_R:
-            dkb_kmod &= ~TOP;
+            dkb_kmod &= ~META;
             return 1;
         }
         return 0;
@@ -163,8 +163,11 @@ int dkb_modifiers (SIM_KEY_EVENT *kev)
 
 int dkb_keys (SIM_KEY_EVENT *kev, UNIT *uptr)
 {
-  if (kev->state == SIM_KEYPRESS_UP)
+  if (kev->state == SIM_KEYPRESS_UP) {
+    if (kev->key == SIM_KEY_F11)
+      vid_set_fullscreen_window (kev->vptr, !vid_is_fullscreen_window (kev->vptr));
     return 0;
+  }
 
   switch (kev->key) {
   case SIM_KEY_0:  /* ok */
@@ -181,7 +184,7 @@ int dkb_keys (SIM_KEY_EVENT *kev, UNIT *uptr)
     return 1;
   case SIM_KEY_2:
     if ((dkb_kmod & (TOP|SHFT)) == TOP)
-        uptr->DATA = (dkb_kmod | 052) & ~TOP;  /* Circle Star */
+        uptr->DATA = (dkb_kmod | 005) & ~TOP;  /* @ */
     else
         uptr->DATA = dkb_kmod | 062;
     return 1;
@@ -211,19 +214,19 @@ int dkb_keys (SIM_KEY_EVENT *kev, UNIT *uptr)
     return 1;
   case SIM_KEY_7:
     if ((dkb_kmod & (TOP|SHFT)) == TOP)
-        uptr->DATA = (dkb_kmod | 024) & ~TOP;  /* & */
+        uptr->DATA = (dkb_kmod | 024) & ~TOP;  /* & (TOP+T) */
     else
         uptr->DATA = dkb_kmod | 067;
     return 1;
   case SIM_KEY_8:  /* ok */
     if ((dkb_kmod & (TOP|SHFT)) == TOP)
-        uptr->DATA = (dkb_kmod | 052) & ~TOP;  /* * */
+        uptr->DATA = dkb_kmod | 052 | SHFT;  /* * */
     else
         uptr->DATA = dkb_kmod | 070;
     return 1;
   case SIM_KEY_9:  /* ok */
     if ((dkb_kmod & (TOP|SHFT)) == TOP)
-        uptr->DATA = dkb_kmod | 050;   /* ( */
+        uptr->DATA = dkb_kmod | 050 | SHFT;   /* ( */
     else
         uptr->DATA = dkb_kmod | 071;
     return 1;
@@ -308,38 +311,41 @@ int dkb_keys (SIM_KEY_EVENT *kev, UNIT *uptr)
   case SIM_KEY_Z:
     uptr->DATA = dkb_kmod | 032;
     return 1;
-  case SIM_KEY_BACKQUOTE:                 /* ` ~ */
+  case SIM_KEY_BACKQUOTE:
     if ((dkb_kmod & (TOP|SHFT)) == TOP)
-        uptr->DATA = dkb_kmod | 043;
+        uptr->DATA = (dkb_kmod | 025) & ~TOP;  //` (TOP+U)
     else
-        uptr->DATA = dkb_kmod | 00;
+        uptr->DATA = (dkb_kmod | 070) & ~TOP;  //~ (TOP+8)
     return 1;
   case SIM_KEY_MINUS:                     /* - not */
-    uptr->DATA = dkb_kmod | 055;
+    if ((dkb_kmod & (TOP|SHFT)) == TOP)
+        uptr->DATA = (dkb_kmod | 071) & ~TOP;  //_ (TOP+9)
+    else
+        uptr->DATA = dkb_kmod | 055;
     return 1;
   case SIM_KEY_EQUALS:                    /* = + */
     if ((dkb_kmod & (TOP|SHFT)) == TOP)
-        uptr->DATA = dkb_kmod | 053;
+        uptr->DATA = dkb_kmod | 053 | SHFT;
     else
-        uptr->DATA = (dkb_kmod | 010) & ~TOP;
+        uptr->DATA = (dkb_kmod | 010) & ~TOP;  //TOP+H
     return 1;
   case SIM_KEY_LEFT_BRACKET:              /* [ { */
     if ((dkb_kmod & (TOP|SHFT)) == TOP)
-        uptr->DATA = (dkb_kmod | 017) & ~TOP;
+        uptr->DATA = (dkb_kmod | 017) & ~TOP;  //TOP+P
     else
-        uptr->DATA = (dkb_kmod | 050) & ~TOP;;
+        uptr->DATA = (dkb_kmod | 050) & ~TOP;  //TOP+(
     return 1;
   case SIM_KEY_RIGHT_BRACKET:             /* ] } */
     if ((dkb_kmod & (TOP|SHFT)) == TOP)
-        uptr->DATA = (dkb_kmod | 020) & ~TOP;
+        uptr->DATA = (dkb_kmod | 020) & ~TOP;  //TOP+O
     else
-        uptr->DATA = (dkb_kmod | 051) & ~TOP;;
+        uptr->DATA = (dkb_kmod | 051) & ~TOP;  //TOP+)
     return 1;
   case SIM_KEY_SEMICOLON:                 /* ; : */
     if ((dkb_kmod & (TOP|SHFT)) == TOP)
-        uptr->DATA = dkb_kmod | 072 | TOP;
+        uptr->DATA = dkb_kmod | 072 | SHFT;
     else
-        uptr->DATA = dkb_kmod | 073 | TOP;
+        uptr->DATA = dkb_kmod | 073;
     return 1;
   case SIM_KEY_SINGLE_QUOTE:  /* ok */    /* ' " */
     if ((dkb_kmod & (TOP|SHFT)) == TOP)
@@ -349,35 +355,33 @@ int dkb_keys (SIM_KEY_EVENT *kev, UNIT *uptr)
     return 1;
   case SIM_KEY_BACKSLASH:  /* Ok */
     if ((dkb_kmod & (TOP|SHFT)) == TOP)    /* \ | */
-        uptr->DATA = (dkb_kmod | 053) & ~TOP;
-    else if ((dkb_kmod & (TOP|SHFT)) == SHFT) 
-        uptr->DATA = (dkb_kmod | 034) & ~TOP;
+        uptr->DATA = (dkb_kmod | 053) & ~TOP;  //TOP++
     else
-        uptr->DATA = dkb_kmod | 034 | TOP;
+        uptr->DATA = dkb_kmod | 034;
     return 1;
   case SIM_KEY_LEFT_BACKSLASH:
     uptr->DATA = dkb_kmod | 034;
     return 1;
   case SIM_KEY_COMMA: /* ok */
     if ((dkb_kmod & (TOP|SHFT)) == TOP)    /* , < */
-        uptr->DATA = (dkb_kmod | 04) & ~TOP;
+        uptr->DATA = (dkb_kmod | 04) & ~TOP;  //TOP+D
     else
-        uptr->DATA = dkb_kmod | 054 | TOP;
+        uptr->DATA = dkb_kmod | 054;
     return 1;
   case SIM_KEY_PERIOD: /* Ok */
     if ((dkb_kmod & (TOP|SHFT)) == TOP)    /* . > */
-        uptr->DATA = (dkb_kmod | 06) & ~TOP;
+        uptr->DATA = (dkb_kmod | 06) & ~TOP;  //TOP+F
     else
         uptr->DATA = dkb_kmod | 056;
     return 1;
   case SIM_KEY_SLASH: /* Ok */
     if ((dkb_kmod & (TOP|SHFT)) == TOP)    /* / ? */
-        uptr->DATA = (dkb_kmod | 056) & ~TOP;
+        uptr->DATA = (dkb_kmod | 056) & ~TOP;  //TOP+.
     else 
         uptr->DATA = dkb_kmod | 057;
     return 1;
   case SIM_KEY_ESC:
-    uptr->DATA = dkb_kmod | 042;
+    uptr->DATA = dkb_kmod | 075;  //ALT
     return 1;
   case SIM_KEY_BACKSPACE:
     uptr->DATA = dkb_kmod | 074;
@@ -394,9 +398,52 @@ int dkb_keys (SIM_KEY_EVENT *kev, UNIT *uptr)
   case SIM_KEY_SPACE:
     uptr->DATA = dkb_kmod | 040;
     return 1;
+  case SIM_KEY_F1:
+    uptr->DATA = dkb_kmod | 043;  //CALL
+    return 1;
+  case SIM_KEY_F2:
+    uptr->DATA = dkb_kmod | 042;  //ESC
+    return 1;
+  case SIM_KEY_F3:
+    uptr->DATA = dkb_kmod | 041;  //BREAK
+    return 1;
+  case SIM_KEY_F4:
+    uptr->DATA = dkb_kmod | 035;  //LINE
+    return 1;
+  case SIM_KEY_F5:
+    uptr->DATA = dkb_kmod | 046;  //FORM
+    return 1;
+  case SIM_KEY_F6:
+    uptr->DATA = dkb_kmod | 047;  //VT
+    return 1;
+  case SIM_KEY_LEFT:
+    uptr->DATA = (dkb_kmod | 012) & ~TOP;  //Left arrow (TOP+J)
+    return 1;
+  case SIM_KEY_RIGHT:
+    uptr->DATA = (dkb_kmod | 013) & ~TOP;  //Right arrow (TOP+K)
+    return 1;
+  case SIM_KEY_DOWN:
+    uptr->DATA = (dkb_kmod | 072 ) & ~TOP;  //Down arrow (TOP+;)
+    return 1;
+  case SIM_KEY_UP:
+    uptr->DATA = (dkb_kmod | 073) & ~TOP;  //Up arrow (TOP+:)
+    return 1;
   default:
     return 0;
   }
+}
+
+uint32 dkb_line (SIM_KEY_EVENT *kev)
+{
+#if NUM_DEVS_III
+    if (kev->dev == &iii_dev)
+        return iii_keyboard_line ((void *)kev->vptr);
+#endif
+#if NUM_DEVS_DD
+    if (kev->dev == &dd_dev)
+        return dd_keyboard_line ((void *)kev->vptr);
+#endif
+    return ~0U;
 }
 
 int dkb_keyboard (SIM_KEY_EVENT *kev)
@@ -405,9 +452,11 @@ int dkb_keyboard (SIM_KEY_EVENT *kev)
     if (dkb_modifiers (kev))
       return 0;
 
-    if (dkb_keys (kev, &dkb_unit[0])) {
+    dkb_unit[0].LINE = dkb_line (kev);
+    if (dkb_unit[0].LINE != ~0U && dkb_keys (kev, &dkb_unit[0])) {
       dkb_unit[0].DATA |= VALID;
       dkb_unit[0].STATUS |= DONE;
+      sim_debug(DEBUG_DETAIL, &dkb_dev, "DKB interrupt, data %o\n", dkb_unit[0].DATA);
       set_interrupt(DKB_DEVNUM, dkb_unit[0].PIA);
       return 0;
     }
@@ -415,11 +464,19 @@ int dkb_keyboard (SIM_KEY_EVENT *kev)
     return 1;
 }
 
+t_stat dkb_svc(UNIT *uptr)
+{
+    SIM_KEY_EVENT ev;
+    sim_activate_after (uptr, 10000);
+    if (vid_poll_kb (&ev) == SCPE_OK)
+        dkb_keyboard (&ev);
+    return SCPE_OK;
+}
 
 t_stat dkb_reset( DEVICE *dptr)
 {
     if ((dkb_dev.flags & DEV_DIS) == 0)
-        vid_display_kb_event_process = dkb_keyboard;
+        sim_activate_abs (dkb_unit, 0);
     dkb_kmod = SHFT|TOP|META|CTRL;
     return SCPE_OK;
 }
@@ -427,12 +484,12 @@ t_stat dkb_reset( DEVICE *dptr)
 
 t_stat dkb_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
-    fprintf (stderr, "This is the keyboard input for the Stanford III display\n");
+    fprintf (stderr, "Keyboard input for the Stanford III and Data Disc displays\n");
     return SCPE_OK;
 }
 
 const char *dkb_description (DEVICE *dptr)
 {
-    return "Keyboard scanner for III display devices";
+    return "Keyboard scanner for III and DD display devices";
 }
 #endif

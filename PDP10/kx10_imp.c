@@ -613,13 +613,13 @@ MTAB imp_mod[] = {
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, NULL, "ARP=ddd.ddd.ddd.ddd=XX:XX:XX:XX:XX:XX",
       &imp_set_arp, NULL, NULL, "Create a static ARP Entry" },
 #if KS
-    {MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "addr", "addr",  &uba_set_addr, uba_show_addr,
+    {MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "ADDR", "ADDR",  &uba_set_addr, uba_show_addr,
             NULL, "Sets address of IMP11" },
-    {MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "vect", "vect",  &uba_set_vect, uba_show_vect,
+    {MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECT", "VECT",  &uba_set_vect, uba_show_vect,
             NULL, "Sets vect of IMP11" },
-    {MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "br", "br",  &uba_set_br, uba_show_br,
+    {MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "BR", "BR",  &uba_set_br, uba_show_br,
             NULL, "Sets br of IMP11" },
-    {MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "ctl", "ctl",  &uba_set_ctl, uba_show_ctl,
+    {MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "CTL", "CTL",  &uba_set_ctl, uba_show_ctl,
             NULL, "Sets uba of IMP11" },
 #endif
     { 0 }
@@ -2352,14 +2352,14 @@ t_stat imp_set_arp (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
     cptr = get_glyph (cptr, abuf, '=');
     if (cptr && *cptr) {
         if (SCPE_OK != eth_mac_scan (&mac_addr, cptr)) /* scan string for mac, put in mac */
-            return sim_messagef(SCPE_ARG, "Invalid MAC address: %s", cptr);
+            return sim_messagef(SCPE_ARG, "Invalid MAC address: %s\n", abuf);
     } else
-        return sim_messagef(SCPE_ARG, "Invalid MAC address: %s", cptr);
+        return sim_messagef(SCPE_ARG, "MAC address empty\n");
     if (ipv4_inet_aton (abuf, (struct in_addr *)&ip)) {
         imp_arp_update(&imp_data, ip, &mac_addr, ARP_DONT_AGE);
         return SCPE_OK;
     }
-    return sim_messagef(SCPE_ARG, "Invalid IP Address: %s", abuf);
+    return sim_messagef(SCPE_ARG, "Invalid IP Address: %s\n", abuf);
 }
 
 t_stat imp_show_arp (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
