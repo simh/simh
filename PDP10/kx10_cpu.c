@@ -9012,6 +9012,7 @@ jrstf:
               if (QKLB && t20_page &&pc_sect != 0 && (BR & SMASK) == 0 && (BR & SECTM) != 0) {
                   BR = (BR + 1) & FMASK;
                   sect = (BR >> 18) & 07777;
+                  glb_sect = 1;
               } else {
                   sect = pc_sect;
 #endif
