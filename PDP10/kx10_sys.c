@@ -718,7 +718,9 @@ t_stat load_exe (FILE *fileref, int ftype)
                 }
                 fpage++;
             }
-            ma = mpage << PAG_V_PN;                     /* mem addr */
+            if ((sim_switches & SWMASK ('M')) == 0) {   /* -m? */
+                ma = mpage << PAG_V_PN;                 /* mem addr */
+            }
             for (k = 0; k < PAG_SIZE; k++, ma++) {      /* copy buf to mem */
                 if (ma > MEMSIZE)
                     return SCPE_NXM;
