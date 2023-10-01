@@ -4313,21 +4313,17 @@ int Mem_read_nopage() {
     if (adr_cond && AB == AS)
         address_conditions (0, 0);
 #endif
-    if (AB < 020) {
-        MB =  get_reg(AB);
-    } else {
-        if (AB >= MEMSIZE) {
+    if (AB >= MEMSIZE) {
 #if KL | KS
-            irq_flags |= NXM_MEM;
+        irq_flags |= NXM_MEM;
 #else
-            nxm_flag = 1;
+        nxm_flag = 1;
 #endif
-            check_apr_irq();
-            return 1;
-        }
-        sim_interval--;
-        MB = M[AB];
+        check_apr_irq();
+        return 1;
     }
+    sim_interval--;
+    MB = M[AB];
     return 0;
 }
 
@@ -4341,21 +4337,17 @@ int Mem_write_nopage() {
     if (adr_cond && AB == AS)
         address_conditions (0, 1);
 #endif
-    if (AB < 020) {
-        set_reg(AB, MB);
-    } else {
-        if (AB >= MEMSIZE) {
+    if (AB >= MEMSIZE) {
 #if KL | KS
-            irq_flags |= NXM_MEM;
+        irq_flags |= NXM_MEM;
 #else
-            nxm_flag = 1;
+        nxm_flag = 1;
 #endif
-            check_apr_irq();
-            return 1;
-        }
-        sim_interval--;
-        M[AB] = MB;
+        check_apr_irq();
+        return 1;
     }
+    sim_interval--;
+    M[AB] = MB;
     return 0;
 }
 
