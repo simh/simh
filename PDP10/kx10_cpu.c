@@ -12257,7 +12257,7 @@ last:
         pi_restore = 0;
     }
     sim_interval--;
-    if (!pi_cycle && instr_count != 0 && --instr_count == 0) {
+    if (f_load_pc && !pi_cycle && instr_count != 0 && --instr_count == 0) {
 #if ITS
         if (QITS)
             load_quantum();
