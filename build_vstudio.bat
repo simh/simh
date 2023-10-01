@@ -193,6 +193,8 @@ if not "%_VC_VER%" == "2022" goto _RunBuild
 if exist "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\MSBuild\Microsoft\VC\v150\Platforms\x64\PlatformToolsets\v141_xp" goto _DoXPConvert
 if exist "%ProgramFiles%\Microsoft Visual Studio\2022\Professional\MSBuild\Microsoft\VC\v150\Platforms\x64\PlatformToolsets\v141_xp" goto _DoXPConvert
 if exist "%ProgramFiles%\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v150\Platforms\x64\PlatformToolsets\v141_xp" goto _DoXPConvert
+goto _RunBuild
+
 :_DoXPConvert
 set _X_PROJS_CONVERTED=
 for /F "usebackq tokens=1" %%a in (`findstr /C:"<WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>" "%_BUILD_PROJECT_DIR%BuildROMs.vcxproj"`) do set _X_PROJS_CONVERTED=%%a
