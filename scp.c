@@ -3244,6 +3244,8 @@ if (docmdp) {
         snprintf(nbuf, sizeof (nbuf), "\"%s%s%ssimh.ini\"", cptr2 ? cptr2 : "", cptr, strchr (cptr, '/') ? "/" : "\\");
         stat = docmdp->action (-1, nbuf);                   /* simh.ini proc cmd file */
         }
+    else
+        stat = SCPE_OPENERR;
     if (SCPE_BARE_STATUS(stat) == SCPE_OPENERR)
         stat = docmdp->action (-1, "simh.ini");             /* simh.ini proc cmd file */
     if (*cbuf)                                              /* cmd file arg? */
