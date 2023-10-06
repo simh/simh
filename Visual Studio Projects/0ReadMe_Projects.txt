@@ -64,7 +64,9 @@ Then install Visual Studio Express Visual C++ by executing VCExpress\setup.exe
 on that DVD image.  No need to install "Silverlight Runtime" or 
 "Microsoft SQL Server 2008 Express Edition".  Depending on your OS Version 
 you may be prompted to install an older version of .NET Framework which should 
-be installed.
+be installed.  Once that install completes, you will need to run Windows-Update
+(with "Recieve updates for other Microsoft products enabled") to completely 
+update the Visual Studio environment you've just installed.
 
 Visual Studio Express 2008 will build executables that will run on all Windows 
 versions from XP onward with equivalent functionality.
