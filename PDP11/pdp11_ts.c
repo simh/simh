@@ -1194,9 +1194,10 @@ fprint_set_help (st, dptr);
 fprint_show_help (st, dptr);
 fprintf (st, "\nThe type options can be used only when a unit is not attached to a file.  The\n");
 fprintf (st, "bad block option can be used only when a unit is attached to a file.\n");
-fprintf (st, "The TS11 does not support the BOOT command.\n");
 #if defined (VM_PDP11)
 fprintf (st, "The TS11 device supports the BOOT command.\n");
+#else
+fprintf (st, "The TS11 does not support the BOOT command.\n");
 #endif
 fprint_reg_help (st, dptr);
 fprintf (st, "\nError handling is as follows:\n\n");
