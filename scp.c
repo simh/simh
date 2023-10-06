@@ -2924,6 +2924,7 @@ free (*tmpname);
 static t_stat sim_snprint_sym (char *buf, size_t bufsize, t_bool vm_flag, t_addr addr, t_value *val, UNIT *uptr, int32 sw, int32 dfltinc, int32 rdx, uint32 width, uint32 fmt)
 {
 t_stat reason;
+size_t str_width;
 size_t s;
 
 rewind (sim_tmpfile);
@@ -2931,9 +2932,15 @@ if (vm_flag || ((reason = fprint_sym (sim_tmpfile, addr, val, uptr, sw)) > 0)) {
     fprint_val (sim_tmpfile, val[0], rdx, width, fmt);
     reason = dfltinc;
     }
+str_width = (size_t)ftell(sim_tmpfile);
+if (str_width > width)
+    str_width = width;
+if (bufsize > str_width)
+    memset (buf + str_width, 0, bufsize - width);
 rewind (sim_tmpfile);
-s = fread (buf, 1, bufsize - 1, sim_tmpfile);
-buf[s] = '\0';
+s = fread (buf, 1, str_width, sim_tmpfile);
+if (s < bufsize)
+    buf[s] = '\0';
 return reason;
 }
 
