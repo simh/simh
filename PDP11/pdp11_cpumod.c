@@ -685,6 +685,9 @@ return SCPE_NXM;                                        /* unimplemented */
 t_stat CPU70_wr (int32 data, int32 pa, int32 access)
 {
 switch ((pa >> 1) & 017) {                              /* decode pa<4:1> */
+    case 000:
+    case 001:
+        return SCPE_OK;                                 /* error addr */
 
     case 002:                                           /* MEMERR */
         ODD_SHF (data);
@@ -706,6 +709,9 @@ switch ((pa >> 1) & 017) {                              /* decode pa<4:1> */
         return SCPE_OK;
 
     case 011:                                           /* high size */
+        return SCPE_OK;
+
+    case 012:                                           /* system ID */
         return SCPE_OK;
 
     case 013:                                           /* CPUERR */
