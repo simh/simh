@@ -186,6 +186,7 @@ static uint32 sim_throt_delay = 3;
 static int32 sim_int_clk_tps;
 static t_bool sim_timer_calib_enabled = TRUE;
 static struct timespec sim_timer_uncalib_base_time = {0, 0};
+static t_bool sim_throttle_has_been_enabled = FALSE;
 
 typedef struct RTC {
     UNIT *clock_unit;               /* registered ticking clock unit */
@@ -1863,6 +1864,7 @@ t_stat sim_set_throt (int32 arg, CONST char *cptr)
 {
 CONST char *tptr;
 char c;
+uint32 saved_throt_type = sim_throt_type;
 t_value val, val2 = 0;
 
 if (arg == 0) {
@@ -1899,6 +1901,10 @@ else {
     else if ((c == '/') && (val2 != 0))
         sim_throt_type = SIM_THROT_SPC;
     else return sim_messagef (SCPE_ARG, "Invalid throttle specification: %s\n", cptr);
+    if (sim_throttle_has_been_enabled) {
+        sim_throt_type = saved_throt_type;
+        return sim_messagef (SCPE_ARG, "Throttling was previously enabled.  Restart to change throttling\n");
+        }
     if (sim_idle_enab) {
         sim_printf ("Idling disabled\n");
         sim_clr_idle (NULL, 0, NULL, NULL);
@@ -1925,6 +1931,7 @@ if (sim_throt_type == SIM_THROT_SPC)    /* Set initial value while correct one i
     sim_throt_cps = (int32)((1000.0 * sim_throt_val) / (double)sim_throt_sleep_time);
 else
     sim_throt_cps = sim_precalibrate_ips;
+sim_throttle_has_been_enabled = TRUE;
 return SCPE_OK;
 }
 

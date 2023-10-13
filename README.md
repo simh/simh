@@ -100,6 +100,7 @@ Simulator binaries for x86 Linus, x86 macOS, and Windows for all recent changes 
 - VHD Support for Differencing Disks has been corrected.
 - Attach time disk container copy support between dissimilar storage formats (VHD<->SIMH).  Previously container copy operations were only supported between identical format containers (SIMH<->SIMH, and VHD<->VHD).
 - DISKINFO command provides more useful metadata information and file system verification with full support for VHD Differencing Disks.
+- Simulator THROTTLING can only be enabled once per simulator run.  This avoids potential errant behaviors when arbitrarily switching throttling settings.
 
 #### Changes to the PDP-11 and VAX simulators also not in the Open SIMH repo
 
