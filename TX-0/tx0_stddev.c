@@ -524,7 +524,6 @@ int32 ptp (int32 inst, int32 dev, int32 dat)
 
 t_stat ptp_svc (UNIT *uptr)
 {
-    ios = 1;                                            /* restart */
     iosta = iosta | IOS_PTP;                                /* set flag */
     if ((uptr->flags & UNIT_ATT) == 0)                      /* not attached? */
         return SCPE_UNATT;
