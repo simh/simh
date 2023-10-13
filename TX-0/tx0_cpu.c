@@ -305,6 +305,8 @@ extern int32 drm (int32 inst, int32 dev, int32 dat);
 extern int32 dpy (int32 ac);
 #endif
 
+extern UNIT petr_unit;
+
 /* CPU data structures
 
    cpu_dev      CPU device descriptor
@@ -471,14 +473,20 @@ t_stat sim_instr (void)
             break;
         }
 
+        sim_interval = sim_interval - 1;
+
         if (ios) {
             TRACE_PRINT(ERROR_MSG, ("I/O Stop - Waiting...\n"));
-            continue;
+            continue; /* Don't execute test/readin/normal mode */
         }
 
         /* Handle Instruction Execution in TEST and READIN modes */
         if (mode_tst) { /* Test Mode / Readin mode */
             if (mode_rdin) { /* Readin Mode */
+
+                if ((petr_unit.flags & UNIT_ATT) == 0)
+                    return SCPE_UNATT;
+
                 reason = SCPE_OK;   /* Default is to continue reading, and transfer control when done. */
                 AC = petr(3,0,0);   /* Read three chars from tape into AC */
                 MAR = AC & AMASK;   /* Set memory address */
@@ -487,6 +495,7 @@ t_stat sim_instr (void)
                 if (!MEM_ADDR_OK(MAR)) {
                     TRACE_PRINT(ERROR_MSG, ("READIN: Tape address out of range.\n"));
                     reason = SCPE_FMT;
+                    break;
                 }
 
                 switch (IR) {
@@ -498,29 +507,29 @@ t_stat sim_instr (void)
                         break;
                     case 02:    /* Transfer Control (trn x) Start Execution */
                         PC = MAR;
-                        reason = SCPE_OK;   /* let SIMH start execution. */
                         TRACE_PRINT(READIN_MSG, ("READIN: trn %06o (Start Execution)\n", PC));
                         reason = cpu_set_mode(&cpu_unit, 0, NULL, NULL);
                         break;
                     case 01:    /* Transfer (add x) - Halt */
                         PC = MAR;
-                        reason = SCPE_STOP; /* let SIMH halt. */
                         TRACE_PRINT(READIN_MSG, ("READIN: add %06o (Halt)\n", PC));
                         reason = cpu_set_mode(&cpu_unit, 0, NULL, NULL);
+                        if (reason == SCPE_OK) reason = SCPE_STOP; /* let SIMH halt. */
                         break;
                     default:
                         reason = SCPE_IERR;
                         break;
                 }
-            } else if (mode_tst) {  /* Test mode not implemented yet. */
+                continue;  /* Don't fall into normal-mode processing. */
+            } else {  /* Test mode not implemented yet. */
                 TRACE_PRINT(ERROR_MSG, ("TEST Mode not implemented.\n"));
                 reason = SCPE_STOP;
-
-            } else {
-                TRACE_PRINT(ERROR_MSG, ("Invalid CPU mode.\n"));
-                reason = SCPE_IERR;
+                break;
             }
-            continue;   /* Proceed with next instruction */
+        } else if (mode_rdin) {
+            TRACE_PRINT(ERROR_MSG, ("Invalid CPU mode.\n"));
+            reason = SCPE_IERR;
+            break;
         }
 
         /* Fetch, decode instruction in NORMAL mode */
@@ -531,7 +540,6 @@ t_stat sim_instr (void)
         inst_class = IR >> 3;
         op = MBR & AMASK;
         y = MBR & YMASK;
-        sim_interval = sim_interval - 1;
 
         if ((cpu_unit.flags & UNIT_EXT_INST) == 0) {  /* Original instruction set */
             IR &= 030;
