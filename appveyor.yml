@@ -25,6 +25,7 @@ skip_commits:
     
 before_build:
   - ps: |
+        Write-Output "Building repo '$env:APPVEYOR_REPO_NAME' branch: $env:APPVEYOR_REPO_BRANCH"
         $platform = uname -s
         if ($platform -eq 'Linux') {
           sudo apt-get update -yqqm
@@ -115,16 +116,17 @@ on_success:
         # repository if the current build for this platform is one week or more 
         # from the last saved build for this platform in the repository
         if (((Get-Date -UFormat %s) -gt $recent_saved_commit_time + $oneweek) -and 
-            ("$APPVEYOR_REPO_NAME" -eq "simh/simh")                           -and 
-            ("$APPVEYOR_REPO_BRANCH" -eq "master")) {
+            ("$env:APPVEYOR_REPO_NAME" -eq "simh/simh")                       -and 
+            ("$env:APPVEYOR_REPO_BRANCH" -eq "master")) {
           ("$platform Build") | Out-File -FilePath ../Save-Build-Results
         }
-        if (("$APPVEYOR_PULL_REPO_NAME" -ne "simh/simh") -or 
-            ("$APPVEYOR_PULL_REPO_BRANCH" -ne "master")) {
+        Write-Output "Building repo '$env:APPVEYOR_REPO_NAME' branch: $env:APPVEYOR_PULL_REPO_BRANCH"
+        if (("$env:APPVEYOR_PULL_REPO_NAME" -ne "simh/simh") -or 
+            ("$env:APPVEYOR_PULL_REPO_BRANCH" -ne "master")) {
           Write-Output "Skipping Saving binaries for non simh/simh master branch CI build"
         } else {
           if ((Get-Date -UFormat %s) -lt $recent_saved_commit_time + $oneweek) {
-            Write-Output "Skipping Saving binaries since the last one was saved " + (([System.DateTimeOffset]::FromUnixTimeSeconds($EpochTime)).DateTime).ToString()
+            Write-Output "Skipping Saving binaries since the last one was saved " + (([System.DateTimeOffset]::FromUnixTimeSeconds($recent_saved_commit_time)).DateTime).ToString()
           }
         }
   # Linux & macOS use the shell to perform git activities.
