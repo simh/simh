@@ -120,9 +120,9 @@ on_success:
             ("$env:APPVEYOR_REPO_BRANCH" -eq "master")) {
           ("$platform Build") | Out-File -FilePath ../Save-Build-Results
         }
-        Write-Output "Building repo '$env:APPVEYOR_REPO_NAME' branch: $env:APPVEYOR_PULL_REPO_BRANCH"
-        if (("$env:APPVEYOR_PULL_REPO_NAME" -ne "simh/simh") -or 
-            ("$env:APPVEYOR_PULL_REPO_BRANCH" -ne "master")) {
+        Write-Output "Building repo '$env:APPVEYOR_REPO_NAME' branch: $env:APPVEYOR_REPO_BRANCH"
+        if (("$env:APPVEYOR_REPO_NAME" -ne "simh/simh") -or 
+            ("$env:APPVEYOR_REPO_BRANCH" -ne "master")) {
           Write-Output "Skipping Saving binaries for non simh/simh master branch CI build"
         } else {
           if ((Get-Date -UFormat %s) -lt $recent_saved_commit_time + $oneweek) {
