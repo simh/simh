@@ -702,10 +702,11 @@ struct REG {
 
 /* Register flags */
 
-#define REG_FMT         00003                           /* see PV_x */
-#define REG_RO          00004                           /* read only */
-#define REG_HIDDEN      00010                           /* hidden */
-#define REG_NZ          00020                           /* must be non-zero */
+#define REG_FMT         00017                           /* see PV_x */
+#define REG_DOUBLE      00010                           /* Double Precision Value */
+#define REG_RO          00020                           /* read only */
+#define REG_HIDDEN      00040                           /* hidden */
+#define REG_NZ          00100                           /* must be non-zero */
 #define REG_CIRC        00200                           /* circular array */
 #define REG_VMIO        00400                           /* use VM data print/parse */
 #define REG_VMAD        01000                           /* use VM addr print/parse */
@@ -886,6 +887,7 @@ struct MEMFILE {
      HRDATA    Scalar with hexadecimal display/entry
      BINRDATA  Scalar with binary display/entry
      FLDATA    Scalar with single bit display/entry
+     DBRDATA   Scalar double precision floating display (no entry)
      GRDATA    Scalar with with specification of radix/width/offset parameters
 
      BRDATA    Singly-subscripted array of scalars
@@ -1018,6 +1020,11 @@ struct MEMFILE {
     _RegCheck(#nm,&(loc),2,1,pos,1,desc,NULL,0,0,sizeof((loc)),FLDATAD)
 #define FLDATADF(nm,loc,pos,desc,flds) \
     _RegCheck(#nm,&(loc),2,1,pos,1,desc,flds,0,0,sizeof((loc)),FLDATADF)
+/* Double Precision Floating Register Data */
+#define DBRDATA(nm,loc) \
+    _RegCheck(#nm,&(loc),10,16,0,1,NULL,NULL,0,0,sizeof((loc)),DBRDATA)
+#define DBRDATAD(nm,loc,desc) \
+    _RegCheck(#nm,&(loc),10,16,0,1,desc,NULL,0,0,sizeof((loc)),DBRDATAD)
 /* Arbitrary location and Radix Register */
 #define GRDATA(nm,loc,rdx,wd,pos) \
     _RegCheck(#nm,&(loc),rdx,wd,pos,1,NULL,NULL,0,0,sizeof((loc)),GRDATA)

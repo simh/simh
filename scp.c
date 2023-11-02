@@ -9194,8 +9194,13 @@ for (i = 0; i < (device_count + sim_internal_device_count); i++) {/* loop thru d
         fputc ('\n', sfile);
         WRITE_I (rptr->depth);                          /* [V2.10] depth */
         for (j = 0; j < rptr->depth; j++) {             /* loop thru values */
-            val = get_rval (rptr, j);                   /* get value */
-            WRITE_I (val);                              /* store */
+            if ((rptr->macro != NULL) && (memcmp (rptr->macro, "DBRDATA", 7) == 0)) {
+                fprintf (sfile, "%f\n", *(((double *)(rptr->loc)) + j));
+                }
+            else {
+                val = get_rval (rptr, j);                   /* get value */
+                WRITE_I (val);                              /* store */
+                }
             }
         }
     fputc ('\n', sfile);                                /* end registers */
@@ -9517,6 +9522,11 @@ for ( ;; ) {                                            /* device loop */
         else                                            /* otherwise */
             max = width_mask[rptr->width];              /*   the mask defines the maximum value */
         for (us = 0; us < depth; us++) {                /* loop thru values */
+            if ((rptr->macro != NULL) && (memcmp (rptr->macro, "DBRDATA", 7) == 0)) {
+                READ_S (buf);
+                sscanf(buf, "%lf", (((double *)rptr->loc) + us));
+                continue;
+                }
             READ_I (val);                               /* read value */
             if (val > max) {                            /* value ok? */
                 sim_printf ("Invalid register value: %s %s\n", sim_dname (dptr), buf);
@@ -10354,7 +10364,8 @@ if ((rptr->flags & REG_VMAD) && sim_vm_fprint_addr)
     sim_vm_fprint_addr (ofile, sim_dflt_dev, (t_addr) val);
 else {
     sim_snprint_sym (sim_last_val, sizeof (sim_last_val), !(rptr->flags & REG_VMFLAGS),
-                     (t_addr)((rptr->flags & REG_UFMASK) | rdx), sim_eval,
+                     (t_addr)((rptr->flags & REG_UFMASK) | rdx), 
+                     ((rptr->flags & REG_DOUBLE) == 0) ? sim_eval : (t_value *)rptr->loc,
                      NULL, sim_switches | SIM_SW_REG, 0, rdx, rptr->width, 
                      rptr->flags & REG_FMT);
     fprintf (ofile, "%s", sim_last_val);
@@ -12247,6 +12258,24 @@ t_bool negative = FALSE;
 int32 d, digit, ndigits, commas = 0;
 char dbuf[MAX_WIDTH + 1];
 
+if ((format & REG_DOUBLE) != 0) {
+    double dvalue = *((double *)&val);
+
+    snprintf (dbuf, sizeof (dbuf), "%f", dvalue);
+    if ((strrchr (dbuf, 'E') == NULL) && (strrchr (dbuf, 'e') == NULL) && (strchr (dbuf, '.') != NULL)) {
+        while (dbuf[strlen (dbuf) - 1] == '0')
+            dbuf[strlen (dbuf) - 1] = '\0';
+        if (dbuf[strlen (dbuf) - 1] == '.')
+            dbuf[strlen (dbuf) - 1] = '\0';
+        }
+    if (!buffer)
+        return strlen(dbuf);
+    *buffer = '\0';
+    if (width < strlen(dbuf))
+        return sim_messagef (SCPE_IOERR, "Invalid width (%u) for buffer size (%u)\n", width, (uint32)strlen(dbuf));
+    strcpy(buffer, dbuf);
+    return SCPE_OK;
+    }
 if (((format == PV_LEFTSIGN) || (format == PV_RCOMMASIGN)) &&
     (0 > (t_svalue)val)) {
     val = (t_value)(-((t_svalue)val));
@@ -16686,6 +16715,7 @@ for (i = 0; (dptr = devices[i]) != NULL; i++) {
     int reg_entry = -1;
 
     for (rptr = dptr->registers; (rptr != NULL) && (rptr->name != NULL); rptr++) {
+        uint32 format = rptr->flags & REG_FMT;
         uint32 bytes = 1;
         uint32 rsz = SZ_R(rptr);
         uint32 memsize = (rptr->depth >= 1) ? rptr->depth * rsz : rsz;
@@ -16730,13 +16760,27 @@ for (i = 0; (dptr = devices[i]) != NULL; i++) {
             }
 
         if (sim_switches & SWMASK ('R'))            /* Debug output */
-            sim_printf ("%5s:%-9.9s %s%s%s(rdx=%u, wd=%u, off=%u, dep=%u, strsz=%u, objsz=%u, oobjsz=%u, elesz=%u, rsz=%u, %s%s%s membytes=%u)\n", 
+            sim_printf ("%5s:%-9.9s %s%s%s(rdx=%u, wd=%u, off=%u, dep=%u, strsz=%u, objsz=%u, oobjsz=%u, elesz=%u, rsz=%u, %s%s%s%s membytes=%u)\n", 
                         dptr->name, rptr->name, rptr->desc ? rptr->desc : "", rptr->desc ? "\n\t" : "", rptr->macro ? rptr->macro : "", 
                         rptr->radix, rptr->width, rptr->offset, rptr->depth, (uint32)rptr->stride, (uint32)rptr->obj_size, (uint32)rptr->pobj_size, (uint32)rptr->size, rsz,
                         (rptr->flags & REG_VMAD) ? " REG_VMAD" : "", (rptr->flags & REG_VMIO) ? " REG_VMIO" : "",
-                        (rptr->flags & REG_DEPOSIT) ? " REG_DEPOSIT" : "", memsize);
+                        (rptr->flags & REG_DEPOSIT) ? " REG_DEPOSIT" : "", (rptr->flags & REG_DEPOSIT) ? " REG_DOUBLE" : "", memsize);
 
         MFlush (f);
+        if (rptr->flags & REG_DOUBLE) {
+            Mprintf (f, "%s %s:%s used the %s macro but had REG_DOUBLE flag bit set\n", sim_name, dptr->name, rptr->name, rptr->macro);
+            Mprintf (f, "%s %s:%s REG_DOUBLE shoule never be specified as a register flag bit\n", sim_name, dptr->name, rptr->name, rptr->macro);
+            Bad = TRUE;
+            }
+        if ((rptr->macro != NULL) && (0 == memcmp (rptr->macro, "DBRDATA", 7))) {
+            if (rptr->flags != 0) {
+                Mprintf (f, "%s %s:%s used the %s macro but had flags bit set\n", sim_name, dptr->name, rptr->name, rptr->macro);
+                Mprintf (f, "%s %s:%s No flags should be specified for %s registers\n", sim_name, dptr->name, rptr->name, rptr->macro);
+                Bad = TRUE;
+                }
+            else
+                rptr->flags |= REG_DOUBLE|REG_RO;
+            }
         if (rptr->depth == 1) {
             if (rptr->offset)
                 Mprintf (f, "%s %s:%s used the %s macro to describe a %u bit%s wide field at offset %u\n", sim_name, dptr->name, rptr->name, rptr->macro, rptr->width, (rptr->width == 1) ? "" : "s", rptr->offset);
@@ -16836,6 +16880,12 @@ for (i = 0; (dptr = devices[i]) != NULL; i++) {
         }
     }
 MClose (f);
+if (devices == sim_devices) {               /* Testing defaulted to simulator's DEVICEs? */
+    t_stat int_stat = sim_sanity_check_register_declarations (sim_internal_devices); /* Also test simulator's Internal Devices */
+
+    if (int_stat != SCPE_OK)
+        return int_stat;
+    }
 return stat;
 }
 
