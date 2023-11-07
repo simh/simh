@@ -1,6 +1,6 @@
 /* pdp11_tu.c - PDP-11 TM02/TU16 TM03/TU45/TU77 Massbus magnetic tape controller
 
-   Copyright (c) 1993-2017, Robert M Supnik
+   Copyright (c) 1993-2023, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tu           TM02/TM03 magtape
 
+   06-Nov-23    RMS     Fixed BOT logic
    28-Dec-17    RMS     Read tape mark must set Massbus EXC
    13-Mar-17    RMS     Annotated fall through in switch
    23-Oct-13    RMS     Revised for new boot setup routine
@@ -53,6 +54,10 @@
    If the byte count is odd, the record is padded with an extra byte
    of junk.  File marks are represented by a single record length of 0.
    End of tape is two consecutive end of file marks.
+
+   BOT is not the same as POS == 0. BOT is set after rewinding or after
+   a reverse operation from before the first record. It is cleared by
+   any successful motion operation.
 */
 
 #if defined (VM_PDP10)
@@ -117,11 +122,12 @@
 /* TUFS - formatter status - offset 1
    + indicates kept in drive status
    ^ indicates calculated on the fly
+   Rewinding is a pseudo-status flag and never appears in TUFS
 */
 
 #define FS_OF           1
 #define FS_SAT          0000001                         /* slave attention */
-#define FS_BOT          0000002                         /* ^beginning of tape */
+#define FS_BOT          0000002                         /* +beginning of tape */
 #define FS_TMK          0000004                         /* end of file */
 #define FS_ID           0000010                         /* ID burst detected */
 #define FS_SLOW         0000020                         /* slowing down NI */
@@ -129,7 +135,7 @@
 #define FS_SSC          0000100                         /* slave stat change */
 #define FS_RDY          0000200                         /* ^formatter ready */
 #define FS_FPR          0000400                         /* formatter present */
-#define FS_EOT          0002000                         /* +end of tape */
+#define FS_EOT          0002000                         /* ^end of tape */
 #define FS_WRL          0004000                         /* ^write locked */
 #define FS_MOL          0010000                         /* ^medium online */
 #define FS_PIP          0020000                         /* +pos in progress */
@@ -502,7 +508,7 @@ switch (fnc) {                                          /* case on function */
         tutc = tutc & ~TC_FCS;                          /* clear fc status */
         tufs = tufs & ~(FS_SAT | FS_SSC | FS_ID | FS_ERR);
         sim_cancel (uptr);                              /* reset drive */
-        uptr->USTAT = 0;
+        uptr->USTAT &= FS_BOT;                          /* fall through */
         /* fall through */
     case FNC_NOP:
         tucs1 = tucs1 & ~CS1_GO;                        /* no operation */
@@ -510,8 +516,10 @@ switch (fnc) {                                          /* case on function */
 
     case FNC_RIP:                                       /* read-in preset */
         tutc = TC_RIP;                                  /* set tutc */
-        sim_tape_rewind (&tu_unit[0]);                  /* rewind unit 0 */
-        tu_unit[0].USTAT = 0;
+        if (tu_unit[0].flags & UNIT_ATT) {              /* unit 0 attached? */
+            sim_tape_rewind (&tu_unit[0]);              /* rewind unit 0 */
+            tu_unit[0].USTAT = FS_BOT;
+            }
         tucs1 = tucs1 & ~CS1_GO;
         tufs = tufs & ~FS_TMK;
         return SCPE_OK;
@@ -556,7 +564,7 @@ switch (fnc) {                                          /* case on function */
             tu_set_er (ER_UNS);
             break;
             }
-        if (sim_tape_bot (uptr) || ((tutc & TC_FCS) == 0)) {
+        if ((uptr->USTAT & FS_BOT) || ((tutc & TC_FCS) == 0)) {
             tu_set_er (ER_NXF);
             break;
             }
@@ -565,7 +573,7 @@ switch (fnc) {                                          /* case on function */
 
     case FNC_WCHKR:                                     /* wchk = read */
     case FNC_READR:                                     /* read rev */
-        if (tufs & FS_BOT) {                            /* beginning of tape? */
+        if (uptr->USTAT & FS_BOT) {                     /* beginning of tape? */
             tu_set_er (ER_NXF);
             break;
             }
@@ -636,7 +644,9 @@ t_stat st, r = SCPE_OK;
 drv = (int32) (uptr - tu_dev.units);                    /* get drive # */
 if (uptr->USTAT & FS_REW) {                             /* rewind or unload? */
     sim_tape_rewind (uptr);                             /* rewind tape */
-    uptr->USTAT = 0;                                    /* clear status */
+    if (uptr->flags & UNIT_ATT)                         /* standard rewind? */
+        uptr->USTAT = FS_BOT;                           /* set BOT */
+    else uptr->USTAT = 0;                               /* clear status */
     tu_update_fs (FS_ATA | FS_SSC, drv);
     return SCPE_OK;
     }
@@ -835,17 +845,13 @@ int32 act = sim_activate_time (&tu_unit[drv]);
 
 tufs = (tufs & ~FS_DYN) | FS_FPR | flg;
 if (tu_unit[drv].flags & UNIT_ATT) {
-    tufs = tufs | FS_MOL | tu_unit[drv].USTAT;
+    tufs = tufs | FS_MOL | (tu_unit[drv].USTAT & 0177777);
     if (tu_unit[drv].UDENS == TC_1600)
         tufs = tufs | FS_PE;
     if (sim_tape_wrp (&tu_unit[drv]))
         tufs = tufs | FS_WRL;
-    if (!act) {
-        if (sim_tape_bot (&tu_unit[drv]))
-            tufs = tufs | FS_BOT;
-        if (sim_tape_eot (&tu_unit[drv]))
+    if (!act && sim_tape_eot (&tu_unit[drv]))
             tufs = tufs | FS_EOT;
-        }
     }
 if (tuer)
     tufs = tufs | FS_ERR;
@@ -904,6 +910,7 @@ switch (st) {
         break;
 
     case MTSE_BOT:                                      /* reverse into BOT */
+        tu_unit[drv].USTAT = FS_BOT;                    /* set BOT */
         return SCPE_OK;
 
     case MTSE_WRP:                                      /* write protect */
@@ -938,7 +945,10 @@ for (u = 0; u < TU_NUMDR; u++) {                        /* loop thru units */
     uptr = tu_dev.units + u;
     sim_tape_reset (uptr);                              /* clear pos flag */
     sim_cancel (uptr);                                  /* cancel activity */
-    uptr->USTAT = 0;
+    if ((uptr->flags & UNIT_ATT) &&                     /* if attached */
+        sim_tape_bot (uptr))                            /* and BOT */
+        uptr->USTAT = FS_BOT;                           /* set BOT */
+    else uptr->USTAT = 0;
     }
 if (xbuf == NULL)
     xbuf = (uint8 *) calloc (MT_MAXFR + 4, sizeof (uint8));
@@ -961,7 +971,7 @@ t_stat r;
 r = sim_tape_attach (uptr, cptr);
 if (r != SCPE_OK)
     return r;
-uptr->USTAT = 0;                                        /* clear unit status */
+uptr->USTAT = FS_BOT;                                   /* set BOT */
 uptr->UDENS = UD_UNK;                                   /* unknown density */
 flg = FS_ATA | FS_SSC;                                  /* set attention */
 if (GET_DRV (tutc) == drv)                              /* sel drv? set SAT */

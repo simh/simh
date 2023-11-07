@@ -1,6 +1,6 @@
 /* pdp10_tu.c - PDP-10 RH11/TM03/TU45 magnetic tape simulator
 
-   Copyright (c) 1993-2022, Robert M Supnik
+   Copyright (c) 1993-2023, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tu           RH11/TM03/TU45 magtape
 
+   06-Nov-23    RMS     Fixed BOT logic
    26-Mar-22    RMS     Added extra case points for new MTSE definitions
    07-Sep-20    RMS     Fixed || -> | in macro (Mark Pizzolato)
    12-Jan-18    RMS     Fixed missing () in logical test (Mark Pizzolato)
@@ -94,6 +95,10 @@
      level sensitive.
    - The DONE interrupt, once set, is not disabled if IE is cleared,
      but the SC interrupt is.
+
+   BOT is not the same as POS == 0. BOT is set after rewinding or after
+   a reverse operation from before the first record. It is cleared by
+   any successful motion operation.
 */
 
 #include "pdp10_defs.h"
@@ -183,7 +188,7 @@
 */
 
 #define FS_SAT          0000001                         /* slave attention */
-#define FS_BOT          0000002                         /* ^beginning of tape */
+#define FS_BOT          0000002                         /* +beginning of tape */
 #define FS_TMK          0000004                         /* end of file */
 #define FS_ID           0000010                         /* ID burst detected */
 #define FS_SLOW         0000020                         /* slowing down NI */
@@ -191,7 +196,7 @@
 #define FS_SSC          0000100                         /* slave stat change */
 #define FS_RDY          0000200                         /* ^formatter ready */
 #define FS_FPR          0000400                         /* formatter present */
-#define FS_EOT          0002000                         /* +end of tape */
+#define FS_EOT          0002000                         /* ^end of tape */
 #define FS_WRL          0004000                         /* ^write locked */
 #define FS_MOL          0010000                         /* ^medium online */
 #define FS_PIP          0020000                         /* +pos in progress */
@@ -675,7 +680,7 @@ switch (fnc) {                                          /* case on function */
         tufs = tufs & ~(FS_SAT | FS_SSC | FS_ID | FS_ERR);
         if (!(uptr->TU_STATEFLAGS & TUS_ATTPENDING))
             sim_cancel (uptr);                          /* stop motion, not on-line delay */
-        uptr->USTAT = 0;
+        uptr->USTAT &= FS_BOT;                          /* fall through */
         /* fall through */
     case FNC_NOP:
         tucs1 = tucs1 & ~CS1_GO;                        /* no operation */
@@ -687,8 +692,10 @@ switch (fnc) {                                          /* case on function */
             break;
             }
         tutc = TC_RIP;                                  /* density = 800 */
-        sim_tape_rewind (&tu_unit[0]);                  /* rewind unit 0 */
-        tu_unit[0].USTAT = 0;
+        if (tu_unit[0].flags & UNIT_ATT) {              /* attached? */
+            sim_tape_rewind (&tu_unit[0]);              /* rewind unit 0 */
+            tu_unit[0].USTAT = FS_BOT;
+            }
         tucs1 = tucs1 & ~CS1_GO;
         tufs = tufs & ~FS_TMK;
         return;
@@ -733,7 +740,7 @@ switch (fnc) {                                          /* case on function */
             set_tuer (ER_UNS);
             break;
             }
-        if (sim_tape_bot (uptr) || ((tutc & TC_FCS) == 0)) {
+        if ((uptr->USTAT & FS_BOT) || ((tutc & TC_FCS) == 0)) {
             set_tuer (ER_NXF);
             break;
             }
@@ -761,7 +768,7 @@ switch (fnc) {                                          /* case on function */
 
     case FNC_WCHKR:                                     /* wchk = read */
     case FNC_READR:                                     /* read rev */
-        if (tufs & FS_BOT) {                            /* beginning of tape? */
+        if (uptr->USTAT & FS_BOT) {                     /* beginning of tape? */
             set_tuer (ER_NXF);
             break;
             }
@@ -835,7 +842,9 @@ if (uptr->TU_STATEFLAGS & TUS_ATTPENDING) {
 
 if (uptr->USTAT & FS_REW) {                             /* rewind or unload? */
     sim_tape_rewind (uptr);                             /* rewind tape */
-    uptr->USTAT = 0;                                    /* clear status */
+    if (uptr->flags & UNIT_ATT)                         /* attached? */
+        uptr->USTAT = FS_BOT;                           /* set BOT */
+    else uptr->USTAT = 0;                               /* clear status */
     tufs = tufs | FS_ATA | FS_SSC;
     update_tucs (CS1_SC, drv);                          /* update status */
     return SCPE_OK;
@@ -1041,21 +1050,17 @@ if ((flag & ~tucs1) & CS1_DONE)                         /* DONE 0 to 1? */
     tuiff = (tucs1 & CS1_IE)? 1: 0;                     /* CSTB INTR <- IE */
 if (GET_FMTR (tucs2) == 0) {                            /* formatter present? */
     tufs = (tufs & ~FS_DYN) | FS_FPR;
-    if (tu_unit[drv].TU_STATEFLAGS & TUS_ATTPENDING)    /* Delayed on-line timer running? */
-        act = 0;                                        /* Not a tape motion op */
+    if (tu_unit[drv].TU_STATEFLAGS & TUS_ATTPENDING)    /* delayed on-line timer running? */
+        act = 0;                                        /* not a tape motion op */
     else {
         if (tu_unit[drv].flags & UNIT_ATT) {
-            tufs = tufs | FS_MOL | tu_unit[drv].USTAT;
+            tufs = tufs | FS_MOL | (tu_unit[drv].USTAT & 0177777);
             if (tu_unit[drv].UDENS == TC_1600)
                 tufs = tufs | FS_PE;
             if (sim_tape_wrp (&tu_unit[drv]))
                 tufs = tufs | FS_WRL;
-            if (!act) {
-                if (sim_tape_bot (&tu_unit[drv]))
-                    tufs = tufs | FS_BOT;
-                if (sim_tape_eot (&tu_unit[drv]))
+            if (!act && sim_tape_eot (&tu_unit[drv]))
                     tufs = tufs | FS_EOT;
-                }
             }
         }
     if (tuer)
@@ -1138,6 +1143,7 @@ switch (st) {
         break;
 
     case MTSE_BOT:                                      /* reverse into BOT */
+        uptr->USTAT = FS_BOT;                           /* set BOT */
         break;
 
     case MTSE_WRP:                                      /* write protect */
@@ -1178,7 +1184,9 @@ for (u = 0; u < TU_NUMDR; u++) {                        /* loop thru units */
         if (!sim_is_active(uptr) )
             sim_activate_after(uptr, SPINUPDLY);
         }
-    uptr->USTAT = 0;
+    if ((uptr->flags & UNIT_ATT) && sim_tape_bot (uptr))
+        uptr->USTAT = FS_BOT;
+    else uptr->USTAT = 0;
     }
 if (xbuf == NULL)
     xbuf = (uint8 *) calloc (MT_MAXFR + 4, sizeof (uint8));
@@ -1197,7 +1205,7 @@ t_stat r;
 r = sim_tape_attach (uptr, cptr);
 if (r != SCPE_OK)
     return r;
-uptr->USTAT = 0;                                        /* clear unit status */
+uptr->USTAT = FS_BOT;                                   /* set BOT */
 uptr->UDENS = UD_UNK;                                   /* unknown density */
 /* Delay setting MOL since we may have just detached a previous file.
  * In that case, the OS must see MOL clear, so that it will know that the
@@ -1243,7 +1251,7 @@ return sim_tape_detach (uptr);
 }
 
 /* Device bootstrap */
-/* Note that the dec and ITS boot code is word for word identical,
+/* Note that the DEC and ITS boot code is word for word identical,
  * except for the IO instructions.  The ITS instructions encode the
  * UBA number.  No attempt is made to allow UBA selection under ITS,
  * though it should work with the DEC rom.
