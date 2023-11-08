@@ -1,6 +1,6 @@
 /* sds_cpu.c: SDS 940 CPU simulator
 
-   Copyright (c) 2001-2021, Robert M. Supnik
+   Copyright (c) 2001-2023, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    cpu          central processor
    rtc          real time clock
 
+   07-Nov-23    RMS     Fixed shift counts > 48 (Howard Bussey)
    17-Feb-21    kenr    Added C register implementation to support console
    07-Sep-17    RMS     Fixed sim_eval declaration in history routine (COVERITY)
    09-Mar-17    RMS     trap_P not set if mem mgt trap during fetch (COVERITY)
@@ -994,18 +995,19 @@ switch (op) {                                           /* case on opcode */
             return r;
         shf_op = I_GETSHFOP (va);                       /* get eff op */
         sc = va & I_SHFMSK;                             /* get eff count */
+        if (sc > 48)                                    /* > 48 same as 48 */
+            sc = 48;
         switch (shf_op) {                               /* case on sub-op */
         case 00:                                        /* right arithmetic */
-            if (sc)
+            if (sc != 0)
                 ShfR48 (sc, (A & SIGN)? DMASK: 0);
             break;
         case 04:                                        /* right cycle */
-            sc = sc % 48;                               /* mod 48 */
-            if (sc)
+            if ((sc != 0) && (sc != 48))                /* rotate */
                 RotR48 (sc);
             break;
         case 05:                                        /* right logical */
-            if (sc)
+            if (sc != 0)
                 ShfR48 (sc, 0);
             break;
         default:
@@ -1019,11 +1021,11 @@ switch (op) {                                           /* case on opcode */
             return r;
         shf_op = I_GETSHFOP (va);                       /* get eff op */
         sc = va & I_SHFMSK;                             /* get eff count */
+        if (sc > 48)                                    /* > 48 same as 48 */
+            sc = 48;
         switch (shf_op) {                               /* case on sub-op */
         case 00:                                        /* left arithmetic */
             dat = A;                                    /* save sign */
-            if (sc > 48)
-                sc = 48;
             for (i = 0; i < sc; i++) {                  /* loop */
                 A = ((A << 1) | (B >> 23)) & DMASK;
                 B = (B << 1) & DMASK;
@@ -1032,8 +1034,6 @@ switch (op) {                                           /* case on opcode */
                 }
             break;
         case 02:                                        /* normalize */
-            if (sc > 48)
-                sc = 48;
             for (i = 0; i < sc; i++) {                  /* until max count */
                 if ((A ^ (A << 1)) & SIGN)
                     break;
@@ -1043,13 +1043,10 @@ switch (op) {                                           /* case on opcode */
             X = (X - i) & DMASK;
             break;
         case 04:                                        /* left cycle */
-            sc = sc % 48;                               /* mod 48 */
-            if (sc)                                     /* rotate */
+            if ((sc != 0) && (sc != 48))                /* rotate */
                 RotR48 (48 - sc);
             break;
         case 06:                                        /* cycle normalize */
-            if (sc > 48)
-                sc = 48;
             for (i = 0; i < sc; i++) {                  /* until max count */
                 if ((A ^ (A << 1)) & SIGN)
                     break;
@@ -1394,6 +1391,8 @@ if (TSTS (ar))                                          /* sign of rem */
 else B = dvdh;                                          /* B = rem */
 return;
 }
+
+/* Input is in the range [1,47] */
 
 void RotR48 (uint32 sc)
 {
