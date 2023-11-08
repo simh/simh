@@ -163,7 +163,7 @@ REG ta_reg[] = {
     { ORDATAD (TACS, ta_cs, 16, "control/status register") },
     { ORDATAD (TAIDB, ta_idb, 8, "input data buffer") },
     { ORDATAD (TAODB, ta_odb, 8, "output data buffer") },
-    { FLDATAD (WRITE, ta_write, 0, "TA60 write operation flag") },
+    { FLDATAD (WRITE, ta_write, 0, "TU60 write operation flag") },
     { FLDATAD (INT, IREQ (TA), INT_V_TA, "interrupt request") },
     { FLDATAD (ERR, ta_cs, CSR_V_ERR, "error flag") },
     { FLDATAD (TR, ta_cs, CSR_V_DONE, "transfer request flag") },
@@ -672,7 +672,7 @@ t_stat ta_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr
 {
 const char *const text =
 /*567901234567890123456789012345678901234567890123456789012345678901234567890*/
-" TA11/TA60 Cassette Tape (CT)\n"
+" TA11/TU60 Cassette Tape (CT)\n"
 "\n"
 " The TA11 is a programmed I/O controller supporting two cassette drives\n"
 " (0 and 1).  The TA11 can be used like a small magtape under RT11 and\n"
@@ -697,5 +697,5 @@ return SCPE_OK;
 
 const char *ta_description (DEVICE *dptr)
 {
-return "TA11/TA60 Cassette Tape";
+return "TA11/TU60 Cassette Tape";
 }
