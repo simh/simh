@@ -2326,7 +2326,7 @@ static const char simh_help2[] =
       " The syntax of the regular expressions available are those supported\n"
       " by the Perl Compatible Regular Expression package (aka PCRE).  As\n"
       " the name implies, the syntax is generally the same as Perl regular\n"
-      " expressions.  See http://perldoc.perl.org/perlre.html for more\n\n"
+      " expressions.  See http://perldoc.perl.org/perlre.html for more\n"
       " details.\n\n"
       "5-i\n"
       " If a regular expression expect rule is defined with the -i switch,\n"
@@ -10148,6 +10148,9 @@ for (gptr = gbuf, reason = SCPE_OK;
         if ((!sim_oline) && (sim_log && (ofile == stdout)))
             exdep_reg_loop (sim_log, sim_schrptr, EX_E, cptr,
                 lowr, --highr, 0, 0xFFFFFFFF);
+        if (sim_deb && (sim_deb != stdout) && (sim_deb != sim_log))
+            exdep_reg_loop (sim_deb, sim_schrptr, EX_E, cptr,
+                lowr, --highr, 0, 0xFFFFFFFF);
         continue;
         }
 
@@ -10180,6 +10183,9 @@ for (gptr = gbuf, reason = SCPE_OK;
         if ((flag & EX_E) && (!sim_oline) && (sim_log && (ofile == stdout)))
             exdep_reg_loop (sim_log, sim_schrptr, EX_E, cptr,
                 lowr, highr, (uint32) low, (uint32) high);
+        if ((flag & EX_E) && (!sim_oline) && (sim_deb && (sim_deb != stdout) && (sim_deb != sim_log)))
+            exdep_reg_loop (sim_deb, sim_schrptr, EX_E, cptr,
+                lowr, highr, (uint32) low, (uint32) high);
         continue;
         }
 
@@ -10201,6 +10207,9 @@ for (gptr = gbuf, reason = SCPE_OK;
         sim_dfdev, sim_dfunit);
     if ((flag & EX_E) && (!sim_oline) && (sim_log && (ofile == stdout)))
         exdep_addr_loop (sim_log, sim_schaptr, EX_E, cptr, low, high,
+            sim_dfdev, sim_dfunit);
+    if ((flag & EX_E) && (!sim_oline) && (sim_deb && (sim_deb != stdout) && (sim_deb != sim_log)))
+        exdep_addr_loop (sim_deb, sim_schaptr, EX_E, cptr, low, high,
             sim_dfdev, sim_dfunit);
     }                                                   /* end for */
 if (sim_ofile)                                          /* close output file */
