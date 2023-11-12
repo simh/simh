@@ -277,7 +277,7 @@ void _sim_debug_device (uint32 dbits, DEVICE* dptr, const char* fmt, ...) GCC_FM
 #define sim_debug(dbits, dptr, ...) do { if ((sim_deb != NULL) && ((dptr) != NULL) && ((dptr)->dctrl & (dbits))) _sim_debug_device (dbits, dptr, __VA_ARGS__);} while (0)
 #define sim_debug_unit(dbits, uptr, ...) do { if ((sim_deb != NULL) && ((uptr) != NULL) && (uptr->dptr != NULL) && (((uptr)->dctrl | (uptr)->dptr->dctrl) & (dbits))) _sim_debug_unit (dbits, uptr, __VA_ARGS__);} while (0)
 #endif
-void sim_flush_buffered_files (void);
+void sim_flush_buffered_files (t_bool debug_flush);
 
 /* Only for use in SCP code and libraries - NOT in simulator code */
 #define SIM_SCP_ABORT(msg) _sim_scp_abort (msg, __FILE__, __LINE__)

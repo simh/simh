@@ -982,7 +982,7 @@ if (r == SCPE_OK) {
     }
 
 if ((sim_switches & SWMASK ('D')) && !had_debug)
-    sim_set_deboff (0, "");
+    sim_set_deboff (0, NULL);
 if (sim_switches & SWMASK ('D'))
     uptr->dctrl = starting_dctrl;
 if ((r == SCPE_OK) && (sim_switches & SWMASK ('X')))

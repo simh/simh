@@ -1437,7 +1437,7 @@ for (i=(was_active_command ? sim_rem_cmd_active_line : 0);
             sim_is_running = FALSE;
             sim_rem_collect_all_registers ();
             sim_stop_timer_services ();
-            sim_flush_buffered_files ();
+            sim_flush_buffered_files (TRUE);
             if (rem->act == NULL) {
                 for (j=0; j < sim_rem_con_tmxr.lines; j++) {
                     TMLN *lpj = &sim_rem_con_tmxr.ldsc[j];
@@ -1468,7 +1468,7 @@ for (i=(was_active_command ? sim_rem_cmd_active_line : 0);
                     sim_is_running = FALSE;
                     sim_rem_collect_all_registers ();
                     sim_stop_timer_services ();
-                    sim_flush_buffered_files ();
+                    sim_flush_buffered_files (TRUE);
                     stat = SCPE_STOP;
                     _sim_rem_message ("RUN", stat);
                     _sim_rem_log_out (lp);
@@ -2414,13 +2414,18 @@ t_stat sim_set_deboff (int32 flag, CONST char *cptr)
 {
 if (cptr && (*cptr != 0))                               /* now eol? */
     return SCPE_2MARG;
-if (sim_deb == NULL)                                    /* no debug? */
-    return SCPE_OK;
+if (sim_deb == NULL) {                                  /* no debug? */
+    if  (cptr != NULL)
+        return sim_messagef (SCPE_OK, "Debug not enabled\n");
+    else
+        return SCPE_OK;
+    }
 if (sim_deb_switches & SWMASK ('B')) {
     size_t offset = (sim_debug_buffer_inuse == sim_deb_buffer_size) ? sim_debug_buffer_offset : 0;
-    const char *bufmsg = "Circular Buffer Contents follow here:\n\n";
+    const char *bufmsg = "\nCircular Buffer Contents follow here:\n\n";
 
-    fwrite (bufmsg, 1, strlen (bufmsg), sim_deb);
+    if (sim_debug_buffer_inuse > 0)
+        fwrite (bufmsg, 1, strlen (bufmsg), sim_deb);
 
     while (sim_debug_buffer_inuse > 0) {
         size_t write_size = MIN (sim_deb_buffer_size - offset, sim_debug_buffer_inuse);

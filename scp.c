@@ -3192,8 +3192,9 @@ if ((stat = sim_brk_init ()) != SCPE_OK) {
     sim_exit_status = EXIT_FAILURE;
     goto cleanup_and_exit;
     }
-/* always check for register definition problems */
-sim_sanity_check_register_declarations (NULL);
+/* always check for register definition problems, unless we already did that */
+if (register_check == FALSE)
+    sim_sanity_check_register_declarations (NULL);
 
 if (device_unit_tests) {
     int i;
@@ -9604,7 +9605,7 @@ if (warned)
 return r;
 }
 
-void sim_flush_buffered_files (void)
+void sim_flush_buffered_files (t_bool debug_flush)
 {
 uint32 i, j;
 DEVICE *dptr;
@@ -9612,7 +9613,7 @@ UNIT *uptr;
 
 if (sim_log)                                            /* flush console log */
     fflush (sim_log);
-if (sim_deb)                                            /* flush debug log */
+if (debug_flush && (sim_deb != NULL))                   /* flush debug log */
     _sim_debug_flush ();
 for (i = 1; (dptr = sim_devices[i]) != NULL; i++) {     /* flush attached files */
     for (j = 0; j < dptr->numunits; j++) {              /* if not buffered in mem */
@@ -9640,7 +9641,7 @@ t_stat
 flush_svc (UNIT *uptr)
 {
 sim_activate_after (uptr, sim_flush_interval * 1000000);
-sim_flush_buffered_files ();
+sim_flush_buffered_files (FALSE);
 return SCPE_OK;
 }
 
@@ -9920,7 +9921,7 @@ sim_brk_clrall (BRK_TYP_DYN_STEPOVER);                  /* cancel any step/over 
 signal (SIGHUP, sigterm_received ? SIG_IGN : SIG_DFL);  /* cancel WRU */
 #endif
 signal (SIGTERM, sigterm_received ? SIG_IGN : SIG_DFL); /* cancel WRU */
-sim_flush_buffered_files();
+sim_flush_buffered_files (TRUE);
 sim_cancel (&sim_flush_unit);                           /* cancel flush timer */
 sim_cancel_step ();                                     /* cancel step timer */
 sim_throt_cancel ();                                    /* cancel throttle */
@@ -14232,9 +14233,9 @@ return SCPE_OK;
 void _sim_scp_abort (const char *msg, const char *file, int linenum)
 {
 sim_printf ("%s - aborting from %s:%d\n", msg, file, linenum);
-sim_flush_buffered_files ();
+sim_flush_buffered_files (TRUE);
 if (sim_deb)
-    fclose (sim_deb);
+    sim_set_deboff (0, NULL);
 abort ();
 }
 
@@ -14269,7 +14270,7 @@ static void _debug_fwrite (const char *buf, size_t len)
 {
 size_t move_size;
 
-if (sim_deb_buffer == NULL) {
+if ((sim_deb_buffer == NULL) || (!sim_is_running)) {
     _debug_fwrite_all (buf, len, sim_deb);  /* output now. */
     return;
     }
