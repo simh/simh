@@ -106,7 +106,7 @@ static t_stat ch_tx_word (int data);
 static int ch_test_int (void);
 static t_stat ch_transmit ();
 static void ch_validate (const uint8 *p, int count);
-static void ch_receive (void);
+static int ch_receive (void);
 static void ch_clear (void);
 static void ch_command (int32 data);
 
@@ -195,13 +195,18 @@ t_stat ch_rx_word (int32 *data)
     sim_debug (DBG_DAT, &ch_dev, "Read buffer word %d: %06o\n",
                rx_count, *data);
     rx_count--;
+    if (rx_count == 0) {
+      ch_lines[0].rcve = TRUE;
+      sim_debug (DBG_TRC, &ch_dev, "Read all, rx on\n");
+      status &= ~RXD;
+    }
   }
   return SCPE_OK;
 }
 
 t_stat ch_tx_word (int data)
 {
-  if (tx_count < 126) {
+  if (tx_count < 246) {
     int i = CHUDP_HEADER + 2*tx_count;
     sim_debug (DBG_DAT, &ch_dev, "Write buffer word %d: %06o\n",
                tx_count, data);
@@ -246,10 +251,11 @@ t_stat ch_transmit ()
   if (r == SCPE_OK) {
     sim_debug (DBG_PKT, &ch_dev, "Sent UDP packet, %d bytes.\n", (int)len);
     tmxr_poll_tx (&ch_tmxr);
-    status |= TXD;
-    ch_test_int ();
   } else
     sim_debug (DBG_ERR, &ch_dev, "Sending UDP failed: %d.\n", r);
+  tx_count = 0;
+  status |= TXD;
+  ch_test_int ();
   return SCPE_OK;
 }
 
@@ -281,7 +287,7 @@ void ch_validate (const uint8 *p, int count)
     sim_debug (DBG_TRC, &ch_dev, "Checksum: %05o\n", chksum);
 }
 
-void ch_receive (void)
+int ch_receive (void)
 {
   size_t count;
   const uint8 *p;
@@ -289,10 +295,10 @@ void ch_receive (void)
   tmxr_poll_rx (&ch_tmxr);
   if (tmxr_get_packet_ln (&ch_lines[0], &p, &count) != SCPE_OK) {
     sim_debug (DBG_ERR, &ch_dev, "TMXR error receiving packet\n");
-    return;
+    return 0;
   }
   if (p == NULL)
-    return;
+    return 0;
 
   sim_debug (DBG_PKT, &ch_dev, "Received UDP packet, %d bytes\n", (int)count);
   if ((status & RXD) == 0) {
@@ -311,6 +317,8 @@ void ch_receive (void)
     if ((status & LOST) < LOST)
       status += 01000;
   }
+
+  return 1;
 }
 
 t_stat ch_rd (int32 *data, int32 PA, int32 access)
@@ -413,8 +421,18 @@ t_stat ch_wr (int32 data, int32 PA, int32 access)
 
 t_stat ch_svc(UNIT *uptr)
 {
+  if (ch_lines[0].conn) {
+    if (ch_receive ()) {
+      sim_activate_after (uptr, 300);
+      return SCPE_OK;
+    }
+  } else {
+    if (tmxr_poll_conn (&ch_tmxr) != -1)
+      ch_lines[0].rcve = TRUE;
+  }
   sim_clock_coschedule (uptr, 1000);
-  (void)tmxr_poll_conn (&ch_tmxr);
+  if (tmxr_poll_conn (&ch_tmxr) != -1)
+    ch_lines[0].rcve = TRUE;
   if (ch_lines[0].conn)
     ch_receive ();
   return SCPE_OK;
