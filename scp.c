@@ -2396,6 +2396,11 @@ static const char simh_help2[] =
       " arbitrary floating point number.  Given two or more arguments, pause\n"
       " for the amount of time specified by the sum of their values.\n"
       " NOTE: A SLEEP command is interruptable with SIGINT (CTRL+C).\n\n"
+      "4Switches\n"
+      " A switch can be used to influence the behavior of the SLEEP command\n\n"
+      "5-v\n"
+      " Causes the sleep command to visibly count down the time left until\n"
+      " the sleeping will finish.\n\n"
       /***************** 80 character line width template *************************/
 #define HLP_ASSERT      "*Commands Executing_Command_Files Testing_Simulator_State"
 #define HLP_IF          "*Commands Executing_Command_Files Testing_Simulator_State"
@@ -5840,6 +5845,7 @@ t_stat sleep_cmd (int32 flag, CONST char *cptr)
 char *tptr;
 double wait;
 
+GET_SWITCHES (cptr);                                    /* get switches */
 while (*cptr) {
     wait = strtod (cptr, &tptr);
     switch (*tptr) {
@@ -5871,10 +5877,16 @@ while (*cptr) {
         }
     wait *= 1000.0;                             /* Convert to Milliseconds */
     cptr = tptr;
-    while ((wait > 1000.0) && (!stop_cpu))
+    while ((wait > 1000.0) && (!stop_cpu)) {
+        if (sim_switches & SWMASK ('V'))
+            sim_printf ("Sleeping for: %s          \r", sim_fmt_secs (wait / 1000.0));
         wait -= sim_os_ms_sleep (1000);
-    if ((wait > 0.0) && (!stop_cpu))
+        }
+    if ((wait > 0.0) && (!stop_cpu)) {
+        if (sim_switches & SWMASK ('V'))
+            sim_printf ("Sleeping for: %s          \r", sim_fmt_secs (wait / 1000.0));
         sim_os_ms_sleep ((unsigned)wait);
+        }
     }
 stop_cpu = FALSE;                   /* Clear in case sleep was interrupted */
 return SCPE_OK;
