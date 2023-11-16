@@ -494,7 +494,7 @@ if (val.tv_sec >= TOY_MAX_SECS) {                       /* todr overflowed? */
     return todr_reg = 0;                                /* stop counting */
     }
 
-sim_debug (DBG_REG, &clk_dev, "todr_rd() - TODR=0x%X\n", (int32)(val.tv_sec*100 + val.tv_nsec/10000000));
+sim_debug (DBG_REG, &clk_dev, "todr_rd() - TODR=0x%X\n", (int32)(val.tv_sec*100 + (val.tv_nsec + 5000000)/10000000));
 return (int32)(val.tv_sec*100 + (val.tv_nsec + 5000000)/10000000);  /* 100hz Clock rounded Ticks */
 }
 

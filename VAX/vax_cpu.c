@@ -3300,6 +3300,12 @@ return 0;                                               /* set new cc's */
 
 void cpu_idle (void)
 {
+/* Normal use of sim_idle would specify FALSE (0) as the sim_interval */
+/* adjustment parameter since this simullator doesn't have a WAIT     */
+/* instruction and merely detects instruction patterns that reflect   */
+/* the system idling.  However, a TRUE (1) value for this parameter   */
+/* produces clock calibration results while idling which closer       */
+/* the actual simulator instruction execution rate.                   */
 sim_idle (TMR_CLK, TRUE);
 }
 
