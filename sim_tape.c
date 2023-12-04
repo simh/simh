@@ -4543,9 +4543,9 @@ static void ansi_make_HDR1 (HDR1 *hdr1, VOL1 *vol, HDR4 *hdr4, const char *filen
     memcpy (hdr4->type, "HDR", 3);
     hdr4->num = '4';
     to_ansi_a (hdr1->file_ident, fn, sizeof (hdr1->file_ident));
-    if (strlen (fn) > 17) {
-        to_ansi_a (hdr4->extra_name, fn + 17, sizeof (hdr4->extra_name));
-        sprintf (extra_name_used, "%02d", (int)(strlen (fn) - 17));
+    if (strlen (fn) > sizeof (hdr1->file_ident)) {
+        to_ansi_a (hdr4->extra_name, fn + sizeof (hdr1->file_ident), sizeof (hdr4->extra_name));
+        snprintf (extra_name_used, sizeof (extra_name_used), "%02d", (int)(MIN((strlen (fn) - sizeof (hdr1->file_ident)), sizeof (hdr4->extra_name))));
         }
     memcpy (hdr4->extra_name_used, extra_name_used, 2);
     memcpy (hdr1->file_set, vol->ident, sizeof (hdr1->file_set));
