@@ -2512,15 +2512,17 @@ t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 int32 i, lnt;
 t_stat r;
 
-if (cptr == NULL) {
+if (cptr == NULL) { /* Clear History */
     for (i = 0; i < hst_lnt; i++)
         hst[i].pc = 0;
     hst_p = 0;
     return SCPE_OK;
     }
 lnt = (int32) get_uint (cptr, 10, HIST_MAX, &r);
-if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN)))
-    return SCPE_ARG;
+if (r != SCPE_OK)
+    return sim_messagef (SCPE_ARG, "Invalid Numeric Value: %s.  Maximum is %d\n", cptr, HIST_MAX);
+if (lnt && (lnt < HIST_MIN))
+    return sim_messagef (SCPE_ARG, "%d is less than the minumum history value of %d\n", lnt, HIST_MIN);
 hst_p = 0;
 if (hst_lnt) {
     free (hst);
@@ -2550,7 +2552,7 @@ if (hst_lnt == 0)                                       /* enabled? */
 if (cptr) {
     lnt = (int32) get_uint (cptr, 10, hst_lnt, &r);
     if ((r != SCPE_OK) || (lnt == 0))
-        return SCPE_ARG;
+        return sim_messagef (SCPE_ARG, "Invalid count specifier: %s, max is %d\n", cptr, hst_lnt);
     }
 else lnt = hst_lnt;
 di = hst_p - lnt;                                       /* work forward */
@@ -2558,6 +2560,10 @@ if (di < 0)
     di = di + hst_lnt;
 fprintf (st, "PC      AC            EA      IR\n\n");
 for (k = 0; k < lnt; k++) {                             /* print specified */
+    if (stop_cpu) {                                     /* Control-C (SIGINT) */
+        stop_cpu = FALSE;
+        break;                                          /* abandon remaining output */
+        }
     h = &hst[(++di) % hst_lnt];                         /* entry pointer */
     if (h->pc & HIST_PC) {                              /* instruction? */
         fprintf (st, "%06o  ", h->pc & AMASK);

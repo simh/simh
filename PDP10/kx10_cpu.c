@@ -13956,8 +13956,10 @@ if (cptr == NULL) {
     return SCPE_OK;
     }
 lnt = (int32) get_uint (cptr, 10, HIST_MAX, &r);
-if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN)))
-    return SCPE_ARG;
+if (r != SCPE_OK)
+    return sim_messagef (SCPE_ARG, "Invalid Numeric Value: %s.  Maximum is %d\n", cptr, HIST_MAX);
+if (lnt && (lnt < HIST_MIN))
+    return sim_messagef (SCPE_ARG, "%d is less than the minumum history value of %d\n", lnt, HIST_MIN);
 hst_p = 0;
 if (hst_lnt) {
     free (hst);
@@ -13995,6 +13997,10 @@ if (di < 0)
     di = di + hst_lnt;
 fprintf (st, "PC       AC             EA        AR            RES           FLAGS IR\n\n");
 for (k = 0; k < lnt; k++) {                             /* print specified */
+    if (stop_cpu) {                                     /* Control-C (SIGINT) */
+        stop_cpu = FALSE;
+        break;                                          /* abandon remaining output */
+    }
     h = &hst[(++di) % hst_lnt];                         /* entry pointer */
     if (h->pc & HIST_PC) {                              /* instruction? */
 #if KL

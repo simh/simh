@@ -525,6 +525,10 @@ cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
     j = history_m + history_i - history_n;
 
   for (i = 0; i < history_n; i++) {
+    if (stop_cpu) {                 /* Control-C (SIGINT) */
+        stop_cpu = FALSE;
+        break;                      /* abandon remaining output */
+    }
     fprintf (st, "%06o %06o %06o %06o %06o %d  ",
              history[j].PC,
              history[j].IR,

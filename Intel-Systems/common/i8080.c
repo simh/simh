@@ -1555,8 +1555,10 @@ t_stat cpu_set_hist(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
         return SCPE_OK;
         }
     lnt = (int32) get_uint (cptr, 10, HIST_MAX, &r);
-    if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN)))
-        return SCPE_ARG;
+    if (r != SCPE_OK)
+        return sim_messagef (SCPE_ARG, "Invalid Numeric Value: %s.  Maximum is %d\n", cptr, HIST_MAX);
+    if (lnt && (lnt < HIST_MIN))
+        return sim_messagef (SCPE_ARG, "%d is less than the minumum history value of %d\n", lnt, HIST_MIN);
     hst_p = 0;
     if (hst_lnt) {
         free (hst);
@@ -1586,7 +1588,7 @@ t_stat cpu_show_hist(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
     if (cptr) {
         lnt = (int32) get_uint (cptr, 10, hst_lnt, &r);
         if ((r != SCPE_OK) || (lnt == 0))
-            return SCPE_ARG;
+            return sim_messagef (SCPE_ARG, "Invalid count specifier: %s, max is %d\n", cptr, hst_lnt);
         }
     else lnt = hst_lnt;
     di = hst_p - lnt;                       /* work forward */
@@ -1594,6 +1596,10 @@ t_stat cpu_show_hist(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
         di = di + hst_lnt;
     fprintf (st, "PC   SP   CC A  B  C  D  E  F  H  L  Instruction\n\n");
     for (k = 0; k < lnt; k++) {             /* print specified */
+        if (stop_cpu) {                     /* Control-C (SIGINT) */
+            stop_cpu = FALSE;
+            break;                          /* abandon remaining output */
+            }
         h = &hst[(di++) % hst_lnt];         /* entry pointer */
         ir = h->inst[0];
         fprintf (st, "%04X %04X %02X ", h->pc , h->sp, h->psw);

@@ -4272,8 +4272,10 @@ cpu_set_hist(UNIT * uptr, int32 val, CONST char *cptr, void *desc)
         return SCPE_OK;
     }
     lnt = (int32) get_uint(cptr, 10, HIST_MAX, &r);
-    if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN)))
-        return SCPE_ARG;
+    if (r != SCPE_OK)
+        return sim_messagef (SCPE_ARG, "Invalid Numeric Value: %s.  Maximum is %d\n", cptr, HIST_MAX);
+    if (lnt && (lnt < HIST_MIN))
+        return sim_messagef (SCPE_ARG, "%d is less than the minumum history value of %d\n", lnt, HIST_MIN);
     hst_p = 0;
     if (hst_lnt) {
         free(hst);
@@ -4315,6 +4317,10 @@ cpu_show_hist(FILE * st, UNIT * uptr, int32 val, CONST void *desc)
     fprintf(st,
 "IC      AC            MQ            EA      SR             XR1    XR2   XR4\n\n");
     for (k = 0; k < lnt; k++) { /* print specified */
+        if (stop_cpu) {                 /* Control-C (SIGINT) */
+            stop_cpu = FALSE;
+            break;                      /* abandon remaining output */
+        }
         h = &hst[(++di) % hst_lnt];     /* entry pointer */
         if (h->ic & HIST_PC) {  /* instruction? */
             fprintf(st, "%06o%c", h->ic & 077777, ((h->ic>>19)&1)?'b':' ');

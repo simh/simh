@@ -7548,8 +7548,10 @@ cpu_set_hist(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
     }
     /* the user has specified options, process them */
     lnt = (int32)get_uint(cptr, 10, HIST_MAX, &r);
-    if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN)))
-        return SCPE_ARG;                            /* arg error for bad input or too small a value */
+    if (r != SCPE_OK)
+        return sim_messagef (SCPE_ARG, "Invalid Numeric Value: %s.  Maximum is %d\n", cptr, HIST_MAX);
+    if (lnt && (lnt < HIST_MIN))
+        return sim_messagef (SCPE_ARG, "%d is less than the minumum history value of %d\n", lnt, HIST_MIN);
     hst_p = 0;                                      /* start at beginning */
     if (hst_lnt) {                                  /* if a new length was input, resize history buffer */
         free(hst);                                  /* out with the old */
@@ -7586,6 +7588,10 @@ t_stat cpu_show_hist(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
     if (di < 0)
         di = di + hst_lnt;                          /* wrap */
     for (k = 0; k < lnt; k++) {                     /* print specified entries */
+        if (stop_cpu) {                             /* Control-C (SIGINT) */
+            stop_cpu = FALSE;
+            break;                                  /* abandon remaining output */
+        }
         h = &hst[(++di) % hst_lnt];                 /* entry pointer */
         /* display the instruction and results */
         if (MODES & BASEBIT)

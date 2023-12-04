@@ -1468,7 +1468,7 @@ t_stat cpu_set_hist(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 
     /* If no length was provided, give up */
     if (result != SCPE_OK) {
-        return SCPE_ARG;
+        return sim_messagef (SCPE_ARG, "Invalid Numeric Value: %s.  Maximum is %d\n", cptr, MAX_HIST_SIZE);
     }
 
     /* Legnth 0 is a special flag that means disable the feature. */
@@ -1535,6 +1535,10 @@ t_stat cpu_show_hist(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
     fprintf(st, "PSW      SP       PC        IR\n");
 
     for (i = 0; i < count; i++) {
+        if (stop_cpu) {                                     /* Control-C (SIGINT) */
+            stop_cpu = FALSE;
+            break;                                          /* abandon remaining output */
+        }
         ip = &INST[(di++) % (int32) cpu_hist_size];
         if (ip->valid) {
             /* Show the opcode mnemonic */

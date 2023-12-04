@@ -1586,7 +1586,7 @@ for ( ;; ) {
         hst_p = hst_p + 1;
         if (hst_p >= hst_lnt)
             hst_p = 0;
-        if (hst_log && (hst_p == hst_log_p))
+        if (hst_log && (hst_p == hst_log_p))    /* File Logging and Full, then write all records*/
             cpu_show_hist_records (hst_log, FALSE, hst_log_p, hst_lnt);
         }
 
@@ -3533,21 +3533,21 @@ int32 i, lnt;
 char gbuf[CBUFSIZE];
 t_stat r;
 
-if (cptr == NULL) {
-    for (i = 0; i < hst_lnt; i++)
-        hst[i].iPC = 0;
-    hst_p = 0;
+if (cptr == NULL) { /* Clear History */
     if (hst_log) {
         sim_set_fsize (hst_log, (t_addr)0);
         hst_log_p = 0;
         cpu_show_hist_records (hst_log, TRUE, 0, 0);
         }
+    for (i = 0; i < hst_lnt; i++)
+        hst[i].iPC = 0;
+    hst_p = 0;
     return SCPE_OK;
     }
 cptr = get_glyph (cptr, gbuf, ':');
 lnt = (int32) get_uint (gbuf, 10, HIST_MAX, &r);
 if (r != SCPE_OK)
-    return sim_messagef (SCPE_ARG, "Invalid Numeric Value: %s\n", gbuf);
+    return sim_messagef (SCPE_ARG, "Invalid Numeric Value: %s.  Maximum is %d\n", gbuf, HIST_MAX);
 if (lnt && (lnt < HIST_MIN))
     return sim_messagef (SCPE_ARG, "%d is less than the minumum history value of %d\n", lnt, HIST_MIN);
 hst_p = 0;
@@ -3594,7 +3594,7 @@ if (hst_lnt == 0)                                       /* enabled? */
 if (cptr) {
     lnt = (int32) get_uint (cptr, 10, hst_lnt, &r);
     if ((r != SCPE_OK) || (lnt == 0))
-        return SCPE_ARG;
+        return sim_messagef (SCPE_ARG, "Invalid count specifier: %s, max is %d\n", cptr, hst_lnt);
     }
 else lnt = hst_lnt;
 di = hst_p - lnt;                                       /* work forward */
@@ -3616,6 +3616,10 @@ if (do_header) {
     fprintf (st, "PC       PSL       IR\n\n");
     }
 for (k = 0; k < count; k++) {                           /* print specified */
+    if (stop_cpu) {                                     /* Control-C (SIGINT) */
+        stop_cpu = FALSE;
+        break;                                          /* abandon remaining output */
+        }
     h = &hst[(start++) % hst_lnt];                      /* entry pointer */
     if (h->iPC == 0)                                    /* filled in? */
         continue;
@@ -4010,7 +4014,7 @@ fprintf (st, "   sim> SET CPU HISTORY                 clear history buffer\n");
 fprintf (st, "   sim> SET CPU HISTORY=0               disable history\n");
 fprintf (st, "   sim> SET CPU {-T} HISTORY=n{:file}   enable history, length = n\n");
 fprintf (st, "   sim> SHOW CPU HISTORY                print CPU history\n");
-fprintf (st, "   sim> SHOW CPU HISTORY=n              print first n entries of CPU history\n\n");
+fprintf (st, "   sim> SHOW CPU HISTORY=n              print most recent n entries of history\n\n");
 fprintf (st, "The -T switch causes simulator time to be recorded (and displayed)\n");
 fprintf (st, "with each history entry.\n");
 fprintf (st, "When writing history to a file (SET CPU HISTORY=n:file), 'n' specifies\n");

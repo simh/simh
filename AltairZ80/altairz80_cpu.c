@@ -7186,6 +7186,10 @@ t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
     if (di < 0) di = di + hst_lnt;
 
     for (k = 0; k < lnt; k++) {
+        if (stop_cpu) {                              /* Control-C (SIGINT) */
+            stop_cpu = FALSE;
+            break;                                   /* abandon remaining output */
+        }
         h = &hst[(di++) % hst_lnt];
 
         if (h->valid) {                              /* valid entry? */
