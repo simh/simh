@@ -678,7 +678,7 @@ if (c != NULL) {
     if ((c - validate_addr) > sizeof (v_cpy) - 1)
         return status;
     memcpy (v_cpy, validate_addr, c - validate_addr);   /* Copy everything before the / */
-    v_cpy[1 + c - validate_addr] = '\0';                /* NUL terminate the result */
+    v_cpy[c - validate_addr] = '\0';                    /* NUL terminate the result */
     validate_addr = v_cpy;                              /* Use the original string minus the prefix specifier */
     }
 if (p_getaddrinfo(validate_addr, NULL, NULL, &ai_validate))
