@@ -304,6 +304,8 @@ return total;
 /* Forward Declaration */
 
 t_offset sim_ftell (FILE *st);
+static int _sim_filename_compare (const char *filename1, const char *filename2);
+static void _flush_filelist_directory_cache_entry (const char *directory);
 
 /* Get file size */
 
@@ -564,29 +566,98 @@ static struct relative_path_test {
         {NULL},
         };
 
+static struct filename_compare_test {
+    const char *testname;
+    const char *filename1;
+    const char *filename2;
+    int         expected_result;
+    } name_compare_test[] = {
+        {"name-equal-drive letter different case",
+         "C:\\Xyz\\zzz.x",
+         "c:\\Xyz\\zzz.x",
+         0},
+        {"name-diff-drive letter different",
+         "C:\\Xyz\\zzz.x",
+         "E:\\Xyz\\zzz.x",
+         -1},
+        {"name-diff-drive letter different-vs-path",
+         "C:\\Xyz\\zzz.x",
+         "\\Xyz\\zzz.x",
+         -1},
+        {"name-equal-separator-different-2",
+         "C:/Xyz/zzz.x",
+         "c:\\Xyz\\zzz.x",
+#if defined(_WIN32)
+         2},
+#else
+         1},
+#endif
+        {"name-equal-separator-different-1",
+         "c:\\Xyz\\zzz.x",
+         "C:/Xyz/zzz.x",
+#if defined(_WIN32)
+         1},
+#else
+         2},
+#endif
+        {"name-different-equal-path-diff-filename",
+         "/a/b/cdd/dzzz.x",
+         "/a/b/cdd/zzzz.x",
+         -1},
+        {"name-diff-nostarting-separator",
+         "a/b/cdd/dzzz.x",
+         "a/b/cdd/zzzz.x",
+         -1},
+        {"name-equal-nostarting-separator",
+         "a/b/cdd/dzzz.x",
+         "a/b/cdd/dzzz.x",
+         0},
+        {"name-equal-noseparator",
+         "zzz.x",
+         "zzz.x",
+         0},
+        {"name-diff-nostarting-separator",
+         "a/b/cdd/dzzz.x",
+         "abcddzzzz.x",
+         -1},
+        {"name-diff-nostarting-same-length",
+         "abcddzzzz.x/b/cdd/dzzz.x",
+         "abcddzzzz.x",
+         -1},
+        {"name-diff-nostarting-same-length-firsttoken",
+         "abcde.x/b/cdd/dzzz.x",
+         "abcde.x",
+         -1},
+        {NULL},
+        };
+
 static struct get_filelist_test {
     const char *name;
     const char  *files[10];
     const char *search;
     int         expected_count;
    } get_test[] = {
-        {"test-1",
-         {"file.txt",
+        {"test-single file in subdirectory",
+         {"a0a/file.txt",
           NULL},
          "file.txt", 1},
-        {"test-2",
+        {"test-similar deep file names",
          {"aab/bbc/ccd/eef/file.txt", 
           "aab/bbc/ccd/eef/file2.txt", 
           "aac/bbd/cce/eef/file2.txt", 
           NULL},
          "file.txt", 1},
-        {"test-3",
+        {"test-single file no subdirectories",
+         {"file.txt",
+          NULL},
+         "file.txt", 1},
+        {"test-3 text files in the same 4 deep subdirectory",
          {"aab/bbc/ccd/eef/file.txt", 
           "aab/bbc/ccd/eef/file2.txt", 
           "aac/bbd/cce/eef/file2.txt", 
           NULL},
          "*.txt", 3},
-        {"test-4",
+        {"test-2 text files",
          {"xab/bbc/ccd/eef/file.txt", 
           "xab/bbc/ccd/eef/file2.bbb", 
           "xac/bbd/cce/eef/file2.txt", 
@@ -601,19 +672,22 @@ t_stat sim_fio_test (const char *cptr)
 {
 struct pack_test *pt;
 struct relative_path_test *rt;
+struct filename_compare_test *nt;
 struct get_filelist_test *gt;
 t_stat r = SCPE_OK;
 char test_desc[512];
 uint8 result[512];
+int tests;
 
 sim_register_internal_device (&sim_fio_test_dev);
 sim_fio_test_dev.dctrl |= (sim_switches & SWMASK ('D')) ? FIO_DBG_PACK : 0;
 sim_fio_test_dev.dctrl |= (sim_switches & SWMASK ('S')) ? FIO_DBG_SCAN : 0;
 sim_set_deb_switches (SWMASK ('F'));
-sim_messagef (SCPE_OK, "sim_buf_pack_unpack - tests\n");
-for (pt = p_test; pt->src; ++pt) {
+sim_messagef (SCPE_OK, "*** Running sim_buf_pack_unpack - tests\n");
+for (pt = p_test, tests = 0; pt->src; ++pt) {
     t_bool res;
 
+    ++tests;
     snprintf (test_desc, sizeof (test_desc), "%dbit%s->%dbit%s %d words", pt->sbits, pt->slsb ? "LSB" : "MSB", pt->dbits, pt->dlsb ? "LSB" : "MSB", pt->scount);
     memset (result, 0x80, sizeof (result));
     res = sim_buf_pack_unpack (pt->src, result, pt->sbits, pt->slsb, pt->scount, pt->dbits, pt->dlsb);
@@ -634,8 +708,11 @@ for (pt = p_test; pt->src; ++pt) {
     else
         r = sim_messagef (SCPE_IERR, "%s - BAD Status - Expected: %s got %s\n", test_desc, pt->exp_stat ? "True" : "False", res ? "True" : "False");
     }
-sim_messagef (SCPE_OK, "Testing relative path logic:\n");
-for (rt = r_test; rt->input; ++rt) {
+if (r != SCPE_OK)
+    return r;
+sim_messagef (SCPE_OK, "*** All %d sim_buf_pack_unpack tests GOOD\n", tests);
+sim_messagef (SCPE_OK, "*** Testing relative path logic:\n");
+for (rt = r_test, tests = 0; rt->input; ++rt) {
     char input[PATH_MAX + 1];
     char cmpbuf[PATH_MAX + 1];
     char cwd[PATH_MAX + 1];
@@ -647,6 +724,7 @@ for (rt = r_test; rt->input; ++rt) {
     const char *sep;
     t_stat mkdir_stat = SCPE_OK;
 
+    ++tests;
     strlcpy (origcwd, cwd, sizeof (origcwd));
     if (rt->extra_dir != NULL)
         mkdir_stat = mkdir_cmd (0, rt->extra_dir);
@@ -715,16 +793,38 @@ for (rt = r_test; rt->input; ++rt) {
         free (xdir);
         }
     }
-sim_messagef (SCPE_OK, "Testing get filelist:\n");
-for (gt = get_test; gt->name; ++gt) {
+if (r != SCPE_OK)
+    return r;
+sim_messagef (SCPE_OK, "*** All %d relative path logic tests GOOD\n", tests);
+sim_messagef (SCPE_OK, "*** Testing filename compare:\n");
+for (nt = name_compare_test, tests = 0; nt->testname; ++nt) {
+    int result;
+
+    ++tests;
+    result = _sim_filename_compare (nt->filename1, nt->filename2);
+    if (result != nt->expected_result) {
+        sim_messagef (SCPE_IERR, "Name Compare test %d %s\n", tests, nt->testname);
+        sim_messagef (SCPE_IERR, "    filename1: %s\n", nt->filename1);
+        sim_messagef (SCPE_IERR, "    filename2: %s\n", nt->filename2);
+        r = sim_messagef (SCPE_IERR, "    BAD result: %d\n", result);
+        }
+    }
+if (r != SCPE_OK)
+    return r;
+sim_messagef (SCPE_OK, "*** All %d filename compare tests GOOD\n", tests);
+sim_messagef (SCPE_OK, "*** Testing sim_get_filelist:\n");
+for (gt = get_test, tests = 0; gt->name; ++gt) {
     char xpath[PATH_MAX + 1];
     int i;
     char **filelist;
 
-    sim_messagef (SCPE_OK, "FileList test %s\n", gt->name);
+    ++tests;
+    sim_messagef (r, "FileList test %s\n", gt->name);
     for (i=0; gt->files[i]; ++i) {
         char *c, *end;
         char *filename = sim_filepath_parts (gt->files[i], "nx");
+
+        sim_messagef (r, "Creating: %s\n", gt->files[i]);
         snprintf (xpath, sizeof (xpath), "testfiles/%s", gt->files[i]);
         end = strrchr (xpath, '/');
         *end = '\0';
@@ -743,14 +843,16 @@ for (gt = get_test; gt->name; ++gt) {
     snprintf (xpath, sizeof (xpath), "%s", gt->search);
     filelist = sim_get_filelist (xpath);
     sim_chdir ("..");
-    r = sim_messagef ((gt->expected_count != sim_count_filelist (filelist)) ? SCPE_IERR : SCPE_OK, 
-                      "sim_get_filelist (\"%s\") yielded %d entries:\n", xpath, sim_count_filelist (filelist));
+    r |= sim_messagef ((gt->expected_count != sim_count_filelist (filelist)) ? SCPE_IERR : SCPE_OK, 
+                      "sim_get_filelist (\"%s\") yielded %d entries, expected %d entries:\n", xpath, sim_count_filelist (filelist), gt->expected_count);
     sim_print_filelist (filelist);
     sim_free_filelist (&filelist);
+    /* Cleanup created test files and directories */
     for (i=0; gt->files[i]; ++i) {
         char *c;
         char *filename = sim_filepath_parts (gt->files[i], "nx");
         snprintf (xpath, sizeof (xpath), "testfiles/%s", gt->files[i]);
+        sim_messagef (r, "Removing: %s\n", gt->files[i]);
         unlink (xpath);
         c = strrchr (xpath, '/');
         *c = '\0';
@@ -763,6 +865,8 @@ for (gt = get_test; gt->name; ++gt) {
         free (filename);
         }
     }
+if (r == SCPE_OK)
+    sim_messagef (SCPE_OK, "All %d sim_get_filelist tests GOOD\n", tests);
 return r;
 }
 
@@ -801,9 +905,23 @@ return mkdir (pathbuf, 0777);
 int sim_rmdir(const char *path)
 {
 char pathbuf[PATH_MAX + 1];
+struct stat statb;
+char *fullpath;
+char FullPath[PATH_MAX + 1];
 
 if (NULL == _sim_expand_homedir (path, pathbuf, sizeof (pathbuf)))
     return -1;
+
+memset (&statb, 0, sizeof (statb));
+(void)stat (pathbuf, &statb);
+if ((statb.st_mode & S_IFDIR) == 0)
+    return rmdir (pathbuf);         /* This is an error, but let rmdir() set errno */
+
+fullpath = sim_filepath_parts (pathbuf, "f");
+snprintf (FullPath, sizeof (FullPath), "%s/*", fullpath);
+free (fullpath);
+_flush_filelist_directory_cache_entry (FullPath);
+
 return rmdir (pathbuf);
 }
 
@@ -844,6 +962,27 @@ entry->dirlist = dirlist;
 entry->next = _filelist_directory_cache;
 _filelist_directory_cache = entry;
 sim_debug (FIO_DBG_SCAN, &sim_fio_test_dev, "_save_filelist_directory_cache(directory=\"%s\") saved with %d directories\n", directory, sim_count_filelist (dirlist));
+}
+
+static void _flush_filelist_directory_cache_entry (const char *directory)
+{
+FILELIST_DIRECTORY_CACHE *entry = _filelist_directory_cache;
+FILELIST_DIRECTORY_CACHE *last = NULL;
+
+while (entry != NULL) {
+    if (strcmp (entry->directory, directory) == 0) {
+        if (last == NULL)
+            _filelist_directory_cache = entry->next;
+        else
+            last->next = entry->next;
+        free (entry->directory);
+        sim_free_filelist (&entry->dirlist);
+        free (entry);
+        return;
+        }
+    last = entry;
+    entry = entry->next;
+    }
 }
 
 static void _flush_filelist_directory_cache (void)
@@ -937,6 +1076,92 @@ if (*filename != '\0') {
     }
 }
 
+/*
+ * Compare two file names ignoring possibly different path separators
+ * 
+ * Return value
+ *    -1 - names are different
+ *     0 - names are equal
+ *     1 - names equal first one is preferred on this platform - 
+ *         path separators are locally appropriate.
+ *     2 - names equal second one is preferred on this platform - 
+ *         path separators are locally appropriate.
+ */
+static int _sim_filename_compare (const char *name1,
+                                  const char *name2)
+{
+const char *p1 = name1;
+const char *p2 = name2;
+const char *e1;
+const char *e2;
+char n1_sep = '\0';
+char n2_sep = '\0';
+int result = -2;
+
+if (p1[1] == ':') {  /* Windows Drive letter delimiter */
+    if ((p2[1] == ':') &&
+        (sim_toupper (p1[0]) == sim_toupper (p2[0]))) {
+        p1 += 2;
+        p2 += 2;
+        }
+    }
+if ((*p1 == '/') || (*p1 == '\\')) {
+    n1_sep = *p1;
+    ++p1;
+    }
+if ((*p2 == '/') || (*p2 == '\\')) {
+    n2_sep = *p2;
+    ++p2;
+    }
+if (n1_sep == '\0') {
+    if (strchr (p1, '/'))
+        n1_sep = '/';
+    if (strchr (p1, '\\'))
+        n1_sep = '\\';
+    }
+if (n2_sep == '\0') {
+    if (strchr (p2, '/'))
+        n2_sep = '/';
+    if (strchr (p2, '\\'))
+        n2_sep = '\\';
+    }
+if (strcmp (p1, p2) == 0)
+    result = 0;
+while (result == -2) {
+    e1 = strchr (p1, n1_sep);
+    e2 = strchr (p2, n2_sep);
+    if ((e1 != NULL) && (e2 != NULL)) {
+        if ((e1 - p1) != (e2 - p2)) {
+            result = -1;/* Directory or filename Lengths differ */
+            break;
+            }
+        if (memcmp (p1, p2, (e1 - p1)) != 0) {
+            result = -1;/* Directory or filename differ */
+            break;
+            }
+        /* Move to next Directory or filename */
+        p1 = e1 + ((n1_sep != '\0') ? 1 : 0);
+        p2 = e2 + ((n2_sep != '\0') ? 1 : 0);
+        continue;
+        }
+    if (((e1 != NULL) && (e2 == NULL)) ||
+        ((e2 != NULL) && (e1 == NULL))) {
+        result = -1;    /* At the end of one filename but not both */
+        }
+    if (0 != strcmp (p1, p2)) {
+        result = -1;    /* The filename parts are different */
+        break;
+        }
+    if (n1_sep == sim_file_path_separator) {
+        result = 1;
+        break;
+        }
+    result = 2;
+    }
+sim_debug (FIO_DBG_SCAN, &sim_fio_test_dev, "_sim_filename_compare(\"%s\", \"%s\") result: %d\n", name1, name2, result);
+return result;
+}
+
 static void _sim_filelist_entry (const char *directory, 
                                  const char *filename,
                                  t_offset FileSize,
@@ -949,8 +1174,19 @@ int listcount = 0;
 
 snprintf (FullPath, sizeof (FullPath), "%s%s", directory, filename);
 if (filelist != NULL) {
-    while (filelist[listcount++] != NULL);
-    --listcount;
+    while (filelist[listcount] != NULL) {
+        int same = _sim_filename_compare (filelist[listcount], FullPath);
+
+        if (same < 0) {
+            ++listcount;
+            continue;
+            }
+        if (same == 2) {
+            free (filelist[listcount]);
+            filelist[listcount] = strdup (FullPath);
+            }
+        return;
+        }
     }
 filelist = (char **)realloc (filelist, (listcount + 2) * sizeof (filelist));
 filelist[listcount] = strdup (FullPath);
