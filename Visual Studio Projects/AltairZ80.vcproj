@@ -368,6 +368,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\AltairZ80\s100_jair.c"
+				>
+			</File>
+			<File
 				RelativePath="..\AltairZ80\s100_mdriveh.c"
 				>
 			</File>

@@ -2050,6 +2050,7 @@ ALTAIR_OPT = -I ${ALTAIRD}
 
 ALTAIRZ80D = ${SIMHD}/AltairZ80
 ALTAIRZ80 = ${ALTAIRZ80D}/altairz80_cpu.c ${ALTAIRZ80D}/altairz80_cpu_nommu.c \
+	${ALTAIRZ80D}/s100_jair.c \
 	${ALTAIRZ80D}/sol20.c \
 	${ALTAIRZ80D}/s100_vdm1.c \
 	${ALTAIRZ80D}/mmd.c \
