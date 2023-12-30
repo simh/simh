@@ -185,16 +185,16 @@ uint32 dmac_read(uint32 pa, size_t size)
             break;
         default:
             sim_debug(READ_MSG, &dmac_dev,
-                      "DMAC READ %lu B @ %08x\n",
-                      size, pa);
+                      "DMAC READ %u B @ %08x\n",
+                      (unsigned int)size, pa);
             data = 0;
         }
 
         return data;
     default:
         sim_debug(READ_MSG, &dmac_dev,
-                  "[BASE: %08x] DMAC READ %lu B @ %08x\n",
-                  base, size, pa);
+                  "[BASE: %08x] DMAC READ %u B @ %08x\n",
+                  base, (unsigned int)size, pa);
         return 0;
     }
 }
