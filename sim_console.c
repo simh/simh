@@ -2188,7 +2188,10 @@ else
     if (kmap_char <= 26)
         fprintf (st, " = ^%c\n", '@' + (kmap_char&0xFF));
     else
-        fprintf (st, "\n");
+        if (kmap_char == 28)
+            fprintf (st, " = ^\\\n");
+        else
+            fprintf (st, "\n");
 return SCPE_OK;
 }
 
@@ -2224,7 +2227,7 @@ if (sim_tt_pchar) {
     static const char *pchars[] = {"NUL(^@)", "SOH(^A)", "STX(^B)", "ETX(^C)", "EOT(^D)", "ENQ(^E)", "ACK(^F)", "BEL(^G)", 
                                    "BS(^H)" , "HT(^I)",  "LF(^J)",  "VT(^K)",  "FF(^L)",  "CR(^M)",  "SO(^N)",  "SI(^O)",
                                    "DLE(^P)", "DC1(^Q)", "DC2(^R)", "DC3(^S)", "DC4(^T)", "NAK(^U)", "SYN(^V)", "ETB(^W)",
-                                   "CAN(^X)", "EM(^Y)",  "SUB(^Z)", "ESC",     "FS",      "GS",      "RS",      "US"};
+                                   "CAN(^X)", "EM(^Y)",  "SUB(^Z)", "ESC",     "FS(^\\)", "GS",      "RS",      "US"};
     int i;
     t_bool found = FALSE;
 
