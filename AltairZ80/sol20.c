@@ -85,7 +85,8 @@ extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_typ
 extern t_stat set_dev_enbdis(DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr);
 extern t_stat (*vdm1_kb_callback)(SIM_KEY_EVENT *kev);
 extern t_stat set_membase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
-extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+extern t_stat show_rambase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+extern t_stat show_rombase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern t_stat set_cmd(int32 flag, CONST char *cptr);
 
 extern void PutBYTEWrapper(const uint32 Addr, const uint32 Value);
@@ -135,6 +136,7 @@ static t_stat sol20_rewind(UNIT *uptr);
 static t_stat sol20_erase(UNIT *uptr);
 static int32 sol20io(int32 addr, int32 rw, int32 data);
 static int32 sol20rom(int32 addr, int32 rw, int32 data);
+static int32 sol20ram(int32 addr, int32 rw, int32 data);
 static uint8 sol20_io_in(uint32 addr);
 static uint8 sol20_io_out(uint32 addr, int32 data);
 static t_stat sol20_kb_callback(SIM_KEY_EVENT *kev);
@@ -143,6 +145,12 @@ static uint8 translate_key(SIM_KEY_EVENT *kev);
 /***********/
 /* RAM/ROM */
 /***********/
+
+#define SOL20_RAM_BASE   0xc800
+#define SOL20_RAM_SIZE   1024
+#define SOL20_RAM_MASK   (SOL20_RAM_SIZE-1)
+
+static uint8 sol20_ram[SOL20_RAM_SIZE];
 
 #define SOL20_ROM_BASE   0xc000
 #define SOL20_ROM_SIZE   2048
@@ -978,14 +986,16 @@ static uint8 *sol20_rom = sol20_rom_41;    /* Default 4.1 ROM */
 */
 
 typedef struct {
-    uint32    rom_base;     /* Memory Base Address */
-    uint32    rom_size;     /* Memory Address space requirement */
+    uint32    rom_base;     /* ROM Base Address */
+    uint32    rom_size;     /* ROM Address space requirement */
     uint32    io_base;      /* I/O Base Address */
     uint32    io_size;      /* I/O Address Space requirement */
+    uint32    ram_base;     /* RAM Base Address */
+    uint32    ram_size;     /* RAM Address space requirement */
 } SOL20_CTX;
 
 static SOL20_CTX sol20_ctx = {
-    SOL20_ROM_BASE, SOL20_ROM_SIZE, SOL20_STAPT, 1
+    SOL20_ROM_BASE, SOL20_ROM_SIZE, SOL20_STAPT, 1, SOL20_RAM_BASE, SOL20_RAM_SIZE
 };
 
 static UNIT sol20_unit[] = {
@@ -998,7 +1008,9 @@ static REG sol20_reg[] = {
 
 static MTAB sol20_mod[] = {
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "ROM", "ROM",
-        &set_membase, &show_membase, NULL, "ROM address"},
+        &set_membase, &show_rombase, NULL, "ROM address"},
+    { MTAB_VDV, 0, "RAM", NULL,
+        NULL, &show_rambase, NULL, "RAM address"},
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VER", "VER={13,13C,41}",
         &sol20_set_rom, &sol20_show_rom, NULL, "ROM version"},
     { MTAB_XTD|MTAB_VDV, 0, "PORT", "PORT",
@@ -1384,6 +1396,7 @@ static t_stat sol20_reset(DEVICE *dptr)
 
     if (dptr->flags & DEV_DIS) { /* Disconnect Resources */
         sim_map_resource(sol20_ctx.rom_base, sol20_ctx.rom_size, RESOURCE_TYPE_MEMORY, &sol20rom, "sol20rom", TRUE);
+        sim_map_resource(sol20_ctx.ram_base, sol20_ctx.ram_size, RESOURCE_TYPE_MEMORY, &sol20ram, "sol20ram", TRUE);
         sim_map_resource(sol20_ctx.io_base, sol20_ctx.io_size, RESOURCE_TYPE_IO, &sol20io, "sol20io", TRUE);
     }
     else {
@@ -1408,7 +1421,11 @@ static t_stat sol20_reset(DEVICE *dptr)
         }
 
         if (sim_map_resource(sol20_ctx.rom_base, sol20_ctx.rom_size, RESOURCE_TYPE_MEMORY, &sol20rom, "sol20rom", FALSE) != 0) {
-            sim_debug(ERROR_MSG, &sol20_dev, "Error mapping MEM resource at 0x%04x\n", sol20_ctx.rom_base);
+            sim_debug(ERROR_MSG, &sol20_dev, "Error mapping ROM resource at 0x%04x\n", sol20_ctx.rom_base);
+            return SCPE_ARG;
+        }
+        if (sim_map_resource(sol20_ctx.ram_base, sol20_ctx.ram_size, RESOURCE_TYPE_MEMORY, &sol20ram, "sol20ram", FALSE) != 0) {
+            sim_debug(ERROR_MSG, &sol20_dev, "Error mapping RAM resource at 0x%04x\n", sol20_ctx.ram_base);
             return SCPE_ARG;
         }
         /* Connect I/O Ports at base address */
@@ -1815,6 +1832,20 @@ static t_stat sol20_erase(UNIT *uptr)
 static int32 sol20rom(int32 addr, int32 rw, int32 data)
 {
     return(sol20_rom[addr & SOL20_ROM_MASK]);
+}
+
+/*
+ * Handles memory reads/writes
+ */
+static int32 sol20ram(int32 addr, int32 rw, int32 data)
+{
+    if (rw == 0) {
+        return(sol20_ram[addr & SOL20_RAM_MASK]);
+    }
+
+    sol20_ram[addr & SOL20_RAM_MASK] = data & 0xff;
+
+    return 0xff;
 }
 
 /*
@@ -2255,6 +2286,44 @@ static uint8 translate_key(SIM_KEY_EVENT *kev)
     }
 
     return 0;
+}
+
+/* Show ROM Address routine */
+t_stat show_rombase(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+    DEVICE *dptr;
+    SOL20_CTX *ctxp;
+
+    if (uptr == NULL)
+        return SCPE_IERR;
+    dptr = find_dev_from_unit (uptr);
+    if (dptr == NULL)
+        return SCPE_IERR;
+    ctxp = (SOL20_CTX *) dptr->ctxt;
+    if (ctxp == NULL)
+        return SCPE_IERR;
+
+    fprintf(st, "ROM=0x%04X-0x%04X", ctxp->rom_base, ctxp->rom_base + ctxp->rom_size-1);
+    return SCPE_OK;
+}
+
+/* Show RAM Address routine */
+t_stat show_rambase(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+    DEVICE *dptr;
+    SOL20_CTX *ctxp;
+
+    if (uptr == NULL)
+        return SCPE_IERR;
+    dptr = find_dev_from_unit (uptr);
+    if (dptr == NULL)
+        return SCPE_IERR;
+    ctxp = (SOL20_CTX *) dptr->ctxt;
+    if (ctxp == NULL)
+        return SCPE_IERR;
+
+    fprintf(st, "RAM=0x%04X-0x%04X", ctxp->ram_base, ctxp->ram_base + ctxp->ram_size-1);
+    return SCPE_OK;
 }
 
 /*
