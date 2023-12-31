@@ -109,8 +109,12 @@ uint32 cdr_cmd(UNIT * uptr, uint16 cmd, uint16 dev)
         }
         return SCPE_BUSY;
     }
-    chan_set_attn(chan);
-    return SCPE_NODEV;
+    uptr->wait = 0;
+    uptr->u5 |= URCSTA_READ | URCSTA_CMD | (24 << CDRPOSSHIFT);
+    chan_set_sel(chan, 0);
+    chan_clear_status(chan);
+    sim_activate(uptr, us_to_ticks(1000));      /* activate */
+    return SCPE_OK;
 }
 
 t_stat cdr_srv(UNIT * uptr)

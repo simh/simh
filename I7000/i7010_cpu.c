@@ -409,6 +409,10 @@ void WriteP(uint32 MA, uint8 v) {
       if (fault)
         return;
 
+
+      if (MA == 275) {
+          int x = v+1;
+      }
       if (reloc && (MA & BBIT) == 0 && MAR > 100) {
           if (low_addr > 0) {
               MAR += low_addr;
@@ -596,7 +600,7 @@ sim_instr(void)
                     if (hst_lnt)        /* History enabled? */
                         hst[hst_p].bend = BAR;
                 }
-                chan_io_status[chwait & 07] &= ~0100;
+                chan_io_status[chwait & 07] &= ~IO_CHS_DONE;
                 chwait = 0;
             }
         }
@@ -1198,7 +1202,7 @@ sim_instr(void)
                 case OP_IO4:
                     /* Not in protected mode */
                      if (prot_enb || reloc) {
-                         reason = STOP_PROG;
+                         reason = STOP_IOCHECK;
                          break;
                      }
                 case OP_STS:
@@ -1242,10 +1246,6 @@ sim_instr(void)
                        break;
                 case OP_UC:
                     /* Not in protected mode */
-                     if (prot_enb || reloc) {
-                         reason = STOP_PROG;
-                         break;
-                     }
 
                     /* Valid forms */
                     /* Op xxx mod */
@@ -1323,8 +1323,10 @@ sim_instr(void)
                 if (cpu_unit.flags & OPTION_PRIO && (pri_enb || timer_enable)) {
                     int irq = inquiry;
                     int     ok_irq = 0;
+
                     for(i = 1; i < NUM_CHAN; i++ ) {
-                        if ((chan_io_status[i] & 0300) == 0300 &&
+                        if ((chan_io_status[i] & (IO_CHS_OVER|IO_CHS_DONE))
+                                   == (IO_CHS_OVER|IO_CHS_DONE) &&
                             chan_irq_enb[i])
                             irq = 1;
                         if (chan_test(i, SNS_ATTN1))
@@ -1332,7 +1334,6 @@ sim_instr(void)
                         if (urec_irq[i])
                             irq = 1;
                     }
-
 
                     if (irq || (timer_enable && timer_irq == 1)) {
                     /* Check if we can interupt this opcode */
@@ -1387,24 +1388,25 @@ sim_instr(void)
                         }
 
                         if (ok_irq) {
-                            sim_debug(DEBUG_PRIO, &cpu_dev, "Irq IAR=%d\n",IAR);
                             prot_enb = reloc = 0;
                             if (pri_enb && irq) {
+                                sim_debug(DEBUG_PRIO, &cpu_dev, "Irq=%d\n",IAR);
                                 IAR = temp;
                                 AAR = 101;
                                 op = OP_PRI;
-                                op_mod = CHR_X; /* X */
+                                op_mod = CHR_X;
                                 if (hst_lnt) {  /* History enabled? */
                                     hst[hst_p].inst[0] = op;
                                     hst[hst_p].inst[1] = op_mod;
                                     hst[hst_p].inst[2] = WM;
                                 }
                             } else if (timer_enable && timer_irq == 1) {
+                                sim_debug(DEBUG_PRIO, &cpu_dev, "Tim=%d\n",IAR);
                                 IAR = temp;
                                 AAR = 301;
                                 timer_irq = 2;
                                 op = OP_PRI;
-                                op_mod = CHR_X; /* X */
+                                op_mod = CHR_X;
                                 if (hst_lnt) {  /* History enabled? */
                                     hst[hst_p].inst[0] = op;
                                     hst[hst_p].inst[1] = op_mod;
@@ -1980,20 +1982,16 @@ sim_instr(void)
                 case CHR_STAR:  /* *   Inq req ch 2 */
                         break;
                 case CHR_1:     /* 1   Overlap in Proc Ch 1 */
-                        jump = ((chan_io_status[1] & 0300) == 0200) && 
-                                chan_active(1);
+                        jump = chan_active(1);
                         break;
                 case CHR_2:     /* 2   Overlap in Proc Ch 2 */
-                        jump = ((chan_io_status[2] & 0300) == 0200) && 
-                                chan_active(2);
+                        jump = chan_active(2);
                         break;
                 case CHR_4:     /* 4   Channel 3 */
-                        jump = ((chan_io_status[3] & 0300) == 0200) &&
-                                chan_active(3);
+                        jump = chan_active(3);
                         break;
                 case CHR_RPARN: /* )   Channel 4 */
-                        jump = ((chan_io_status[4] & 0300) == 0200) &&
-                                chan_active(4);
+                        jump = chan_active(4);
                         break;
                 case CHR_9:     /* 9 Carriage 9 CH1 */ /* 1401 same */
                         jump = lpr_chan9[1];
@@ -2250,15 +2248,19 @@ sim_instr(void)
                                 sim_six_to_ascii[op], ch & 07,
                                 (ch & 010)?"": "overlap",
                              sim_six_to_ascii[op_mod], chan_io_status[ch & 07]);
-                        chan_io_status[ch & 07] = IO_CHS_BUSY;
+                        chan_io_status[ch & 07] |= IO_CHS_BUSY;
                         break;
                 case SCPE_NODEV:
+fprintf(stderr, "No device %d %d\n\r", ch, temp);
+                        /* Fall through */
                 case SCPE_IOERR:
-                        chan_io_status[ch & 07] = IO_CHS_NORDY;
+                        chan_io_status[ch & 07] |= IO_CHS_NORDY;
                         break;
                 }
-                if (CPU_MODEL == 1)
+                if (CPU_MODEL == 1) {
                     chan_io_status[ch & 07] &= 0177;
+                    chwait = (ch & 07) | 040;
+                }
                 break;
 
             case OP_CC1:
@@ -2274,13 +2276,17 @@ sim_instr(void)
                         chan_irq_enb[ch & 7] = 0;
                         break;
                 case SCPE_BUSY:
-                        chan_io_status[ch & 07] = IO_CHS_BUSY;
+                        chan_io_status[ch & 07] |= IO_CHS_BUSY;
                         break;
                 case SCPE_NODEV:
                 case SCPE_IOERR:
-                        chan_io_status[ch & 07] = IO_CHS_NORDY;
+                        chan_io_status[ch & 07] |= IO_CHS_NORDY;
                         break;
                 }
+                sim_debug(DEBUG_CMD, &cpu_dev,
+                   "%d CC1 on %o %o %s %c %o\n", IAR, ch & 07, temp,
+                     (ch & 010)?"": "overlap",
+                     sim_six_to_ascii[op_mod], chan_io_status[ch & 07]);
                 break;
 
             case OP_CC2:
@@ -2350,12 +2356,13 @@ sim_instr(void)
                 switch (chan_cmd(temp, t, 0)) {
                 case SCPE_OK:
                         chan_io_status[ch & 07] = 0000;
+                        chan_irq_enb[ch & 7] = 0;
                         if (ch & 010) {
                             chwait = (ch & 07) | 040;
                         } else if (op_mod == CHR_M) {
                             chan_io_status[ch & 07] = IO_CHS_OVER;
+                            chan_irq_enb[ch & 7] = 1;
                         }
-                        chan_irq_enb[ch & 7] = 0;
                         sim_debug(DEBUG_CMD, &cpu_dev,
                            "%d UC on %o %o %s %c %o\n", IAR, ch & 07, temp,
                              (ch & 010)?"": "overlap",
@@ -2370,8 +2377,9 @@ sim_instr(void)
                         chan_io_status[ch & 07] = IO_CHS_NORDY;
                         break;
                 }
-                if (CPU_MODEL == 1)
+                if (CPU_MODEL == 1) {
                     chan_io_status[ch & 07] &= 0177;
+                }
                 sim_interval -= 100;
                 break;
 
@@ -2380,12 +2388,19 @@ sim_instr(void)
                 ch = 1;
         checkchan:
                 chan_proc();
+                /* If channel is active, wait for it to finish */
+                if (chan_active(ch)) {
+                    chwait = (ch & 07) | 040;
+                    IAR = temp-6; /* Still holds the start of the instruction.*/
+                    break;
+                }
+
                 if (chan_io_status[ch] & op_mod) {
                     jump = 1;
                 }
-                chan_io_status[ch] &= 077;
-                sim_debug(DEBUG_CMD, &cpu_dev, "Check chan %d %o %x\n", ch,
-                        chan_io_status[ch], chan_flags[ch]);
+                if (pri_enb == 0) {
+                    chan_io_status[ch] &= 077;
+                }
                 break;
 
             case OP_IO2:
@@ -2732,6 +2747,7 @@ sim_instr(void)
                     break;
 
                 case CHR_M:                  /* M - Floating mul */
+                    CAR = AAR;
                     temp = oind;
                     oind = 0;
                     reason = do_addsub(0);
@@ -2746,16 +2762,18 @@ sim_instr(void)
                         eoind = 1;
                         break;
                     }
-                    CAR = AAR;
-                    DAR = 279;
+
                     /* Scan for A word mark */
-                    qsign = 1;
+                    zind = 1;
+                    ix = 0;
+                    AAR = CAR - 2;
                     ar = ReadP(AAR);
                     DownReg(AAR);
+                    qsign = ((ar & 060) == 040);
                     while (1) {
                         if ((ar & 017) != 10)
-                           qsign = 0;
-                        ClrBit(DAR--, WM);      /* Clear word marks */
+                           zind = 0;
+                        ix++;
                         if (ar & WM || AAR == 0)
                            break;
                         ar = ReadP(AAR);
@@ -2763,64 +2781,117 @@ sim_instr(void)
                         sim_interval -= 4;
                     };
 
-                    ClrBit(DAR--, WM);  /* Extra zero */
-                    if (qsign)
+                    if (zind)
                         goto zerofacc;
+                    DAR = 279 - ix;
+                    BAR = 297;
+
+                    br = ReadP(BAR--);
+
+                    /* Compute sign of product */
+                    qsign ^= ((br & 060) == 040);
+                    qsign = (qsign)?040:060;
 
                     /* Scan for B word mark */
                     zind = 1;
-                    br = ReadP(BAR--);
+                    WriteP(DAR--, WM);
+                    temp = DAR;
+
+                    /* Copy B over */
                     while (1) {
+                        WriteP(DAR--, CHR_0 | qsign);
+                        qsign = 0;
                         if ((br & 017) != 10)
                            zind = 0;
-                        WriteP(DAR--, br);
                         if (br & WM || BAR == 279)
                            break;
                         br = ReadP(BAR--);
                         sim_interval -= 2;
                     };
+                    SetBit(DAR+1, WM);
 
                     /* If B zero, scan to A word mark and set B zero */
-                    if (zind || qsign)
+                    if (zind)
                         goto zerofacc;
 
-                    temp = BAR; /* Save for later */
-                    BAR = 279;
-                    AAR = CAR;
-                    reason = do_mult();
-                    if (reason != SCPE_OK)
-                        break;
+                    qsign = ReadP(temp) & 060;
+                    DAR = 297;
+                    br = ReadP(DAR);
+                    BAR = temp = 279;
+                    WriteP(BAR--, CHR_0 | qsign);
+                    for (;ix > 0; ix--) {
+                        WriteP(BAR--, CHR_0);
+                    }
+                    WriteP(BAR--, CHR_0);
+                    zind = 1;
+                    /* Do multiple loop until B word mark */
+                    while(1) {
+                         uint8   bx;
+                         /* Interloop, multiply one digit */
+                         ch = bcd_bin[br & 0xf];
+
+                         while (ch != 0) {
+                             WriteP(DAR, bin_bcd[ch - 1] | (br & WM));
+                             BAR = temp;
+                             bx = ReadP(BAR);
+                             cy = 0;
+                             AAR = CAR-2;
+                             ar = ReadP(AAR);
+                             DownReg(AAR);
+                             while(1) {
+                                 ch = bcd_bin[bx & 0xf];
+                                 ch = bcd_bin[ar & 0xf] + ch + cy;
+                                 if (ch != 0)   /* Clear zero */
+                                    zind = 0;
+                                 cy = ch > 9;   /* Update carry */
+                                 WriteP(BAR--, bin_bcd[ch] | (bx & 0160));
+                                 bx = ReadP(BAR);
+                                 if (ar & WM)
+                                    break;
+                                 ar = ReadP(AAR);
+                                 DownReg(AAR);
+                                 sim_interval -= 4;
+                             }
+                             /* Add carry to next digit */
+                             ch = bcd_bin[bx & 0xf] + cy;
+                             if (ch != 0)       /* Clear zero */
+                                 zind = 0;
+                             sim_interval -= 2;
+                             WriteP(BAR--, bin_bcd[ch] | (bx & WM));
+                             br = ReadP(DAR);
+                             ch = bcd_bin[br & 0xf];
+                        }
+                        if (br & WM)
+                            break;
+                        temp--;
+                        DAR--;
+                        br = ReadP(DAR);
+                    }
 
                     /* Count number of leading zeros */
-                    ix = 0;
-                    BAR++;      /* Skip first zero */
+                    ix = -1;
                     while (BAR != 280) {
-                        br = ReadP(++BAR);
+                        br = ReadP(BAR);
                         if ((br & 017) != 10)
                            break;
+                        BAR++;
                         ix++;
                     }
+
+                   /* Find end of result */
+
+                   /* Copy result */
+                    br = ReadP(BAR++) | WM;
+                    while(DAR != 297) {
+                        WriteP(DAR++, br);
+                        br = ReadP(BAR++);
+                    }
+                    WriteP(DAR, br | qsign);
+                    BAR = 299;
                     if (ix != 0) {
-                        DAR = BAR;
-                        BAR = 299;
                         if(do_addint(-ix))
                             goto undfacc;
-                        BAR = DAR;
                     }
-                   /* Find end of result */
-                    CAR = 297;
-                    ar = ReadP(CAR--);
-                    while((ar & WM) == 0)
-                        ar = ReadP(CAR--);
-                    br = (ReadP(BAR) & 017) | WM;
-                  /* Copy result */
-                    while(CAR != 297 && BAR != 279) {
-                        WriteP(++CAR, br);
-                        br = ReadP(++BAR) & 017;
-                    }
-                    while(CAR != 297)           /* Zero fill rest */
-                        WriteP(++CAR, 10);
-                    SetBit(297, ReadP(279) & 060);      /* Copy sign */
                     break;
 
                 case CHR_D:                  /* D - Floating div */
@@ -2857,8 +2928,10 @@ sim_instr(void)
                     };
 
                     /* Are fractions same size? */
-                    if ((br & WM) && (ar & WM) == 0)
+                    if ((br & WM) && (ar & WM) == 0) {
+                        dind = 1;
                         goto zerofacc;
+                    }
 
                     /* Is A zero? */
                     if (qsign) {
@@ -2912,13 +2985,15 @@ sim_instr(void)
                         goto zerofacc;
                     }
 
+                    /* Check if exponent went to small */
                     if (sign) {
                         eoind = 1;
                         break;
                     }
 
-                    if (ch)
+                    if (ch) {
                         goto undfacc;
+                    }
 
                     AAR = CAR;
                     /* Do actual divide */
@@ -3096,20 +3171,16 @@ sim_instr(void)
                      urec_irq[2] = 0;
                      break;
                 case CHR_1:     /* 1 branch if ch 1 overlap priority */
-                     if (chan_irq_enb[1]) 
-                         jump = (chan_io_status[1] & 0300) == 0300;
+                     jump = (chan_io_status[1] & 0200) == 0200;
                      break;
                 case CHR_2:     /* 2 branch if ch 2 overlap priority */
-                     if (chan_irq_enb[2]) 
-                         jump = (chan_io_status[2] & 0300) == 0300;
+                     jump = (chan_io_status[2] & 0200) == 0200;
                      break;
                 case CHR_3:     /* 3 branch if ch 3 overlap priority */
-                     if (chan_irq_enb[3]) 
-                         jump = (chan_io_status[3] & 0300) == 0300;
+                     jump = (chan_io_status[3] & 0300) == 0300;
                      break;
                 case CHR_4:     /* 4 branch if ch 4 overlap priority */
-                     if (chan_irq_enb[4]) 
-                         jump = (chan_io_status[4] & 0300) == 0300;
+                     jump = (chan_io_status[4] & 0300) == 0300;
                      break;
                 case CHR_Q:     /* Q branch if inquiry ch 1 */
                      jump = inquiry;
@@ -3138,12 +3209,12 @@ sim_instr(void)
                      break;
                 case CHR_X:     /* X branch and exit */
                      pri_enb = 0;
-                sim_debug(DEBUG_PRIO, &cpu_dev, "dis irq\n");
+                     sim_debug(DEBUG_PRIO, &cpu_dev, "dis irq\n");
                      jump = 1;
                      break;
                 case CHR_E:     /* E branch and enter */
                      pri_enb = 1;
-                sim_debug(DEBUG_PRIO, &cpu_dev, "enb irq\n");
+                     sim_debug(DEBUG_PRIO, &cpu_dev, "enb irq\n");
                      jump = 1;
                      break;
                 case CHR_A:     /* A branch if ch1 attention */
@@ -3182,19 +3253,17 @@ sim_instr(void)
                                 "Leave Protect mode %d %d %d\n",
                                          AAR & AMASK, prot_enb, reloc);
                         /* If in protect mode, abort */
-                        if ((prot_enb /*|| reloc*/) /*&& (AAR & BBIT) == 0*/) {
-                            reason = STOP_PROG;
+                        if (prot_enb) {
+                            jump = 1;
+                            prot_enb = 0;
+                            prot_fault |= 2;
                         } else {
                             /* Test protect mode */
-                            if (reloc && (AAR & BBIT) == 0) {
-                                reason = STOP_PROG;
-                            } else {
-                                jump = 1;
-                                prot_enb = 0;
-                                reloc = 0;
-                                high_addr = -1;
-                                low_addr = -1;
-                            }
+                            jump = 0;
+                            prot_enb = 0;
+                            reloc = 0;
+                            high_addr = -1;
+                            low_addr = -1;
                         }
                      }
                      break;
@@ -3218,7 +3287,7 @@ sim_instr(void)
                      if (cpu_unit.flags & OPTION_PROT) {
                             sim_debug(DEBUG_DETAIL, &cpu_dev,
                                          "Check prog fault %d %d\n",
-                                         AAR, prot_fault&2);
+                                         AAR, prot_fault);
                         /* If in protect mode, abort */
                         if (prot_enb) {
                             reason = STOP_PROG;
@@ -3266,29 +3335,24 @@ sim_instr(void)
                         sim_debug(DEBUG_DETAIL, &cpu_dev,
                                  "Enable relocation + prot %d\n",
                                  AAR & AMASK);
-                        if (prot_enb) {
-                            reason = STOP_PROG;
-                        } else {
-                            prot_enb = 1;
-                            reloc = 1;
-                            prot_fault = 0;
-                            BAR = IAR;
-                            IAR = AAR;
-                            if ((IAR & BBIT) == 0 && low_addr >= 0) {
-                                if (IAR < low_addr)
-                                    IAR += 100000 - low_addr;
-                                else
-                                    IAR -= low_addr;
-                            }
-                            /* Fix BAR for correct return address */
-                            if ((BAR & BBIT) == 0 && low_addr >= 0) {
-                                if (BAR < low_addr)
-                                    BAR += 100000 - low_addr;
-                                else
-                                    BAR -= low_addr;
-                            }
-                            AAR = BAR;
+                        reloc = 1;
+                        prot_fault = 0;
+                        BAR = IAR;
+                        IAR = AAR;
+                        if ((IAR & BBIT) == 0 && low_addr >= 0) {
+                            if (IAR < low_addr)
+                                IAR += 100000 - low_addr;
+                            else
+                                IAR -= low_addr;
                         }
+                        /* Fix BAR for correct return address */
+                        if ((BAR & BBIT) == 0 && low_addr >= 0) {
+                            if (BAR < low_addr)
+                                BAR += 100000 - low_addr;
+                            else
+                                BAR -= low_addr;
+                        }
+                        AAR = BAR;
                      }
                      break;
 
@@ -3404,6 +3468,7 @@ check_prot:
                         "IAR = %d Prog check AAR=%d BAR=%d low=%d high=%d\n",
                                  IAR, AAR, BAR, low_addr, high_addr);
                         prot_fault |= 2;
+                        prot_enb = 0;
                         reason = 0;
                         break;
             case STOP_PROT:
@@ -3411,6 +3476,7 @@ check_prot:
                          "IAR = %d Prot check AAR=%d BAR=%d low=%d high=%d\n",
                                  IAR, AAR, BAR, low_addr, high_addr);
                         prot_fault |= 1;
+                        prot_enb = 0;
                         reason = 0;
                         break;
             default:    /* Anything else halt sim */

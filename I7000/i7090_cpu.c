@@ -815,6 +815,8 @@ sim_instr(void)
             MA = 012;
             f = 0;
 
+            sim_debug(DEBUG_TRAP, &cpu_dev,
+                          "Checking trap chan IC=%06o %06o\n", IC, iotraps);
             for (shiftcnt = 1; shiftcnt < NUM_CHAN; shiftcnt++) {
                 /* CRC *//* Trap *//* EOF */
                 /* Wait until channel stops to trigger interupts */
@@ -828,10 +830,12 @@ sim_instr(void)
                             iotraps &= ~(1 << shiftcnt);
                         }
                     }
-                    if (mask & DMASK & ioflags && chan_stat(shiftcnt, CHS_ERR))
+                    if (mask & DMASK & ioflags && chan_stat(shiftcnt, CHS_ERR)) {
                         f |= 2;        /* We have device error */
+                    }
                     /* check if we need to perform a trap */
                     if (f) {
+//                        iotraps &= ~(1 << (shiftcnt + 18));
                         /* HTR/HPR behave like wait if protected */
                         if (hltinst)
                             temp = (((t_uint64) bcore & 3) << 31) |
@@ -854,8 +858,8 @@ sim_instr(void)
                         sim_interval = sim_interval - 1;        /* count down */
                         SR = ReadP(MA);
                         sim_debug(DEBUG_TRAP, &cpu_dev,
-                          "Doing trap chan %c %o >%012llo loc %o %012llo IC=%06o\n",
-                                  shiftcnt + 'A' - 1, f, temp, MA, SR, IC);
+                          "Doing trap chan %c %o >%012llo loc %o %012llo IC=%06o %06o\n",
+                                  shiftcnt + 'A' - 1, f, temp, MA, SR, IC, iotraps);
                         if (hst_lnt) {  /* history enabled? */
                             hst_p = (hst_p + 1);        /* next entry */
                             if (hst_p >= hst_lnt)
@@ -1329,10 +1333,12 @@ prottrap:
                         if ((bcore & 4) || STM)
                             goto seltrap;
                         itrap = 1;
+//                        iotraps &= ~(AMASK & (ioflags << 1));
                         if (CPU_MODEL == CPU_709)
                             ihold = 1;
                         else
                             ihold = 2;
+                        sim_debug(DEBUG_TRAP, &cpu_dev, "rxt %06o\n", iotraps);
                     }
                     break;
                 case OP_LMTM:
@@ -1481,7 +1487,7 @@ prottrap:
                 hltinst = 1;
                 ihold = 0;      /* Kill any hold on traps now */
                 if (opcode == OP_HTR) {
-                     fptemp = IC-1;
+                     fptemp = IC;
                      IC = MA;
                 } else
                      fptemp = IC;
@@ -3339,14 +3345,16 @@ prottrap:
                    itrap = 1;
                 else
                    itrap = 0;
-                sim_debug(DEBUG_TRAP, &cpu_dev, "ENB %012llo\n", ioflags);
-                ihold = 1;
+                sim_debug(DEBUG_TRAP, &cpu_dev, "ENB %012llo %06o\n", ioflags, iotraps);
                 /*
                  * IBSYS can't have an trap right after ENB or it will hang
                  * on a TTR * in IBNUC.
                  */
-                if (CPU_MODEL >= CPU_7090)
+                if (CPU_MODEL >= CPU_7090) {
+                    ihold = 1;
                     break;
+                }
+#if 0
                 temp = 00000001000001LL;
 
                 for (shiftcnt = 1; shiftcnt < NUM_CHAN; shiftcnt++) {
@@ -3360,6 +3368,7 @@ prottrap:
                         ihold = 0;
                     temp <<= 1;
                 }
+#endif
                 break;
 #endif
 
@@ -3393,15 +3402,21 @@ prottrap:
                 switch (chan_cmd(MA, opcode)) {
                 case SCPE_BUSY:
                     iowait = 1; /* Channel is active, hold */
+                    ihold = 1;  /* Hold interupts for one cycle */
                     break;
                 case SCPE_OK:
-                    if (((MA >> 9) & 017) == 0) {
-                        if (opcode==IO_RDS)
-                            MQ = 0;
-                        chan_clear(0, CHS_EOF|CHS_EOT|DEV_REOR);
+                    {   uint16 temp16;
+                        temp16 = (MA >> 9) & 017;
+                        if (temp16 == 0) {
+                            if (opcode==IO_RDS)
+                                MQ = 0;
+                            chan_clear(0, CHS_EOF|CHS_EOT|DEV_REOR);
+                        } else {
+                            iotraps &= ~(1 << temp16);
+                            chan_clear(temp16, CHS_EOF|CHS_EOT|DEV_REOR);
+                        }
                     }
                     ihold = 1;  /* Hold interupts for one cycle */
-                    iotraps &= ~(1 << ((MA >> 9) & 017));
                     break;
                 case SCPE_IOERR:
                     iocheck = 1;
@@ -4183,7 +4198,7 @@ cpu_reset(DEVICE * dptr)
     interval_irq = dcheck = acoflag = mqoflag = iocheck = 0;
     sim_brk_types = sim_brk_dflt = SWMASK('E');
     limitaddr = 077777;
-    memmask = MEMMASK;
+    memmask = MEMSIZE-1;
     if (cpu_unit.flags & OPTION_TIMER) {
         sim_rtcn_init_unit (&cpu_unit, cpu_unit.wait, TMR_RTC);
         sim_activate(&cpu_unit, cpu_unit.wait);

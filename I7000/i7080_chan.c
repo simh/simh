@@ -190,7 +190,6 @@ chan_reset(DEVICE * dptr)
 
     /* Clear channel assignment */
     for (i = 0; i < NUM_CHAN; i++) {
-        chan_flags[i] = 0;
         caddr[i] = 0;
         cmd[i] = 0;
         bcnt[i] = 0;
@@ -361,7 +360,8 @@ int chan_zero_reccnt(int chan) {
 
 /* Return next channel data address, advance address by 5 if channel */
 uint32  chan_next_addr(int chan) {
-    int         unit = 0;
+    uint32      unit = 0;
+    uint32      s_unit = 0;
     uint32      addr = 0;
     switch(CHAN_G_TYPE(chan_unit[chan].flags)) {
     case CHAN_754:
@@ -375,8 +375,9 @@ uint32  chan_next_addr(int chan) {
         unit = 8 + 1024 + chan_unit[chan].u3 * 32;
         break;
     }
-    addr = load_addr(unit);
-    store_addr(addr + 5, unit);
+    s_unit = unit;
+    addr = load_addr(&unit);
+    store_addr(addr + 5, &s_unit);
     return addr;
 }
 
@@ -831,11 +832,19 @@ chan_cmd(uint16 dev, uint16 dcmd, uint32 addr)
         switch(CHAN_G_TYPE(chan_unit[chan].flags)) {
         case CHAN_754:
         case CHAN_UREC:
+            if (M[caddr[chan]] == CHR_GM) {
+               return SCPE_OK;
+            }
             cmd[chan] |= CHAN_NOREC;
             break;
         case CHAN_7621:
             dcmd &= ~ CHAN_ZERO;
             switch(dcmd & 0xf) {
+            case 0:
+                 if (M[caddr[chan]] == CHR_GM) {
+                    return SCPE_OK;
+                 }
+                 break;
             case 1:     cmd[chan] |= CHAN_NOREC; break;
             case 2:
                 unit = 512 + chan_unit[chan].u3 * 32;
@@ -901,6 +910,7 @@ chan_cmd(uint16 dev, uint16 dcmd, uint32 addr)
         chan_flags[chan] &= ~(CHS_EOF|CHS_ERR|CHS_ATTN);
     /* Activate channel if select raised */
     if (r == SCPE_OK && chan_flags[chan] & DEV_SEL) {
+        uint32    t_unit;
         chan_flags[chan] |= STA_ACTIVE;
         irqdev[chan] = dev;
         irqflags &= ~(1 << chan);
@@ -920,13 +930,17 @@ chan_cmd(uint16 dev, uint16 dcmd, uint32 addr)
             unit = 512 + chan_unit[chan].u3 * 32;
             AC[unit+16+5] = 10; /* Set digit next to 0 */
             AC[unit+24+5] = 10;
-            store_addr(caddr[chan], 8 + unit);
+            sim_debug(DEBUG_DETAIL, &chan_dev,
+                                 "chan %d set addr %d\n", chan, caddr[chan]);
+            t_unit = 8 + unit;
+            store_addr(caddr[chan], &t_unit);
             if (cmd[chan] & CHAN_RECCNT && chan_zero_reccnt(chan)) {
                 cmd[chan] &= ~CHAN_RECCNT;
             }
             break;
         case CHAN_7908:
-            store_addr(caddr[chan], 8+1024 + chan_unit[chan].u3 * 32);
+            t_unit = 8+1024+chan_unit[chan].u3 * 32;
+            store_addr(caddr[chan], &t_unit);
             break;
         }
     }

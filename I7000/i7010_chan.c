@@ -371,33 +371,30 @@ chan_proc()
 
         /* If device put up EOR, terminate transfer. */
         if (chan_flags[chan] & DEV_REOR) {
+             sim_debug(DEBUG_DETAIL, &chan_dev, "chan %d EOR %02o Check\n",
+                                 chan, chan_io_status[chan]);
              if (chan_flags[chan] & DEV_WRITE) {
                  if ((cmd[chan] & (CHAN_LOAD|CHAN_WM)) == (CHAN_WM|CHAN_LOAD))
                     M[caddr[chan]++] = 035;
                  caddr[chan]++;
-             } else {
+             } else if ((chan_flags[chan] & (CTL_READ|CTL_WRITE)) != 0) {
                  if ((cmd[chan] & CHAN_NOREC) == 0 &&
                      (chan_flags[chan] & STA_WAIT) == 0) {
                      if (MEM_ADDR_OK(caddr[chan])) {
-                         if (M[caddr[chan]++] != (WM|077)) {
-                             if (MEM_ADDR_OK(caddr[chan])) {
-                                 chan_io_status[chan] |= IO_CHS_WRL;
-                                 if (!MEM_ADDR_OK(caddr[chan]+1)) {
-                                     caddr[chan]++;
-                                 }
-                             }
+                         uint8 ch = M[caddr[chan]++];
+                         if (ch != (WM|077)) {
+                             sim_debug(DEBUG_DETAIL, &chan_dev, "chan %d WRL\n", chan);
+                             chan_io_status[chan] |= IO_CHS_WRL;
                         }
-                    } else {
-                         chan_io_status[chan] |= IO_CHS_WRL;
-                    }
-                }
-                if ((cmd[chan] & CHAN_NOREC) && MEM_ADDR_OK(caddr[chan])) {
-                     chan_io_status[chan] |= IO_CHS_WRL;
-                     if (!MEM_ADDR_OK(caddr[chan]+1)) {
-                          chan_io_status[chan] &= ~IO_CHS_WRL;
                      }
-                     caddr[chan]++;
-                }
+                 }
+                 if ((cmd[chan] & CHAN_NOREC) && MEM_ADDR_OK(caddr[chan])) {
+                      chan_io_status[chan] |= IO_CHS_WRL;
+                      if (!MEM_ADDR_OK(caddr[chan]+1)) {
+                           chan_io_status[chan] &= ~IO_CHS_WRL;
+                      }
+                      caddr[chan]++;
+                 }
              }
              chan_flags[chan] &= ~(STA_ACTIVE|STA_WAIT|DEV_WRITE|DEV_REOR);
              chan_io_status[chan] |= IO_CHS_DONE;
@@ -460,6 +457,7 @@ chan_cmd(uint16 dev, uint16 dcmd, uint32 addr)
     /* Unit is busy doing something, wait */
     if (chan_flags[chan] & (DEV_SEL|DEV_DISCO|STA_TWAIT|STA_WAIT|STA_ACTIVE))
         return SCPE_BUSY;
+    sim_debug(DEBUG_CMD, &chan_dev, "chan %d %o cmd %02o %d\n", chan, dev, dcmd, addr);
     /* Ok, try and find the unit */
     caddr[chan] = addr;
     assembly[chan] = 0;
@@ -509,6 +507,7 @@ chan_cmd(uint16 dev, uint16 dcmd, uint32 addr)
         chan_flags[chan] |= STA_ACTIVE;
         return r;
     }
+    /* Handle com device special also */
     if ((com_dib.mask & dev) == (com_dib.addr & com_dib.mask)) {
         switch(dcmd) {
         case IO_RDS: chan_flags[chan] |= CTL_READ; break;
@@ -525,6 +524,12 @@ chan_cmd(uint16 dev, uint16 dcmd, uint32 addr)
     }
 
     r = chan_issue_cmd(chan, dcmd, dev);
+    switch(dcmd) {
+    case IO_RDS: chan_flags[chan] |= CTL_READ; break;
+    case IO_WRS: chan_flags[chan] |= CTL_WRITE; break;
+    case IO_TRS: chan_flags[chan] |= CTL_SNS; break;
+    case IO_CTL: chan_flags[chan] |= CTL_CNTL; break;
+    }
     /* Activate channel if select raised */
     if (chan_flags[chan] & DEV_SEL) {
         chan_flags[chan] |= STA_ACTIVE;
@@ -560,11 +565,11 @@ chan_write_char(int chan, uint8 * data, int flags)
 {
     uint8       ch = *data;
 
-    sim_debug(DEBUG_DATA, &chan_dev, "chan %d char %o %d %o %o\n", chan,
-               *data, caddr[chan], chan_io_status[chan], flags);
+    sim_debug(DEBUG_DATA, &chan_dev, "write chan %d char %o %d %o %o %o\n", chan,
+               *data, caddr[chan], M[caddr[chan]], chan_io_status[chan], flags);
 
     if (chan_flags[chan] & STA_WAIT) {
-        sim_debug(DEBUG_DETAIL, &chan_dev, "chan %d setWR %d %o\n", chan,
+        sim_debug(DEBUG_DETAIL, &chan_dev, "chan %d setWRL %d %o\n", chan,
                caddr[chan], chan_io_status[chan]);
         chan_io_status[chan] |= IO_CHS_WRL;
         return END_RECORD;
@@ -586,8 +591,7 @@ chan_write_char(int chan, uint8 * data, int flags)
         chan_flags[chan] |= DEV_REOR;
         if (chan_flags[chan] & DEV_SEL)
             chan_flags[chan] |= DEV_DISCO;
-        chan_io_status[chan] |= IO_CHS_DONE;
-        caddr[chan]++;
+        chan_io_status[chan] |= IO_CHS_DONE|IO_CHS_WRL;
         sim_debug(DEBUG_DETAIL, &chan_dev, "chan %d past mem %d %o\n", chan,
                 caddr[chan], chan_io_status[chan]);
         chan_flags[chan] &= ~(DEV_WRITE|STA_ACTIVE);
@@ -630,6 +634,8 @@ int
 chan_read_char(int chan, uint8 * data, int flags)
 {
 
+    sim_debug(DEBUG_DATA, &chan_dev, "read chan %d char %o %d %o %o\n", chan,
+               M[caddr[chan]], caddr[chan], chan_io_status[chan], flags);
     /* Return END_RECORD if requested */
     if (flags & DEV_WEOR) {
         chan_flags[chan] &= ~(DEV_WEOR);
@@ -656,11 +662,11 @@ chan_read_char(int chan, uint8 * data, int flags)
         *data = assembly[chan];
         cmd[chan] &= ~CHAN_WM;
     } else {
-        if (!MEM_ADDR_OK(caddr[chan]+1)) {
+        if (!MEM_ADDR_OK(caddr[chan])) {
             chan_flags[chan] &= ~STA_ACTIVE;
             if (chan_flags[chan] & DEV_SEL)
                 chan_flags[chan] |= DEV_DISCO;
-            caddr[chan]++;
+            chan_io_status[chan] |= IO_CHS_DONE;
             return END_RECORD;
         }
         assembly[chan] = M[caddr[chan]++];
@@ -670,6 +676,7 @@ chan_read_char(int chan, uint8 * data, int flags)
             if (chan_flags[chan] & DEV_SEL)
                 chan_flags[chan] |= DEV_DISCO;
             chan_io_status[chan] |= IO_CHS_DONE;
+    sim_debug(DEBUG_DATA, &chan_dev, "read return EOR %d\n", chan);
             return END_RECORD;
         }
         if (cmd[chan] & CHAN_LOAD &&
@@ -691,6 +698,7 @@ chan_read_char(int chan, uint8 * data, int flags)
             chan_flags[chan] |= DEV_DISCO;
         chan_io_status[chan] |= IO_CHS_DONE;
         chan_flags[chan] |= DEV_REOR;
+    sim_debug(DEBUG_DATA, &chan_dev, "read return EOR2 %d\n", chan);
         return END_RECORD;
     } else
         chan_flags[chan] |= DEV_WRITE;

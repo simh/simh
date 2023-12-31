@@ -74,6 +74,10 @@
 #define EMULATE2        (2 << UNIT_EMU)
 #define UNIT_V_NONSTOP  (UNIT_EMU + 2)
 #define NONSTOP         (1 << UNIT_V_NONSTOP)
+#define UNIT_V_IOIRQ    (UNIT_V_NONSTOP + 1)
+#define IOIRQ           (1 << UNIT_V_IOIRQ)
+#define UNIT_V_40K      (UNIT_V_IOIRQ + 1)
+#define EMU40K          (1 << UNIT_V_40K)
 
 #define CPU_702         0x0
 #define CPU_705         0x1
@@ -116,8 +120,8 @@ const char          *cpu_description (DEVICE *dptr);
 
 uint32 read_addr(uint8 *reg, uint8 *zone);
 void write_addr(uint32 addr, uint8 reg, uint8 zone);
-uint32 load_addr(int loc);
-void store_addr(uint32 addr, int loc);
+uint32 load_addr(uint32 *loc);
+void store_addr(uint32 addr, uint32 *loc);
 void store_cpu(uint32 addr, int full);
 void load_cpu(uint32 addr, int full);
 uint16 get_acstart(uint8 reg);
@@ -197,7 +201,7 @@ uint8  cmp_order[0100] = {
 
 #define SIGN            (ASIGN|BSIGN)
 #define ZERO            (AZERO|BZERO)
-#define IRQFLAGS        (INSTFLAG|MCHCHK|IOCHK|RECCHK|ACOFLAG|SGNFLAG)
+#define IRQFLAGS        (ANYFLAG)
 
 uint8               M[MAXMEMSIZE] = { 0 };      /* memory */
 uint32              EMEMSIZE;                   /* Physical memory size */
@@ -298,6 +302,10 @@ MTAB                cpu_mod[] = {
     {EMULATE3, EMULATE3, "EMU7053", "EMU7053", NULL, NULL, NULL},
     {NONSTOP, 0, "PROGRAM", "PROGRAM", NULL, NULL, NULL},
     {NONSTOP, NONSTOP, "NONSTOP", "NONSTOP", NULL, NULL, NULL},
+    {IOIRQ, 0, "NOIOIRQ", "NOIOIRQ", NULL, NULL, NULL},
+    {IOIRQ, IOIRQ, "IOIRQ", "IOIRQ", NULL, NULL, NULL},
+    {EMU40K, 0, "NOEMU40K", "NOEMU40K", NULL, NULL, NULL},
+    {EMU40K, EMU40K, "EMU40K", "EMU40K", NULL, NULL, NULL},
     {MTAB_XTD | MTAB_VDV | MTAB_NMO | MTAB_SHP, 0, "HISTORY", "HISTORY",
      &cpu_set_hist, &cpu_show_hist},
     {0}
@@ -318,7 +326,7 @@ uint16          prev_addr[6 * 256];     /* Previous storage location */
 uint16          next_half[6 * 256];     /* Forward half loop locations */
 
 /*#define ReadP(addr)   M[(addr) % EMEMSIZE] */
-#define WriteP(addr, data) M[(addr) % EMEMSIZE] = data
+/*#define WriteP(addr, data) M[(addr) % EMEMSIZE] = data */
 
 #define Next(reg)       if (reg == 0) reg = EMEMSIZE; reg--
 #define Prev5(reg)      reg += 5; if (reg > EMEMSIZE) reg -= EMEMSIZE
@@ -328,7 +336,11 @@ uint16          next_half[6 * 256];     /* Forward half loop locations */
 /* Read 1 character from memory, checking for reducancy error. */
 uint8   ReadP(uint32 addr, uint16 flag) {
     uint8       value;
-    value = M[(addr) % EMEMSIZE];
+    addr %= EMEMSIZE;
+    if ((flags & EMU40K) != 0) {
+       addr %= 40000;
+    }
+    value = M[addr];
     if (value & 0100) {
         if (flag == 0)
             return value;
@@ -336,7 +348,7 @@ uint8   ReadP(uint32 addr, uint16 flag) {
     } else if (value == 0) {
         flags |= flag|ANYFLAG;
     }
-    return value & 077;
+    return value;
 }
 
 /* Read 5 characters from memory starting at addr */
@@ -349,6 +361,15 @@ uint32  Read5(uint32 addr, uint16 flag) {
     value |= ReadP(addr-1, flag) << (1 * 6);
     value |= ReadP(addr, flag);
     return value;
+}
+
+/* Write 1 character to memory. */
+void  WriteP(uint32 addr, uint8 value) {
+    addr %= EMEMSIZE;
+    if ((flags & EMU40K) != 0) {
+       addr %= 40000;
+    }
+    M[addr] = value;
 }
 
 /* Write 5 characters from memory starting at addr */
@@ -453,11 +474,6 @@ stop_cpu:
         if ((cpu_unit.flags & NONSTOP) && (intprog == 0) && intmode != 0 &&
                 selreg2 == 0 && (IRQFLAGS & flags)) {
              /* Process as interrupt */
-             Next(IC);          /* Back up to start of instruction */
-             Next(IC);
-             Next(IC);
-             Next(IC);
-             Next(IC);
              store_cpu(0x3E0, 1);
              load_cpu(0x2A0, 0);
              intprog = 1;
@@ -495,40 +511,7 @@ stop_cpu:
                 flags &= ~(SGNFLAG|ANYFLAG);
                 break;
            }
-        } else if (cpu_unit.flags & NONSTOP && intprog && (IRQFLAGS & flags)) {
-           /* Issue sim halt */
-           if (flags & INSTFLAG) {
-                reason = STOP_UUO;
-                flags &= ~ (INSTFLAG|ANYFLAG);
-                break;
-           }
-           if (flags & MCHCHK) {
-                reason = STOP_MMTRP;
-                flags &= ~(MCHCHK|ANYFLAG);
-                break;
-           }
-           if (flags & IOCHK) {
-                reason = STOP_IOCHECK;
-                flags &= ~(IOCHK|ANYFLAG);
-                break;
-           }
-           if (flags & RECCHK) {
-                reason = STOP_RECCHK;
-                flags &= ~(RECCHK|ANYFLAG);
-                break;
-           }
-           if (flags & ACOFLAG) {
-                reason = STOP_ACOFL;
-                flags &= ~(ACOFLAG|ANYFLAG);
-                break;
-           }
-           if (flags & SGNFLAG) {
-                reason = STOP_SIGN;
-                flags &= ~(SGNFLAG|ANYFLAG);
-                break;
-           }
         }
-
 
         /* If we are waiting on I/O, don't fetch */
         if (!chwait) {
@@ -763,6 +746,12 @@ stop_cpu:
                          default:
                               break;
                          }
+                         if (CPU_MODEL == CPU_7080 &&
+                            (cpu_unit.flags & IOIRQ) != 0 && reg < 4 &&
+                            (flags & EIGHTMODE) == 0) {
+                            flags |= INSTFLAG|ANYFLAG;
+                            t = 0;
+                         }
                      } else {
                          switch((selreg >> 8) & 0xff) {
                          case 20:            /* Tape DS */
@@ -823,6 +812,15 @@ stop_cpu:
                          case 8:             /* ???? */
                          default:    /* Drum */
                               break;
+                         }
+                         if (CPU_MODEL == CPU_7080 &&
+                             (cpu_unit.flags & IOIRQ) != 0 &&
+                             (flags & EIGHTMODE) == 0) {
+                            temp = (selreg >> 8) & 0xff;
+                            if (temp != 9 && temp != 5) {
+                               flags |= INSTFLAG|ANYFLAG;
+                               t = 0;
+                            }
                          }
                      }
                      if (t) {
@@ -962,8 +960,10 @@ stop_cpu:
                                 cr2 &= 060;
                                 cr2 |= 012;
                              }
-                             if ((cr2 & 060) == 040 || (cr2 & 060) == 020)
+                             if ((cr2 & 060) == 040 || (cr2 & 060) == 020) {
                                 cr2 |= 0100;
+                                flags |= MCHCHK|ANYFLAG;
+                             }
                          }
                          WriteP(MA, cr2);
                          Next(MA);
@@ -1045,6 +1045,9 @@ stop_cpu:
                              AC[addr] = 10;
                          } else if (AC[addr] != 10)
                              flags &= ~(ZERO & fmsk); /* No zero, adjust flag */
+                         if (AC[addr] & 0100) {
+                             flags |= MCHCHK|ANYFLAG;
+                         }
                          MAC--;
                          addr = next_addr[addr];
                          sim_interval --;    /* count down */
@@ -1405,6 +1408,12 @@ stop_cpu:
                              chan_chr_13();
                              memset(ioflags, 0, sizeof(ioflags));
                              flags &= ~(IRQFLAGS);
+                             if (CPU_MODEL == CPU_7080 &&
+                                 (cpu_unit.flags & IOIRQ) != 0 &&
+                                 (flags & EIGHTMODE) == 0 &&
+                                 ((selreg >> 8) & 0xff) != 5) {
+                                 flags |= ANYFLAG|INSTFLAG;
+                             }
                              break;
 
                          case 14:    /* EEM */
@@ -1521,6 +1530,12 @@ stop_cpu:
                              break;
                          }
                      }
+                     if (iowait == 0 && CPU_MODEL == CPU_7080 &&
+                         (cpu_unit.flags & IOIRQ) != 0 &&
+                         (flags & EIGHTMODE) == 0 &&
+                         ((selreg >> 8) & 0xff) != 5) {
+                         flags |= ANYFLAG|INSTFLAG;
+                     }
                      break;
 
              case OP_RD:     /* READ */
@@ -1537,6 +1552,12 @@ stop_cpu:
                      case SCPE_IOERR:
                          flags |= ANYFLAG|INSTFLAG;
                          break;
+                     }
+                     if (iowait == 0 && CPU_MODEL == CPU_7080 &&
+                         (cpu_unit.flags & IOIRQ) != 0 &&
+                         (flags & EIGHTMODE) == 0 &&
+                         ((selreg >> 8) & 0xff) != 5) {
+                         flags |= ANYFLAG|INSTFLAG;
                      }
                      break;
 
@@ -1555,6 +1576,12 @@ stop_cpu:
                          flags |= ANYFLAG|INSTFLAG;
                          break;
                      }
+                     if (iowait == 0 && CPU_MODEL == CPU_7080 &&
+                         (cpu_unit.flags & IOIRQ) != 0 &&
+                         (flags & EIGHTMODE) == 0 &&
+                         ((selreg >> 8) & 0xff) != 5) {
+                         flags |= ANYFLAG|INSTFLAG;
+                     }
                      break;
 
              case OP_WRE:    /* WR ER */
@@ -1572,11 +1599,25 @@ stop_cpu:
                          flags |= ANYFLAG|INSTFLAG;
                          break;
                      }
+                     if (iowait == 0 && CPU_MODEL == CPU_7080 &&
+                         (cpu_unit.flags & IOIRQ) != 0 &&
+                         (flags & EIGHTMODE) == 0 &&
+                         ((selreg >> 8) & 0xff) != 5) {
+                         flags |= ANYFLAG|INSTFLAG;
+                     }
                      break;
 
              case OP_RWW:    /* RWW  705 only */
                      MAC2 = MAC;
-                     selreg2 = selreg | 0x8000;
+                     if (CPU_MODEL == CPU_7080 &&
+                         (cpu_unit.flags & IOIRQ) != 0 &&
+                         (flags & EIGHTMODE) == 0 &&
+                         ((selreg >> 8) & 0xff) != 5) {
+                         flags |= ANYFLAG|INSTFLAG;
+                         selreg2 = selreg;
+                     } else {
+                         selreg2 = selreg | 0x8000;
+                     }
                      break;
 
              /* 7080 opcodes */
@@ -1786,7 +1827,7 @@ stop_cpu:
                      case 14:        /* SMT */
                              write_addr(MAC2, 0, 0);
                              WriteP(MA, 10); /* Finish with zero */
-                             store_addr(MAC2, addr);
+                             store_addr(MAC2, &addr);
                              sim_interval -= 10;
                              break;
                      }
@@ -2186,8 +2227,6 @@ stop_cpu:
                           break;
                      }
                      t = ReadP(MA, 0);
-                     if (t & 0100)
-                          flags |= MCHCHK|ANYFLAG;
                      sim_interval --;        /* count down */
                      switch(reg) {
                      case 0:     /* Nop */
@@ -2198,12 +2237,20 @@ stop_cpu:
                      case 4:     /* 8 */
                      case 5:     /* A */
                      case 6:     /* B */
+                             if (t & 0100)
+                                  flags |= MCHCHK|ANYFLAG;
                              t &= ~(1<<(reg-1));
+                             t &= 077;
                              break;
                      case 7:     /* Reverse A */
+                             if (t & 0100)
+                                  flags |= MCHCHK|ANYFLAG;
                              t ^= 020;
+                             t &= 077;
                              break;
                      case 8:     /* Reverse C */
+                             if (t & 0100)
+                                  flags |= MCHCHK;
                              t = M[MA % EMEMSIZE] ^ 0100;
                              break;
                      case 9:      /* 1 */
@@ -2212,7 +2259,10 @@ stop_cpu:
                      case 12:     /* 8 */
                      case 13:     /* A */
                      case 14:     /* B */
+                             if (t & 0100)
+                                  flags |= MCHCHK|ANYFLAG;
                              t |= 1<<(reg-9);
+                             t &= 077;
                              break;
                      }
                      WriteP(MA, t);
@@ -2224,7 +2274,7 @@ stop_cpu:
              }
              if (hst_lnt) {  /* history enabled? */
                   hst[hst_p].flags = flags;
-                  addr = get_acstart(reg);
+                  addr = spc;
                   for (t = 0; t < 254; t++) {
                      hst[hst_p].store[t] = AC[addr];
                      addr = next_addr[addr];
@@ -2356,7 +2406,7 @@ void write_addr(uint32 addr, uint8 reg, uint8 zone) {
 }
 
 /* Store converted address in storage */
-void store_addr(uint32 addr, int loc) {
+void store_addr(uint32 addr, uint32 *loc) {
     uint8       value[4];
     int         i;
 
@@ -2386,7 +2436,7 @@ void store_addr(uint32 addr, int loc) {
         if ((cpu_unit.flags & EMULATE2))
             value[3] |= (addr & 0xc) << 2;
         else /* 20k */
-            value[3] |= (addr & 0x8) << 2;
+            value[3] |= (addr & 0xc) << 2;
         break;
     case CPU_702:       /* 702 */
         break;
@@ -2398,32 +2448,37 @@ void store_addr(uint32 addr, int loc) {
          value[i] &= 0360;
        if (value[i] == 0)
          value[i] = 10;
-       AC[loc] = value[i];
-       loc = next_addr[loc];
+       AC[*loc] = value[i];
+       *loc = next_addr[*loc];
     }
 }
 
 
 /* Read address from storage */
-uint32 load_addr(int loc) {
+uint32 load_addr(uint32 *loc) {
     uint8       t;
+    uint8       f;
     uint8       zone;
     uint32      addr;
 
-    t = AC[loc];                /* First digit */
-    loc = next_addr[loc];
+    t = AC[*loc];               /* First digit */
+    f = t;
     zone = (t & 060) >> 2;
     addr = bcd_bin[t & 0xf];
-    t = AC[loc];                /* Second digit */
-    loc = next_addr[loc];
+    *loc = next_addr[*loc];
+    t = AC[*loc];               /* Second digit */
+    f |= t;
     addr += dig2[bcd_bin[t & 0xf]];
-    t = AC[loc];                /* Read third digit */
-    loc = next_addr[loc];
+    *loc = next_addr[*loc];
+    t = AC[*loc];               /* Read third digit */
+    f |= t;
     addr += dig3[bcd_bin[t & 0xf]];
-    t = AC[loc];                /* Save High order address */
-    loc = next_addr[loc];
+    *loc = next_addr[*loc];
+    t = AC[*loc];               /* Save High order address */
+    f |= t;
     zone |= (t & 060) >> 4;
     addr += dig4[bcd_bin[t & 0xf]];
+    *loc = next_addr[*loc];
     switch (cpu_type) {
     case CPU_7080:      /* 7080 */
         break;
@@ -2432,50 +2487,65 @@ uint32 load_addr(int loc) {
         if (cpu_unit.flags & EMULATE2)
             zone &= 3;  /* 40k */
         else
-            zone &= 013; /* 80k */
+            zone &= 7;  /* 80k */
         break;
     case CPU_705:       /* 705 */
         if (cpu_unit.flags & EMULATE2)
             zone &= 3;  /* 40K */
         else
-            zone &= 1;  /* 20k */
+            zone &= 3;  /* 20k */
         break;
     case CPU_702:       /* 702 */
         zone = 0;       /* 10k Memory */
         break;
     }
     addr += dig_zone[zone];
+    /* Set Machine Check if got redundant data */
+    if (f & 0100) {
+        flags |= MCHCHK|ANYFLAG;
+    }
     return addr;
 }
 
 /* Store converted hex address in storage */
-void store_hex(uint32 addr, int loc) {
+void store_hex(uint32 addr, uint32 *loc) {
    /* Convert address into BCD first */
-    AC[loc] = bin_bcd[addr & 0xf];
-    loc = next_addr[loc];
-    AC[loc] = bin_bcd[(addr >> 4) & 0xf];
-    loc = next_addr[loc];
-    AC[loc] = bin_bcd[(addr >> 8) & 0xf];
-    loc = next_addr[loc];
-    AC[loc] = bin_bcd[(addr >> 12) & 0xf];
+    AC[*loc] = bin_bcd[addr & 0xf];
+    *loc = next_addr[*loc];
+    AC[*loc] = bin_bcd[(addr >> 4) & 0xf];
+    *loc = next_addr[*loc];
+    AC[*loc] = bin_bcd[(addr >> 8) & 0xf];
+    *loc = next_addr[*loc];
+    AC[*loc] = bin_bcd[(addr >> 12) & 0xf];
+    *loc = next_addr[*loc];
 }
 
 /* Read hex address from storage */
-uint32 load_hex(int loc) {
+uint32 load_hex(uint32 *loc) {
     uint8       t;
+    uint8       f;
     uint32      addr;
 
-    t = AC[loc];                /* First digit */
+    t = AC[*loc];               /* First digit */
+    f = t;
     addr = bcd_bin[t & 0xf];
-    loc = next_addr[loc];
-    t = AC[loc];                /* Second digit */
+    *loc = next_addr[*loc];
+    t = AC[*loc];               /* Second digit */
+    f |= t;
     addr += bcd_bin[t & 0xf] << 4;
-    loc = next_addr[loc];
-    t = AC[loc];                /* Read third digit */
+    *loc = next_addr[*loc];
+    t = AC[*loc];               /* Read third digit */
+    f |= t;
     addr += bcd_bin[t & 0xf] << 8;
-    loc = next_addr[loc];
-    t = AC[loc];                /* Save High order address */
+    *loc = next_addr[*loc];
+    t = AC[*loc];               /* Save High order address */
+    f |= t;
     addr += bcd_bin[t & 0xf] << 12;
+    *loc = next_addr[*loc];
+    /* Set Machine Check if got redundant data */
+    if (f & 0100) {
+        flags |= MCHCHK|ANYFLAG;
+    }
     return addr;
 }
 
@@ -2497,89 +2567,137 @@ uint16 get_acstart(uint8 reg) {
 
 /* Store CPU state in CASU 15 */
 void store_cpu(uint32 addr, int full) {
-     uint8      t;
+    uint8      t;
 
-     store_addr(IC, addr);
-     addr = next_addr[addr];
-     addr = next_addr[addr];
-     addr = next_addr[addr];
-     addr = next_addr[addr];
+    store_addr(IC, &addr);
     /* Save status characters */
-     t = flags & 0xf;
-     AC[addr] = 040 | ((t + 8) & 027);
-     addr = next_addr[addr];
-     t = (flags >> 4) & 0xf;
-     AC[addr] = 040 | ((t + 8) & 027);
-     addr = next_addr[addr];
-     t = (flags >> 8) & 0xf;
-     AC[addr] = 040 | ((t + 8) & 027);
-     addr = next_addr[addr];
-     t = (flags >> 12) & 0x3;
-     AC[addr] = 040 | t;
-     if (full) {
-         addr = next_addr[addr];
-         AC[addr] = bin_bcd[spc & 7];
-         addr = next_addr[addr];
-         AC[addr] = bin_bcd[(spc >> 3) & 3];
-         addr = next_addr[addr];
-         AC[addr] = bin_bcd[(spc >> 5) & 7];
-         addr = next_addr[addr];
-         AC[addr] = bin_bcd[(spc >> 8) & 7];
-         addr = next_addr[addr];
-         for(; addr < 0x3F8; addr++)
-            AC[addr] = 10;
-         for(; addr < 0x400; addr++)
-            AC[addr] = 0;
-         store_addr(MAC2, 0x3F0);
-         store_hex(selreg, 0x3F8);
-     }
+    t = flags & 0xf;
+    AC[addr] = 040 | ((t + 8) & 027);
+    addr = next_addr[addr];
+    t = (flags >> 4) & 0xf;
+    AC[addr] = 040 | ((t + 8) & 027);
+    addr = next_addr[addr];
+    t = (flags >> 8) & 0xf;
+    AC[addr] = 040 | ((t + 8) & 027);
+    addr = next_addr[addr];
+    t = (flags >> 12) & 0x3;
+    AC[addr] = 040 | t;
+    if (full) {
+        addr = next_addr[addr];
+        AC[addr] = bin_bcd[spc & 7];
+        addr = next_addr[addr];
+        AC[addr] = bin_bcd[(spc >> 3) & 3];
+        addr = next_addr[addr];
+        AC[addr] = bin_bcd[(spc >> 5) & 7];
+        addr = next_addr[addr];
+        AC[addr] = bin_bcd[(spc >> 8) & 7];
+        addr = next_addr[addr];
+        AC[addr] = 10;
+        addr = next_addr[addr];
+        AC[addr] = 10;
+        addr = next_addr[addr];
+        AC[addr] = 10;
+        addr = next_addr[addr];
+        AC[addr] = 10;
+        addr = next_addr[addr];
+        store_addr(MAC2, &addr);
+        AC[addr] = 10;
+        addr = next_addr[addr];
+        AC[addr] = 10;
+        addr = next_addr[addr];
+        AC[addr] = 10;
+        addr = next_addr[addr];
+        AC[addr] = 10;
+        addr = next_addr[addr];
+        store_hex(selreg, &addr);
+        AC[addr] = 0;
+        addr = next_addr[addr];
+        AC[addr] = 0;
+        addr = next_addr[addr];
+        AC[addr] = 0;
+        addr = next_addr[addr];
+        AC[addr] = 0;
+    }
 }
 
 /* Load CPU State from storage */
 void load_cpu(uint32 addr, int full) {
     uint8       t;
+    uint8       f;
 
-    IC = load_addr(addr);
-    addr = next_addr[addr];
-    addr = next_addr[addr];
-    addr = next_addr[addr];
-    addr = next_addr[addr];
     flags = 0;
-    t = AC[addr++];
+    IC = load_addr(&addr);
+    t = AC[addr];
+    addr = next_addr[addr];
+    f = t;
     flags |= (t & 0x7) | ((t >> 1) & 0x8);
-    t = AC[addr++];
+    t = AC[addr];
+    addr = next_addr[addr];
+    f |= t;
     flags |= ((t & 0x7) | ((t >> 1) & 0x8)) << 4;
-    t = AC[addr++];
+    t = AC[addr];
+    addr = next_addr[addr];
+    f |= t;
     flags |= ((t & 0x7) | ((t >> 1) & 0x8)) << 8;
-    t = AC[addr++];
+    t = AC[addr];
+    addr = next_addr[addr];
+    f |= t;
     flags |= (t & 0x3) << 12;
-    /* Adjust Max memory if mode changed */
-    EMEMSIZE = MEMSIZE;
-    if (flags & EIGHTMODE) {
-        cpu_type = CPU_7080;
-    } else {
-        cpu_type = (cpu_unit.flags & EMULATE3)?  CPU_7053:CPU_705;
-        EMEMSIZE = MEMSIZE;
-        if (cpu_unit.flags & EMULATE2 && EMEMSIZE > 40000)
-            EMEMSIZE = 40000;
-        if (cpu_type == CPU_705 && (cpu_unit.flags & EMULATE2) == 0
-                        && EMEMSIZE > 20000)
-            EMEMSIZE = 20000;
-        if (EMEMSIZE > 80000)
-            EMEMSIZE = 80000;
+    /* Update emulation mode */
+    if (CPU_MODEL == CPU_7080) {
+        if (flags & EIGHTMODE) {
+           EMEMSIZE = MEMSIZE;
+           cpu_type = CPU_7080;
+        } else {
+           cpu_type = (cpu_unit.flags & EMULATE3)? CPU_7053:CPU_705;
+           EMEMSIZE = MEMSIZE;
+           if (cpu_unit.flags & EMULATE2 && EMEMSIZE > 40000)
+             EMEMSIZE = 40000;
+           if (cpu_type == CPU_705 && (cpu_unit.flags & EMULATE2) == 0 &&
+                EMEMSIZE > 20000)
+               EMEMSIZE = 20000;
+           if (EMEMSIZE > 80000)
+               EMEMSIZE = 80000;
+         }
     }
     if (full) {
-        spc = bcd_bin[AC[addr++]] & 07;      /* Units digit */
+        int i;
+        t = AC[addr];
+        addr = next_addr[addr];
+        f |= t;
+        spc = bcd_bin[t & 0xf] & 07;      /* Units digit */
         /* One of words */
-        spc += (bcd_bin[AC[addr++]] & 3) << 3; /* Tens digit */
+        t = AC[addr];
+        addr = next_addr[addr];
+        f |= t;
+        spc += (bcd_bin[t & 0xf] & 3) << 3; /* Tens digit */
         /* One of four word sets */
-        spc += (bcd_bin[AC[addr++]] & 7) << 5;  /* Hundreds */
+        t = AC[addr];
+        addr = next_addr[addr];
+        f |= t;
+        spc += (bcd_bin[t & 0xf] & 7) << 5;  /* Hundreds */
         /* Bank */
-        spc += (bcd_bin[AC[addr++]] & 7) << 8;  /* Thousands */
-        addr += 4;
-        MAC2 = load_addr(addr);
-        addr += 8;
-        selreg = load_hex(addr);
+        t = AC[addr];
+        addr = next_addr[addr];
+        f |= t;
+        spc += (bcd_bin[t & 0xf] & 7) << 8;  /* Thousands */
+        for (i = 0; i < 4; i++) {
+            f |= AC[addr];
+            addr = next_addr[addr];
+        }
+        MAC2 = load_addr(&addr);
+        for (i = 0; i < 4; i++) {
+            f |= AC[addr];
+            addr = next_addr[addr];
+        }
+        selreg = load_hex(&addr);
+        for (i = 0; i < 4; i++) {
+            f |= AC[addr];
+            addr = next_addr[addr];
+        }
+    }
+    if (f & 0100) {
+       flags |= MCHCHK | ANYFLAG;
     }
 }
 
@@ -2825,6 +2943,7 @@ do_divide(int reg, uint16 fmsk)
     int                 remtrig;
     int                 carry;
     int                 dzt;
+    int                 over;
 
    /* Step I, put storage mark before start of AC */
     at = 0;
@@ -2833,6 +2952,7 @@ do_divide(int reg, uint16 fmsk)
     smt = 1;
     carry = 0;
     msign = 0;
+    over = 0;
 
    /* Step II, step address until we find storage mark */
 step2:
@@ -2947,6 +3067,8 @@ step6:
                 tsac = tspc;
                 if (t >= 10) {
                    flags |= ACOFLAG|ANYFLAG;
+                   msign = 0;
+                   over = 1;
                    at = 1;
                    goto step2;
                 }
@@ -2967,6 +3089,8 @@ step6:
             at = 1;
             if (t >= 10) {
                 flags |= ACOFLAG|ANYFLAG;
+                msign = 0;
+                over = 1;
                 goto step2;
             }
             dzt = 0;
@@ -3065,7 +3189,9 @@ done:
 
    /* Update sign and zero */
    flags ^= msign;
-   flags &= ~(((flags & ZERO) >> 2) & fmsk);
+   if (over == 0) {
+       flags &= ~(((flags & ZERO) >> 2) & fmsk);
+   }
    return SCPE_OK;
 }
 
@@ -3386,8 +3512,12 @@ cpu_show_hist(FILE * st, UNIT * uptr, int32 val, CONST void *desc)
                     (h->flags & LOWFLAG)? 'l' :
                         ((h->flags & HIGHFLAG) ? 'h' : 'e'));
 
-            for(len--; len >= 0; len--)
+            for(len--; len >= 0; len--) {
                 fputc(mem_to_ascii[h->store[len] & 077], st);
+                if (h->store[len] & 0100) {
+                    fputc('|', st);
+                }
+            }
             fputc('@', st);
             if (h->flags & 0x7f0) {
                 int     i;
