@@ -442,6 +442,7 @@ t_stat dp_devio(uint32 dev, uint64 *data) {
             df10_writecw(df10);
             df10->status |= CCW_COMP;
          }
+
          if (*data & PI_ENABLE) {
              uptr->UFLAGS &= ~DONE;
              /* Check if any drives still reporting seek done */
@@ -459,6 +460,12 @@ t_stat dp_devio(uint32 dev, uint64 *data) {
              else
                  df10_setirq(df10);
          }
+
+         /* If setting the interrupt value and done set trigger IRQ */
+         if ((uptr->UFLAGS & DONE) != 0) {
+            df10_setirq(df10);
+         }
+  
          sim_debug(DEBUG_CONO, dptr, "DP %03o CONO %06o %d PC=%o %06o\n", dev,
                  (uint32)*data, ctlr, PC, df10->status);
          break;
@@ -726,6 +733,9 @@ t_stat dp_svc (UNIT *uptr)
            if (r)
                sim_activate(uptr, 25);
            else {
+               sim_debug(DEBUG_DETAIL, dptr,
+                  "DP done %d cmd=%o cyl=%d (%o) sect=%d surf=%d %d\n",
+                   ctlr, uptr->UFLAGS, cyl, cyl, sect, surf,uptr->CUR_CYL);
                uptr->STATUS &= ~(SRC_DONE|END_CYL|BUSY);
                uptr->UFLAGS |= DONE;
                return SCPE_OK;
@@ -802,6 +812,9 @@ t_stat dp_svc (UNIT *uptr)
            if (r)
                sim_activate(uptr, 25);
            else {
+               sim_debug(DEBUG_DETAIL, dptr,
+                  "DP done %d cmd=%o cyl=%d (%o) sect=%d surf=%d %d\n",
+                   ctlr, uptr->UFLAGS, cyl, cyl, sect, surf,uptr->CUR_CYL);
                uptr->STATUS &= ~(SRC_DONE|END_CYL|BUSY);
                uptr->UFLAGS |= DONE;
                return SCPE_OK;
