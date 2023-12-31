@@ -662,6 +662,9 @@ lpr_ini(DEVICE *dptr) {
 
      for(i = 0; i < NUM_DEVS_LPR; i++) {
         lpr_unit[i].CMD = 0;
+        if (lpr_unit[i].LPP == 0) {
+            lpr_unit[i].LPP = 59;
+        }
         sim_cancel(&lpr_unit[i]);
      }
      return SCPE_OK;
