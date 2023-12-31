@@ -522,10 +522,6 @@ t_stat rh_devio(uint32 dev, uint64 *data) {
 
          case DATAI:
               *data = 0;
-              if (rhc->status & BUSY && rhc->reg != 04) {
-                  rhc->status |= CC_CHAN_ACT;
-                  return SCPE_OK;
-              }
               if (rhc->reg < 040) {
                   int parity;
                   if (rhc->dev_read(dptr, rhc, rhc->reg, &drdat))
@@ -668,10 +664,6 @@ t_stat rh_devio(uint32 dev, uint64 *data) {
 
      case DATAI:
         *data = 0;
-        if (rhc->status & BUSY && rhc->reg != 04) {
-            rhc->status |= CC_CHAN_ACT;
-            return SCPE_OK;
-        }
         if (rhc->reg == 040) {
               if (rhc->dev_read(dptr, rhc, 0, &drdat))
                   rhc->status |= CR_DRE;
