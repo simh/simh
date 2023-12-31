@@ -79,7 +79,7 @@ int    ch11_read(DEVICE *dptr, t_addr addr, uint16 *data, int32 access);
 uint16 ch11_checksum (const uint8 *p, int count);
 void   ch11_validate (const uint8 *p, int count);
 t_stat ch11_transmit (struct pdp_dib *dibp);
-void   ch11_receive (struct pdp_dib *dibp);
+int    ch11_receive (struct pdp_dib *dibp);
 void   ch11_clear (struct pdp_dib *dibp);
 t_stat ch11_svc(UNIT *);
 t_stat ch11_reset (DEVICE *);
@@ -349,10 +349,11 @@ ch11_transmit (struct pdp_dib *dibp)
     ch11_csr |= CSR_TAB;
   }
   tx_count = 0;
+  ch11_csr |= CSR_TDN;
   return SCPE_OK;
 }
 
-void
+int
 ch11_receive (struct pdp_dib *dibp)
 {
   size_t count;
@@ -362,16 +363,16 @@ ch11_receive (struct pdp_dib *dibp)
   tmxr_poll_rx (&ch11_tmxr);
   if (tmxr_get_packet_ln (&ch11_lines[0], &p, &count) != SCPE_OK) {
     sim_debug (DBG_ERR, &ch11_dev, "TMXR error receiving packet\n");
-    return;
+    return 0;
   }
   if (p == NULL)
-    return;
+    return 0;
   dest = ((p[4+CHUDP_HEADER] & 0xff) << 8) + (p[5+CHUDP_HEADER] & 0xff);
 
   sim_debug (DBG_PKT, &ch11_dev, "Received UDP packet, %d bytes for: %o\n", (int)count, dest);
   /* Check if packet for us. */
   if (dest != address && dest != 0 && (ch11_csr & CSR_SPY) == 0)
-    return;
+    return 1;
 
   if ((CSR_RDN & ch11_csr) == 0) {
     count = (count + 1) & 01776;
@@ -392,6 +393,7 @@ ch11_receive (struct pdp_dib *dibp)
     if ((ch11_csr & CSR_LOS) != CSR_LOS)
         ch11_csr = (ch11_csr & ~CSR_LOS) | (CSR_LOS & (ch11_csr + 01000));
   }
+  return 1;
 }
 
 void
@@ -417,10 +419,14 @@ ch11_svc(UNIT *uptr)
    DEVICE           *dptr = find_dev_from_unit (uptr);
    struct pdp_dib   *dibp = (DIB *)dptr->ctxt;
 
-  sim_clock_coschedule (uptr, 1000);
-  (void)tmxr_poll_conn (&ch11_tmxr);
   if (ch11_lines[0].conn) {
-    ch11_receive (dibp);
+    if (ch11_receive (dibp))
+      sim_activate_after (uptr, 300);
+    else
+      sim_clock_coschedule (uptr, 1000);
+  } else {
+    (void)tmxr_poll_conn (&ch11_tmxr);
+    sim_clock_coschedule (uptr, 1000);
   }
   if (tx_count == 0) {
     ch11_csr |= CSR_TDN;

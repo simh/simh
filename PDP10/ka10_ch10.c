@@ -251,11 +251,12 @@ t_stat ch10_transmit ()
     ch10_status |= OVER;
   }
   tx_count = 0;
+  ch10_status |= TXD;
   ch10_test_int ();
   return SCPE_OK;
 }
 
-void ch10_receive (void)
+int ch10_receive (void)
 {
   size_t count;
   const uint8 *p;
@@ -264,16 +265,16 @@ void ch10_receive (void)
   tmxr_poll_rx (&ch10_tmxr);
   if (tmxr_get_packet_ln (&ch10_lines[0], &p, &count) != SCPE_OK) {
     sim_debug (DBG_ERR, &ch10_dev, "TMXR error receiving packet\n");
-    return;
+    return 0;
   }
   if (p == NULL)
-    return;
+    return 0;
   dest = ((p[4+CHUDP_HEADER] & 0xff) << 8) + (p[5+CHUDP_HEADER] & 0xff);
 
   sim_debug (DBG_PKT, &ch10_dev, "Received UDP packet, %d bytes for: %o\n", (int)count, dest);
   /* Check if packet for us. */
   if (dest != address && dest != 0 && (ch10_status & SPY) == 0)
-    return;
+    return 1;
 
   if ((RXD & ch10_status) == 0) {
     count = (count + 1) & 01776;
@@ -291,6 +292,7 @@ void ch10_receive (void)
     if ((ch10_status & LOST) < LOST)
       ch10_status += 01000;
   }
+  return 1;
 }
 
 void ch10_clear (void)
@@ -410,14 +412,15 @@ t_stat ch10_devio(uint32 dev, uint64 *data)
 
 t_stat ch10_svc(UNIT *uptr)
 {
-  sim_clock_coschedule (uptr, 1000);
-  (void)tmxr_poll_conn (&ch10_tmxr);
   if (ch10_lines[0].conn) {
-    ch10_receive ();
+    if (ch10_receive ()) {
+      sim_activate_after (uptr, 300);
+      return SCPE_OK;
+    }
+  } else {
+    (void)tmxr_poll_conn (&ch10_tmxr);
   }
-  if (tx_count == 0)
-    ch10_status |= TXD;
-  ch10_test_int ();
+  sim_clock_coschedule (uptr, 1000);
   return SCPE_OK;
 }
 
