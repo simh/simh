@@ -553,6 +553,16 @@ return 0;
 }
 #endif
 
+t_stat sim_os_process_cpu_times (double *system, double *user)
+{
+t_uint64 ftCreation, ftExit, ftKernel, ftUser;
+
+GetProcessTimes (GetCurrentProcess(), (FILETIME *)&ftCreation, (FILETIME *)&ftExit, (FILETIME *)&ftKernel, (FILETIME *)&ftUser);
+*system = (double)(ftKernel / 10000000) + (((double)(ftKernel % 10000000)) / 10000000.0);
+*user = (double)(ftUser / 10000000) + (((double)(ftUser % 10000000)) / 10000000.0);
+return SCPE_OK;
+}
+
 #else
 
 /* UNIX routines */
@@ -584,6 +594,22 @@ sleep (sec);
 uint32 sim_os_ms_sleep_init (void)
 {
 return _compute_minimum_sleep ();
+}
+
+#include <sys/time.h>
+#include <sys/resource.h>
+
+t_stat sim_os_process_cpu_times (double *system, double *user)
+{
+struct rusage usage;
+
+*system = 0.0;
+*user = 0.0;
+if (0 == getrusage (RUSAGE_SELF, &usage)) {
+    *system = ((double)usage.ru_stime.tv_sec) + ((double)usage.ru_stime.tv_usec / 1000000.0);
+    *user =   ((double)usage.ru_utime.tv_sec) + ((double)usage.ru_utime.tv_usec / 1000000.0);
+    }
+return SCPE_OK;
 }
 
 #if !defined(_POSIX_SOURCE)
