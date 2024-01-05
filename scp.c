@@ -361,9 +361,6 @@ pthread_cond_t sim_asynch_wake = PTHREAD_COND_INITIALIZER;
 
 pthread_mutex_t sim_timer_lock     = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t sim_timer_wake      = PTHREAD_COND_INITIALIZER;
-pthread_mutex_t sim_tmxr_poll_lock = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t sim_tmxr_poll_cond  = PTHREAD_COND_INITIALIZER;
-int32 sim_tmxr_poll_count;
 pthread_t sim_asynch_main_threadid;
 UNIT * volatile sim_asynch_queue;
 t_bool sim_asynch_enabled = TRUE;

@@ -188,9 +188,6 @@ extern pthread_cond_t sim_asynch_wake;
 extern pthread_mutex_t sim_timer_lock;
 extern pthread_cond_t sim_timer_wake;
 extern t_bool sim_timer_event_canceled;
-extern int32 sim_tmxr_poll_count;
-extern pthread_cond_t sim_tmxr_poll_cond;
-extern pthread_mutex_t sim_tmxr_poll_lock;
 extern pthread_t sim_asynch_main_threadid;
 extern UNIT * volatile sim_asynch_queue;
 extern volatile t_bool sim_idle_wait;
@@ -265,8 +262,6 @@ extern int32 sim_asynch_inst_latency;
       pthread_cond_destroy(&sim_asynch_wake);                     \
       pthread_mutex_destroy(&sim_timer_lock);                     \
       pthread_cond_destroy(&sim_timer_wake);                      \
-      pthread_mutex_destroy(&sim_tmxr_poll_lock);                 \
-      pthread_cond_destroy(&sim_tmxr_poll_cond);                  \
       } while (0)
 #ifdef _WIN32
 #elif defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4) || defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_8)
@@ -311,8 +306,6 @@ extern int32 sim_asynch_inst_latency;
       pthread_cond_destroy(&sim_asynch_wake);                     \
       pthread_mutex_destroy(&sim_timer_lock);                     \
       pthread_cond_destroy(&sim_timer_wake);                      \
-      pthread_mutex_destroy(&sim_tmxr_poll_lock);                 \
-      pthread_cond_destroy(&sim_tmxr_poll_cond);                  \
       } while (0)
 #define AIO_ILOCK AIO_LOCK
 #define AIO_IUNLOCK AIO_UNLOCK
