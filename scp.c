@@ -408,9 +408,10 @@ return migrated;
 void sim_aio_activate (ACTIVATE_API caller, UNIT *uptr, int32 event_time)
 {
 AIO_ILOCK;
-sim_debug (SIM_DBG_AIO_QUEUE, &sim_scp_dev, "Queueing Asynch event for %s after %d %s\n", sim_uname(uptr), event_time, sim_vm_interval_units);
+sim_debug (SIM_DBG_AIO_QUEUE, &sim_scp_dev, "Lock Free Queueing Asynch event for %s after %d %s\n", sim_uname(uptr), event_time, sim_vm_interval_units);
 if (uptr->a_next) {
     uptr->a_activate_call = sim_activate_abs;
+    uptr->a_event_time = MIN (uptr->a_event_time, event_time);
     }
 else {
     UNIT *q;
@@ -424,7 +425,7 @@ else {
 AIO_IUNLOCK;
 sim_asynch_check = 0;                             /* try to force check */
 if (sim_idle_wait) {
-    sim_debug (TIMER_DBG_IDLE, &sim_timer_dev, "waking due to event on %s after %d %s\n", sim_uname(uptr), event_time, sim_vm_interval_units);
+    sim_debug (TIMER_DBG_IDLE, &sim_timer_dev, "wakeup from idle due to async event on %s after %d %s\n", sim_uname(uptr), event_time, sim_vm_interval_units);
     pthread_cond_signal (&sim_asynch_wake);
     }
 }
@@ -7405,8 +7406,11 @@ else {
                     }
                 else
                     fprintf (st, "  Unknown");
-        if (inst_per_sec != 0.0)
+        if (inst_per_sec != 0.0) {
             tim = sim_fmt_secs(((_sim_activate_queue_time (uptr) - 1) / sim_timer_inst_per_sec ()) + (uptr->usecs_remaining / 1000000.0));
+            if (strcmp (tim, "0 seconds") == 0)
+                tim = "";
+            }
         if (uptr->usecs_remaining)
             fprintf (st, " at %d plus %.0f usecs%s%s%s%s\n", _sim_activate_queue_time (uptr) - 1, uptr->usecs_remaining,
                                             (*tim) ? " (" : "", tim, (*tim) ? " total)" : "",
@@ -12400,14 +12404,14 @@ return stat;
 
 const char *sim_fmt_secs (double seconds)
 {
-static char buf[60];
+static char buf[70];
 char frac[16] = "";
 const char *sign = "";
 double val = seconds;
 double days, hours, mins, secs, msecs, usecs;
 
 if (val == 0.0)
-    return "";
+    return "0 seconds";
 if (val < 0.0) {
     sign = "-";
     val = -val;
