@@ -1379,8 +1379,8 @@ return reason;
  */
 
 static const char *pdp8_clock_precalibrate_commands[] = {
-    "106 100"
-    "-m 100 MQL MQA"
+    "106 100",
+    "-m 100 MQL MQA",
     "-m 101 ISZ 112",
     "-m 102 JMP I 106",
     "-m 103 JMP I 106",
