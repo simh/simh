@@ -6109,6 +6109,16 @@ if (cptr && (*cptr != 0))                               /* now eol? */
 #ifdef SIM_ASYNCH_IO
 if (flag == sim_asynch_enabled)                         /* already set correctly? */
     return SCPE_OK;
+if (1) {
+    uint32 i;
+    DEVICE *dptr;
+
+    for (i = 1; (dptr = sim_devices[i]) != NULL; i++) { /* flush attached files */
+        if ((DEV_TYPE(dptr) == DEV_ETHER) &&
+            (dptr->units->flags & UNIT_ATT))
+            return sim_messagef (SCPE_ALATT, "Can't change asynch mode with %s device attached\n", dptr->name);
+        }
+    }
 sim_asynch_enabled = flag;
 sim_timer_change_asynch ();
 if (1) {

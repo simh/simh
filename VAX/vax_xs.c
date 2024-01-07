@@ -130,7 +130,7 @@ DEVICE xs_dev = {
     1, DEV_RDX, 20, 1, DEV_RDX, 8,
     NULL, NULL, &xs_reset,
     NULL, &xs_attach, &xs_detach,
-    &xs_dib, DEV_DEBUG | XS_FLAGS, 0,
+    &xs_dib, DEV_DEBUG | XS_FLAGS | DEV_ETHER, 0,
     xs_debug, NULL, NULL, &xs_help, NULL, NULL,
     &xs_description
     };

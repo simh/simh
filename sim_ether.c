@@ -2218,6 +2218,10 @@ return NULL;
 }
 #endif
 
+/* eth_set_async 
+ *
+ * Turn on reciever processing which can be either asynchronous or polled 
+ */
 t_stat eth_set_async (ETH_DEV *dev, int latency)
 {
 #if !defined(USE_READER_THREAD) || !defined(SIM_ASYNCH_IO)
@@ -2227,7 +2231,7 @@ return sim_messagef (SCPE_NOFNC, "%s", msg);
 #else
 int wakeup_needed;
 
-dev->asynch_io = 1;
+dev->asynch_io = sim_asynch_enabled;
 dev->asynch_io_latency = latency;
 pthread_mutex_lock (&dev->lock);
 wakeup_needed = (dev->read_queue.count != 0);
@@ -2240,6 +2244,10 @@ if (wakeup_needed) {
 return SCPE_OK;
 }
 
+/* eth_clr_async 
+ *
+ * Turn off reciever processing
+ */
 t_stat eth_clr_async (ETH_DEV *dev)
 {
 #if !defined(USE_READER_THREAD) || !defined(SIM_ASYNCH_IO)
