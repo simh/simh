@@ -354,6 +354,8 @@ DEVICE sim_scp_dev = {
     scp_debug, NULL, NULL, NULL, NULL, NULL,
     sim_scp_description};
 
+static volatile t_uint64 sim_asynch_event_count = 0;
+static t_uint64 sim_processed_event_count = 0;
 /* Asynch I/O support */
 #if defined (SIM_ASYNCH_IO)
 pthread_mutex_t sim_asynch_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -364,6 +366,7 @@ pthread_cond_t sim_timer_wake      = PTHREAD_COND_INITIALIZER;
 pthread_t sim_asynch_main_threadid;
 UNIT * volatile sim_asynch_queue;
 t_bool sim_asynch_enabled = TRUE;
+//volatile int32 sim_asynch_check;
 int32 sim_asynch_check;
 int32 sim_asynch_latency = 4000;      /* 4 usec interrupt latency */
 int32 sim_asynch_inst_latency = 20;   /* assume 5 mip simulator */
@@ -408,6 +411,12 @@ return migrated;
 void sim_aio_activate (ACTIVATE_API caller, UNIT *uptr, int32 event_time)
 {
 AIO_ILOCK;
+if (sim_asynch_enabled == FALSE) {
+    char buf[128];
+    snprintf (buf, sizeof (buf), "sim_aio_activate() called with ASYNCH Disabled for %s\n", sim_uname(uptr));
+    SIM_SCP_ABORT (buf);
+    }
+++sim_asynch_event_count;
 sim_debug (SIM_DBG_AIO_QUEUE, &sim_scp_dev, "Lock Free Queueing Asynch event for %s after %d %s\n", sim_uname(uptr), event_time, sim_vm_interval_units);
 if (uptr->a_next) {
     uptr->a_activate_call = sim_activate_abs;
@@ -1790,7 +1799,7 @@ static const char simh_help2[] =
       " %%TIME_HH%%, %%TIME_MM%%, %%TIME_SS%%, %%TIME_MSEC%%, %%STATUS%%, %%TSTATUS%%,\n"
       " %%SIM_VERIFY%%, %%SIM_QUIET%%, %%SIM_MESSAGE%%, %%SIM_NAME%%, %%SIM_BIN_NAME%%,\n"
       " %%SIM_BIN_PATH%%, %%SIM_OSTYPE%%, %%SIM_RUNTIME%%, %%SIM_RUNTIME_UNITS%%,\n"
-      " %%SIM_RUNLIMIT%%, %%SIM_RUNLIMIT_UNITS%%, %%SIM_REGEX_TYPE%%,\n"
+      " %%SIM_ASYNC_EVENTS%%, %%SIM_PROCESSED_EVENTS%%, %%SIM_REGEX_TYPE%%,\n"
       " %%SIM_MAJOR%%, %%SIM_MINOR%%, %%SIM_PATCH%%, %%SIM_DELTA%%,\n"
       " %%SIM_VM_RELEASE%%, %%SIM_VERSION_MODE%%, %%SIM_GIT_COMMIT_ID%%,\n"
       " %%SIM_GIT_COMMIT_TIME%%, %%SIM_ARCHIVE_GIT_COMMIT_ID%%,\n"
@@ -1855,6 +1864,8 @@ static const char simh_help2[] =
       "++%%SIM_RUNTIME%%          The Number of simulated instructions or\n"
       "++++++++      cycles performed\n"
       "++%%SIM_RUNTIME_UNITS%%    The units of the SIM_RUNTIME value\n"
+      "++%%SIM_PROCESSED_EVENTS%% The Number of events performed\n"
+      "++%%SIM_ASYNC_EVENTS%%     The Number of Asynchronous events performed\n"
       "++%%SIM_REGEX_TYPE%%       The regular expression type available\n"
       "++%%SIM_MAJOR%%            The major portion of the simh version\n"
       "++%%SIM_MINOR%%            The minor portion of the simh version\n"
@@ -5067,6 +5078,14 @@ if (!ap) {                              /* no environment variable found? */
         }
     else if (!strcmp ("SIM_RUNTIME_UNITS", gbuf)) {
         sprintf (rbuf, "%s", sim_vm_interval_units);
+        ap = rbuf;
+        }
+    else if (!strcmp ("SIM_ASYNC_EVENTS", gbuf)) {
+        sprintf (rbuf, "%s", sim_fmt_numeric ((double)sim_asynch_event_count));
+        ap = rbuf;
+        }
+    else if (!strcmp ("SIM_PROCESSED_EVENTS", gbuf)) {
+        sprintf (rbuf, "%s", sim_fmt_numeric ((double)sim_processed_event_count));
         ap = rbuf;
         }
     else if (!strcmp ("SIM_RUNLIMIT_REMAINING", gbuf)) {
@@ -12602,6 +12621,7 @@ do {
         }
     else {
         sim_debug (SIM_DBG_EVENT, &sim_scp_dev, "Processing Event for %s\n", sim_uname (uptr));
+        ++sim_processed_event_count;
         if (uptr->action != NULL)
             reason = uptr->action (uptr);
         else
