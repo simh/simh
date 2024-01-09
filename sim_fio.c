@@ -2844,6 +2844,8 @@ typedef struct CHECK_STATS {
     int TextFiles;
     int ProblemFiles;
     int FileCount;
+    int SourceTotalLineCount;
+    int SourceTotalSize;
     FILE_STATS **Files;
     } CHECK_STATS;
 
@@ -2916,7 +2918,7 @@ for (i = 0; i < count; i++)
 free (list);
 }
 
-static void _sim_check_source_file_report (FILE_STATS *File, int maxnamelen, t_stat stat)
+static void _sim_check_source_file_report (FILE_STATS *File, int maxnamelen, t_stat stat, int *SourceLineCount, int *SourceByteCount)
 {
 if ((sim_switches & SWMASK ('D')) || (File->ProblemFile) || 
     ((stat != SCPE_OK) && 
@@ -2926,6 +2928,10 @@ if ((sim_switches & SWMASK ('D')) || (File->ProblemFile) ||
     if (File->Lines)
         sim_printf (" %5d lines", File->Lines);
     if (File->IsSource) {
+        if (SourceLineCount != NULL)
+            *SourceLineCount += File->Lines;
+        if (SourceByteCount != NULL)
+            *SourceByteCount += (int)File->FileSize;
         if (File->HasTabs)
             sim_printf (", has-tabs");
         if (File->HasBinary)
@@ -3063,7 +3069,12 @@ if ((sim_check_scp_dir != NULL) &&
     sim_check_scp_dir = NULL;
     }
 for (file = 0; file < Stats->FileCount; file++)
-    _sim_check_source_file_report (Stats->Files[file], namelen, stat);
+    _sim_check_source_file_report (Stats->Files[file], namelen, stat, &Stats->SourceTotalLineCount, &Stats->SourceTotalSize);
+if (sim_switches & SWMASK ('D')) {
+    sim_printf ("Source Code Total Files: %d, ", Stats->FileCount);
+    sim_printf ("Total Lines: %s, ", sim_fmt_numeric ((double)Stats->SourceTotalLineCount));
+    sim_printf ("Total Size: %s bytes\n", sim_fmt_numeric ((double)Stats->SourceTotalSize));
+    }
 if (Stats->ProblemFiles > 0)
     stat = SCPE_FMT;
 free (Stats->Files);
