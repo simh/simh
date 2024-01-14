@@ -7163,6 +7163,7 @@ if (flag) {
         char *proc_rev = getenv ("PROCESSOR_REVISION");
         char *proc_arch3264 = getenv ("PROCESSOR_ARCHITEW6432");
         char osversion[PATH_MAX+1] = "";
+        char cores[64] = "";
         char tarversion[PATH_MAX+1] = "";
         char curlversion[PATH_MAX+1] = "";
         char wmicpath[PATH_MAX+1] = "";
@@ -7170,16 +7171,23 @@ if (flag) {
         FILE *f;
 
         if ((f = _popen ("ver", "r"))) {
-            memset (osversion, 0, sizeof(osversion));
             do {
-                if (NULL == fgets (osversion, sizeof(osversion)-1, f))
+                if (NULL == fgets (osversion, sizeof (osversion), f))
                     break;
                 sim_trim_endspc (osversion);
                 } while (osversion[0] == '\0');
             _pclose (f);
             }
+        if ((f = _popen ("WMIC CPU Get NumberOfCores", "r"))) {
+            do {
+                if (NULL == fgets (cores, sizeof (cores), f))
+                    break;
+                sim_trim_endspc (cores);
+                } while (!isdigit (cores[0]));
+            _pclose (f);
+            }
         fprintf (st, "\n        OS: %s", osversion);
-        fprintf (st, "\n        Architecture: %s%s%s, Processors: %s", arch, proc_arch3264 ? " on " : "", proc_arch3264 ? proc_arch3264  : "", procs);
+        fprintf (st, "\n        Architecture: %s%s%s, %s%s%sLogical Processors: %s", arch, proc_arch3264 ? " on " : "", proc_arch3264 ? proc_arch3264  : "", (cores[0] == '\0') ? "" : "Cores: ", cores, (cores[0] == '\0') ? "" : ", ", procs);
         fprintf (st, "\n        Processor Id: %s, Level: %s, Revision: %s", proc_id ? proc_id : "", proc_level ? proc_level : "", proc_rev ? proc_rev : "");
         strlcpy (wmicpath, sim_get_tool_path ("wmic"), sizeof (wmicpath));
         if (wmicpath[0]) {
@@ -7256,38 +7264,79 @@ if (flag) {
             pclose (f);
             }
 #if (defined(__linux) || defined(__linux__))
-        if ((f = popen ("lscpu 2>/dev/null | grep 'Model name:'", "r"))) {
+        if ((f = popen ("lscpu 2>/dev/null", "r"))) {
+            char line[256];
+            char arch[PATH_MAX+1] = "";
+            char cores[PATH_MAX+1] = "";
+            char procs[PATH_MAX+1] = "";
             char proc_name[PATH_MAX+1] = "";
 
-            memset (proc_name, 0, sizeof (proc_name));
             do {
-                if (NULL == fgets (proc_name, sizeof (proc_name)-1, f))
+                if (NULL == fgets (line, sizeof (line), f))
                     break;
-                sim_trim_endspc (proc_name);
-                if (0 == memcmp ("Model name:", proc_name, 11)) {
-                    size_t offset = 11 + strspn (proc_name + 11, " ");
-                    memmove (proc_name, &proc_name[offset], 1 + strlen (&proc_name[offset]));
+                sim_trim_endspc (line);
+                if (0 == memcmp ("Architecture:", line, 13)) {
+                    size_t offset = 13 + strspn (line + 13, " ");
+                    strlcpy (arch, &line[offset], sizeof (arch));
                     }
-                } while (proc_name[0] == '\0');
-            pclose (f);
-            if (proc_name[0] != '\0') {
-                
-                fprintf (st, "\n        Processor Name: %s", proc_name);
-                }
-            }
-#elif defined (__APPLE__)
-        if ((f = popen ("sysctl -n machdep.cpu.brand_string 2>/dev/null", "r"))) {
-            char proc_name[PATH_MAX+1] = "";
-
-            memset (proc_name, 0, sizeof (proc_name));
-            do {
-                if (NULL == fgets (proc_name, sizeof (proc_name)-1, f))
-                    break;
-                sim_trim_endspc (proc_name);
-                } while (proc_name[0] == '\0');
+                if (0 == memcmp ("Model name:", line, 11)) {
+                    size_t offset = 11 + strspn (line + 11, " ");
+                    strlcpy (proc_name, &line[offset], sizeof (proc_name));
+                    }
+                if (0 == memcmp ("CPU(s):", line, 7)) {
+                    size_t offset = 7 + strspn (line + 7, " ");
+                    strlcpy (procs, &line[offset], sizeof (procs));
+                    }
+                if (0 == memcmp ("Core(s) per socket:", line, 19)) {
+                    size_t offset = 19 + strspn (line + 19, " ");
+                    strlcpy (cores, &line[offset], sizeof (cores));
+                    }
+                } while ((arch[0] == '\0') || (proc_name[0] == '\0') || (procs[0] == '\0') || (cores[0] == '\0'));
             pclose (f);
             if (proc_name[0] != '\0')
                 fprintf (st, "\n        Processor Name: %s", proc_name);
+            if ((arch[0] != '\0') || (procs[0] != '\0') || (cores[0] != '\0'));
+                fprintf (st, "\n        ");
+            if (arch[0] != '\0')
+                fprintf (st, "Architecture: %s", arch);
+            if (cores[0] != '\0')
+                fprintf (st, ", Cores: %s", cores);
+            if (procs[0] != '\0')
+                fprintf (st, ", Logical Processors: %s", procs);
+            }
+#elif defined (__APPLE__)
+        if ((f = popen ("sysctl machdep.cpu 2>/dev/null", "r"))) {
+            char line[256];
+            char cores[PATH_MAX+1] = "";
+            char procs[PATH_MAX+1] = "";
+            char proc_name[PATH_MAX+1] = "";
+
+            do {
+                if (NULL == fgets (line, sizeof (line), f))
+                    break;
+                sim_trim_endspc (line);
+                if (0 == memcmp ("machdep.cpu.brand_string:", line, 25)) {
+                    size_t offset = 25 + strspn (line + 25, " ");
+                    strlcpy (proc_name, &line[offset], sizeof (proc_name));
+                    }
+                if (0 == memcmp ("machdep.cpu.core_count:", line, 23)) {
+                    size_t offset = 23 + strspn (line + 23, " ");
+                    strlcpy (cores, &line[offset], sizeof (cores));
+                    }
+                if (0 == memcmp ("machdep.cpu.thread_count:", line, 25)) {
+                    size_t offset = 25 + strspn (line + 25, " ");
+                    strlcpy (procs, &line[offset], sizeof (procs));
+                    }
+                } while ((proc_name[0] == '\0') || (cores[0] == '\0') || (procs[0] == '\0'));
+            pclose (f);
+            if (proc_name[0] != '\0')
+                fprintf (st, "\n        Processor Name: %s", proc_name);
+            if ((procs[0] != '\0') || (cores[0] != '\0'))
+                fprintf (st, "\n        ");
+            if (cores[0] != '\0')
+                fprintf (st, "Cores: %s", cores);
+            if (procs[0] != '\0')
+                fprintf (st, ", Logical Processors: %s", procs);
             }
 #endif
         strlcpy (tarversion, _get_tool_version ("tar"), sizeof (tarversion));
