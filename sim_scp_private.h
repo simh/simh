@@ -268,8 +268,8 @@ extern int32 sim_asynch_inst_latency;
 #define InterlockedCompareExchangePointerAcquire(Destination, Exchange, Comparand) __sync_val_compare_and_swap(Destination, Comparand, Exchange)
 #define InterlockedCompareExchangePointerRelease(Destination, Exchange, Comparand) __sync_val_compare_and_swap(Destination, Comparand, Exchange)
 #elif defined(__DECC_VER)
-#define InterlockedCompareExchangePointerAcquire(Destination, Exchange, Comparand) (void *)((int32)_InterlockedCompareExchange64(Destination, Exchange, Comparand))
-#define InterlockedCompareExchangePointerRelease(Destination, Exchange, Comparand) (void *)((int32)_InterlockedCompareExchange64(Destination, Exchange, Comparand))
+#define InterlockedCompareExchangePointerAcquire(Destination, Exchange, Comparand) _InterlockedCompareExchange64_acq(Destination, Exchange, Comparand)
+#define InterlockedCompareExchangePointerRelease(Destination, Exchange, Comparand) _InterlockedCompareExchange64_rel(Destination, Exchange, Comparand)
 #else
 #error "Implementation of function InterlockedCompareExchangePointer() is needed to build with USE_AIO_INTRINSICS"
 #endif
