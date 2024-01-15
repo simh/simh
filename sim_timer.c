@@ -408,9 +408,11 @@ return SCPE_OK;
 #define sys$waitfr SYS$WAITFR
 #define lib$subx LIB$SUBX
 #define lib$ediv LIB$EDIV
+#define sys$getjpiw SYS$GETJPIW
 #endif
 
 #include <starlet.h>
+#include <jpidef.h>
 #include <lib$routines.h>
 #include <unistd.h>
 
@@ -481,6 +483,34 @@ tp->tv_nsec = ns*100;
 return 0;
 }
 #endif /* CLOCK_REALTIME */
+
+typedef struct {
+    unsigned short status;
+    unsigned short count;
+    unsigned int dev_status; } IOSB;
+
+typedef struct {
+    unsigned short buffer_size;
+    unsigned short item_code;
+    void *buffer_address;
+    void *return_length_address;
+    } ITEM;
+
+t_stat sim_os_process_cpu_times (double *system, double *user)
+{
+t_uint64 CPUtime = 0;
+ITEM items[] = { {sizeof (CPUtime), JPI$_CPUTIM, &CPUtime, NULL},
+                 {                0,             0,      NULL, NULL}};
+IOSB iosb;
+
+memset (&iosb, 0, sizeof (iosb));
+
+sys$getjpiw (1, NULL, NULL, items, &iosb, NULL, 0);
+
+*system = 0.0;
+*user = (double)(CPUtime) / 100.0;
+return SCPE_OK;
+}
 
 #elif defined (_WIN32)
 
@@ -1570,7 +1600,7 @@ fields = sscanf (cptr, "%d/%d/%d-%d:%d:%d.%d", &base.tm_year, &base.tm_mon, &bas
 base.tm_mon -= 1;
 base.tm_year -= 1900;
 secs = mktime (&base);
-if ((fields < 3) || (secs < 0) || (msecs > 999)) {
+if ((fields < 3) || (secs == (time_t)-1) || (msecs > 999)) {
     sim_messagef (SCPE_ARG, "Unexpected date/time specification: %s\n", cptr);
     return sim_messagef (SCPE_ARG, "Valid format is: BASE=YYYY/MM/DD-HH:MM:SS.MSEC\n");
     }
