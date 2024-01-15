@@ -385,3 +385,8 @@ pcap_close(pcap_t *p)
 	pcap_freecode(&p->fcode);
 	free(p);
 }
+
+const char *pcap_lib_version(void)
+{
+return "simh Pcap VMS";
+}

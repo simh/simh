@@ -208,6 +208,8 @@ void	pcap_dump(u_char *, const struct pcap_pkthdr *, const u_char *);
 int	pcap_findalldevs(pcap_if_t **, char *);
 void	pcap_freealldevs(pcap_if_t *);
 
+const char *pcap_lib_version(void);
+
 /* XXX this guy lives in the bpf tree */
 u_int	bpf_filter(struct bpf_insn *, u_char *, u_int, u_int);
 int	bpf_validate(struct bpf_insn *f, int len);
