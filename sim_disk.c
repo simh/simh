@@ -401,7 +401,7 @@ static t_stat sim_os_disk_write (UNIT *uptr, t_offset addr, uint8 *buf, uint32 *
 static t_stat sim_os_disk_info_raw (FILE *f, uint32 *sector_size, uint32 *removable, uint32 *is_cdrom);
 static char *HostPathToVhdPath (const char *szHostPath, char *szVhdPath, size_t VhdPathSize);
 static char *VhdPathToHostPath (const char *szVhdPath, char *szHostPath, size_t HostPathSize);
-static t_offset get_filesystem_size (UNIT *uptr, t_bool *readonly);
+static t_offset get_filesystem_size (UNIT *uptr, t_bool *isreadonly);
 
 struct sim_disk_fmt {
     const char          *name;                          /* name */
@@ -1507,7 +1507,7 @@ ODSChecksum (void *Buffer, uint16 WordCount)
     }
 
 
-static t_offset get_ods2_filesystem_size (UNIT *uptr, uint32 physsectsz, t_bool *readonly)
+static t_offset get_ods2_filesystem_size (UNIT *uptr, uint32 physsectsz, t_bool *isreadonly)
 {
 t_addr saved_capac;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
@@ -1585,12 +1585,12 @@ ret_val = ((t_offset)Scb.scb_l_volsize) * 512;
 
 Return_Cleanup:
 uptr->capac = saved_capac;
-if (readonly)
-    *readonly = sim_disk_wrp (uptr);
+if (isreadonly)
+    *isreadonly = sim_disk_wrp (uptr);
 return ret_val;
 }
 
-static t_offset get_ods1_filesystem_size (UNIT *uptr, uint32 physsectsz, t_bool *readonly)
+static t_offset get_ods1_filesystem_size (UNIT *uptr, uint32 physsectsz, t_bool *isreadonly)
 {
 t_addr saved_capac;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
@@ -1643,8 +1643,8 @@ sim_messagef (SCPE_OK, "%s: Volume Name: %12.12s Format: %12.12s Sectors In Volu
                                 sim_uname (uptr), Home.hm1_t_volname, Home.hm1_t_format, (uint32)(ret_val / 512));
 Return_Cleanup:
 uptr->capac = saved_capac;
-if (readonly)
-    *readonly = sim_disk_wrp (uptr);
+if (isreadonly)
+    *isreadonly = sim_disk_wrp (uptr);
 return ret_val;
 }
 
@@ -1660,7 +1660,7 @@ typedef struct ultrix_disklabel {
 #define PT_MAGIC        0x032957        /* Partition magic number */
 #define PT_VALID        1               /* Indicates if struct is valid */
 
-static t_offset get_ultrix_filesystem_size (UNIT *uptr, uint32 physsectsz, t_bool *readonly)
+static t_offset get_ultrix_filesystem_size (UNIT *uptr, uint32 physsectsz, t_bool *isreadonly)
 {
 t_addr saved_capac;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
@@ -1695,8 +1695,8 @@ ret_val = ((t_offset)max_lbn) * 512;
 
 Return_Cleanup:
 uptr->capac = saved_capac;
-if (readonly)
-    *readonly = sim_disk_wrp (uptr);
+if (isreadonly)
+    *isreadonly = sim_disk_wrp (uptr);
 return ret_val;
 }
 
@@ -1746,7 +1746,7 @@ typedef struct ISO_9660_Primary_Volume_Descriptor {
     uint8   Reserved[653];              // Reserved by ISO.
     } ISO_9660_Primary_Volume_Descriptor;
 
-static t_offset get_iso9660_filesystem_size (UNIT *uptr, uint32 physsectsz, t_bool *readonly)
+static t_offset get_iso9660_filesystem_size (UNIT *uptr, uint32 physsectsz, t_bool *isreadonly)
 {
 t_addr saved_capac;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
@@ -1790,8 +1790,8 @@ while (sim_disk_rdsect(uptr, (t_lba)(sectfactor * cur_pos / sizeof (*Desc)), (ui
         }
     }
 uptr->capac = saved_capac;
-if (readonly)
-    *readonly = sim_disk_wrp (uptr) || (ret_val != (t_offset)-1);
+if (isreadonly)
+    *isreadonly = sim_disk_wrp (uptr) || (ret_val != (t_offset)-1);
 return ret_val;
 }
 
@@ -1879,7 +1879,7 @@ typedef struct BSD_211_disklabel {
 } BSD_211_disklabel;
 
 
-static t_offset get_BSD_211_filesystem_size (UNIT *uptr, uint32 physsectsz, t_bool *readonly)
+static t_offset get_BSD_211_filesystem_size (UNIT *uptr, uint32 physsectsz, t_bool *isreadonly)
 {
 t_addr saved_capac;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
@@ -1930,8 +1930,8 @@ ret_val = ((t_offset)max_lbn) * 512;
 
 Return_Cleanup:
 uptr->capac = saved_capac;
-if (readonly)
-    *readonly = sim_disk_wrp (uptr);
+if (isreadonly)
+    *isreadonly = sim_disk_wrp (uptr);
 return ret_val;
 }
 
@@ -2024,7 +2024,7 @@ typedef struct NetBSD_disklabel {
 } NetBSD_disklabel;
 
 
-static t_offset get_NetBSD_filesystem_size (UNIT *uptr, uint32 physsectsz, t_bool *readonly)
+static t_offset get_NetBSD_filesystem_size (UNIT *uptr, uint32 physsectsz, t_bool *isreadonly)
 {
 t_addr saved_capac;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
@@ -2074,8 +2074,8 @@ ret_val = ((t_offset)max_lbn) * 512;
 
 Return_Cleanup:
 uptr->capac = saved_capac;
-if (readonly)
-    *readonly = sim_disk_wrp (uptr);
+if (isreadonly)
+    *isreadonly = sim_disk_wrp (uptr);
 return ret_val;
 }
 
@@ -2486,7 +2486,7 @@ if (uar != 0) {
 return SCPE_IOERR;
 }
 
-static t_offset get_rsts_filesystem_size (UNIT *uptr, uint32 physsectsz, t_bool *readonly)
+static t_offset get_rsts_filesystem_size (UNIT *uptr, uint32 physsectsz, t_bool *isreadonly)
 {
 t_addr saved_capac;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
@@ -2562,8 +2562,8 @@ for (context.dcshift = 0; context.dcshift < 8; context.dcshift++) {
     }
 cleanup_done:
 uptr->capac = saved_capac;
-if (readonly)
-    *readonly = sim_disk_wrp (uptr);
+if (isreadonly)
+    *isreadonly = sim_disk_wrp (uptr);
 return ret_val;
 }
 
@@ -2646,7 +2646,7 @@ if (strncmp((char *)&home->hb_b_sysid, HB_C_VMSSYSID, strlen(HB_C_VMSSYSID)) == 
 return RT11_NOPART;
 }
 
-static t_offset get_rt11_filesystem_size (UNIT *uptr, uint32 physsectsz, t_bool *readonly)
+static t_offset get_rt11_filesystem_size (UNIT *uptr, uint32 physsectsz, t_bool *isreadonly)
 {
 t_addr saved_capac;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
@@ -2774,8 +2774,8 @@ if (partitions) {
     sim_messagef (SCPE_OK, "%d valid partition%s, Type: %s, Sectors On Disk: %u\n", partitions, partitions == 1 ? "" : "s", parttype, (uint32)(ret_val / 512));
     }
 uptr->capac = saved_capac;
-if (readonly)
-    *readonly = sim_disk_wrp (uptr);
+if (isreadonly)
+    *isreadonly = sim_disk_wrp (uptr);
 return ret_val;
 }
 
@@ -2783,7 +2783,7 @@ t_offset pseudo_filesystem_size = 0;        /* Dummy file system check return us
 
 typedef t_offset (*FILESYSTEM_CHECK)(UNIT *uptr, uint32, t_bool *);
 
-static t_offset get_filesystem_size (UNIT *uptr, t_bool *readonly)
+static t_offset get_filesystem_size (UNIT *uptr, t_bool *isreadonly)
 {
 static FILESYSTEM_CHECK checks[] = {
     &get_ods2_filesystem_size,
@@ -2805,8 +2805,8 @@ uint32 saved_sector_size = ctx->sector_size;
 t_offset ret_val = (t_offset)-1;
 int i;
 
-if (readonly != NULL)
-    *readonly = FALSE;
+if (isreadonly != NULL)
+    *isreadonly = FALSE;
 
 if (pseudo_filesystem_size != 0) {      /* Dummy file system size mechanism? */
     sim_messagef (SCPE_OK, "%s: '%s' Pseudo File System containing %u %d byte sectors\n", sim_uname (uptr), uptr->filename, (uint32)(pseudo_filesystem_size / ctx->sector_size), ctx->sector_size);
@@ -2814,16 +2814,16 @@ if (pseudo_filesystem_size != 0) {      /* Dummy file system size mechanism? */
     }
 
 for (i = 0; checks[i] != NULL; i++)
-    if ((ret_val = checks[i] (uptr, 0, readonly)) != (t_offset)-1) {
+    if ((ret_val = checks[i] (uptr, 0, isreadonly)) != (t_offset)-1) {
         /* ISO files that haven't already been determined to be ISO 9660
          * which contain a known file system are also marked read-only
          * now.  This fits early DEC distribution CDs that were created 
          * before ISO 9660 was standardized and operating support was added.
          */
-        if ((readonly != NULL)          && 
-            (*readonly == FALSE)        &&
+        if ((isreadonly != NULL)          && 
+            (*isreadonly == FALSE)        &&
             (NULL != match_ext (uptr->filename, "ISO")))
-            *readonly = TRUE;
+            *isreadonly = TRUE;
         return ret_val;
         }
 /* 
@@ -2835,10 +2835,10 @@ for (i = 0; checks[i] != NULL; i++)
    
 for (i = 0; checks[i] != NULL; i++) {
     ctx->sector_size = 256;
-    if ((ret_val = checks[i] (uptr, ctx->sector_size, readonly)) != (t_offset)-1)
+    if ((ret_val = checks[i] (uptr, ctx->sector_size, isreadonly)) != (t_offset)-1)
         break;
     ctx->sector_size = 128;
-    if ((ret_val = checks[i] (uptr, ctx->sector_size, readonly)) != (t_offset)-1)
+    if ((ret_val = checks[i] (uptr, ctx->sector_size, isreadonly)) != (t_offset)-1)
         break;
     }
 if (ret_val != (t_offset)-1) {
@@ -3998,12 +3998,12 @@ if (container_size && (container_size != (t_offset)-1) &&
     }
 
 if ((uptr->flags & UNIT_RO) == 0) {     /* Opened Read/Write? */
-    t_bool readonly;
+    t_bool isreadonly;
     int32 saved_quiet = sim_quiet;
 
     sim_quiet = 1;
-    get_filesystem_size (uptr, &readonly);
-    if (readonly) {                     /* ReadOny File System? */
+    get_filesystem_size (uptr, &isreadonly);
+    if (isreadonly) {                     /* ReadOny File System? */
         sim_disk_detach (uptr);
         sim_switches |= SWMASK ('R');
         sim_disk_attach_ex2 (uptr, cptr, sector_size, xfer_encode_size, dontchangecapac,
