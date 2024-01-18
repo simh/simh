@@ -74,7 +74,7 @@ int tty_typed [TTY_MAX+1], tty_instate [TTY_MAX+1];
 /* For all lines */
 time_t tty_last_time [LINES_MAX+1];
 int tty_idle_count [LINES_MAX+1];
-int tty_lnorder[LINES_MAX+1] = { -1 };
+int32 tty_lnorder[LINES_MAX+1] = { -1 };
 
 /* The serial interrupt generator frequency, common for all VT lines */
 int tty_rate = 300;
