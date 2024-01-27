@@ -77,7 +77,9 @@ typedef unsigned int uint;
 
 #if M68K_USE_64_BIT
 typedef signed   long long sint64;
+#if !(defined(__DECC_VER) && defined(__ia64))
 typedef unsigned long long uint64;
+#endif
 #else
 typedef sint32 sint64;
 typedef uint32 uint64;

@@ -24,7 +24,9 @@
 *----------------------------------------------------------------------------*/
 
 typedef sint8 flag;
+#if !(defined(__DECC_VER) && defined(__ia64))
 typedef sint64 int64;
+#endif
 
 /*----------------------------------------------------------------------------
 | Each of the following `typedef's defines a type that holds integers
