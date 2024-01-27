@@ -607,7 +607,7 @@ int days_since_1980(void) {
 
     local_now = mktime(&currentTime);
 
-    if (time(&local_now) == -1) return 0;
+    if (time(&local_now) == (time_t)-1) return 0;
 
     return (int)floor(difftime(local_now, jan1980) / 86400);
 }
