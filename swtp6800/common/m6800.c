@@ -1980,7 +1980,7 @@ t_stat m6800_reset(DEVICE *dptr)
 
 #define HLEN    16
 
-int32 sim_load(FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
+t_stat sim_load(FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
     int32 i, addr = 0, addr0 = 0, cnt = 0, cnt0 = 0, start = 0x10000;
     int32 addr1 = 0, end = 0, byte, chk, rtype, flag0 = 1;
