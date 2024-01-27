@@ -233,27 +233,27 @@ lpxb[LPT_WIDTH] = 0;
 return r;
 }
 
-t_stat lpt_vfu (UNIT *uptr, int32 ch)
+int32 lpt_vfu (UNIT *uptr, int32 ch)
 {
 uint32 i, j;
 
 if ((ch == (FF_VFU - 1)) && VFUP (ch, lpt_vfut[0])) {   /* top of form? */
     fputs ("\n\f", uptr->fileref);                      /* nl + ff */
     lpt_vfup = 0;                                       /* top of page */
-    return SCPE_OK;
+    return 0;
     }
 for (i = 1; i < lpt_vful + 1; i++) {                    /* sweep thru cct */
     lpt_vfup = (lpt_vfup + 1) % lpt_vful;               /* adv pointer */
     if (VFUP (ch, lpt_vfut[lpt_vfup])) {                /* chan punched? */
         for (j = 0; j < i; j++)
             fputc ('\n', uptr->fileref);
-        return SCPE_OK;
+        return 0;
         }
     }
 return STOP_VFU;                                        /* runaway channel */
 }
 
-t_stat lpt_spc (UNIT *uptr, int32 cnt)
+int32 lpt_spc (UNIT *uptr, int32 cnt)
 {
 int32 i;
 
@@ -264,7 +264,7 @@ else {
         fputc ('\n', uptr->fileref);
     lpt_vfup = (lpt_vfup + cnt) % lpt_vful;
     }
-return SCPE_OK;
+return 0;
 }
 
 /* Reset routine */
