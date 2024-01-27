@@ -115,7 +115,7 @@ static char* hdc1001_reg_wr_str[] = {
 
 typedef struct {
     UNIT *uptr;
-    uint8  readonly;    /* Drive is read-only? */
+    uint8  isreadonly;  /* Drive is read-only? */
     uint16 sectsize;    /* sector size */
     uint16 nsectors;    /* number of sectors/track */
     uint16 nheads;      /* number of heads */
@@ -295,7 +295,7 @@ static t_stat hdc1001_attach(UNIT *uptr, CONST char *cptr)
     sim_debug(VERBOSE_MSG, &hdc1001_dev, DEV_NAME "%d, attached to '%s', type=DSK, len=%d\n",
         i, cptr, uptr->capac);
 
-    pDrive->readonly = (uptr->flags & UNIT_RO) ? 1 : 0;
+    pDrive->isreadonly = (uptr->flags & UNIT_RO) ? 1 : 0;
     hdc1001_info->error_reg = 0;
     pDrive->ready = 1;
 
@@ -626,7 +626,7 @@ static t_stat HDC1001_doCommand(void)
                 break;
             case HDC1001_CMD_WRITE_SECT:
                 /* If drive is read-only, signal a write fault. */
-                if (pDrive->readonly) {
+                if (pDrive->isreadonly) {
                     hdc1001_info->status_reg |= HDC1001_STATUS_ERROR;
                     hdc1001_info->status_reg |= HDC1001_STATUS_WRITE_FAULT;
                 break;
@@ -696,7 +696,7 @@ static t_stat HDC1001_doCommand(void)
                 uint8 *fmtBuffer;
 
                 /* If drive is read-only, signal a write fault. */
-                if (pDrive->readonly) {
+                if (pDrive->isreadonly) {
                     hdc1001_info->status_reg |= HDC1001_STATUS_ERROR;
                     hdc1001_info->status_reg |= HDC1001_STATUS_WRITE_FAULT;
                     hdc1001_info->status_reg |= HDC1001_STATUS_DRQ;

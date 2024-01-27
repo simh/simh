@@ -77,7 +77,7 @@
 
 typedef struct {
     UNIT  *uptr;
-    uint8  readonly;    /* Drive is read-only? */
+    uint8  isreadonly;  /* Drive is read-only? */
     uint16 sectsize;    /* sector size */
     uint16 nsectors;    /* number of sectors/track */
     uint16 nheads;      /* number of heads */
@@ -266,7 +266,7 @@ static t_stat ibc_smd_attach(UNIT *uptr, CONST char *cptr)
     sim_debug(VERBOSE_MSG, &ibc_smd_dev, DEV_NAME "%d, attached to '%s', type=DSK, len=%d\n",
         i, cptr, uptr->capac);
 
-    pDrive->readonly = (uptr->flags & UNIT_RO) ? 1 : 0;
+    pDrive->isreadonly = (uptr->flags & UNIT_RO) ? 1 : 0;
     ibc_smd_info->error_reg = 0;
     pDrive->ready = 1;
 
