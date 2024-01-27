@@ -63,7 +63,7 @@ extern "C" {
 #define WSAAPI
 #endif
 
-#if defined(SHUT_RDWR) && !defined(SD_BOTH)
+#if !defined(SD_BOTH)
 #define SD_BOTH SHUT_RDWR
 #endif
 
