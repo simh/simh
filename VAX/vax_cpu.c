@@ -237,7 +237,7 @@
 uint32 *M = NULL;                                       /* memory */
 int32 R[16];                                            /* registers */
 int32 STK[5];                                           /* stack pointers */
-int32 PSL;                                              /* PSL */
+uint32 PSL;                                             /* PSL */
 int32 SCBB = 0;                                         /* SCB base */
 int32 PCBB = 0;                                         /* PCB base */
 int32 P0BR = 0;                                         /* P0 mem mgt */
@@ -250,7 +250,7 @@ int32 SISR;                                             /* swre int req */
 int32 ASTLVL;                                           /* AST level */
 int32 mapen;                                            /* map enable */
 int32 pme;                                              /* perf mon enable */
-int32 trpirq;                                           /* trap/intr req */
+uint32 trpirq;                                          /* trap/intr req */
 int32 in_ie = 0;                                        /* in exc, int */
 int32 recq[6];                                          /* recovery queue */
 int32 recqptr;                                          /* recq pointer */
@@ -491,7 +491,8 @@ return buf;
 
 t_stat sim_instr (void)
 {
-volatile int32 opc = 0, cc;                             /* used by setjmp */
+volatile int32 opc = 0;                                 /* used by setjmp */
+volatile uint32 cc;                                     /* used by setjmp */
 volatile int32 acc;                                     /* set by setjmp */
 int abortval;
 t_stat ret;
@@ -1897,8 +1898,12 @@ for ( ;; ) {
         r = (op1 + op0 + (cc & CC_C)) & LMASK;          /* calc result */
         WRITE_L (r);                                    /* store result */
         CC_ADD_L (r, op0, op1);                         /* set cc's */
+#if defined(CC_BRANCHLESS)
+        cc |= ((r == op1) && op0) * CC_C;
+#else
         if ((r == op1) && op0)                          /* special case */
             cc = cc | CC_C;
+#endif
         break;
 
     case ADDL2: case ADDL3:
@@ -1923,8 +1928,12 @@ for ( ;; ) {
         r = (op1 - op0 - (cc & CC_C)) & LMASK;          /* calc result */
         WRITE_L (r);                                    /* store result */
         CC_SUB_L (r, op0, op1);                         /* set cc's */
+#if defined(CC_BRANCHLESS)
+        cc |= ((op0 == op1) && r) * CC_C;
+#else
         if ((op0 == op1) && r)                          /* special case */
             cc = cc | CC_C;
+#endif
         break;
 
     case SUBL2: case SUBL3:
