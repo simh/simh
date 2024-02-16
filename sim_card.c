@@ -988,10 +988,7 @@ _sim_read_deck(UNIT * uptr, int eof)
     do {
         if (buf.len < 500 && !feof(uptr->fileref)) {
             l = sim_fread(&buf.buffer[buf.len], 1, 8192, uptr->fileref);
-            if (l < 0)
-                r = SCPE_OPENERR;
-            else
-                buf.len += l;
+            buf.len += l;
         }
 
         /* Allocate space for some more cards if needed */
@@ -1018,6 +1015,7 @@ _sim_read_deck(UNIT * uptr, int eof)
         j = buf.size;
         for(i = 0; i < l; i++, j++)
             buf.buffer[i] = buf.buffer[j];
+        buf.buffer[i] = '\0';
         buf.len -= buf.size;
     } while (buf.len > 0 && r == SCPE_OK);
 
