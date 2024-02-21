@@ -1,6 +1,6 @@
 /* sigma_dk.c: 7250/7251-7252 cartridge disk simulator
 
-   Copyright (c) 2007-2022, Robert M Supnik
+   Copyright (c) 2007-2024, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,9 @@
 
    dk           7250/7251-7252 cartridge disk
 
+   11-Feb-24    RMS     Report non-operational if not attached (Ken Rector)
+   01-Feb-24    RMS     Fixed nx unit test (Ken Rector)
+   15-Dec-22    RMS     Moved SIO interrupt test to devices
    02-Jul-22    RMS     Fixed bugs in multi-unit operation
 
    Transfers are always done a sector at a time.
@@ -164,8 +167,10 @@ int32 iu;
 UNIT *uptr;
 
 if ((un >= DK_NUMDR) ||                                 /* inv unit num? */
-    (dk_unit[un].flags & UNIT_DIS))                     /* disabled unit? */
-    return DVT_NODEV;
+    (dk_unit[un].flags & UNIT_DIS)) {                   /* disabled unit? */
+    *dvst = DVT_NODEV;
+    return 0;
+    }
 switch (op) {                                           /* case on op */
 
     case OP_SIO:                                        /* start I/O */
@@ -412,12 +417,17 @@ return FALSE;                                           /* cmd done */
 
 uint32 dk_tio_status (uint32 un)
 {
-uint32 i;
+uint32 i, st;
 
+st = DVS_AUTO;                                          /* flags */
+if (sim_is_active (&dk_unit[un]))                       /* active => busy */
+    st |= DVS_DBUSY;
+else if ((dk_unit[un].flags & UNIT_ATT) == 0)           /* not att => offl */
+    st |= DVS_DOFFL;                                 
 for (i = 0; i < DK_NUMDR; i++) {                        /* loop thru units */
     if (sim_is_active (&dk_unit[i]))                    /* active? */
-        return (DVS_AUTO | DVS_CBUSY | (CC2 << DVT_V_CC) |
-            ((i == un)? DVS_DBUSY: 0));
+        st |= (DVS_CBUSY | (CC2 << DVT_V_CC));          /* ctrl is busy */
+        return st;
     }
 return DVS_AUTO;
 }

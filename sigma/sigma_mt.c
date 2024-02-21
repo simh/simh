@@ -1,6 +1,6 @@
 /* sigma_mt.c: Sigma 732X 9-track magnetic tape
 
-   Copyright (c) 2007-2022, Robert M. Supnik
+   Copyright (c) 2007-2024, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,11 +25,18 @@
 
    mt           7320 and 7322/7323 magnetic tape
 
+   11-Feb-24    RMS     Report non-operational if not attached (Ken Rector)
+   01-Feb-24    RMS     Fixed nx unit test (Ken Rector)
+   01-Nov-23    RMS     Fixed reset not to clear BOT
+   31-Mar-23    RMS     Mask unit flag before calling status in AIO (Ken Rector)
+   07-Feb-23    RMS     Silenced Mac compiler warnings (Ken Rector)
+   15-Dec-22    RMS     Moved SIO interrupt test to devices
    20-Jul-22    RMS     Space record must set EOF flag on tape mark (Ken Rector)
    03-Jul-22    RMS     Fixed error in handling of channel errors (Ken Rector)
    02-Jul-22    RMS     Fixed bugs in multi-unit operation
    07-Jun-22    RMS     Removed unused variables (V4)
    26-Mar-22    RMS     Added extra case points for new MTSE definitions
+   23-Mar-20    RMS     Unload should call sim_tape_detach (Mark Pizzolato)
    13-Mar-17    RMS     Annotated fall through in switch
 
    Magnetic tapes are represented as a series of variable records
@@ -231,8 +238,10 @@ uint32 un = DVA_GETUNIT (dva);
 UNIT *uptr = &mt_unit[un];
 
 if ((un >= MT_NUMDR) ||                                 /* inv unit num? */
-    (uptr-> flags & UNIT_DIS))                          /* disabled unit? */
-    return DVT_NODEV;
+    (uptr-> flags & UNIT_DIS)) {                        /* disabled unit? */
+    *dvst = DVT_NODEV;
+    return 0;
+    }
 switch (op) {                                           /* case on op */
 
     case OP_SIO:                                        /* start I/O */
@@ -563,10 +572,12 @@ uint32 mt_tio_status (uint32 un)
 uint32 i, st;
 UNIT *uptr = &mt_unit[un];
 
-st = (uptr->flags & UNIT_ATT)? DVS_AUTO: 0;             /* AUTO */
+st = DVS_AUTO;                                          /* flags */
 if (sim_is_active (uptr) ||                             /* unit busy */
     sim_is_active (uptr + MT_REW))                      /* or rewinding? */
     st |= DVS_DBUSY;
+else if ((uptr -> flags & UNIT_ATT) == 0)              /* not att => offl */
+    st |= DVS_DOFFL;                                 
 for (i = 0; i < MT_NUMDR; i++) {                        /* loop thru units */
     if (sim_is_active (&mt_unit[i])) {                  /* active? */
         st |= (DVS_CBUSY | (CC2 << DVT_V_CC));          /* ctrl is busy */
@@ -654,7 +665,9 @@ uint32 i;
 for (i = 0; i < MT_NUMDR; i++) {
     sim_cancel (&mt_unit[i]);                           /* stop unit */
     sim_cancel (&mt_unit[i + MT_REW]);                  /* stop rewind */
-    mt_unit[i].UST = 0;
+    if (mt_unit[i].flags & UNIT_ATT)                    /* attached? */
+        mt_unit[i].UST &= MTDV_BOT;                     /* clr sta exc BOT */
+    else mt_unit[i].UST = 0;
     mt_unit[i].UCMD = 0;
     }
 mt_rwi = 0;

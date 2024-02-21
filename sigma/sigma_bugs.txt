@@ -131,6 +131,19 @@
 124. IO, all devices: moved SIO reject-on-interrupt test to devices.
 125. DP: SIO will knock down pending device interrupts and allow operation to proceed.
 126. MT: AIO must mask unit number before calling TDV status.
+127. IO: location 20/21 set incorrectly in the even, non-zero register case.
+128. CPU: WAIT must be implemented for correct operation of CP-V.
+129. DP: On 10 byte models, SENSE length errors can't happen. On 16 byte models,
+     SENSE length errors only occur if length == 0 || length > 16.
+130. IO: DVT_NOTDEV macro incorrect.
+131. DP: Test for non-existent device returns wrong status.
+132. DK: Test for non-existent device returns wrong status.
+133. MT: Test for non-existent device returns wrong status.
+134. RAD: Test for non-existent device returns wrong status.
+135. DP: TIO status should return non-operational for unattached device.
+136. DK: TIO status should return non-operational for unattached device.
+137. NT: TIO status should return non-operational for unattached device.
+138. IO: Device mapping algorithm creates false dispatch points.
 
 Diagnostic Notes
 ----------------
