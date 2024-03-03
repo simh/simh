@@ -581,6 +581,8 @@ static t_stat sio_reset(DEVICE *dptr) {
             if (TerminalLines[i].conn)
                 tmxr_reset_ln(&TerminalLines[i]);
     mapAltairPorts();
+    if (sio_unit.flags & UNIT_SIO_INTERRUPT)
+        sim_activate(&sio_unit, sio_unit.wait);             /* activate unit    */
     return SCPE_OK;
 }
 
