@@ -1,6 +1,6 @@
 /* sigma_dp.c: moving head disk pack controller
 
-   Copyright (c) 2008-2022, Robert M Supnik
+   Copyright (c) 2008-2024, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,13 +25,18 @@
 
    dp           moving head disk pack controller
 
+   11-Feb-24    RMS     Report non-operational if not attached (Ken Rector)
+   01-Feb-24    RMS     Fixed nx unit test (Ken Rector)
+   03-Jun-23    RMS     Fixed SENSE length error detection (Ken Rector)
+   06-Mar-23    RMS     SIO can start despite outstanding seek interrupt (Ken Rector)
+   15-Dec-22    RMS     Moved SIO interrupt test to devices
    09-Dec-22    RMS     Invalid address must set a TDV-visible error flag (Ken Rector)
    23-Jul-22    RMS     SEEK(I), RECAL(I) should be fast operations (Ken Rector)
    02-Jul-22    RMS     Fixed bugs in multi-unit operation
+   29-Jun-22    RMS     Fixed initialization errors in ctrl, seek units (Ken Rector)
    28-Jun-22    RMS     Fixed off-by-1 error in DP_SEEK definition (Ken Rector)
    07-Jun-22    RMS     Removed unused variables (V4)
    06-Jun-22    RMS     Fixed incorrect return in TIO status (Ken Rector)
-   06-Jun-22    RMS     Fixed missing loop increment in TDV (Ken Rector)
    13-Mar-17    RMS     Fixed bug in selecting 3281 unit F (COVERITY)
 
    Transfers are always done a sector at a time.
@@ -47,7 +52,7 @@
    one for timing asynchronous seek completions. The controller will not
    start a new operation is it is busy (any of the main units active) or if
    the target device is busy (its seek unit is active).
- 
+
    The DP's seek interrupt has a unique feature: it comes and goes, lasting only
    a sector's time; and it gets "knocked down" by any SIO to a different unit.
    Therefore, the SIO interrupt check is complicated.
@@ -586,14 +591,19 @@ int32 iu;
 uint32 i;
 DP_CTX *ctx;
 
-if (cidx >= DP_NUMCTL)                                  /* inv ctrl num? */
-    return DVT_NODEV;
+if (cidx >= DP_NUMCTL) {                                /* inv ctrl num? */
+    *dvst = DVT_NODEV;
+    return 0;
+    }
 ctx = &dp_ctx[cidx];
 if (((un < DP_NUMDR) &&                                 /* un valid and */
     ((dp_unit[un].flags & UNIT_DIS) == 0)) ||           /* not disabled OR */
     ((un == 0xF) && (ctx->dp_ctype == DP_C3281)))       /* 3281 unit F? */
     uptr = dp_unit + un;                                /* un exists */
-else return DVT_NODEV;
+else {
+    *dvst = DVT_NODEV;
+    return 0;
+    }
 
 switch (op) {                                           /* case on op */
 
@@ -995,21 +1005,23 @@ return FALSE;                                           /* cmd done */
 
 uint32 dp_tio_status (uint32 cidx, uint32 un)
 {
-uint32 i;
+uint32 i, st;
 DP_CTX *ctx = &dp_ctx[cidx];
 UNIT *dp_unit = dp_dev[cidx].units;
-uint32 stat = DVS_AUTO;
 
+st = DVS_AUTO;
+if (sim_is_active (&dp_unit[un]) ||
+    sim_is_active (&dp_unit[un + DP_SEEK]))
+    st |= (DVS_DBUSY | (CC2 << DVT_V_CC));
+else if ((un != 0xF) && ((dp_unit[un].flags & UNIT_ATT) == 0))
+    st |= DVS_DOFFL;
 for (i = 0; i < DP_NUMDR; i++) {
     if (sim_is_active (&dp_unit[i])) {
-        stat |= (DVS_CBUSY | (CC2 << DVT_V_CC));
+        st |= (DVS_CBUSY | (CC2 << DVT_V_CC));
         break;
         }
     }
-if (sim_is_active (&dp_unit[un]) ||
-    sim_is_active (&dp_unit[un + DP_SEEK]))
-    stat |= (DVS_DBUSY | (CC2 << DVT_V_CC));
-return stat;
+return st;
 }
 
 uint32 dp_tdv_status (uint32 cidx, uint32 un)

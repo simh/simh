@@ -149,7 +149,7 @@ typedef struct {
 #define DVT_GETCC(x)    (((x) >> DVT_V_CC) & DVT_M_CC)
 #define DVT_GETDVS(x)   (((x) >> DVT_V_DVS) & DVT_M_DVS)
 #define DVT_NOST        (CC1 << DVT_V_CC)               /* no status */
-#define DVT_NODEV       ((CC1|CC2) < DVT_V_CC)          /* no device */
+#define DVT_NODEV       ((CC1|CC2) << DVT_V_CC)          /* no device */
 
 /* Read and write direct address format */
 
