@@ -10403,7 +10403,8 @@ if ((low > mask) || (high > mask) || (low > high))
 dfltinc =  parse_sym ("0", 0, uptr, sim_eval, sim_switches);
 if (dfltinc > 0)                                        /* parse_sym doing nums? */
     dfltinc = 1 - dptr->aincr;                          /* no, use std dflt incr */
-for (i = low; i <= high; ) {                            /* all paths must incr!! */
+for (i = low;
+     ((i <= high) && (sim_is_running || !stop_cpu)); ) {/* all paths must incr!! */
     reason = get_aval (i, dptr, uptr);                  /* get data */
     sim_switches = saved_switches;
     if (reason != SCPE_OK)                              /* return if error */
@@ -10428,6 +10429,9 @@ for (i = low; i <= high; ) {                            /* all paths must incr!!
         i = i + (1 - reason);                           /* incr */
         }
     }
+if (flag == EX_E)
+    ex_addr (ofile, EX_DONE, i, dptr, uptr, dfltinc);
+stop_cpu = FALSE;
 return SCPE_OK;
 }
 
@@ -10675,7 +10679,62 @@ t_stat ex_addr (FILE *ofile, int32 flag, t_addr addr, DEVICE *dptr, UNIT *uptr, 
 {
 t_stat reason;
 int32 rdx;
+char sim_current_last_val[sizeof(sim_last_val)];
+static int32 same = -1;
+static t_bool same_done = TRUE;
+static t_addr same_start_addr;
 
+if (flag == EX_DONE) {
+    if (same >= 0) {
+        if (sim_vm_fprint_addr)
+            sim_vm_fprint_addr (ofile, dptr, same_start_addr);
+        else 
+            fprint_val (ofile, same_start_addr, dptr->aradix, dptr->awidth, PV_LEFT);
+        if (same == 0)
+            fprintf (ofile, ":\t%s\n", sim_last_val);
+        else {
+            fprintf (ofile, ": thru ");
+            if (sim_vm_fprint_addr)
+                sim_vm_fprint_addr (ofile, dptr, addr - (1 - dfltinc));
+            else 
+                fprint_val (ofile, addr - (1 - dfltinc), dptr->aradix, dptr->awidth, PV_LEFT);
+            fprintf (ofile, ": same as above.\n");
+            }
+        same = -1;
+        }
+    same_done = TRUE;
+    return SCPE_OK;
+    }
+if ((flag == EX_E) && same_done) {
+    strlcpy (sim_last_val, "", sizeof (sim_last_val));
+    same_done = FALSE;
+    }
+GET_RADIX (rdx, dptr->dradix);
+reason = sim_snprint_sym (sim_current_last_val, sizeof (sim_current_last_val), FALSE, addr, sim_eval, uptr, sim_switches, dfltinc, rdx, dptr->dwidth, PV_RZRO);
+if ((flag == EX_E) && (strcmp (sim_last_val, sim_current_last_val) == 0)) {
+    if (same < 0)
+        same_start_addr = addr;
+    ++same;
+    return reason;
+    }
+if (same >= 0) {
+    if (sim_vm_fprint_addr)
+        sim_vm_fprint_addr (ofile, dptr, same_start_addr);
+    else 
+        fprint_val (ofile, same_start_addr, dptr->aradix, dptr->awidth, PV_LEFT);
+    if (same == 0)
+        fprintf (ofile, ":\t%s\n", sim_last_val);
+    else {
+        fprintf (ofile, ": thru ");
+        if (sim_vm_fprint_addr)
+            sim_vm_fprint_addr (ofile, dptr, addr - (1 - dfltinc));
+        else 
+            fprint_val (ofile, addr - (1 - dfltinc), dptr->aradix, dptr->awidth, PV_LEFT);
+        fprintf (ofile, ": same as above.\n");
+        }
+    same = -1;
+    }
+same_start_addr = addr;
 if (sim_vm_fprint_addr)
     sim_vm_fprint_addr (ofile, dptr, addr);
 else fprint_val (ofile, addr, dptr->aradix, dptr->awidth, PV_LEFT);
@@ -10683,9 +10742,8 @@ fprintf (ofile, ":\t");
 if (!(flag & EX_E))
     return dfltinc;
 
-GET_RADIX (rdx, dptr->dradix);
-reason = sim_snprint_sym (sim_last_val, sizeof (sim_last_val), FALSE, addr, sim_eval, uptr, sim_switches, dfltinc, rdx, dptr->dwidth, PV_RZRO);
-fprintf (ofile, "%s", sim_last_val);
+fprintf (ofile, "%s", sim_current_last_val);
+strlcpy (sim_last_val, sim_current_last_val, sizeof (sim_last_val));
 if (flag & EX_I)
     fprintf (ofile, "\t");
 else

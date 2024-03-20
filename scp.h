@@ -57,6 +57,7 @@ extern "C" {
 #define EX_D            0                               /* deposit */
 #define EX_E            1                               /* examine */
 #define EX_I            2                               /* interactive */
+#define EX_DONE         4                               /* examine done */
 
 /* brk_cmd parameters */
 
