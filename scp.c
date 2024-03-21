@@ -12459,7 +12459,7 @@ switch (format) {
                 break;
         ndigits = MAX_WIDTH - digit;
         commas = (ndigits - 1)/3;
-        for (digit=0; digit<ndigits-3; digit++)
+        for (digit=0; (digit + 3) < ndigits; digit++)
             dbuf[MAX_WIDTH + (digit - ndigits) - (ndigits - digit - 1)/3] = dbuf[MAX_WIDTH + (digit - ndigits)];
         for (digit=1; digit<=commas; digit++)
             dbuf[MAX_WIDTH - (digit * 4)] = ',';
