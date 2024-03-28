@@ -1,6 +1,6 @@
 /* sigma_io_defs.h: XDS Sigma I/O device simulator definitions
 
-   Copyright (c) 2007-2008, Robert M Supnik
+   Copyright (c) 2007-2024, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -126,6 +126,7 @@ typedef struct {
 
 #define CHSF_ACT        0x0001                          /* channel active */
 #define CHSF_MU         0x0002                          /* multi-unit dev */
+#define CHSF_CM         0x0004                          /* chaining modifier */
 
 /* Dispatch routine status return value */
 
@@ -253,6 +254,7 @@ void chan_set_dvi (uint32 dva);
 int32 chan_clr_chi (uint32 dva);
 int32 chan_chk_chi (uint32 dva);
 t_bool chan_chk_dvi (uint32 dva);
+uint32 chan_set_cm (uint32 dva);
 uint32 chan_end (uint32 dva);
 uint32 chan_uen (uint32 dva);
 uint32 chan_RdMemB (uint32 dva, uint32 *dat);
