@@ -363,6 +363,7 @@ if (CC & cpu_tab[cpu_model].iocc)                       /* error? */
 chan[ch].chf[dev] = 0;                                  /* clear flags */
 chan[ch].chi[dev] = 0;                                  /* clear intrs */
 chan[ch].chsf[dev] |= CHSF_ACT;                         /* set chan active */
+chan[ch].chsf[dev] &= ~CHSF_CM;                         /* clear chain mod */
 chan_new_cmd (ch, dev, R[0]);                           /* new command */
 return st;
 }
@@ -544,16 +545,18 @@ return 0;
 uint32 chan_end (uint32 dva)
 {
 uint32 ch, dev;
-uint32 st;
+uint32 st, cm;
 
 if ((st = chan_proc_prolog (dva, &ch, &dev)) != 0)      /* valid, active? */
     return st;
 if (chan[ch].cmf[dev] & CMF_ICE)                        /* int on chan end? */
     chan_set_chi (dva, CHI_END);
+cm = chan[ch].chsf[dev] & CHSF_CM ? 1 : 0;              /* get modifier flag, */
+chan[ch].chsf[dev] &= ~CHSF_CM;                         /* then clear it */
 if ((chan[ch].cmf[dev] & CMF_CCH) &&                    /* command chain? */
-    !chan_new_cmd (ch, dev, chan[ch].clc[dev] + 1))     /* next command? */
+    !chan_new_cmd (ch, dev, chan[ch].clc[dev] + 1 + cm)) /* next command? */
     return CHS_CCH;
-else chan[ch].chsf[dev] &= ~CHSF_ACT;                   /* channel inactive */
+else chan[ch].chsf[dev] &= ~(CHSF_ACT|CHSF_CM);         /* channel inactive */
 return 0;
 }
 
@@ -611,7 +614,7 @@ if (!VALID_DVA (ch, dev))                               /* valid? */
 if (chan[ch].cmf[dev] & CMF_IUE)                        /* int on uend? */
     chan_set_chi (dva, CHI_UEN);
 chan[ch].chf[dev] |= CHF_UEN;                           /* flag uend */
-chan[ch].chsf[dev] &= ~CHSF_ACT;
+chan[ch].chsf[dev] &= ~(CHSF_ACT|CHSF_CM);
 return CHS_INACTV;                                      /* done */
 }
 
@@ -760,7 +763,7 @@ for (i = 0; i < 2; i++) {                               /* max twice */
     chan[ch].clc[dev] = clc;                            /* and save */
     if (ReadPW (clc << 1, &ccw1)) {                     /* get ccw1, nxm? */
         chan[ch].chf[dev] |= CHF_IOME;                  /* memory error */
-        chan[ch].chsf[dev] &= ~CHSF_ACT;                /* stop channel */
+        chan[ch].chsf[dev] &= ~(CHSF_ACT|CHSF_CM);      /* stop channel */
         return CHS_INACTV;
         }
     ReadPW ((clc << 1) + 1, &ccw2);                     /* get ccw2 */
@@ -776,7 +779,7 @@ for (i = 0; i < 2; i++) {                               /* max twice */
         }
     }
 chan[ch].chf[dev] |= CHF_IOCE;                          /* control error */
-chan[ch].chsf[dev] &= ~CHSF_ACT;                        /* stop channel */
+chan[ch].chsf[dev] &= ~(CHSF_ACT|CHSF_CM);              /* stop channel */
 return CHS_INACTV;
 }
 
@@ -838,6 +841,20 @@ if ((chan[ch].chf[dev] & CHF_INP) != 0)
 return FALSE;
 }
 
+/* Channel set Chaining Modifier flag */
+
+uint32 chan_set_cm (uint32 dva)
+{
+uint32 ch, dev;
+
+ch = DVA_GETCHAN (dva);                                 /* get chan, dev */
+dev = DVA_GETDEV (dva);
+if (!VALID_DVA (ch, dev))                               /* valid? */
+    return SCPE_IERR;
+chan[ch].chsf[dev] |= CHSF_CM;
+return 0;
+}
+
 /* Called by device reset to reset channel registers */
 
 t_stat chan_reset_dev (uint32 dva)
@@ -849,7 +866,7 @@ dev = DVA_GETDEV (dva);
 if (!VALID_DVA (ch, dev))                               /* valid? */
     return SCPE_IERR;
 chan[ch].chf[dev] &= ~CHF_INP;                          /* clear intr */
-chan[ch].chsf[dev] &= ~CHSF_ACT;                        /* clear active */
+chan[ch].chsf[dev] &= ~(CHSF_ACT|CHSF_CM);              /* clear active */
 return SCPE_OK;
 }
 
@@ -1245,7 +1262,7 @@ for (i = 0; i < CHAN_N_DEV; i++) {
     chan[ch].bc[i] = 0;
     chan[ch].chf[i] = 0;
     chan[ch].chi[i] = 0;
-    chan[ch].chsf[i] &= ~CHSF_ACT;
+    chan[ch].chsf[i] &= ~(CHSF_ACT|CHSF_CM);
     for (j = 0; (devp = sim_devices[j]) != NULL; j++) { /* loop thru dev */
         if (devp->ctxt != NULL) {
             dib_t *dibp = (dib_t *) devp->ctxt;
