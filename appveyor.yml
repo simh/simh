@@ -15,7 +15,6 @@ matrix:
 
 cache:
   - ../windows-build
-  - ../Development-Binaries
 
 skip_commits:
   files:
@@ -116,14 +115,12 @@ on_success:
         # repository if the current build for this platform is one week or more 
         # from the last saved build for this platform in the repository
         if (((Get-Date -UFormat %s) -gt $recent_saved_commit_time + $oneweek) -and 
-            ("$env:APPVEYOR_REPO_NAME" -eq "simh/simh")                       -and 
-            ("$env:APPVEYOR_REPO_BRANCH" -eq "master")) {
+            ("$env:APPVEYOR_PULL_REQUEST_NUMBER" -eq "")) {
           ("$platform Build") | Out-File -FilePath ../Save-Build-Results
         }
         Write-Output "Building repo '$env:APPVEYOR_REPO_NAME' branch: $env:APPVEYOR_REPO_BRANCH"
-        if (("$env:APPVEYOR_REPO_NAME" -ne "simh/simh") -or 
-            ("$env:APPVEYOR_REPO_BRANCH" -ne "master")) {
-          Write-Output "Skipping Saving binaries for non simh/simh master branch CI build"
+        if ("$env:APPVEYOR_PULL_REQUEST_NUMBER" -ne "") {
+          Write-Output "Skipping Saving binaries for pull request $env:APPVEYOR_PULL_REQUEST_NUMBER CI build"
         } else {
           if ((Get-Date -UFormat %s) -lt $recent_saved_commit_time + $oneweek) {
             Write-Output "Skipping Saving binaries since the last one was saved " + (([System.DateTimeOffset]::FromUnixTimeSeconds($recent_saved_commit_time)).DateTime).ToString()
