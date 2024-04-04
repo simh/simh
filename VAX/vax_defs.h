@@ -847,7 +847,7 @@ void cpu_idle (void);
 
 /* Instruction History */
 #define HIST_MIN        64
-#define HIST_MAX        250000
+#define HIST_MAX        2000000
 
 #define OPND_SIZE       16
 #define INST_SIZE       52

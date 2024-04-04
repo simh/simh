@@ -1587,7 +1587,7 @@ for ( ;; ) {
         if (hst_p >= hst_lnt)
             hst_p = 0;
         if (hst_log && (hst_p == hst_log_p))    /* File Logging and Full, then write all records*/
-            cpu_show_hist_records (hst_log, FALSE, hst_log_p, hst_lnt);
+            cpu_show_hist_records (hst_log, ((hst_switches & SWMASK('O')) != 0), hst_log_p, hst_lnt);
         }
 
 /* Dispatch to instructions */
@@ -3536,6 +3536,7 @@ t_stat r;
 if (cptr == NULL) { /* Clear History */
     if (hst_log) {
         sim_set_fsize (hst_log, (t_addr)0);
+        rewind (hst_log);
         hst_log_p = 0;
         cpu_show_hist_records (hst_log, TRUE, 0, 0);
         }
@@ -3611,6 +3612,10 @@ InstHistory *h;
 if (hst_lnt == 0)                                       /* enabled? */
     return SCPE_NOFNC;
 if (do_header) {
+    if (hst_switches & SWMASK('O')) {
+        sim_set_fsize (hst_log, (t_addr)0);
+        rewind (hst_log);
+        }
     if (hst_switches & SWMASK('T'))
         fprintf (st," TIME       ");
     fprintf (st, "PC       PSL       IR\n\n");
@@ -4010,16 +4015,22 @@ fprintf (st, "indicats the number of seconds which the simulator must run before
 fprintf (st, "starts.\n\n");
 fprintf (st, "The CPU can maintain a history of the most recently executed instructions.\n");
 fprintf (st, "This is controlled by the SET CPU HISTORY and SHOW CPU HISTORY commands:\n\n");
-fprintf (st, "   sim> SET CPU HISTORY                 clear history buffer\n");
-fprintf (st, "   sim> SET CPU HISTORY=0               disable history\n");
-fprintf (st, "   sim> SET CPU {-T} HISTORY=n{:file}   enable history, length = n\n");
-fprintf (st, "   sim> SHOW CPU HISTORY                print CPU history\n");
-fprintf (st, "   sim> SHOW CPU HISTORY=n              print most recent n entries of history\n\n");
+fprintf (st, "   sim> SET CPU HISTORY                    clear history buffer\n");
+fprintf (st, "   sim> SET CPU HISTORY=0                  disable history\n");
+fprintf (st, "   sim> SET CPU {-T} {-O} HISTORY=n{:file} enable history, length = n\n");
+fprintf (st, "   sim> SHOW CPU HISTORY                   print CPU history\n");
+fprintf (st, "   sim> SHOW CPU HISTORY=n                 print most recent n entries of\n");
+fprintf (st, "                                           history\n\n");
 fprintf (st, "The -T switch causes simulator time to be recorded (and displayed)\n");
-fprintf (st, "with each history entry.\n");
+fprintf (st, "with each history entry.  This may be useful when correlating history\n");
+fprintf (st, "with debug output.\n");
 fprintf (st, "When writing history to a file (SET CPU HISTORY=n:file), 'n' specifies\n");
 fprintf (st, "the buffer flush frequency.  Warning: prodigious amounts of disk space\n");
-fprintf (st, "may be comsumed.  The maximum length for the history is %d entries.\n\n", HIST_MAX);
+fprintf (st, "may be comsumed.\n");
+fprintf (st, "Consumption of prodigious amounts of disk space can be avoided, if the\n");
+fprintf (st, "-O switch is specified which will cause each buffer flush to overwrite\n");
+fprintf (st, "any previously output history.\n");
+fprintf (st, "The maximum length for the history is %d entries.\n\n", HIST_MAX);
 fprintf (st, "Different VAX systems implemented different VAX architecture instructions\n");
 fprintf (st, "in hardware with other instructions possibly emulated by software in the\n");
 fprintf (st, "system.  The instructions that a particular simulator implements can be\n");
