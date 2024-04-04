@@ -326,7 +326,6 @@ extern size_t sim_deb_buffer_size;                      /* debug memory buffer s
 extern char *sim_deb_buffer;                            /* debug memory buffer */
 extern size_t sim_debug_buffer_offset;                  /* debug memory buffer insertion offset */
 extern size_t sim_debug_buffer_inuse;                   /* debug memory buffer inuse count */
-extern struct timespec sim_deb_basetime;                /* debug base time for relative time output */
 extern DEVICE **sim_internal_devices;
 extern uint32 sim_internal_device_count;
 extern UNIT *sim_clock_queue;

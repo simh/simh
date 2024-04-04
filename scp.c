@@ -668,7 +668,6 @@ size_t sim_deb_buffer_size = 0;                         /* debug memory buffer s
 char *sim_deb_buffer = NULL;                            /* debug memory buffer */
 size_t sim_debug_buffer_offset = 0;                     /* debug memory buffer insertion offset */
 size_t sim_debug_buffer_inuse = 0;                      /* debug memory buffer inuse count */
-struct timespec sim_deb_basetime;                       /* debug timestamp relative base time */
 char *sim_prompt = NULL;                                /* prompt string */
 static FILE *sim_gotofile;                              /* the currently open do file */
 static int32 sim_goto_line[MAX_DO_NEST_LVL+1];          /* the current line number in the currently open do file */
@@ -3454,6 +3453,10 @@ t_stat r = SCPE_EXIT;
 if (cptr && *cptr) {
     sim_exit_status = atoi (cptr);
     r |= SCPE_NOMESSAGE;            /* exit silently with the specified status */
+    }
+if (sim_deb) {                      /* If debugging, then close debugging cleanly */
+    sim_switches |= SWMASK ('Q');   /*   and quietly */
+    sim_set_deboff (0, NULL);
     }
 return r;
 }
@@ -14532,10 +14535,12 @@ static t_stat _sim_debug_flush (void)
 int32 saved_quiet = sim_quiet;
 int32 saved_sim_switches = sim_switches;
 int32 saved_deb_switches = sim_deb_switches;
-struct timespec saved_deb_basetime = sim_deb_basetime;
+struct timespec saved_deb_basetime;
 
 if (sim_deb == NULL)                                    /* no debug? */
     return SCPE_OK;
+
+saved_deb_basetime = *sim_rtcn_get_debug_basetime ();
 
 _sim_debug_write_flush ("", 0, TRUE);
 
@@ -14553,7 +14558,7 @@ if ((saved_deb_switches & SWMASK ('B')) != 0) {
     sim_set_deboff (0, NULL);
     sim_switches = saved_deb_switches;
     sim_set_debon (0, saved_debug_filename);
-    sim_deb_basetime = saved_deb_basetime;
+    sim_rtcn_set_debug_basetime (&saved_deb_basetime);
     sim_switches = saved_sim_switches;
     sim_quiet = saved_quiet;
     }
@@ -14600,7 +14605,7 @@ struct timespec time_now;
 if (sim_deb_switches & (SWMASK ('T') | SWMASK ('R') | SWMASK ('A'))) {
     sim_rtcn_debug_time(&time_now);
     if (sim_deb_switches & SWMASK ('R'))
-        sim_timespec_diff (&time_now, &time_now, &sim_deb_basetime);
+        sim_timespec_diff (&time_now, &time_now, sim_rtcn_get_debug_basetime ());
     if (sim_deb_switches & SWMASK ('T')) {
         time_t tnow = (time_t)time_now.tv_sec;
         struct tm *now = localtime(&tnow);

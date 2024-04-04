@@ -2369,13 +2369,15 @@ sim_set_deb_switches (sim_switches);
 if (sim_deb_switches & SWMASK ('R')) {
     struct tm loc_tm, gmt_tm;
     time_t time_t_now;
+    struct timespec basetime;
 
-    sim_rtcn_get_time(&sim_deb_basetime, 0);
-    time_t_now = (time_t)sim_deb_basetime.tv_sec;
+    sim_rtcn_get_time(&basetime, 0);
+    time_t_now = (time_t)basetime.tv_sec;
     /* Adjust the relative timebase to reflect the localtime GMT offset */
     loc_tm = *localtime (&time_t_now);
     gmt_tm = *gmtime (&time_t_now);
-    sim_deb_basetime.tv_sec -= mktime (&gmt_tm) - mktime (&loc_tm);
+    basetime.tv_sec -= mktime (&gmt_tm) - mktime (&loc_tm);
+    sim_rtcn_set_debug_basetime (&basetime);
     if (!(sim_deb_switches & (SWMASK ('A') | SWMASK ('T'))))
         sim_deb_switches |= SWMASK ('T');
     }

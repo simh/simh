@@ -721,7 +721,7 @@ return SCPE_OK;
 
 /* diff = min - sub */
 void
-sim_timespec_diff (struct timespec *diff, struct timespec *min, struct timespec *sub)
+sim_timespec_diff (struct timespec *diff, struct timespec *min, const struct timespec *sub)
 {
 /* move the minuend value to the difference and operate there. */
 *diff = *min;
@@ -1348,7 +1348,7 @@ for (tmr=clocks=0; tmr<=SIM_NTIMERS; ++tmr) {
     if (sim_catchup_ticks && rtc->clock_catchup_eligible) {
         _double_to_timespec (&now, rtc->clock_catchup_base_time+rtc->calib_tick_time);
         time_t_now = (time_t)now.tv_sec;
-        fprintf (st, " %sCatchup Tick Time:%s  %8.8s.%03d\n", pseudo, pseudo_space, 11+ctime(&time_t_now), (int)(now.tv_nsec/1000000));
+        fprintf (st, "  %sCatchup Tick Time:%s  %8.8s.%03d\n", pseudo, pseudo_space, 11+ctime(&time_t_now), (int)(now.tv_nsec/1000000));
         _double_to_timespec (&now, rtc->clock_catchup_base_time);
         time_t_now = (time_t)now.tv_sec;
         fprintf (st, "  %sCatchup Base Time:%s  %8.8s.%03d\n", pseudo, pseudo_space, 11+ctime(&time_t_now), (int)(now.tv_nsec/1000000));
@@ -1524,6 +1524,7 @@ if (arg != 0) {                         /* Enabling Calibration? */
         return sim_messagef (SCPE_ARG, "Invalid calibration idle percentage: %s\n", gbuf);
         }
     }
+
 /* Disabling Calibration */
 if (!sim_timer_calib_enabled)
     return sim_messagef (SCPE_OK, "calibration already disabled running at %s %s per pseudo second\n", 
@@ -2348,6 +2349,16 @@ return stat;
 t_stat sim_timer_stop_svc (UNIT *uptr)
 {
 return SCPE_STOP;
+}
+
+void sim_rtcn_set_debug_basetime (const struct timespec *basetime)
+{
+sim_timer_uncalib_base_time = *basetime;
+}
+
+const struct timespec *sim_rtcn_get_debug_basetime (void)
+{
+return &sim_timer_uncalib_base_time;
 }
 
 void sim_rtcn_debug_time (struct timespec *now)
