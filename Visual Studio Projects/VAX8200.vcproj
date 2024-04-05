@@ -398,6 +398,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\VAX\vax_uw.c"
+				>
+			</File>
+			<File
 				RelativePath="..\VAX\vax_watch.c"
 				>
 			</File>
