@@ -89,7 +89,7 @@ Simulator binaries for x86 Linus, x86 macOS, and Windows for all recent changes 
 - Added a SET CLOCK NOCALIBRATE mode.  
     NOCALIBRATE mode allows all activity of a simulator run to occur with precisely consistent event timing.  In this mode, every clock tick takes precisely the same number of instructions/cycles.  Likewise, the polling activities for MUX or other poll oriented devices occurs after precisely the same number of instructions/cycles executed.  As a consequence of this mode, no effort to align simulated clock ticks (and simulated access to wall clock time) is made.
     
-    This mode will often be useful for running diagnostics which expect a particular relationship between perceived wall clock and instruction times.  It might also be useful for running test scripts which may want to compare output of previous executions to to current execution or to compare execution on arbitrarily different host computers.  It will also be useful when running under a host system debugger which might produce confusing results when various wall clock pause times when stopping at breakpoints.
+    This mode will often be useful for running diagnostics which expect a particular relationship between perceived wall clock and instruction times.  It might also be useful for running test scripts which may want to compare output of previous executions to to current execution or to compare execution on arbitrarily different host computers.  It will also be useful when running under a host system debugger which might produce confusing results when various wall clock pause times when stopping at breakpoints.  Additionally, consistent logical timing exists when simulator debug or instruction history is being recorded which normally would impact wall clock times.
     
     In NOCALIBRATE mode, the operator gets to specify the pseudo execution rate along with the base wall clock time that access to pseudo wall clock accesses returns.
 - All removable devices get detached on a media unload without regard to data access format (SIMH, VHD or RAW).  
@@ -100,7 +100,14 @@ Simulator binaries for x86 Linus, x86 macOS, and Windows for all recent changes 
 - VHD Support for Differencing Disks has been corrected.
 - Attach time disk container copy support between dissimilar storage formats (VHD<->SIMH).  Previously container copy operations were only supported between identical format containers (SIMH<->SIMH, and VHD<->VHD).
 - DISKINFO command provides more useful metadata information and file system verification with full support for VHD Differencing Disks.
+- Simulators which have instruction history support can now have SHOW HISTORY output be aborted by SIGINT (Control-C).
+- Device REGister variables have been extended to support double precision data.
+- More complete host system information displayed in SHOW VERSION output.
 - Simulator THROTTLING can only be enabled once per simulator run.  This avoids potential errant behaviors when arbitrarily switching throttling settings.
+- EXAMINE memory commands will now produce minimal output that summarizes multiple successive locations with the same contents and may be aborted by SIGINT (Control-C).
+- 
+
+#### All simulators build cleanly under OpenVMS on ia64 systems.
 
 #### Changes to the PDP-11 and VAX simulators also not in the Open SIMH repo
 
@@ -126,6 +133,8 @@ Simulator binaries for x86 Linus, x86 macOS, and Windows for all recent changes 
 - Properly set asynchronous interrupt latency in all VAX simulators.
 - MicroVAX I simulator boots from oldest MicroVMS media due to the addition of RQDX1 disk controller type.
 - MSCP Media-Id information and drive geometry information is available for all attached disk containers.
+- VAX Instruction history can be recorded to disk both for all instructions executed as well as every n instructions.
+- VAX Unibus simulators (780, 750, 730, 8600, 8200) run DEC supplied diagnostics at the speed of the original systems and also run the privileged instruction diagnostic that was supported on the original systems.
 
 ### All relevant changes in the simh v3.12-4 release have been merged into this repo
 
