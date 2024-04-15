@@ -108,11 +108,12 @@ tv_reset (DEVICE *dptr)
 
 static void tv_character (int row, int col, uint8 c, uint8 *font)
 {
-  uint16 i, j, pixels, address;
+  size_t i, address;
 
   address = 16 * c;
   for (i = 0; i < 16; i++) {
-    pixels = font[address + i];
+    size_t j, pixels = font[address + i];
+
     for (j = 0; j < 8; j++) {
       surface[8 * (72 * i + col) + j] = palette[(pixels >> 7) & 1];
       pixels <<= 1;

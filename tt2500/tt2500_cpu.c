@@ -162,8 +162,8 @@ static uint16 cpu_ars (uint16 data, uint16 n)
 {
   uint32 sign = 0;
   if (data & 0100000)
-    sign = 0177777 << 16;
-  return (data >> n) + (sign >> n);
+    sign = 0177777u << 16;
+  return (data >> n) + ((uint16) (sign >> n));
 }
 
 uint16 cpu_alu (uint16 insn, uint16 op, uint16 adata, uint16 bdata)

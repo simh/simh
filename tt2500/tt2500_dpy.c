@@ -210,7 +210,7 @@ static t_stat dpy_reset (DEVICE *dptr)
 
 void dpy_magic (uint16 xr, uint16 *r2, uint16 *r3, uint16 r4, uint16 r5)
 {
-  uint32 x = *r2, y = *r3;
+  uint16 x = *r2, y = *r3;
   uint16 x0, y0, x1, y1, dx, dy;
 
   sim_debug (DBG_VEC, &dpy_dev, "MAGIC %06o\n", xr);

@@ -113,7 +113,7 @@ uart_r_svc(UNIT *uptr)
   if (uptr->fileref != NULL) {
     unsigned char buf;
     if (sim_fread (&buf, 1, 1, uptr->fileref) == 1) {
-      sim_debug (DBG_RX, &uart_dev, "Received character %03o\n", buf);
+      sim_debug (DBG_RX, &uart_dev, "Received character %03o (%c)\n", buf, isprint(buf) ? buf : ' ');
       RBUF = buf;
       flag_on (INT_RRD);
     }
@@ -122,7 +122,7 @@ uart_r_svc(UNIT *uptr)
     ch = tmxr_getc_ln (&uart_ldsc);
     if (ch & TMXR_VALID) {
       RBUF = sim_tt_inpcvt (ch, TT_GET_MODE (uart_unit[0].flags));
-      sim_debug (DBG_RX, &uart_dev, "Received character %03o\n", RBUF);
+      sim_debug (DBG_RX, &uart_dev, "TMXR received character %03o (%c)\n", RBUF, isprint(RBUF) ? RBUF : ' ');
       flag_on (INT_RRD);
       return SCPE_OK;
     }
