@@ -7223,6 +7223,7 @@ if (flag) {
         }
 #else
     if (1) {
+        char osname[2*PATH_MAX+1] = "";
         char osversion[2*PATH_MAX+1] = "";
         char tarversion[PATH_MAX+1] = "";
         char curlversion[PATH_MAX+1] = "";
@@ -7250,6 +7251,38 @@ if (flag) {
         c = osversion;
         while ((c = strstr (c, "  ")))
             memmove (c, c+1, strlen (c));
+        if ((f = popen ("grep PRETTY_NAME /etc/os-release 2>/dev/null", "r"))) {
+            memset (osname, 0, sizeof (osname));
+            do {
+                if (NULL == fgets (osname, sizeof (osname)-1, f))
+                    break;
+                sim_trim_endspc (osname);
+                } while (osname[0] == '\0');
+            pclose (f);
+            }
+        if ((c = strchr (osname, '=')))
+            memmove (osname, c+1, strlen(c));
+        while (isspace (osname[0]))
+            memmove (osname, osname+1, strlen(osname));
+        if (osname[0] == '"')
+            memmove (osname, osname+1, strlen(osname));
+        if ((osname[0] != '\0') && (osname[strlen(osname)-1] == '"'))
+            osname[strlen(osname)-1] = '\0';
+        if (osname[0] != '\0')
+            fprintf (st, "\n        Operating System: %s", osname);
+        else {
+            if ((f = popen ("sw_vers -ProductVersion 2>/dev/null", "r"))) {
+                memset (osname, 0, sizeof (osname));
+                do {
+                    if (NULL == fgets (osname, sizeof (osname)-1, f))
+                        break;
+                    sim_trim_endspc (osname);
+                    } while (osname[0] == '\0');
+                pclose (f);
+                }
+            if (osname[0] != '\0')
+                fprintf (st, "\n        Operating System: macOS %s", osname);
+            }
 #if defined(SIM_BUILD_OS_VERSION)
         if (strcmp(osversion, buildosversion) != 0) {
             fprintf (st, "\n        Built on OS: %s", buildosversion);
