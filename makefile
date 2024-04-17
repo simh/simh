@@ -283,6 +283,14 @@ ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,yum)))
   PKG_MGR = YUM
   PKG_CMD = yum install
 endif
+ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,dnf)))
+  PKG_MGR = DNF
+  ifneq (,$(shell dnf repolist | grep crb))
+    PKG_CMD = dnf --enablerepo=crb install
+  else
+    PKG_CMD = dnf install
+  endif
+endif
 ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,zypper)))
   PKG_MGR = ZYPPER
   PKG_CMD = zypper install
@@ -320,6 +328,7 @@ ifneq (3,${SIM_MAJOR})
   PKGS_SRC_MACPORTS   = -        -             vde2           pcre         libedit       libsdl2       libpng         zlib       libsdl2_ttf       gmake -
   PKGS_SRC_APT        = gcc      libpcap-dev   libvdeplug-dev libpcre3-dev libedit-dev   libsdl2-dev   libpng-dev     -          libsdl2-ttf-dev   -     curl
   PKGS_SRC_YUM        = gcc      libpcap-devel -              pcre-devel   libedit-devel SDL2-devel    libpng-devel   zlib-devel SDL2_ttf-devel    -     -
+  PKGS_SRC_DNF        = gcc      libpcap-devel -              pcre-devel   libedit-devel SDL2-devel    libpng-devel   zlib-devel SDL2_ttf-devel    -     -
   PKGS_SRC_ZYPPER     = gcc      libpcap-devel -              pcre-devel   libedit-devel libSDL2-devel libpng16-devel zlib-devel libSDL2_ttf-devel make  -
   PKGS_SRC_PKGSRC     = -        -             -              pcre         editline      SDL2          png            zlib       SDL2_ttf          gmake -
   PKGS_SRC_PKGBSD     = -        -             -              pcre         libedit       sdl2          png            -          sdl2_ttf          gmake -
@@ -342,6 +351,7 @@ else
   PKGS_SRC_MACPORTS   = -        -             vde2           -            libedit       -           -            -          -         -
   PKGS_SRC_APT        = gcc      libpcap-dev   libvdeplug-dev -            libedit-dev   -           -            -          -         -
   PKGS_SRC_YUM        = gcc      libpcap-devel -              -            libedit-devel -           -            -          -         -
+  PKGS_SRC_DNF        = gcc      libpcap-devel -              -            libedit-devel -           -            -          -         -
   PKGS_SRC_PKGSRC     = -        -             -              -            editline      -           -            -          -         -
   PKGS_SRC_PKGBSD     = -        -             -              -            libedit       -           -            -          -         -
   PKGS_SRC_PKGADD     = -        -             -              -            -             -           -            -          -         -
