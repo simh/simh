@@ -999,7 +999,7 @@ t_stat sim_ether_test (DEVICE *dptr, const char *cptr)
 #include <net/bpf.h>
 #endif
 
-#if defined (HAVE_PCAP_NETWORK)
+#if defined (HAVE_PCAP_NETWORK) && !defined (PCAP_LIB_VERSION)
 /*============================================================================*/
 /*      WIN32, Linux, and xBSD routines use WinPcap and libpcap packages      */
 /*        OpenVMS Alpha uses a WinPcap port and an associated execlet         */
@@ -1012,8 +1012,46 @@ struct pcap_pkthdr {
     uint32 len;     /* length this packet (off wire) */
 };
 #define PCAP_ERRBUF_SIZE 256
-typedef void * pcap_t;  /* Pseudo Type to avoid compiler errors */
-#define DLT_EN10MB 1    /* Dummy Value to avoid compiler errors */
+typedef void * pcap_t;          /* Pseudo Type to avoid compiler errors */
+#define DLT_EN10MB 1            /* Dummy Value to avoid compiler errors */
+#if defined (PCAP_LIB_VERSION) && defined (USE_SHARED)
+typedef uint32 bpf_u_int32;     /* Pseudo Type to avoid compiler errors */
+typedef struct pcap_if {
+        struct pcap_if *next;
+        char *name;             /* name to hand to "pcap_open_live()" */
+        char *description;      /* textual description of interface, or NULL */
+        struct pcap_addr *addresses;
+        bpf_u_int32 flags;      /* PCAP_IF_ interface flags */
+} pcap_if_t;       /* Pseudo Type to avoid compiler errors */
+#define PCAP_IF_LOOPBACK                                0x00000001      /* interface is loopback */
+struct bpf_program { void *pgm; };  /* Pseudo Type to avoid compiler errors */
+typedef void (*pcap_handler)(u_char *, const struct pcap_pkthdr *,
+                             const u_char *);
+
+void    pcap_close (pcap_t *);
+#define BPF_CONST_STRING 1
+int     pcap_compile (pcap_t *, struct bpf_program *, const char *, int, unsigned int);
+int     pcap_datalink (pcap_t *);
+int     pcap_dispatch (pcap_t *, int, pcap_handler, u_char *);
+int     pcap_findalldevs (pcap_if_t **, char *);
+void    pcap_freealldevs (pcap_if_t *);
+void    pcap_freecode (struct bpf_program *);
+char*   pcap_geterr (pcap_t *);
+int     pcap_lookupnet (const char *, bpf_u_int32 *, bpf_u_int32 *, char *);
+pcap_t* pcap_open_live (const char *, int, int, int, char *);
+#ifdef _WIN32
+int     pcap_setmintocopy (pcap_t* handle, int);
+HANDLE  pcap_getevent (pcap_t *);
+#else
+#ifdef MUST_DO_SELECT
+int     pcap_get_selectable_fd (pcap_t *);
+#endif
+int     pcap_fileno (pcap_t *);
+#endif
+int     pcap_sendpacket (pcap_t* handle, const u_char* msg, int len);
+int     pcap_setfilter (pcap_t *, struct bpf_program *);
+int     pcap_setnonblock(pcap_t* a, int nonblock, char *errbuf);
+#endif
 #endif /* HAVE_PCAP_NETWORK */
 
 /*

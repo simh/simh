@@ -998,6 +998,10 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
         endif
       endif
     else # pcap desired but pcap.h not found
+      ifneq (,$(call find_lib,$(PCAPLIB)))
+        PCAP_LIB_VERSION = $(shell strings $(call find_lib,$(PCAPLIB)) | grep 'libpcap version' | awk '{ print $$3}')
+        PCAP_LIB_BASE_VERSION = $(firstword $(subst ., ,$(PCAP_LIB_VERSION)))
+      endif
       NEEDED_PKGS += DPKG_PCAP
       # On non-Linux platforms, we'll still try to provide deprecated support for libpcap in /usr/local
       INCPATHSAVE := ${INCPATH}
@@ -1053,19 +1057,27 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
         LIBEXT = $(LIBEXTSAVE)
       else
         INCPATH = $(INCPATHSAVE)
-        $(info *** Warning ***)
-        $(info *** Warning *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) $(BUILD_MULTIPLE_VERB) being built WITHOUT)
-        $(info *** Warning *** libpcap networking support)
-        $(info *** Warning ***)
-        $(info *** Warning *** To build simulator(s) with libpcap networking support you)
-        $(info *** Warning *** should install the libpcap development components for)
-        $(info *** Warning *** for your $(OSNAME) system.)
-        ifeq (,$(or $(findstring Linux,$(OSTYPE)),$(findstring OSX,$(OSNAME))))
-          $(info *** Warning *** You should read 0readme_ethernet.txt and follow the instructions)
-          $(info *** Warning *** regarding the needed libpcap development components for your)
-          $(info *** Warning *** $(OSNAME) platform.)
+        ifeq (1,$(PCAP_LIB_BASE_VERSION))
+          $(info using libpcap $(PCAP_LIB_VERSION) without an available pcap.h)
+          NETWORK_CCDEFS = -DUSE_SHARED -DHAVE_PCAP_NETWORK -DPCAP_LIB_VERSION=$(PCAP_LIB_VERSION)
+          NETWORK_FEATURES = - dynamic networking support using libpcap components from www.tcpdump.org and locally installed libpcap.${LIBEXT}
+          NETWORK_LAN_FEATURES += PCAP
+          NEEDED_PKGS := $(filter-out DPKG_PCAP,$(NEEDED_PKGS))
+        else
+          $(info *** Warning ***)
+          $(info *** Warning *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) $(BUILD_MULTIPLE_VERB) being built WITHOUT)
+          $(info *** Warning *** libpcap networking support)
+          $(info *** Warning ***)
+          $(info *** Warning *** To build simulator(s) with libpcap networking support you)
+          $(info *** Warning *** should install the libpcap development components for)
+          $(info *** Warning *** for your $(OSNAME) system.)
+          ifeq (,$(or $(findstring Linux,$(OSTYPE)),$(findstring OSX,$(OSNAME))))
+            $(info *** Warning *** You should read 0readme_ethernet.txt and follow the instructions)
+            $(info *** Warning *** regarding the needed libpcap development components for your)
+            $(info *** Warning *** $(OSNAME) platform.)
+          endif
+          $(info *** Warning ***)
         endif
-        $(info *** Warning ***)
       endif
     endif
     # Consider other network connections
