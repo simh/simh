@@ -1184,7 +1184,7 @@ return 0;                                               /* cc = 0 */
 /* REI - return from exception or interrupt
 
 The lengthiest part of the REI instruction is the validity checking of the PSL
-popped off the stack.  The new PSL is checked against the following eight rules:
+popped off the stack.  The new PSL is checked against the following nine rules:
 
 let     tmp     =       new PSL popped off the stack
 let     PSL     =       current PSL
