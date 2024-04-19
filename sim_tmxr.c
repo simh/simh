@@ -3004,9 +3004,9 @@ while (*tptr) {
                 if ((NULL == cptr) || ('\0' == *cptr))
                     strcpy (buffered, "32768");
                 else {
-                    i = (int32) get_uint (cptr, 10, 1024*1024, &r);
+                    i = (int32) get_uint (cptr, 10, 1024*1024*10, &r);
                     if (r || (i == 0))
-                        return sim_messagef (SCPE_ARG, "Invalid Buffered Specifier: %s\n", cptr);
+                        return sim_messagef (SCPE_ARG, "Invalid Buffer Size Specifier: %s\n", cptr);
                     sprintf(buffered, "%d", i);
                     }
                 continue;
