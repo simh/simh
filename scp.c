@@ -6158,17 +6158,9 @@ if (1) {
             }
         }
     }
-if (!sim_quiet)
-    fprintf (stdout, "Asynchronous I/O %sabled\n", sim_asynch_enabled ? "en" : "dis");
-if ((!sim_oline) && sim_log)
-    fprintf (sim_log, "Asynchronous I/O %sabled\n", sim_asynch_enabled ? "en" : "dis");
-return SCPE_OK;
+return sim_messagef (SCPE_OK, "Asynchronous I/O %sabled\n", sim_asynch_enabled ? "en" : "dis");
 #else
-if (!sim_quiet)
-    fprintf (stdout, "Asynchronous I/O is not available in this simulator\n");
-if ((!sim_oline) && sim_log)
-    fprintf (sim_log, "Asynchronous I/O is not available in this simulator\n");
-return SCPE_NOFNC;
+return sim_messagef (SCPE_NOFNC, "Asynchronous I/O is not available in this simulator\n");
 #endif
 }
 
