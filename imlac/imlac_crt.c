@@ -42,7 +42,8 @@ static UNIT crt_unit = {
 };
 
 static DEBTAB crt_deb[] = {
-  { "DBG", DBG },
+  { "DBG",  DBG },
+  { "VVID", SIM_VID_DBG_VIDEO },
   { NULL, 0 }
 };
 
@@ -90,8 +91,8 @@ crt_reset (DEVICE *dptr)
   } else {
     display_reset ();
     display_init (DIS_IMLAC, 1, dptr);
-    sim_activate_abs (&crt_unit, 0);
     vid_register_quit_callback (&crt_quit_callback);
+    sim_activate_abs (&crt_unit, 0);
   }
 #endif
   return SCPE_OK;

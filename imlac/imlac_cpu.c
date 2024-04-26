@@ -211,7 +211,8 @@ static void cpu_class1 (uint16 insn)
 
 static void cpu_ral (int n)
 {
-  int i, x;
+  int i;
+  uint16 x;
   for (i = 0; i < n; i++) {
     x = L;
     L = AC >> 15;
@@ -221,7 +222,9 @@ static void cpu_ral (int n)
 
 static void cpu_rar (int n)
 {
-  int i, x;
+  int i;
+  uint16 x;
+
   for (i = 0; i < n; i++) {
     x = L;
     L = AC & 1;
@@ -252,7 +255,7 @@ static void cpu_class2 (uint16 insn)
       x = 01600000 >> n;
     else
       x = 0;
-    AC = x | ((AC & 077777) >> n);
+    AC = (uint16) (x | ((AC & 077777) >> n));
     break;
   }
 }
@@ -485,7 +488,7 @@ t_stat sim_instr (void)
     }
   }
 
-  return SCPE_OK;
+  /* unreachable: return SCPE_OK; */
 }
 
 static t_stat
