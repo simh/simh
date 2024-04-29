@@ -38,7 +38,7 @@ set _ARG=
 rem Everything implicitly requires BUILD to also be set to have 
 rem any meaning, it always gets set.
 set _X_BUILD=BUILD
-set _X_REQUIRED_WINDOWS_BUILD=20230504
+set _X_REQUIRED_WINDOWS_BUILD=20240427
 call :FindVCVersion _VC_VER _MSVC_VER _MSVC_TOOLSET_VER  _MSVC_TOOLSET_DIR
 echo _VC_VER=%_VC_VER%
 echo _MSVC_VER=%_MSVC_VER%
@@ -144,11 +144,17 @@ set _X_LAST_WINDOWS_BUILD=
 if not exist ../../windows-build/lib/VisualCVersionSupport.txt goto _find_vc_support
 
 set _X_VC_VER=
+SET _X_MSVC_VER=
 if "%_MSVC_TOOLSET_VER%" EQU "v140" set _VC_VER=2015
 if "%_MSVC_TOOLSET_VER%" EQU "v141" set _VC_VER=2017
 if "%_MSVC_TOOLSET_VER%" EQU "v142" set _VC_VER=2019
 if "%_MSVC_TOOLSET_VER%" EQU "v143" set _VC_VER=2022
 for /F "usebackq tokens=2*" %%i in (`findstr /C:"_VC_VER=%_VC_VER% " ..\..\windows-build\lib\VisualCVersionSupport.txt`) do SET _X_VC_VER=%%i %%j
+for /F "usebackq delims== tokens=2" %%i in (`findstr /C:"_MSVC_VER=" ..\..\windows-build\lib\VisualCVersionSupport.txt`) do SET _X_MSVC_VER=%%i
+echo _MSVC_VER=%_MSVC_VER%
+echo _X_MSVC_VER=%_X_MSVC_VER%
+if "%_X_VC_VER%" neq "" if "%_X_MSVC_VER%" neq "" echo Library support for %_X_VC_VER% (%_X_MSVC_VER%) is available
+if "%_X_VC_VER%" neq "" if "%_X_MSVC_VER%" neq "" goto _done_libsdl
 if "%_X_VC_VER%" neq "" echo Library support for %_X_VC_VER% is available
 if "%_X_VC_VER%" neq "" goto _done_libsdl
 :_find_vc_support
@@ -430,12 +436,20 @@ if "%_GIT_TMP_%" neq "" goto GitFound
 call :WhichInPath cl.exe _VC_CL_
 for /f "tokens=1-4 delims=\" %%a in ("%_VC_CL_%") do set _GIT_BASE_="%%a\%%b\%%c\%%d\"
 for /r %_GIT_BASE_% %%a in (git.exe) do if exist "%%a" set _GIT_TMP_=%%a
+if "%_GIT_TMP_%" neq "" call :AddToPath "%_GIT_TMP_%"
 :GitFound
-set %_GIT_TMP%=%_GIT_TMP_%
+if "%_GIT_TMP_%" equ "" echo *** git not found
+if "%_GIT_TMP_%" neq "" set %_GIT_TMP%=%_GIT_TMP_%
 set _VC_CL_=
 set _GIT_BASE_=
 set _GIT_TMP_=
 set _GIT_TMP=
+exit /B 0
+
+:AddToPath
+set _TO_PATH=%~p1
+PATH %PATH%;%_TO_PATH%
+set _TO_PATH=
 exit /B 0
 
 :FindTar
@@ -523,6 +537,12 @@ exit /B 0
 :CheckDirectoryVCSupport
 set _VC_Check_Path=%~3%~2/
 set _VC_Check_Path=%_VC_Check_Path:/=\%
+set _X_VC_VER=
+set _XX_VC_VER_DIR=lib-VC%_VC_VER%
+if "%_XX_VC_VER_DIR%" equ "lib-VC9" set _XX_VC_VER_DIR=lib-VC2008
+if exist "%_VC_Check_Path%\VisualCVersionSupport.txt" for /F "usebackq tokens=2*" %%i in (`findstr /C:"_VC_VER=%_VC_VER% " "%_VC_Check_Path%\VisualCVersionSupport.txt"`) do SET _X_VC_VER=%%i %%j
+if "%_XX_VC_VER_DIR%" neq "%2" exit /B 0
+if "%_VC_VER%" equ "2022" set _VC_Check_Path=%_VC_Check_Path%%_MSVC_VER%\
 if not exist "%_VC_Check_Path%VisualCVersionSupport.txt" exit /B 1
 for /F "usebackq tokens=2*" %%k in (`findstr /C:"_VC_VER=%_VC_VER% " "%_VC_Check_Path%VisualCVersionSupport.txt"`) do set %1=%_VC_Check_Path%
 exit /B 0
