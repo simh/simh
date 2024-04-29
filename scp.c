@@ -7967,8 +7967,13 @@ lbuf[sizeof(lbuf)-1] = '\0';
 if (sim_type_file_offset)
     (void)fseek (file, sim_type_file_offset, SEEK_SET);
 while ((NULL != fgets (lbuf, sizeof(lbuf)-1, file)) && 
-       (lines++ < sim_type_line_count))
+       (lines++ < sim_type_line_count)) {
     sim_printf ("%s", lbuf);
+    if (stop_cpu) {
+        stop_cpu = FALSE;
+        break;
+        }
+    }
 fclose (file);
 }
 
