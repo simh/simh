@@ -2356,7 +2356,7 @@ if (sim_switches & SWMASK ('B')) {
     if ((buffer_size == 0) || (buffer_size > 1024))
         return sim_messagef (SCPE_ARG, "Invalid debug memory buffersize %u MB\n", (unsigned int)buffer_size);
     }
-cptr = get_glyph_nc (cptr, gbuf, 0);                    /* get file name */
+cptr = get_glyph_quoted (cptr, gbuf, 0);                /* get file name */
 if (*cptr != 0)                                         /* now eol? */
     return SCPE_2MARG;
 r = sim_open_logfile (gbuf, FALSE, &sim_deb, &sim_deb_ref);
@@ -2757,7 +2757,7 @@ const char *tptr;
 
 if ((filename == NULL) || (*filename == 0))             /* too few arguments? */
     return SCPE_2FARG;
-tptr = get_glyph (filename, gbuf, 0);
+tptr = get_glyph_quoted (filename, gbuf, 0);
 if (*tptr != 0)                                         /* now eol? */
     return SCPE_2MARG;
 sim_close_logfile (pref);

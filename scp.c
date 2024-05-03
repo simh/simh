@@ -14582,7 +14582,7 @@ if (sim_deb == sim_log) {                               /* debug is log */
 if ((saved_deb_switches & SWMASK ('B')) != 0) {
     char saved_debug_filename[CBUFSIZE];
     
-    snprintf (saved_debug_filename, sizeof (saved_debug_filename), "%u %s", 
+    snprintf (saved_debug_filename, sizeof (saved_debug_filename), "%u \"%s\"", 
                            (uint32)(sim_deb_buffer_size / (1024 * 1024)), sim_logfile_name (sim_deb, sim_deb_ref));
     sim_quiet = 1;
     sim_set_deboff (0, NULL);
