@@ -3314,17 +3314,35 @@ control:
                         i = compare();
                         switch(field) {
                         case VARIANT(WMOP_GEQ):
-                                if ((i & 5) != 0) f = 1; break;
+                                if ((i & 5) != 0) {
+                                    f = 1;
+                                }
+                                break;
                         case VARIANT(WMOP_GTR):
-                                if (i == 4) f = 1; break;
+                                if (i == 4) {
+                                    f = 1;
+                                }
+                                break;
                         case VARIANT(WMOP_NEQ):
-                                if (i != 1) f = 1; break;
+                                if (i != 1) {
+                                    f = 1;
+                                }
+                                break;
                         case VARIANT(WMOP_LEQ):
-                                if ((i & 3) != 0) f = 1; break;
+                                if ((i & 3) != 0) {
+                                    f = 1;
+                                }
+                                break;
                         case VARIANT(WMOP_LSS):
-                                if (i == 2) f = 1; break;
+                                if (i == 2) {
+                                    f = 1;
+                                }
+                                break;
                         case VARIANT(WMOP_EQL):
-                                if (i == 1) f = 1; break;
+                                if (i == 1) {
+                                    f = 1;
+                                }
+                                break;
                         }
                         B = f;
                         AROF = 0;
