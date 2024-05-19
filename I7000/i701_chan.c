@@ -258,7 +258,6 @@ chan_write(int chan, t_uint64 * data, int flags)
 int
 chan_read(int chan, t_uint64 * data, int flags)
 {
-
     /* Return END_RECORD if requested */
     if (flags & DEV_WEOR) {
         chan_flags[chan] &= ~(DEV_WEOR);

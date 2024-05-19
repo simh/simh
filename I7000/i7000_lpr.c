@@ -135,7 +135,7 @@ lpr_setlpp(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
     if (i < 20 || i > 100)
         return SCPE_ARG;
     uptr->u6 = i;
-    uptr->u4 = 0;
+    uptr->u4 = 1;
     return SCPE_OK;
 }
 
@@ -231,7 +231,9 @@ print_line(UNIT * uptr, int chan, int unit)
             sim_putchar(out[j++]);
     }
     uptr->u4++;
-    if (uptr->u4 > (int32)uptr->u6) {
+    if (uptr->u4 >= (int32)uptr->u6) {
+        sim_fwrite("\f", 1, 1, uptr->fileref);
+        uptr->pos += 1;
         uptr->u4 = 1;
     }
 
@@ -241,6 +243,7 @@ print_line(UNIT * uptr, int chan, int unit)
             if (uptr->flags & UNIT_ATT) {
                 sim_fwrite("\r\n", 1, 2, uptr->fileref);
                 uptr->pos += 2;
+                uptr->u4++;
             }
             if (uptr->flags & ECHO)
                 sim_putchar('\r');
@@ -255,10 +258,14 @@ print_line(UNIT * uptr, int chan, int unit)
                     sim_putchar('\n');
                 }
                 uptr->u4++;
-                if (uptr->u4 > (int32)uptr->u6) {
-                    uptr->u4 = 1;
+                if (uptr->u4 >= (int32)uptr->u6) {
+                    i = 0;
                 }
             }
+        }
+        if (uptr->u4 >= (int32)uptr->u6) {
+            sim_fwrite("\f", 1, 1, uptr->fileref);
+            uptr->u4 = 1;
         }
         uptr->u5 &= ~(URCSTA_SKIPAFT|(0x7f << 12));
     }
@@ -266,7 +273,7 @@ print_line(UNIT * uptr, int chan, int unit)
     if (uptr->u4 == 1)
         lpr_chan9[chan] = 1;
 #ifdef I7010
-    if (uptr->u4 == uptr->u6)
+    if (uptr->u4 >= uptr->u6)
         lpr_chan12[chan] = 1;
 #endif
 
@@ -356,7 +363,10 @@ uint32 lpr_cmd(UNIT * uptr, uint16 cmd, uint16 dev)
              case 1:
              case 9:    if (uptr->u4 == 1)
                             break;
-                        i = uptr->u6 - uptr->u4 + 1; break;
+                        i = uptr->u6 - uptr->u4 + 1;
+            sim_debug(DEBUG_DATA, &lpr_dev, "%d: Feed %d %d %d\n", u,
+                        uptr->u6, uptr->u4, i);
+ break;
              case 12:   i = (uptr->u6/2) - uptr->u4; break;
              }
              if (i == 0)
@@ -369,11 +379,19 @@ uint32 lpr_cmd(UNIT * uptr, uint16 cmd, uint16 dev)
                 if (uptr->flags & UNIT_ATT) {
                     sim_fwrite("\r\n", 1, 2, uptr->fileref);
                     uptr->pos += 2;
+                    uptr->u4++;
+                    if (uptr->u4 >= (int32)uptr->u6) {
+                        i = 0;
+                    }
                 }
                 if (uptr->flags & ECHO) {
                     sim_putchar('\r');
                     sim_putchar('\n');
                 }
+             }
+             if (uptr->u4 >= (int32)uptr->u6) {
+                 sim_fwrite("\f", 1, 1, uptr->fileref);
+                 uptr->u4 = 1;
              }
              break;
         }
@@ -468,6 +486,10 @@ lpr_srv(UNIT *uptr) {
 
 void
 lpr_ini(UNIT *uptr, t_bool f) {
+    if (uptr->u6 == 0) {
+        uptr->u6 = 55;
+    }
+    uptr->u4 = 1;
 }
 
 t_stat
@@ -479,7 +501,7 @@ lpr_attach(UNIT * uptr, CONST char *file)
     if ((r = attach_unit(uptr, file)) != SCPE_OK)
         return r;
     uptr->u5 = 0;
-    uptr->u4 = 0;
+    uptr->u4 = 1;
     return SCPE_OK;
 }
 

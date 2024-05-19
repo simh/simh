@@ -2105,6 +2105,7 @@ sim_instr(void)
                       case SCPE_BUSY:
                            iowait = 1;
                            break;
+                      case SCPE_EOF:
                       case SCPE_IOERR:
                            reason = STOP_IOCHECK;
                            break;
@@ -2151,6 +2152,7 @@ sim_instr(void)
                       case SCPE_BUSY:
                            iowait = 1;
                            break;
+                      case SCPE_EOF:
                       case SCPE_IOERR:
                            reason = STOP_IOCHECK;
                            break;
@@ -2281,6 +2283,7 @@ sim_instr(void)
                       case SCPE_BUSY:
                            iowait = 1;
                            break;
+                      case SCPE_EOF:
                       case SCPE_IOERR:
                            reason = STOP_IOCHECK;
                            break;
@@ -2329,6 +2332,7 @@ sim_instr(void)
                       case SCPE_BUSY:
                            iowait = 1;
                            break;
+                      case SCPE_EOF:
                       case SCPE_IOERR:
                            reason = STOP_IOCHECK;
                            break;
@@ -2376,6 +2380,7 @@ sim_instr(void)
                       case SCPE_BUSY:
                            iowait = 1;
                            break;
+                      case SCPE_EOF:
                       case SCPE_IOERR:
                            reason = STOP_IOCHECK;
                            break;

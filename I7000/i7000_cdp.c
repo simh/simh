@@ -461,12 +461,10 @@ cdp_get_input(FILE *st, UNIT *uptr, int32 v, CONST void *desc)
 {
     int u = (uptr - cdp_unit);
     UNIT *iuptr = &cdp_input_unit[u];
-    int i;
 
     if (uptr == NULL)
         return SCPE_IERR;
 
-    i = (iuptr->flags & INPUT_MASK) >> INPUT_V;
     switch((iuptr->flags & INPUT_MASK) >> INPUT_V) {
     case INPUT_BLANK >> INPUT_V:
         fprintf(st, "%d blanks", iuptr->u3);

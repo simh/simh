@@ -598,29 +598,30 @@ chan_proc()
                 }
 
                 /* Wait for device to recognize EOR */
-                if (chan_flags[chan] & DEV_WEOR)
+                if (chan_flags[chan] & DEV_WEOR) {
                     continue;
+                }
 
-                    /* Check if got EOR */
-                    if (chan_flags[chan] & DEV_REOR) {
-                        switch (cmd[chan] & 070) {
-                        case IORP:
-                            chan_flags[chan] &= ~(DEV_REOR);
-                            if (chan_dev.dctrl & cmask)
-                                sim_debug(DEBUG_DETAIL, &chan_dev,
-                                    "chan %d EOR> %o\n", chan, cmd[chan] & 070);
-                            chan_fetch(chan);
-                            chan_flags[chan] |= STA_ACTIVE;
-                            break;
-                        case IORT:
-                            chan_flags[chan] &= ~(DEV_REOR|STA_ACTIVE);
-                            chan_flags[chan] |= STA_TWAIT;
-                            if (chan_dev.dctrl & cmask)
-                                sim_debug(DEBUG_DETAIL, &chan_dev,
-                                    "chan %d EOR> %o\n", chan, cmd[chan] & 070);
-                            continue;
-                        }
+                /* Check if got EOR */
+                if (chan_flags[chan] & DEV_REOR) {
+                    switch (cmd[chan] & 070) {
+                    case IORP:
+                        chan_flags[chan] &= ~(DEV_REOR);
+                        if (chan_dev.dctrl & cmask)
+                            sim_debug(DEBUG_DETAIL, &chan_dev,
+                                "chan %d EOR> %o\n", chan, cmd[chan] & 070);
+                        chan_fetch(chan);
+                        chan_flags[chan] |= STA_ACTIVE;
+                        break;
+                    case IORT:
+                        chan_flags[chan] &= ~(DEV_REOR|STA_ACTIVE);
+                        chan_flags[chan] |= STA_TWAIT;
+                        if (chan_dev.dctrl & cmask)
+                            sim_debug(DEBUG_DETAIL, &chan_dev,
+                                "chan %d EOR> %o\n", chan, cmd[chan] & 070);
+                        continue;
                     }
+                }
 
                 /* Give device new word if we have one */
                 if (wcount[chan] != 0) {

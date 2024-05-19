@@ -122,8 +122,13 @@ uint32 cdr_cmd(UNIT * uptr, uint16 cmd, uint16 dev)
     uptr->u5 &= ~0xF0000;
     uptr->u5 |= stk << 16;
 #endif
-    if (uptr->u5 & (URCSTA_EOF|URCSTA_ERR)) {
-        uptr->u5 &= ~(URCSTA_EOF|URCSTA_ERR);
+    if (uptr->u5 & (URCSTA_EOF)) {
+        uptr->u5 &= ~(URCSTA_EOF);
+        return SCPE_EOF;
+    }
+
+    if (uptr->u5 & (URCSTA_ERR)) {
+        uptr->u5 &= ~(URCSTA_ERR);
         return SCPE_IOERR;
     }
 
@@ -151,11 +156,12 @@ uint32 cdr_cmd(UNIT * uptr, uint16 cmd, uint16 dev)
     /* If at eof, just return EOF */
     if (sim_card_eof(uptr)) {
         uint16             *image = (uint16 *)(uptr->up7);
+        sim_debug(DEBUG_DETAIL, &cdr_dev, "%d: EOF\n", u);
         chan_set_eof(chan);
         chan_set_attn(chan);
         uptr->u5 &= ~(URCSTA_EOF|URCSTA_ERR);
         (void)sim_read_card(uptr, image);
-        return SCPE_IOERR;
+        return SCPE_EOF;
     }
 
     uptr->u5 |= URCSTA_READ;

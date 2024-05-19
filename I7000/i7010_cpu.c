@@ -409,10 +409,6 @@ void WriteP(uint32 MA, uint8 v) {
       if (fault)
         return;
 
-
-      if (MA == 275) {
-          int x = v+1;
-      }
       if (reloc && (MA & BBIT) == 0 && MAR > 100) {
           if (low_addr > 0) {
               MAR += low_addr;
@@ -2226,14 +2222,14 @@ sim_instr(void)
                    t &= ~0100;  /* Can't be overlaped */
 
                 /* Try to start command */
+                chan_io_status[ch & 07] = 0;
                 switch (chan_cmd(temp, t, BAR & AMASK)) {
                 case SCPE_OK:
                         if (ch & 010) {
-                           chan_io_status[ch & 07] = 0;
                            chwait = ch & 07;
                            chan_irq_enb[ch & 7] = 0;
                         } else {
-                           chan_io_status[ch & 07] = IO_CHS_OVER;
+                           chan_io_status[ch & 07] |= IO_CHS_OVER;
                            chan_irq_enb[ch & 7] = 1;
                         }
                         sim_debug(DEBUG_CMD, &cpu_dev,
@@ -2249,6 +2245,9 @@ sim_instr(void)
                                 (ch & 010)?"": "overlap",
                              sim_six_to_ascii[op_mod], chan_io_status[ch & 07]);
                         chan_io_status[ch & 07] |= IO_CHS_BUSY;
+                        break;
+                case SCPE_EOF:
+                        chan_io_status[ch & 07] |= IO_CHS_COND;
                         break;
                 case SCPE_NODEV:
 fprintf(stderr, "No device %d %d\n\r", ch, temp);
@@ -2268,15 +2267,18 @@ fprintf(stderr, "No device %d %d\n\r", ch, temp);
                 temp = 010200 | op_mod;
                 ch = 1;
         chan_io:
+                chan_io_status[ch & 07] = 0000;
                 switch (chan_cmd(temp, t, 0)) {
                 case SCPE_OK:
-                        chan_io_status[ch & 07] = 0000;
                         if (ch & 010)
                             chwait = (ch & 07) | 040;
                         chan_irq_enb[ch & 7] = 0;
                         break;
                 case SCPE_BUSY:
                         chan_io_status[ch & 07] |= IO_CHS_BUSY;
+                        break;
+                case SCPE_EOF:
+                        chan_io_status[ch & 07] |= IO_CHS_COND;
                         break;
                 case SCPE_NODEV:
                 case SCPE_IOERR:
@@ -2353,14 +2355,14 @@ fprintf(stderr, "No device %d %d\n\r", ch, temp);
                     break;
                 }
                 /* Issue command */
+                chan_io_status[ch & 07] = 0000;
                 switch (chan_cmd(temp, t, 0)) {
                 case SCPE_OK:
-                        chan_io_status[ch & 07] = 0000;
                         chan_irq_enb[ch & 7] = 0;
                         if (ch & 010) {
                             chwait = (ch & 07) | 040;
                         } else if (op_mod == CHR_M) {
-                            chan_io_status[ch & 07] = IO_CHS_OVER;
+                            chan_io_status[ch & 07] |= IO_CHS_OVER;
                             chan_irq_enb[ch & 7] = 1;
                         }
                         sim_debug(DEBUG_CMD, &cpu_dev,
@@ -2370,11 +2372,14 @@ fprintf(stderr, "No device %d %d\n\r", ch, temp);
 
                         break;
                 case SCPE_BUSY:
-                        chan_io_status[ch & 07] = IO_CHS_BUSY;
+                        chan_io_status[ch & 07] |= IO_CHS_BUSY;
+                        break;
+                case SCPE_EOF:
+                        chan_io_status[ch & 07] |= IO_CHS_COND;
                         break;
                 case SCPE_NODEV:
                 case SCPE_IOERR:
-                        chan_io_status[ch & 07] = IO_CHS_NORDY;
+                        chan_io_status[ch & 07] |= IO_CHS_NORDY;
                         break;
                 }
                 if (CPU_MODEL == 1) {
@@ -2395,6 +2400,7 @@ fprintf(stderr, "No device %d %d\n\r", ch, temp);
                     break;
                 }
 
+       sim_debug(DEBUG_DETAIL, &mta_dev, "IO Status %d %02o\n", ch, chan_io_status[ch]);
                 if (chan_io_status[ch] & op_mod) {
                     jump = 1;
                 }

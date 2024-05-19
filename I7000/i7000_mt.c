@@ -905,7 +905,7 @@ t_stat mt_srv(UNIT * uptr)
         /* Do BCD translation */
         if ((parity_table[ch & 077] ^ (ch & 0100) ^ mode) == 0) {
             sim_debug(DEBUG_DETAIL, dptr, "%s parity error %d %03o\n",
-                      (cmd == MT_RDS) ? "BCD" : "Binary", uptr->u3-1, ch);
+                      (cmd == MT_RDS) ? "BCD" : "Binary", uptr->u6-1, ch);
 #ifdef I7010
             if (astmode)
                 ch = 054;

@@ -711,6 +711,7 @@ stop_cpu:
                              case SCPE_BUSY:
                              case SCPE_NODEV:
                              case SCPE_IOERR:
+                             case SCPE_EOF:
                                  break;
                              }
                              break;
@@ -1525,6 +1526,7 @@ stop_cpu:
                          case SCPE_NODEV:
                              reason = STOP_IOCHECK;
                              break;
+                         case SCPE_EOF:
                          case SCPE_IOERR:
                              flags |= ANYFLAG|INSTFLAG;
                              break;
@@ -1549,6 +1551,7 @@ stop_cpu:
                      case SCPE_NODEV:
                          reason = STOP_IOCHECK;
                          break;
+                     case SCPE_EOF:
                      case SCPE_IOERR:
                          flags |= ANYFLAG|INSTFLAG;
                          break;
@@ -1572,6 +1575,7 @@ stop_cpu:
                      case SCPE_NODEV:
                          reason = STOP_IOCHECK;
                          break;
+                     case SCPE_EOF:
                      case SCPE_IOERR:
                          flags |= ANYFLAG|INSTFLAG;
                          break;
@@ -1595,6 +1599,7 @@ stop_cpu:
                      case SCPE_NODEV:
                          reason = STOP_IOCHECK;
                          break;
+                     case SCPE_EOF:
                      case SCPE_IOERR:
                          flags |= ANYFLAG|INSTFLAG;
                          break;
@@ -1609,12 +1614,12 @@ stop_cpu:
 
              case OP_RWW:    /* RWW  705 only */
                      MAC2 = MAC;
-                     if (CPU_MODEL == CPU_7080 &&
+                     if (iowait == 0 && CPU_MODEL == CPU_7080 &&
                          (cpu_unit.flags & IOIRQ) != 0 &&
                          (flags & EIGHTMODE) == 0 &&
                          ((selreg >> 8) & 0xff) != 5) {
                          flags |= ANYFLAG|INSTFLAG;
-                         selreg2 = selreg;
+                         selreg2 = 0;
                      } else {
                          selreg2 = selreg | 0x8000;
                      }
@@ -3375,6 +3380,18 @@ cpu_reset(DEVICE * dptr)
     selreg2 = 0;
     IC = 4;
     sim_brk_types = sim_brk_dflt = SWMASK('E');
+    /* Leave 80 mode */
+    if (CPU_MODEL == CPU_7080) {
+        cpu_type = (cpu_unit.flags & EMULATE3)?  CPU_7053:CPU_705;
+        EMEMSIZE = MEMSIZE;
+        if (cpu_unit.flags & EMULATE2 && EMEMSIZE > 40000)
+          EMEMSIZE = 40000;
+        if (cpu_type == CPU_705 && (cpu_unit.flags & EMULATE2) == 0 &&
+             EMEMSIZE > 20000)
+            EMEMSIZE = 20000;
+        if (EMEMSIZE > 80000)
+            EMEMSIZE = 80000;
+    }
     return SCPE_OK;
 }
 
