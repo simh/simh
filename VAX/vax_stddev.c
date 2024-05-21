@@ -470,7 +470,7 @@ int32 todr_rd (void)
 TOY *toy = (TOY *)clk_unit.filebuf;
 struct timespec base, now, val;
 
-if ((fault_PC&0xFFFE0000) == 0x20040000) {              /* running from ROM? */
+if (ADDR_IS_ROM(fault_PC)) {                            /* running from ROM? */
     sim_debug (DBG_REG, &clk_dev, "todr_rd(ROM) - TODR=0x%X\n", todr_reg);
     return todr_reg;                                    /* return counted value for ROM diags */
     }
