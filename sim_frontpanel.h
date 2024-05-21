@@ -125,7 +125,7 @@ sim_panel_destroy (PANEL **ppanel);
    the simulator uses as internal state to implement the running 
    simulator.
 
-   The registers that a particular frontpanel application mught need 
+   The registers that a particular frontpanel application might need 
    access to are specified by the application when it calls: 
    
    sim_panel_add_register
