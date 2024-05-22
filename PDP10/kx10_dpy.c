@@ -363,6 +363,7 @@ static void dpy_joy_button(int which, int button, int state)
   }
 }
 
+#if ITS
 static int dpy_keyboard (SIM_KEY_EVENT *ev)
 {
     sim_debug(DEBUG_DATA, &dpy_dev, "Key %d %s\n",
@@ -373,6 +374,7 @@ static int dpy_keyboard (SIM_KEY_EVENT *ev)
     }
     return 0;
 }
+#endif
 
 /* Reset routine */
 
@@ -496,7 +498,7 @@ DEVICE wcnsls_dev = {
     NUM_DEVS_WCNSLS, 0, 0, 0, 0, 0,
     NULL, NULL, wcnsls_reset,
     NULL, NULL, NULL,
-    &wcnsls_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG | DEV_DISPLAY, 0, dev_debug,
+    &wcnsls_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG, 0, dev_debug,
     NULL, NULL, NULL, NULL, NULL, &wcnsls_description
     };
 

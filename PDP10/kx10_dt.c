@@ -545,7 +545,6 @@ t_stat dt_devio(uint32 dev, uint64 *data) {
 }
 
 void dt_getword(uint64 *data, int req) {
-    int dev = dt_dib.dev_num;
     clr_interrupt(DT_DEVNUM|4);
     if (dtsb & DTB_DATREQ) {
         dtsb |= DTB_MIS;
@@ -559,7 +558,6 @@ void dt_getword(uint64 *data, int req) {
 }
 
 void dt_putword(uint64 *data) {
-    int dev = dt_dib.dev_num;
     clr_interrupt(DT_DEVNUM|4);
     if (dtsb & DTB_DATREQ) {
         dtsb |= DTB_MIS;

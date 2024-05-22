@@ -210,6 +210,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\PDP10\ka10_dd.c"
+				>
+			</File>
+			<File
 				RelativePath="..\PDP10\ka10_dkb.c"
 				>
 			</File>
@@ -275,6 +279,10 @@
 			</File>
 			<File
 				RelativePath="..\PDP10\kx10_dc.c"
+				>
+			</File>
+			<File
+				RelativePath="..\PDP10\kx10_ddc.c"
 				>
 			</File>
 			<File

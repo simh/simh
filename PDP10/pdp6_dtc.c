@@ -1281,8 +1281,6 @@ dtc_flush (UNIT* uptr)
 t_stat
 dtc_detach (UNIT* uptr)
 {
-    int32 u = uptr - dtc_dev.units;
-    
     if (!(uptr->flags & UNIT_ATT))
         return SCPE_OK;
     if (sim_is_active (uptr)) {

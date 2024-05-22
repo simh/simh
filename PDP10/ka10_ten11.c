@@ -39,6 +39,9 @@ static uint64 ten11_pager[256];
 t_addr ten11_base = 03000000;
 t_addr ten11_end  = 04000000;
 
+/* Number of Unibuses. */
+#define UNIBUSES        8
+
 /* Physical address of 10-11 control page. */
 #define T11CPA          0776000  //Offset inside TEN11 moby.
 
@@ -116,8 +119,8 @@ DEVICE ten11_dev = {
   &ten11_description,                                 /* description */
 };
 
-static TMLN ten11_ldsc;                                 /* line descriptor */
-static TMXR ten11_desc = { 1, 0, 0, &ten11_ldsc };      /* mux descriptor */
+static TMLN ten11_ldsc[UNIBUSES];                       /* line descriptor */
+static TMXR ten11_desc = { 8, 0, 0, ten11_ldsc };       /* mux descriptor */
 
 static t_stat ten11_reset (DEVICE *dptr)
 {
@@ -175,14 +178,20 @@ static void build (unsigned char *request, unsigned char octet)
 
 static t_stat ten11_svc (UNIT *uptr)
 {
+  int i;
   tmxr_poll_rx (&ten11_desc);
-  if (ten11_ldsc.rcve && !ten11_ldsc.conn) {
-    ten11_ldsc.rcve = 0;
-    tmxr_reset_ln (&ten11_ldsc);
+
+  for (i = 0; i < UNIBUSES; i++) {
+    if (ten11_ldsc[i].rcve && !ten11_ldsc[i].conn) {
+      ten11_ldsc[i].rcve = 0;
+      tmxr_reset_ln (&ten11_ldsc[i]);
+    }
   }
-  if (tmxr_poll_conn(&ten11_desc) >= 0) {
+
+  i = tmxr_poll_conn(&ten11_desc);
+  if (i >= 0) {
     sim_debug(DBG_CMD, &ten11_dev, "got connection\n");
-    ten11_ldsc.rcve = 1;
+    ten11_ldsc[i].rcve = 1;
     uptr->wait = TEN11_POLL;
   }
   sim_clock_coschedule (uptr, uptr->wait);
@@ -214,38 +223,40 @@ static const char *ten11_description (DEVICE *dptr)
   return "Rubin PDP-10 to PDP-11 interface";
 }
 
-static int error (const char *message)
+static int error (int unibus, const char *message)
 {
-  sim_debug (DBG_TRC, &ten11_dev, "%s\r\n", message);
+  sim_debug (DBG_TRC, &ten11_dev, "Port %d: %s\r\n", unibus, message);
   sim_debug (DBG_TRC, &ten11_dev, "CLOSE\r\n");
-  ten11_ldsc.rcve = 0;
-  tmxr_reset_ln (&ten11_ldsc);
+  ten11_ldsc[unibus].rcve = 0;
+  tmxr_reset_ln (&ten11_ldsc[unibus]);
   return -1;
 }
 
-static int transaction (unsigned char *request, unsigned char *response)
+static int transaction (int unibus, unsigned char *request, unsigned char *response)
 {
   const uint8 *ten11_request;
   size_t size;
   t_stat stat;
 
-  stat = tmxr_put_packet_ln (&ten11_ldsc, request + 1, (size_t)request[0]);
+  stat = tmxr_put_packet_ln (&ten11_ldsc[unibus], request + 1, (size_t)request[0]);
   if (stat != SCPE_OK)
-    return error ("Write error in transaction");
+    return error (unibus, "Write error in transaction");
 
   do {
     tmxr_poll_rx (&ten11_desc);
-    stat = tmxr_get_packet_ln (&ten11_ldsc, &ten11_request, &size);
+    stat = tmxr_get_packet_ln (&ten11_ldsc[unibus], &ten11_request, &size);
+    if (!ten11_ldsc[unibus].conn)
+      return error (unibus, "Connection lost");
   } while (stat != SCPE_OK || size == 0);
 
   if (size > 7)
-    return error ("Malformed transaction");
+    return error (unibus, "Malformed transaction");
 
   memcpy (response, ten11_request, size);
   return 0;
 }
 
-static int read_word (t_addr addr, int *data)
+static int read_word (int unibus, t_addr addr, int *data)
 {
   unsigned char request[8];
   unsigned char response[8];
@@ -263,7 +274,7 @@ static int read_word (t_addr addr, int *data)
   build (request, (addr >> 8) & 0377);
   build (request, (addr) & 0377);
 
-  if (transaction (request, response) == -1) {
+  if (transaction (unibus, request, response) == -1) {
     /* Network error. */
     *data = 0;
     return 0;
@@ -285,7 +296,7 @@ static int read_word (t_addr addr, int *data)
       *data = 0;
       break;
     default:
-      return error ("Protocol error");
+      return error (unibus, "Protocol error");
     }
 
   return 0;
@@ -325,8 +336,8 @@ int ten11_read (t_addr addr, uint64 *data)
     uaddr = ((mapping & T11ADDR) >> 10) + offset;
     uaddr <<= 2;
 
-    read_word (uaddr, &word1);
-    read_word (uaddr + 2, &word2);
+    read_word (unibus, uaddr, &word1);
+    read_word (unibus, uaddr + 2, &word2);
     *data = ((uint64)word1 << 20) | (word2 << 4);
     
     sim_debug (DBG_TRC, &ten11_dev,
@@ -336,7 +347,7 @@ int ten11_read (t_addr addr, uint64 *data)
   return 0;
 }
 
-static int write_word (t_addr addr, uint16 data)
+static int write_word (int unibus, t_addr addr, uint16 data)
 {
   unsigned char request[8];
   unsigned char response[8];
@@ -355,7 +366,7 @@ static int write_word (t_addr addr, uint16 data)
   build (request, (data >> 8) & 0377);
   build (request, (data) & 0377);
 
-  transaction (request, response);
+  transaction (unibus, request, response);
 
   switch (response[0])
     {
@@ -368,7 +379,7 @@ static int write_word (t_addr addr, uint16 data)
       fprintf (stderr, "TEN11: Write timeout %06o\r\n", addr);
       break;
     default:
-      return error ("Protocol error");
+      return error (unibus, "Protocol error");
     }
 
   return 0;
@@ -417,9 +428,9 @@ int ten11_write (t_addr addr, uint64 data)
                unibus, uaddr, data);
 
     if ((data & 010) == 0)
-      write_word (uaddr, (data >> 20) & 0177777);
+      write_word (unibus, uaddr, (data >> 20) & 0177777);
     if ((data & 004) == 0)
-      write_word (uaddr + 2, (data >> 4) & 0177777);
+      write_word (unibus, uaddr + 2, (data >> 4) & 0177777);
   }
   return 0;
 }

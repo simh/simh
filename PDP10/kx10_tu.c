@@ -416,7 +416,6 @@ tu_write(DEVICE *dptr, struct rh_if *rhc, int reg, uint32 data) {
 
 int
 tu_read(DEVICE *dptr, struct rh_if *rhc, int reg, uint32 *data) {
-    int            ctlr = GET_CNTRL_RH(dptr->units[0].flags);
     uint16        *regs = &rhc->regs[0];
     int            unit = regs[TUTC] & 07;
     UNIT          *uptr = &dptr->units[unit];

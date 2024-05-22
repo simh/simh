@@ -263,7 +263,6 @@ dsk_svc (UNIT *uptr)
    int           wc;
    uint64        data;
    DEVICE       *dptr;
-   t_stat        err;
 
    dptr = &dsk_dev;
 
@@ -279,7 +278,7 @@ dsk_svc (UNIT *uptr)
            if (sec > DSK_SECS)
               sec -= DSK_SECS;
            da = (sec + (cyl * DSK_SECS)) * DSK_WDS;
-           err = sim_fseek(uptr->fileref, da * sizeof(uint64), SEEK_SET);
+           (void)sim_fseek(uptr->fileref, da * sizeof(uint64), SEEK_SET);
            (void)sim_fwrite (&dsk_buf[0], sizeof(uint64),
                         DSK_WDS, uptr->fileref);
            sim_debug(DEBUG_DETAIL, dptr, "DSK %d Write %d %d\n", ctlr, da, cyl);
@@ -337,7 +336,7 @@ dsk_svc (UNIT *uptr)
            if (sec > DSK_SECS)
               sec -= DSK_SECS;
            da = (sec + (cyl * DSK_SECS)) * DSK_WDS;
-           err = sim_fseek(uptr->fileref, da * sizeof(uint64), SEEK_SET);
+           (void)sim_fseek(uptr->fileref, da * sizeof(uint64), SEEK_SET);
            wc = sim_fread (&dsk_buf[0], sizeof(uint64),
                         DSK_WDS, uptr->fileref);
            sim_debug(DEBUG_DETAIL, dptr, "DSK %d Read %d %d\n", ctlr, da, cyl);

@@ -79,11 +79,8 @@ uba_read(t_addr addr, int ctl, uint64 *data, int access)
            *data = (uint64)uba_map[ubm][addr & 077];
            return 0;
        } else if ((addr & 077) == 0) {
-           int     pih, pil;
            int     irqf = 0;
            *data = (uint64)uba_status[ubm];
-           pih = 0200 >> ((uba_status[ubm] >> 3) & 07);
-           pil = 0200 >> (uba_status[ubm] & 07);
            for (i = 0; i < 128; i++) {
                if ((uba_irq_ctlr[i] & VECT_CTR) == ctl)
                    irqf |= uba_irq_ctlr[i];

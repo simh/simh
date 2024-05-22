@@ -447,7 +447,6 @@ dz_checkirq(struct pdp_dib   *dibp)
     int        ln;
     int        stop;
     TMLN      *lp;
-    int        irq = 0;
 
     for (i = 0; i < NUM_DEVS_DZ; i++) {
          if ((dz_csr[i] & MSE) == 0)

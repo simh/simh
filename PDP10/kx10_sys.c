@@ -177,6 +177,10 @@ DEVICE *sim_devices[] = {
 #if (NUM_DEVS_TV > 0)
     &tv_dev,
 #endif
+#if (NUM_DEVS_DD > 0)
+    &dd_dev,
+    &vds_dev,
+#endif
 #if NUM_DEVS_IMP > 0
     &imp_dev,
 #endif
@@ -233,8 +237,15 @@ DEVICE *sim_devices[] = {
 #if NUM_DEVS_DUP > 0
     &dup_dev,
 #endif
-#if NUM_DEVS_DN > 0
-    &dn_dev,
+#if NUM_DEVS_DDC > 0
+    &ddc_dev,
+#endif
+#if NUM_DEVS_TYM > 0
+    &tym_dev,
+#endif
+#if NUM_DEVS_GE > 0
+    &ge_dev,
+    &gtyo_dev,
 #endif
     NULL
     };
@@ -720,6 +731,8 @@ t_stat load_exe (FILE *fileref, int ftype)
             }
             if ((sim_switches & SWMASK ('M')) == 0) {   /* -m? */
                 ma = mpage << PAG_V_PN;                 /* mem addr */
+            } else {
+                ma = mpage;
             }
             for (k = 0; k < PAG_SIZE; k++, ma++) {      /* copy buf to mem */
                 if (ma > MEMSIZE)

@@ -81,7 +81,6 @@ tcu_write(DEVICE *dptr, t_addr addr, uint16 data, int32 access)
 int
 tcu_read(DEVICE *dptr, t_addr addr, uint16 *data, int32 access)
 {
-    struct pdp_dib   *dibp = (DIB *)dptr->ctxt;
     time_t            curtim;
     struct tm        *tptr;
 

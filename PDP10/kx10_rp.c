@@ -1094,18 +1094,17 @@ rp_boot(int32 unit_num, DEVICE * rptr)
 {
     UNIT         *uptr = &rptr->units[unit_num];
     int           ctlr = GET_CNTRL_RH(uptr->flags);
-    int           dtype = GET_DTYPE(uptr->flags);
     uint16        *regs = (uint16 *)(uptr->up7);
     struct rh_if *rhc = &rp_rh[ctlr];
     DEVICE       *dptr = uptr->dptr;
     uint32        addr;
-    uint32        ptr = 0;
     uint64        word;
 #if !KS
     int           wc;
 #endif
 
 #if KS
+    int           dtype = GET_DTYPE(uptr->flags);
     int           da;
     t_stat        r;
     uint64        len;
@@ -1147,8 +1146,8 @@ rp_boot(int32 unit_num, DEVICE * rptr)
        regs[RPDC] =  (int32)((rp_buf[0][04] >> 24) << DC_V_CY);
        len = (int)(((rp_buf[0][05] & 077) * 4) & RMASK);
     }
-if (len == 0)
-    len = 4;
+    if (len == 0)
+        len = 4;
     /* Read len sectors into address 1000 */
     addr = 01000;
     for (; len > 0; len--) {
@@ -1176,6 +1175,8 @@ if (len == 0)
     rh_boot_unit = unit_num;
 #elif KL
     int           sect;
+    uint32        ptr = 0;
+
     /* KL does not support readin, so fake it by reading in sectors 4 to 7 */
     /* Possible in future find boot loader in FE file system */
     addr = (MEMSIZE - 512) & RMASK;
@@ -1189,6 +1190,8 @@ if (len == 0)
     }
     word = (MEMSIZE - 512) & RMASK;
 #else
+    uint32        ptr = 0;
+
     disk_read(uptr, &rp_buf[0][0], 0, RP_NUMWD);
     addr = rp_buf[0][ptr] & RMASK;
     wc = (rp_buf[0][ptr++] >> 18) & RMASK;

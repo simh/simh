@@ -140,9 +140,7 @@ uint32  rdrin_dev;                            /* Read in device */
 uint8   IX;                                   /* Index register */
 uint8   IND;                                  /* Indirect flag */
 #endif
-#if PDP6 | KA | KI
 t_addr  AS;                                   /* Address switches */
-#endif
 int     BYF5;                                 /* Flag for second half of LDB/DPB instruction */
 int     uuo_cycle;                            /* Uuo cycle in progress */
 int     SC;                                   /* Shift count */
@@ -1356,7 +1354,6 @@ t_stat dev_apr(uint32 dev, uint64 *data) {
  * MTR device for KL10.
  */
 t_stat dev_mtr(uint32 dev, uint64 *data) {
-    uint64 res = 0;
 
     switch(dev & 03) {
     case CONI:
@@ -3525,6 +3522,7 @@ int Mem_read_its(int flag, int cur_context, int fetch, int mod) {
                 check_apr_irq();
                 return 1;
             }
+            return 0;
         }
 #endif
 #if NUM_DEVS_TEN11 > 0
@@ -3579,6 +3577,16 @@ int Mem_write_its(int flag, int cur_context) {
         }
         if (!page_lookup_its(AB, flag, &addr, 1, cur_context, 0, 0))
             return 1;
+#if NUM_DEVS_AUXCPU > 0
+        if (AUXCPURANGE(addr) && QAUXCPU) {
+            if (auxcpu_write (addr, MB)) {
+                nxm_flag = 1;
+                check_apr_irq();
+                return 1;
+            }
+            return 0;
+        }
+#endif
 #if NUM_DEVS_TEN11 > 0
         if (T11RANGE(addr) && QTEN11) {
             if (ten11_write (addr, MB)) {
@@ -3587,15 +3595,6 @@ int Mem_write_its(int flag, int cur_context) {
                 return 1;
             }
             return 0;
-        }
-#endif
-#if NUM_DEVS_AUXCPU > 0
-        if (AUXCPURANGE(addr) && QAUXCPU) {
-            if (auxcpu_write (addr, MB)) {
-                nxm_flag = 1;
-                check_apr_irq();
-                return 1;
-            }
         }
 #endif
         if (addr >= MEMSIZE) {
@@ -4486,13 +4485,13 @@ if ((reason = build_dev_tab ()) != SCPE_OK)            /* build, chk dib_tab */
 #if PIDP10
     if (examine_sw) {   /* Examine memory switch */
         AB = AS;
-        (void)Mem_read(1, 0, 0, 0);
+        (void)Mem_read_nopage();
         examine_sw = 0;
     }
     if (deposit_sw) {   /* Deposit memory switch */
         AB = AS;
         MB = SW;
-        (void)Mem_write(1, 0);
+        (void)Mem_write_nopage();
         deposit_sw = 0;
     }
     if (xct_sw) {    /* Handle Front panel xct switch */
@@ -4500,13 +4499,14 @@ if ((reason = build_dev_tab ()) != SCPE_OK)            /* build, chk dib_tab */
         xct_flag = 0;
         uuo_cycle = 1;
         f_pc_inh = 1;
+        f_load_pc = 0;
         MB = SW;
-        xct_sw = 0;
         goto no_fetch;
     }
     if (stop_sw) {    /* Stop switch set */
         RUN = 0;
         stop_sw = 0;
+        reason = STOP_HALT;
     }
     if (sing_inst_sw) {  /* Handle Front panel single instruction */
         instr_count = 1;
@@ -4854,7 +4854,7 @@ st_pi:
 
     /* Check if possible idle loop */
     if (sim_idle_enab &&
-          (((FLAGS & USER) != 0 && PC < 020 && AB < 020 && (IR & 0740) == 0340) ||
+          ((PC < 020 && AB < 020 && (IR & 0740) == 0340) ||
            (uuo_cycle && (IR & 0740) == 0 && IA == 041))) {
        sim_idle (TMR_RTC, FALSE);
     }
@@ -4906,6 +4906,11 @@ st_pi:
     nrf = 0;
     fxu_hold_set = 0;
     modify = 0;
+#if PIDP10
+    if (xct_sw) {    /* Handle Front panel xct switch */
+        xct_sw = 0;
+    } else 
+#endif
     f_pc_inh = 0;
 #if KL | KS
     if (extend) {
@@ -7182,9 +7187,6 @@ fnormx:
                       SC--;
                   } else {
                       AR = BR;
-#if KS
-                      FLAGS |= NODIV|TRP1;
-#endif
                       break;
                   }
               }
@@ -7243,10 +7245,8 @@ fnormx:
                       SC--;
                   }
                   AR &= FMASK;
-#if KL | KS
                   if ((SC & 01600) != 01600)
                       fxu_hold_set = 1;
-#endif
                   if (AR == (SMASK|EXPO)) {
                       AR = (AR >> 1) | (AR & SMASK);
                       SC ++;
@@ -11775,7 +11775,7 @@ fetch_opr:
                                   MB = BR;
                                   if (Mem_write(pi_cycle, 0))
                                       goto last;
-                                      MB = AR;
+                                  MB = AR;
                                   break;
                               }
                               break;
@@ -12263,6 +12263,7 @@ last:
         if (QITS)
             load_quantum();
 #endif
+        RUN = 0;
         return SCPE_STEP;
     }
 }
@@ -13499,7 +13500,11 @@ rtc_srv(UNIT * uptr)
     tmxr_poll = t/2;
 #if PDP6 | KA | KI
     clk_flg = 1;
+#if PIDP10
+    if (clk_en && !sing_inst_sw) {
+#else
     if (clk_en) {
+#endif
         sim_debug(DEBUG_CONO, &cpu_dev, "CONO timmer\n");
         set_interrupt(4, clk_irq);
     }
@@ -13575,13 +13580,17 @@ static const char *pdp10_clock_precalibrate_commands[] = {
 
 t_stat cpu_reset (DEVICE *dptr)
 {
-    int     i;
-    static  int  initialized = 0;
+    int          i;
+    t_stat       r = SCPE_OK;
+    static int   initialized = 0;
 
     if (!initialized) {
          initialized = 1;
 #if PIDP10
-         pi_panel_start();
+         r = pi_panel_start();
+         if (r != SCPE_OK) {
+             return r;
+         }
 #endif
     }
     sim_debug(DEBUG_CONO, dptr, "CPU reset\n");
@@ -13656,7 +13665,7 @@ t_stat cpu_reset (DEVICE *dptr)
 #endif
     sim_vm_interval_units = "cycles";
     sim_vm_step_unit = "instruction";
-    return SCPE_OK;
+    return r;
 }
 
 /* Memory examine */
@@ -13859,6 +13868,7 @@ t_bool build_dev_tab (void)
                 if ((nia_dev.flags & DEV_DIS) == 0 && dptr != &nia_dev &&
                     rh20 == (((DIB *)nia_dev.ctxt)->dev_num & 0777))
                     rh20 += 4;
+                else
                 /* If NIA20, then assign it to it's requested address */
                 if ((nia_dev.flags & DEV_DIS) == 0 && dptr == &nia_dev)
                     d = dibp->dev_num & 0777;
@@ -13956,10 +13966,8 @@ if (cptr == NULL) {
     return SCPE_OK;
     }
 lnt = (int32) get_uint (cptr, 10, HIST_MAX, &r);
-if (r != SCPE_OK)
-    return sim_messagef (SCPE_ARG, "Invalid Numeric Value: %s.  Maximum is %d\n", cptr, HIST_MAX);
-if (lnt && (lnt < HIST_MIN))
-    return sim_messagef (SCPE_ARG, "%d is less than the minumum history value of %d\n", lnt, HIST_MIN);
+if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN)))
+    return SCPE_ARG;
 hst_p = 0;
 if (hst_lnt) {
     free (hst);
@@ -13997,10 +14005,6 @@ if (di < 0)
     di = di + hst_lnt;
 fprintf (st, "PC       AC             EA        AR            RES           FLAGS IR\n\n");
 for (k = 0; k < lnt; k++) {                             /* print specified */
-    if (stop_cpu) {                                     /* Control-C (SIGINT) */
-        stop_cpu = FALSE;
-        break;                                          /* abandon remaining output */
-    }
     h = &hst[(++di) % hst_lnt];                         /* entry pointer */
     if (h->pc & HIST_PC) {                              /* instruction? */
 #if KL

@@ -246,6 +246,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\PDP10\pdp6_ge.c"
+				>
+			</File>
+			<File
 				RelativePath="..\PDP10\pdp6_mtc.c"
 				>
 			</File>
