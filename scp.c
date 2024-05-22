@@ -7020,14 +7020,14 @@ setenv ("SIM_MINOR", vmin_s, 1);
 sprintf (vpat_s, "%d", vpat);
 setenv ("SIM_PATCH", vpat_s, 1);
 fprintf (st, "%s simulator V%d.%d-%d", sim_name, vmaj, vmin, vpat);
-if (sim_vm_release != NULL) {                           /* if a release string is defined */
-    setenv ("SIM_VM_RELEASE", sim_vm_release, 1);
-    fprintf (st, " Release %s", sim_vm_release);        /*   then display it */
-    }
 if (vdelt) {
     sprintf (vdelt_s, "%d", vdelt);
     setenv ("SIM_DELTA", vdelt_s, 1);
     fprintf (st, " delta %d", vdelt);
+    }
+if (sim_vm_release != NULL) {                           /* if a release string is defined */
+    setenv ("SIM_VM_RELEASE", sim_vm_release, 1);
+    fprintf (st, " Release %s", sim_vm_release);        /*   then display it */
     }
 #if defined (SIM_VERSION_MODE)
 if (1) {
