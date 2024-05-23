@@ -92,6 +92,9 @@ extern DEVICE sol20s_dev;
 extern DEVICE sol20p_dev;
 extern DEVICE vdm1_dev;
 
+extern DEVICE tuart0_dev;
+extern DEVICE tuart1_dev;
+extern DEVICE tuart2_dev;
 extern DEVICE cromfdc_dev;
 extern DEVICE wd179x_dev;
 extern DEVICE n8vem_dev;
@@ -134,7 +137,7 @@ DEVICE      *sim_devices[]  = {
     /* Compupro Devices */
     &disk1a_dev, &disk2_dev, &disk3_dev, &ss1_dev, &mdriveh_dev, &selchan_dev, &if3_dev,
     /* Cromemco Devices */
-    &cromfdc_dev,
+    &cromfdc_dev, &tuart0_dev, &tuart1_dev, &tuart2_dev,
     /* Integrated Business Computers (IBC) Devices */
     &ibc_dev,
     &ibctimer_device,
