@@ -217,6 +217,7 @@ t_stat vid_set_fullscreen (t_bool flag);
 extern int vid_active;
 void vid_set_cursor_position (int32 x, int32 y);        /* cursor position (set by calling code) */
 void vid_set_window_size (VID_DISPLAY *vptr, int32 x, int32 y);            /* window size (set by calling code) */
+void vid_render_set_logical_size (VID_DISPLAY *vptr, int32 w, int32 h);
 
 t_stat vid_open_window (VID_DISPLAY **vptr, DEVICE *dptr, const char *title, uint32 width, uint32 height, int flags);
 t_stat vid_close_window (VID_DISPLAY *vptr);
@@ -245,10 +246,11 @@ t_stat vid_set_alpha_mode (VID_DISPLAY *vptr, int mode);
  */
 extern int (*vid_display_kb_event_process)(SIM_KEY_EVENT *kev);
 
-#define SIM_VID_DBG_MOUSE   0x10000000
-#define SIM_VID_DBG_CURSOR  0x20000000
-#define SIM_VID_DBG_KEY     0x40000000
-#define SIM_VID_DBG_VIDEO   0x80000000
+#define SIM_VID_DBG_JOYSTICK 0x08000000
+#define SIM_VID_DBG_MOUSE    0x10000000
+#define SIM_VID_DBG_CURSOR   0x20000000
+#define SIM_VID_DBG_KEY      0x40000000
+#define SIM_VID_DBG_VIDEO    0x80000000
 
 #ifdef  __cplusplus
 }

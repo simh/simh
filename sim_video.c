@@ -345,6 +345,7 @@ static int SDL_SavePNG_RW(SDL_Surface *surface, SDL_RWops *dst, int freedst)
 #define EVENT_BEEP       10                              /* audio beep */
 #define EVENT_FULLSCREEN 11                              /* fullscreen */
 #define EVENT_SIZE       12                              /* set window size */
+#define EVENT_LOGICAL    13                              /* set window logical size */
 #define MAX_EVENTS       20                              /* max events in queue */
 
 typedef struct {
@@ -415,6 +416,7 @@ SDL_MouseButtonEvent *bev;
 SDL_MouseMotionEvent *mev;
 SDL_WindowEvent *wev;
 SDL_UserEvent *uev;
+SDL_version ver;
 
 if (windowID == lastID)
     return last_display;
@@ -493,6 +495,8 @@ switch (ev->type) {
         sim_messagef (SCPE_OK, "Unrecognized event type %u\n", ev->type);
         break;
     }
+
+SDL_GetVersion(&ver);
 
 sim_messagef (SCPE_IERR,
               "\nSIMH has encountered a bug in SDL2 (or in SIMH's use of SDL2).\n");
@@ -660,6 +664,8 @@ SDL_GetVersion(&ver);
 vid_gamepad_ok = (ver.major > 2 ||
                   (ver.major == 2 && (ver.minor > 0 || ver.patch >= 4)));
 
+sim_debug (SIM_VID_DBG_VIDEO|SIM_VID_DBG_JOYSTICK, dev, "SDL %d.%d.%d %s support game controllers.\n", ver.major, ver.minor, ver.patch, vid_gamepad_ok ? "DOES" : "DOES NOT");
+
 if (vid_gamepad_ok)
     SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER);
 else
@@ -685,20 +691,22 @@ if (vid_gamepad_ok && SDL_GameControllerEventState (SDL_ENABLE) < 0) {
 
 n = SDL_NumJoysticks();
 
+sim_debug (SIM_VID_DBG_VIDEO|SIM_VID_DBG_JOYSTICK, dev, "Game controllers found: %d\n", n);
+
 for (i = 0; i < n; i++) {
     if (vid_gamepad_ok && SDL_IsGameController (i)) {
         SDL_GameController *x = SDL_GameControllerOpen (i);
         if (x != NULL) {
-            sim_debug (SIM_VID_DBG_VIDEO, dev,
+            sim_debug (SIM_VID_DBG_VIDEO|SIM_VID_DBG_JOYSTICK, dev,
             "Game controller: %s\n", SDL_GameControllerNameForIndex(i));
             }
         }
     else {
         y = SDL_JoystickOpen (i);
         if (y != NULL) {
-            sim_debug (SIM_VID_DBG_VIDEO, dev,
-            "Joystick: %s\n", SDL_JoystickNameForIndex(i));
-            sim_debug (SIM_VID_DBG_VIDEO, dev,
+            sim_debug (SIM_VID_DBG_VIDEO|SIM_VID_DBG_JOYSTICK, dev,
+            "%s\n", SDL_JoystickNameForIndex(i));
+            sim_debug (SIM_VID_DBG_VIDEO|SIM_VID_DBG_JOYSTICK, dev,
             "Number of axes: %d, buttons: %d\n",
             SDL_JoystickNumAxes(y),
             SDL_JoystickNumButtons(y));
@@ -1660,6 +1668,26 @@ while (SDL_PushEvent (&user_event) < 0)
 #endif
 }
 
+void vid_render_set_logical_size (VID_DISPLAY *vptr, int32 w, int32 h)
+{
+SDL_Event user_event;
+
+vptr->vid_rect.h = h;
+vptr->vid_rect.w = w;
+
+user_event.type = SDL_USEREVENT;
+user_event.user.windowID = vptr->vid_windowID;
+user_event.user.code = EVENT_LOGICAL;
+user_event.user.data1 = NULL;
+user_event.user.data2 = NULL;
+#if defined (SDL_MAIN_AVAILABLE)
+while (SDL_PushEvent (&user_event) < 0)
+    sim_os_ms_sleep (100);
+#else
+    SDL_RenderSetLogicalSize(vptr->vid_renderer, w, h);
+#endif
+}
+
 t_bool vid_is_fullscreen_window (VID_DISPLAY *vptr)
 {
 return SDL_GetWindowFlags (vptr->vid_window) & SDL_WINDOW_FULLSCREEN_DESKTOP;
@@ -2123,6 +2151,9 @@ while (vid_active) {
                         case SDL_WINDOWEVENT_EXPOSED:
                             vid_update (vptr);
                             break;
+                        case SDL_WINDOWEVENT_SIZE_CHANGED:
+                            vid_update (vptr);
+                            break;
                         default:
                             sim_debug (SIM_VID_DBG_VIDEO, vptr->vid_dev, "Did not handle window event: %d - %s\n", event.window.event, windoweventtypes[event.window.event]);
                             break;
@@ -2142,8 +2173,9 @@ while (vid_active) {
                 /*                   it notice vid_active has changed */
                 /* EVENT_SCREENSHOT  to take a screenshot */
                 /* EVENT_BEEP        to emit a beep sound */
-                /* EVENT_SIZE        to change screen size */
                 /* EVENT_FULLSCREEN  to change fullscreen */
+                /* EVENT_SIZE        to change screen size */
+                /* EVENT_LOGICAL     to change screen size */
                 while (vid_active && event.user.code) {
                     /* Handle Beep first since it isn't a window oriented event */
                     if (event.user.code == EVENT_BEEP) {
@@ -2201,6 +2233,10 @@ while (vid_active) {
                         }
                     if (event.user.code == EVENT_SIZE) {
                         SDL_SetWindowSize (vptr->vid_window, vptr->vid_rect.w, vptr->vid_rect.h);
+                        event.user.code = 0;    /* Mark as done */
+                        }
+                    if (event.user.code == EVENT_LOGICAL) {
+                        SDL_RenderSetLogicalSize (vptr->vid_renderer, vptr->vid_rect.w, vptr->vid_rect.h);
                         event.user.code = 0;    /* Mark as done */
                         }
                     if (event.user.code == EVENT_FULLSCREEN) {

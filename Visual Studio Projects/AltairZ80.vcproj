@@ -324,6 +324,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\AltairZ80\s100_dazzler.c"
+				>
+			</File>
+			<File
 				RelativePath="..\AltairZ80\s100_disk1a.c"
 				>
 			</File>

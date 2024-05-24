@@ -79,6 +79,8 @@ extern DEVICE m2sio0_dev;
 extern DEVICE m2sio1_dev;
 extern DEVICE pmmi_dev;
 extern DEVICE hayes_dev;
+extern DEVICE daz_dev;
+extern DEVICE js1_dev;
 extern DEVICE jair_dev;
 extern DEVICE jairs0_dev;
 extern DEVICE jairs1_dev;
@@ -178,6 +180,9 @@ DEVICE      *sim_devices[]  = {
     &pmmi_dev,
     /* HAYES MODEM */
     &hayes_dev,
+    /* IDE/CF */
+    &daz_dev,
+    &js1_dev,
     /* JAIR SBC */
     &jair_dev,
     &jairs0_dev,
