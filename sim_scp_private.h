@@ -231,7 +231,7 @@ extern int32 sim_asynch_inst_latency;
 
 #if defined(__DECC_VER)
 #include <builtins>
-#if defined(__IA64)
+#if defined(__IA64) || defined(__ia64)
 #define USE_AIO_INTRINSICS 1
 #endif
 #endif
@@ -314,10 +314,11 @@ extern int32 sim_asynch_inst_latency;
 #define AIO_UPDATE_QUEUE sim_aio_update_queue ()
 #define AIO_ACTIVATE(caller, uptr, event_time)                         \
     if (!pthread_equal ( pthread_self(), sim_asynch_main_threadid )) { \
-      sim_debug (SIM_DBG_AIO_QUEUE, sim_dflt_dev, "Queueing Asynch event for %s after %d instructions\n", sim_uname(uptr), event_time);\
+      sim_debug (SIM_DBG_AIO_QUEUE, sim_dflt_dev, "Lock Based Queueing Asynch event for %s after %d %s\n", sim_uname(uptr), event_time, sim_vm_interval_units);\
       AIO_LOCK;                                                        \
       if (uptr->a_next) {                       /* already queued? */  \
         uptr->a_activate_call = sim_activate_abs;                      \
+        uptr->a_event_time = MIN (uptr->a_event_time, event_time);     \
       } else {                                                         \
         uptr->a_next = sim_asynch_queue;                               \
         uptr->a_event_time = event_time;                               \
@@ -327,13 +328,13 @@ extern int32 sim_asynch_inst_latency;
       if (sim_idle_wait) {                                             \
         if (sim_deb) {  /* only while debug do lock/unlock overhead */ \
           AIO_UNLOCK;                                                  \
-          sim_debug (TIMER_DBG_IDLE, &sim_timer_dev, "waking due to event on %s after %d instructions\n", sim_uname(uptr), event_time);\
+          sim_debug (TIMER_DBG_IDLE, &sim_timer_dev, "wakeup from idle due to async event on %s after %d %s\n", sim_uname(uptr), event_time, sim_vm_interval_units);\
           AIO_LOCK;                                                    \
           }                                                            \
         pthread_cond_signal (&sim_asynch_wake);                        \
         }                                                              \
       AIO_UNLOCK;                                                      \
-      sim_asynch_check = 0;                                            \
+      sim_asynch_check = 0;     /* try to force check */               \
       return SCPE_OK;                                                  \
     } else (void)0
 #endif /* USE_AIO_INTRINSICS */
