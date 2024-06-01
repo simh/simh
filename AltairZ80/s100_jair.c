@@ -72,6 +72,8 @@ static DEBTAB jair_dt[] = {
 static t_stat jair_reset(DEVICE *dptr);
 static t_stat jair_port_reset(DEVICE *dptr);
 static t_stat jair_svc(UNIT *uptr);
+static t_stat jair_rx_svc(UNIT *uptr);
+static t_stat jair_tx_svc(UNIT *uptr);
 static t_stat jair_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 static t_stat jair_boot(int32 unitno, DEVICE *dptr);
 static t_stat jair_attach(UNIT *uptr, CONST char *cptr);
@@ -83,6 +85,8 @@ static t_stat jair_config_line(DEVICE *dev, TMLN *tmln, int baud);
 static const char* jairs0_description(DEVICE *dptr);
 static const char* jairs1_description(DEVICE *dptr);
 static const char* jairp_description(DEVICE *dptr);
+static int jair_get_modem_status(UNIT *uptr);
+static void jair_get_rxdata(UNIT *uptr);
 static int jair_set_mc(TMLN *tmln, uint8 data);
 static int jair_new_baud(UNIT *uptr);
 static t_stat jair_set_baud(UNIT *uptr, int32 value, const char *cptr, void *desc);
@@ -604,6 +608,7 @@ static uint8 jair_ram[JAIR_ROM_SIZE] = {0};
 **  BIT ASSIGNMENT MASKS
 */
 #define JAIR_DR      0x01    /* SERIAL DATA READY                */
+#define JAIR_OE      0x02    /* SERIAL OVERRUN ERROR             */
 #define JAIR_THRE    0x20    /* SERIAL TRANSMITTER BUFFER EMPTY  */
 #define JAIR_TEMT    0x40    /* SERIAL TRANSMITTER BUFFER EMPTY  */
 #define JAIR_DLAB    0x80    /* DIVISOR LATCH ACCESS BIT         */
@@ -624,6 +629,9 @@ static uint8 jair_ram[JAIR_ROM_SIZE] = {0};
 #define JAIR_STATE_RESP 2    /* sending response */
 #define JAIR_STATE_SBLK 3    /* start block */
 #define JAIR_STATE_WBLK 4    /* write block */
+
+#define JAIR_STAT_WAIT  10000 /* Status wait interval */
+#define JAIR_IO_WAIT    250   /* IO wait interval */
 
 /*
 ** SD Commands
@@ -651,6 +659,8 @@ static uint8 jair_ram[JAIR_ROM_SIZE] = {0};
 #define UNIT_JAIR_WPROTECT       (1 << UNIT_V_JAIR_WPROTECT)
 #define UNIT_V_JAIR_ROM          (UNIT_V_UF + 2)                      /* WRTENB / WRTPROT */
 #define UNIT_JAIR_ROM            (1 << UNIT_V_JAIR_ROM)
+#define UNIT_V_JAIR_CONSOLE      (UNIT_V_UF + 3)                      /* Port checks console for input */
+#define UNIT_JAIR_CONSOLE        (1 << UNIT_V_JAIR_CONSOLE)
 
 /*
 ** JAIR Registers and Interface Controls
@@ -729,6 +739,15 @@ DEVICE jair_dev = {
 /* GENERIC PORT */
 /****************/
 
+#define JAIR_IOBUF_SIZE     (128)
+#define JAIR_IOBUF_MASK     (JAIR_IOBUF_SIZE-1)
+
+#define JAIR_PORT_UNITS     3
+
+#define JAIR_UNIT_STAT      0
+#define JAIR_UNIT_RX        1
+#define JAIR_UNIT_TX        2
+
 typedef struct {
     PNP_INFO  pnp;          /* Must be first */
     int32     conn;         /* Connected Status */
@@ -749,6 +768,9 @@ typedef struct {
     uint8     dlms;         /* Divisor Latch MS */
     TMLN     *tmln;         /* TMLN pointer */
     TMXR     *tmxr;         /* TMXR pointer */
+    int32    iobuf[JAIR_IOBUF_SIZE];
+    uint32   iobufin;
+    uint32   iobufout;
 } JAIR_PORT_CTX;
 
 /**************************/
@@ -783,14 +805,17 @@ static REG jairs0_reg[] = {
     { HRDATAD (TXD0, jairs0_ctx.txd, 8, "Serial port TX data register"), },
     { HRDATAD (RDR0, jairs0_ctx.rdr, 1, "Serial port RX data ready"), },
     { HRDATAD (RXD0, jairs0_ctx.rxd, 8, "Serial port RX register"), },
+    { HRDATAD (BUFIN0, jairs0_ctx.iobufin, 16, "Serial port buffer in ptr"), },
+    { HRDATAD (BUFOUT0, jairs0_ctx.iobufout, 16, "Serial port buffer out ptr"), },
     { HRDATAD (LSR0, jairs0_ctx.lsr, 8, "Serial port line status register"), },
     { HRDATAD (MSR0, jairs0_ctx.msr, 8, "Serial port modem status register"), },
     { NULL }
 };
 
-
-static UNIT jairs0_unit[] = {
-    { UDATA (&jair_svc, UNIT_ATTABLE, 0), (int) USECS_PER_SECOND / 1000 }
+static UNIT jairs0_unit[JAIR_PORT_UNITS] = {
+    { UDATA (&jair_svc, UNIT_ATTABLE | UNIT_JAIR_CONSOLE, 0), JAIR_STAT_WAIT },
+    { UDATA (&jair_rx_svc, UNIT_DIS | UNIT_JAIR_CONSOLE, 0), JAIR_IO_WAIT },
+    { UDATA (&jair_tx_svc, UNIT_DIS | UNIT_JAIR_CONSOLE, 0), JAIR_IO_WAIT }
 };
 
 static MTAB jairs0_mod[] = {
@@ -806,7 +831,7 @@ DEVICE jairs0_dev = {
     jairs0_unit,                                   /* unit */
     jairs0_reg,                                    /* registers */
     jairs0_mod,                                    /* modifiers */
-    1,                                             /* # units */
+    JAIR_PORT_UNITS,                               /* # units */
     10,                                            /* address radix */
     31,                                            /* address width */
     1,                                             /* addr increment */
@@ -826,7 +851,7 @@ DEVICE jairs0_dev = {
     NULL,                                          /* logical name */
     NULL,                                          /* help */
     NULL,                                          /* attach help */
-    NULL,                                          /* context for help */
+    &jairs0_tmxr,                                  /* context for help */
     &jairs0_description                            /* description */
 };
 
@@ -862,13 +887,17 @@ static REG jairs1_reg[] = {
     { HRDATAD (TXD1, jairs1_ctx.txd, 8, "Serial port TX data register"), },
     { HRDATAD (RDR1, jairs1_ctx.rdr, 1, "Serial port RX data ready"), },
     { HRDATAD (RXD1, jairs1_ctx.rxd, 8, "Serial port RX register"), },
+    { HRDATAD (BUFIN1, jairs1_ctx.iobufin, 16, "Serial port buffer in ptr"), },
+    { HRDATAD (BUFOUT1, jairs1_ctx.iobufout, 16, "Serial port buffer out ptr"), },
     { HRDATAD (LSR1, jairs1_ctx.lsr, 8, "Serial port line status register"), },
     { HRDATAD (MSR1, jairs1_ctx.msr, 8, "Serial port modem status register"), },
     { NULL }
 };
 
-static UNIT jairs1_unit[] = {
-    { UDATA (&jair_svc, UNIT_ATTABLE, 0), (int) USECS_PER_SECOND / 1000 }
+static UNIT jairs1_unit[JAIR_PORT_UNITS] = {
+    { UDATA (&jair_svc, UNIT_ATTABLE, 0), JAIR_STAT_WAIT },
+    { UDATA (&jair_rx_svc, UNIT_DIS, 0), JAIR_IO_WAIT },
+    { UDATA (&jair_tx_svc, UNIT_DIS, 0), JAIR_IO_WAIT }
 };
 
 static MTAB jairs1_mod[] = {
@@ -884,7 +913,7 @@ DEVICE jairs1_dev = {
     jairs1_unit,                                   /* unit */
     jairs1_reg,                                    /* registers */
     jairs1_mod,                                    /* modifiers */
-    1,                                             /* # units */
+    JAIR_PORT_UNITS,                               /* # units */
     10,                                            /* address radix */
     31,                                            /* address width */
     1,                                             /* addr increment */
@@ -904,7 +933,7 @@ DEVICE jairs1_dev = {
     NULL,                                          /* logical name */
     NULL,                                          /* help */
     NULL,                                          /* attach help */
-    NULL,                                          /* context for help */
+    &jairs1_tmxr,                                  /* context for help */
     &jairs1_description                            /* description */
 };
 
@@ -943,8 +972,10 @@ static REG jairp_reg[] = {
     { NULL }
 };
 
-static UNIT jairp_unit[] = {
-    { UDATA (&jair_svc, UNIT_ATTABLE, 0), (int) USECS_PER_SECOND / 1000 }
+static UNIT jairp_unit[JAIR_PORT_UNITS] = {
+    { UDATA (&jair_svc, UNIT_ATTABLE, 0), JAIR_STAT_WAIT },
+    { UDATA (&jair_rx_svc, UNIT_DIS, 0), JAIR_IO_WAIT },
+    { UDATA (&jair_tx_svc, UNIT_DIS, 0), JAIR_IO_WAIT }
 };
 
 static MTAB jairp_mod[] = {
@@ -958,7 +989,7 @@ DEVICE jairp_dev = {
     jairp_unit,                                    /* unit */
     jairp_reg,                                     /* registers */
     jairp_mod,                                     /* modifiers */
-    1,                                             /* # units */
+    JAIR_PORT_UNITS,                               /* # units */
     10,                                            /* address radix */
     31,                                            /* address width */
     1,                                             /* addr increment */
@@ -978,7 +1009,7 @@ DEVICE jairp_dev = {
     NULL,                                          /* logical name */
     NULL,                                          /* help */
     NULL,                                          /* attach help */
-    NULL,                                          /* context for help */
+    &jairp_tmxr,                                   /* context for help */
     &jairp_description                             /* description */
 };
 
@@ -1027,7 +1058,7 @@ static t_stat jair_reset(DEVICE *dptr)
             set_dev_enbdis(&jairs1_dev, NULL, 1, NULL);
             set_dev_enbdis(&jairp_dev, NULL, 1, NULL);
 
-	    first = FALSE;
+            first = FALSE;
         }
     }
 
@@ -1042,20 +1073,9 @@ static t_stat jair_reset(DEVICE *dptr)
     return SCPE_OK;
 }
 
-/*
- * The BOOT command will enter the ROM at 0x0000
- */
-static t_stat jair_boot(int32 unitno, DEVICE *dptr)
-{
-    sim_printf("%s: Booting using ROM at 0x%04x\n", JAIR_SNAME, jair_ctx.rom_base);
-
-    *((int32 *) sim_PC->loc) = jair_ctx.rom_base;
-
-    return SCPE_OK;
-}
-
 static t_stat jair_port_reset(DEVICE *dptr) {
     JAIR_PORT_CTX *port;
+    char uname[12];
     uint32 u;
 
     port = (JAIR_PORT_CTX *) dptr->ctxt;
@@ -1080,15 +1100,24 @@ static t_stat jair_port_reset(DEVICE *dptr) {
         /* Enable TMXR modem control passthrough */
         tmxr_set_modem_control_passthru(port->tmxr);
         tmxr_set_port_speed_control(port->tmxr);
+        tmxr_set_line_unit(port->tmxr, 0, &dptr->units[JAIR_UNIT_RX]);
+        tmxr_set_line_output_unit(port->tmxr, 0, &dptr->units[JAIR_UNIT_TX]);
+
+        sprintf(uname, "%.6sRX", sim_uname(&dptr->units[JAIR_UNIT_RX]));
+        sim_set_uname(&dptr->units[JAIR_UNIT_RX], uname);
+        sprintf(uname, "%.6sTX", sim_uname(&dptr->units[JAIR_UNIT_TX]));
+        sim_set_uname(&dptr->units[JAIR_UNIT_TX], uname);
 
         port->status = 0x00;
         port->rdr = FALSE;
         port->txp = FALSE;
         port->lsr = JAIR_TEMT | JAIR_THRE;
         port->msr = 0;
+        port->iobufin = 0;
+        port->iobufout = 0;
 
         for (u = 0; u < dptr->numunits; u++) {
-            sim_activate_after(&dptr->units[u], dptr->units[u].wait);  /* activate timer */
+            sim_activate_abs(&dptr->units[u], dptr->units[u].wait);  /* activate timer */
         }
     }
 
@@ -1096,7 +1125,19 @@ static t_stat jair_port_reset(DEVICE *dptr) {
 }
 
 /*
- * JAIR service routine
+ * The BOOT command will enter the ROM at 0x0000
+ */
+static t_stat jair_boot(int32 unitno, DEVICE *dptr)
+{
+    sim_printf("%s: Booting using ROM at 0x%04x\n", JAIR_SNAME, jair_ctx.rom_base);
+
+    *((int32 *) sim_PC->loc) = jair_ctx.rom_base;
+
+    return SCPE_OK;
+}
+
+/*
+ * JAIR service routines
  *
  * The JAIR simulator has 3 I/O devices
  *
@@ -1107,10 +1148,7 @@ static t_stat jair_port_reset(DEVICE *dptr) {
 static t_stat jair_svc(UNIT *uptr)
 {
     JAIR_PORT_CTX *port;
-    int32 c = 0;
-    int32 s;
     t_stat r = SCPE_OK;
-    uint8 msr;
 
     port = (JAIR_PORT_CTX *) uptr->dptr->ctxt;
 
@@ -1120,9 +1158,62 @@ static t_stat jair_svc(UNIT *uptr)
 
             port->conn = 1;          /* set connected   */
 
-            sim_printf("%s: new connection.\n", uptr->dptr->name);
+            sim_debug(VERBOSE_MSG, &jair_dev, "new connection.\n");
         }
     }
+
+    /* Update modem status register */
+    if ((uptr->flags & UNIT_ATT) && port->conn) {
+        jair_get_modem_status(uptr);
+    }
+
+    sim_activate_abs(uptr, uptr->wait);  /* reactivate timer */
+
+    return r;
+}
+
+static t_stat jair_rx_svc(UNIT *uptr)
+{
+    UNIT *rxunit = uptr;
+    JAIR_PORT_CTX *port;
+    int32 c = 0;
+    t_stat r = SCPE_OK;
+
+    port = (JAIR_PORT_CTX *) uptr->dptr->ctxt;
+
+    /* switch to unit 0 */
+    uptr = uptr->dptr->units;
+
+    /* Buffer any received data */
+    if ((uptr->flags & UNIT_ATT) && port->conn) {
+        tmxr_poll_rx(port->tmxr);
+
+        while ((c = tmxr_getc_ln(&port->tmln[0])) & TMXR_VALID) {
+            port->iobuf[port->iobufin++] = c;
+            port->iobufin &= JAIR_IOBUF_MASK;
+            if (port->iobufin == port->iobufout) {
+                port->iobufin--;
+                port->iobufin &= JAIR_IOBUF_MASK;
+                port->lsr |= JAIR_OE;     /* Overrun Error */
+            }
+        }
+    }
+
+    sim_activate_abs(rxunit, rxunit->wait);  /* reactivate timer */
+
+    return r;
+}
+
+static t_stat jair_tx_svc(UNIT *uptr)
+{
+    UNIT *txunit = uptr;
+    JAIR_PORT_CTX *port;
+    t_stat r = SCPE_OK;
+
+    port = (JAIR_PORT_CTX *) uptr->dptr->ctxt;
+
+    /* switch to unit 0 */
+    uptr = uptr->dptr->units;
 
     /* TX byte pending? */
     if (port->txp == TRUE) {
@@ -1155,74 +1246,7 @@ static t_stat jair_svc(UNIT *uptr)
         port->lsr |= tmxr_txdone_ln(port->tmln) ? (JAIR_TEMT | JAIR_THRE) : 0;
     }
 
-    /* Check for Data if RX buffer empty */
-    if (port->rdr == FALSE) {
-        if (uptr->flags & UNIT_ATT) {
-            if (uptr->fileref) {
-                if (sim_fread(&c, 1, 1, uptr->fileref) == 1) {
-                    c |= SCPE_KFLAG;
-                }
-            }
-            else if (port->conn) {
-                tmxr_poll_rx(port->tmxr);
-                c = tmxr_getc_ln(&port->tmln[0]);
-            }
-        }
-        else if (uptr == jairs0_unit) {
-            c = sim_poll_kbd();
-        }
-
-        if (c & (TMXR_VALID | SCPE_KFLAG)) {
-            port->rxd = c & 0xff;
-            port->rdr = TRUE;
-            port->lsr |= JAIR_DR;
-        }
-    }
-
-    /* Update Modem Status Register */
-    if (uptr->flags & UNIT_ATT && port->conn) {
-        tmxr_set_get_modem_bits(port->tmln, 0, 0, &s);
-
-        msr = port->msr;
-
-        port->msr &= ~JAIR_CTS;
-        port->msr |= (s & TMXR_MDM_CTS) ? JAIR_CTS : 0;
-
-        /* CTS status changed */
-        if ((msr ^ port->msr) & JAIR_CTS) {
-            port->msr |= JAIR_DCTS;
-            sim_debug(STATUS_MSG, uptr->dptr, "CTS state changed to %s.\n", (port->msr & JAIR_CTS) ? "HIGH" : "LOW");
-        }
-
-        port->msr &= ~JAIR_DSR;
-        port->msr |= (s & TMXR_MDM_DSR) ? JAIR_DSR : 0;
-
-        /* DSR status changed */
-        if ((msr ^ port->msr) & JAIR_DSR) {
-            port->msr |= JAIR_DDSR;
-            sim_debug(STATUS_MSG, uptr->dptr, "DSR state changed to %s.\n", (port->msr & JAIR_DSR) ? "HIGH" : "LOW");
-        }
-
-        port->msr &= ~JAIR_RNG;
-        port->msr |= (s & TMXR_MDM_RNG) ? JAIR_RNG : 0;
-
-        /* RI status changed */
-        if ((msr ^ port->msr) & JAIR_RNG) {
-            port->msr |= (port->msr & JAIR_RNG) ? 0 : JAIR_DRNG; /* trailing edge to low */
-            sim_debug(STATUS_MSG, uptr->dptr, "RNG state changed to %s.\n", (port->msr & JAIR_RNG) ? "HIGH" : "LOW");
-        }
-
-        port->msr &= ~JAIR_DCD;
-        port->msr |= (s & TMXR_MDM_DCD) ? JAIR_DCD : 0;
-
-        /* DCD status changed */
-        if ((msr ^ port->msr) & JAIR_DCD) {
-            port->msr |= JAIR_DDCD;
-            sim_debug(STATUS_MSG, uptr->dptr, "DCD state changed to %s.\n", (port->msr & JAIR_DCD) ? "HIGH" : "LOW");
-        }
-    }
-
-    r = sim_activate_after(uptr, uptr->wait);  /* reactivate timer */
+    sim_activate_abs(txunit, txunit->wait);  /* reactivate timer */
 
     return r;
 }
@@ -1305,7 +1329,7 @@ static t_stat jair_attach_mux(UNIT *uptr, CONST char *cptr)
 
     if ((r = tmxr_attach(xptr->tmxr, uptr, cptr)) == SCPE_OK) {
         xptr->tmln[0].rcve = 1;
-        sim_printf("%s: attached '%s' to interface.\n", uptr->dptr->name, cptr);
+        sim_debug(VERBOSE_MSG, uptr->dptr, "attached '%s' to interface.\n", cptr);
         tmxr_set_get_modem_bits(xptr->tmln, TMXR_MDM_DTR | TMXR_MDM_RTS, 0, NULL);
     }
 
@@ -1323,14 +1347,13 @@ static t_stat jair_detach_mux(UNIT *uptr)
 
     xptr = (JAIR_PORT_CTX *) uptr->dptr->ctxt;
 
-    if ((r = tmxr_detach(xptr->tmxr, uptr)) == SCPE_OK) {
-        sim_printf("%s: detached.\n", uptr->dptr->name);
-    }
+    r = tmxr_detach(xptr->tmxr, uptr);
 
     return r;
 }
 
-static t_stat jair_show_ports(FILE *st, UNIT *uptr, int32 val, CONST void *desc) {
+static t_stat jair_show_ports(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
     JAIR_PORT_CTX *port;
 
     port = (JAIR_PORT_CTX *) uptr->dptr->ctxt;
@@ -1342,17 +1365,97 @@ static t_stat jair_show_ports(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 static t_stat jair_config_line(DEVICE *dev, TMLN *tmln, int baud)
 {
     char config[20];
-    const char *fmt;
     t_stat r = SCPE_IERR;
 
+    sprintf(config, "%d-8N1", baud);
+
     if (tmln->serport) {
-        fmt = "8N1";
-
-        sprintf(config, "%d-%s", baud, fmt);
-
         r = tmxr_set_config_line(tmln, config);
+    }
 
-        sim_debug(STATUS_MSG, dev, "port configuration set to '%s'.\n", config);
+    sim_debug(STATUS_MSG, dev, "port configuration set to '%s'.\n", config);
+
+    return r;
+}
+
+static void jair_get_rxdata(UNIT *uptr)
+{
+    JAIR_PORT_CTX *port;
+    int32 c = 0xff;
+
+    port = (JAIR_PORT_CTX *) uptr->dptr->ctxt;
+
+    if (uptr->flags & UNIT_ATT) {
+        if (uptr->fileref) {
+            if (sim_fread(&c, 1, 1, uptr->fileref) == 1) {
+                c |= SCPE_KFLAG;
+            }
+        }
+        else if (port->conn) {
+            if (port->iobufin != port->iobufout) {
+                c = port->iobuf[port->iobufout++];
+                port->iobufout &= JAIR_IOBUF_MASK;
+            }
+        }
+    }
+    else if (uptr->flags & UNIT_JAIR_CONSOLE) {
+        c = sim_poll_kbd();
+    }
+
+    if (c & (TMXR_VALID | SCPE_KFLAG)) {
+        port->rxd = c & 0xff;
+        port->rdr = TRUE;
+        port->lsr |= JAIR_DR;
+    }
+}
+
+static int jair_get_modem_status(UNIT *uptr)
+{
+    JAIR_PORT_CTX *port;
+    uint8 msr;
+    int32 s;
+    t_stat r;
+
+    port = (JAIR_PORT_CTX *) uptr->dptr->ctxt;
+
+    r = tmxr_set_get_modem_bits(port->tmln, 0, 0, &s);
+
+    msr = port->msr;
+
+    port->msr &= ~JAIR_CTS;
+    port->msr |= (s & TMXR_MDM_CTS) ? JAIR_CTS : 0;
+
+    /* CTS status changed */
+    if ((msr ^ port->msr) & JAIR_CTS) {
+        port->msr |= JAIR_DCTS;
+        sim_debug(STATUS_MSG, uptr->dptr, "CTS state changed to %s.\n", (port->msr & JAIR_CTS) ? "HIGH" : "LOW");
+    }
+
+    port->msr &= ~JAIR_DSR;
+    port->msr |= (s & TMXR_MDM_DSR) ? JAIR_DSR : 0;
+
+    /* DSR status changed */
+    if ((msr ^ port->msr) & JAIR_DSR) {
+        port->msr |= JAIR_DDSR;
+        sim_debug(STATUS_MSG, uptr->dptr, "DSR state changed to %s.\n", (port->msr & JAIR_DSR) ? "HIGH" : "LOW");
+    }
+
+    port->msr &= ~JAIR_RNG;
+    port->msr |= (s & TMXR_MDM_RNG) ? JAIR_RNG : 0;
+
+    /* RI status changed */
+    if ((msr ^ port->msr) & JAIR_RNG) {
+        port->msr |= (port->msr & JAIR_RNG) ? 0 : JAIR_DRNG; /* trailing edge to low */
+        sim_debug(STATUS_MSG, uptr->dptr, "RNG state changed to %s.\n", (port->msr & JAIR_RNG) ? "HIGH" : "LOW");
+    }
+
+    port->msr &= ~JAIR_DCD;
+    port->msr |= (s & TMXR_MDM_DCD) ? JAIR_DCD : 0;
+
+    /* DCD status changed */
+    if ((msr ^ port->msr) & JAIR_DCD) {
+        port->msr |= JAIR_DDCD;
+        sim_debug(STATUS_MSG, uptr->dptr, "DCD state changed to %s.\n", (port->msr & JAIR_DCD) ? "HIGH" : "LOW");
     }
 
     return r;
@@ -1439,23 +1542,29 @@ static uint8 jair_io_in(uint32 addr)
 
     switch(addr & 0xff) {
         case JAIR_UART0 + JAIR_LSR:
+            if (!(jairs0_ctx.lsr & JAIR_DR)) {
+                jair_get_rxdata(jairs0_unit);
+            }
             data = jairs0_ctx.lsr;
             break;
 
         case JAIR_UART1 + JAIR_LSR:
+            if (!(jairs1_ctx.lsr & JAIR_DR)) {
+                jair_get_rxdata(jairs1_unit);
+            }
             data = jairs1_ctx.lsr;
             break;
 
         case JAIR_UART0 + JAIR_SDATA:
             data = jairs0_ctx.rxd;
             jairs0_ctx.rdr = FALSE;
-            jairs0_ctx.lsr &= ~JAIR_DR;
+            jairs0_ctx.lsr &= ~(JAIR_DR | JAIR_OE);
             break;
 
         case JAIR_UART1 + JAIR_SDATA:
             data = jairs1_ctx.rxd;
             jairs1_ctx.rdr = FALSE;
-            jairs1_ctx.lsr &= ~JAIR_DR;
+            jairs1_ctx.lsr &= ~(JAIR_DR | JAIR_OE);
             break;
 
         case JAIR_UART0 + JAIR_MSR:
@@ -1509,8 +1618,6 @@ static uint8 jair_io_in(uint32 addr)
             break;
 
         default:
-            sim_printf("Invalid IO Read %02x\n", addr);
-
             sim_debug(ERROR_MSG, &jair_dev, "READ Invalid I/O Address %02x (%02x)\n",
                 addr & 0xFF, addr & 0x01);
             break;
@@ -1657,8 +1764,11 @@ static uint8 jair_io_out(uint32 addr, int32 data)
                                 sd_addr |= jair_ctx.sd_cmd[2] * 0x10000;
                                 sd_addr |= (uint32) jair_ctx.sd_cmd[3] * 0x100;
                                 sd_addr |= (uint32) jair_ctx.sd_cmd[4];
-
-                                if (sim_fseek(jair_unit[0].fileref, sd_addr, SEEK_SET) != 0) {
+                                if (!(jair_unit[0].flags & UNIT_ATT)) {
+                                    jair_ctx.sd_resp[0] |= 0x04;
+                                    jair_ctx.sd_resp_len = 1;
+                                }
+                                else if (sim_fseek(jair_unit[0].fileref, sd_addr, SEEK_SET) != 0) {
                                     jair_ctx.sd_resp[0] |= 0x04;
                                     jair_ctx.sd_resp_len = 1;
                                 }
@@ -1672,7 +1782,6 @@ static uint8 jair_io_out(uint32 addr, int32 data)
                                     jair_ctx.sd_resp[3] |= 0xfe;
                                     jair_ctx.sd_resp_len = 4 + 512 + 2;
                                 }
-
                                 jair_ctx.sd_resp_idx = 0;
                                 jair_ctx.sd_istate = JAIR_STATE_RESP;
                                 jair_ctx.sd_ostate = JAIR_STATE_IDLE;
@@ -1716,7 +1825,7 @@ static uint8 jair_io_out(uint32 addr, int32 data)
                                 jair_ctx.sd_resp_len = 1;
                                 jair_ctx.sd_istate = JAIR_STATE_RESP;
                                 jair_ctx.sd_ostate = JAIR_STATE_IDLE;
-                                sim_printf("Command not implemented: %d\n", jair_ctx.sd_cmd[0]);
+                                sim_debug(ERROR_MSG, &jair_dev, "Command not implemented: %d\n", jair_ctx.sd_cmd[0]);
                                 break;
                         }
                     }
@@ -1740,7 +1849,10 @@ static uint8 jair_io_out(uint32 addr, int32 data)
                         sd_addr |= (uint32) jair_ctx.sd_cmd[3] * 0x100;
                         sd_addr |= (uint32) jair_ctx.sd_cmd[4];
 
-                        if (sim_fseek(jair_unit[0].fileref, sd_addr, SEEK_SET) != 0) {
+                        if (!(jair_unit[0].flags & UNIT_ATT)) {
+                            jair_ctx.sd_resp[0] = 0x0b;
+                        }
+                        else if (sim_fseek(jair_unit[0].fileref, sd_addr, SEEK_SET) != 0) {
                             jair_ctx.sd_resp[0] = 0x0b;
                         }
                         else if (sim_fwrite(&jair_ctx.sd_cmd[6], 1, 512, jair_unit[0].fileref) != 512) {
@@ -1762,8 +1874,6 @@ static uint8 jair_io_out(uint32 addr, int32 data)
             break;
 
         default:
-            sim_printf("Invalid IO Write %02x\n", addr);
-
             sim_debug(ERROR_MSG, &jair_dev, "WRITE Invalid I/O Address %02x (%02x)\n",
                 addr & 0xFF, addr & 0x01);
             break;
