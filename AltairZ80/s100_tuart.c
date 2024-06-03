@@ -215,18 +215,24 @@ static UNIT tuart2_unit[] = {
 };
 
 static REG tuart0_reg[] = {
+    { HRDATAD (TXP0, tuart0_ctx.txp, 1, "TU-ART port 0 transmit pending"), },
+    { HRDATAD (STB0, tuart0_ctx.stb, 8, "TU-ART port 0 status buffer"), },
     { HRDATAD (INTMASK0, tuart0_ctx.intmask, 8, "TU-ART port 0 interrupt mask"), },
     { DRDATAD (INTVEC0, tuart0_ctx.intvector, 8, "TU-ART port 0 interrupt vector"), },
     { HRDATAD (INTADR0, tuart0_ctx.intadr, 8, "TU-ART port 0 interrupt address"), },
     { NULL }
 };
 static REG tuart1_reg[] = {
+    { HRDATAD (TXP1, tuart1_ctx.txp, 1, "TU-ART port 1/A transmit pending"), },
+    { HRDATAD (STB1, tuart1_ctx.stb, 8, "TU-ART port 1/A status buffer"), },
     { HRDATAD (INTMASK1, tuart1_ctx.intmask, 8, "TU-ART port 1/A interrupt mask"), },
     { DRDATAD (INTVEC1, tuart1_ctx.intvector, 8, "TU-ART port 1/A interrupt vector"), },
     { HRDATAD (INTADR1, tuart1_ctx.intadr, 8, "TU-ART port 1/A interrupt address"), },
     { NULL }
 };
 static REG tuart2_reg[] = {
+    { HRDATAD (TXP2, tuart2_ctx.txp, 1, "TU-ART port 2/B transmit pending"), },
+    { HRDATAD (STB2, tuart2_ctx.stb, 8, "TU-ART port 2/B status buffer"), },
     { HRDATAD (INTMASK2, tuart2_ctx.intmask, 8, "TU-ART port 2/B interrupt mask"), },
     { DRDATAD (INTVEC2, tuart2_ctx.intvector, 8, "TU-ART port 2/B interrupt vector"), },
     { HRDATAD (INTADR2, tuart2_ctx.intadr, 8, "TU-ART port 2/B interrupt address"), },
@@ -356,7 +362,7 @@ static t_stat tuart_reset(DEVICE *dptr, int32 (*routine)(const int32, const int3
     dptr->units[0].dptr = dptr;
 
     /* Reset registers */
-    xptr->stb = 0x00;
+    xptr->stb = TUART_TBE;
     xptr->txp = FALSE;
     xptr->hbd = 1;
     xptr->baud = 9600;
@@ -364,8 +370,8 @@ static t_stat tuart_reset(DEVICE *dptr, int32 (*routine)(const int32, const int3
 
     tuart_config_line(&dptr->units[0]);
 
-    if (!(dptr->flags & DEV_DIS) && dptr->units[0].flags & UNIT_TUART_CONSOLE) {
-        sim_activate_after_abs(&dptr->units[0], dptr->units[0].wait);
+    if (!(dptr->flags & DEV_DIS)) {
+        sim_activate_abs(&dptr->units[0], dptr->units[0].wait);
     } else {
         sim_cancel(&dptr->units[0]);
     }
@@ -381,6 +387,7 @@ static t_stat tuart_svc(UNIT *uptr)
     TUART_CTX *xptr;
     int32 c;
     t_stat r;
+    t_bool dr = TRUE;
 
     xptr = (TUART_CTX *) uptr->dptr->ctxt;
 
@@ -389,17 +396,10 @@ static t_stat tuart_svc(UNIT *uptr)
         if (tmxr_poll_conn(xptr->tmxr) >= 0) {      /* poll connection */
 
             xptr->conn = TRUE;          /* set connected   */
+            xptr->tmln->rcve = 1;
 
             sim_debug(STATUS_MSG, uptr->dptr, "new connection.\n");
         }
-    }
-
-    /* Update incoming modem status bits */
-    if (uptr->flags & UNIT_ATT) {
-        xptr->stb = 0x00;
-
-        /* Enable receiver if DCD is active low */
-        xptr->tmln->rcve = 1;
     }
 
     /* TX data */
@@ -407,14 +407,16 @@ static t_stat tuart_svc(UNIT *uptr)
         if (uptr->flags & UNIT_ATT) {
             r = tmxr_putc_ln(xptr->tmln, xptr->txb);
             xptr->txp = FALSE;             /* Reset TX Pending */
+
+            if (r == SCPE_LOST) {
+                xptr->conn = FALSE;          /* Connection was lost */
+                sim_debug(STATUS_MSG, uptr->dptr, "lost connection.\n");
+            }
         } else {
             r = sim_putchar(xptr->txb);
-            xptr->txp = FALSE;                 /* Reset TX Pending */
-        }
-
-        if (r == SCPE_LOST) {
-            xptr->conn = FALSE;          /* Connection was lost */
-            sim_debug(STATUS_MSG, uptr->dptr, "lost connection.\n");
+            xptr->txp = FALSE;             /* Reset TX Pending */
+            xptr->stb |= TUART_TBE;        /* Xmit buffer empty */
+            dr = FALSE;                    /* Skip read */
         }
 
         /* If TX buffer now empty, send interrupt */
@@ -422,21 +424,16 @@ static t_stat tuart_svc(UNIT *uptr)
             xptr->intadr = TUART_TBSIA;
             tuart_int(uptr);
         }
-
     }
 
     /* Update TBE if not set and no character pending */
-    if (!xptr->txp && !(xptr->stb & TUART_TBE)) {
-        if (uptr->flags & UNIT_ATT) {
-            tmxr_poll_tx(xptr->tmxr);
-            xptr->stb |= (tmxr_txdone_ln(xptr->tmln) && xptr->conn) ? TUART_TBE : 0;
-        } else {
-            xptr->stb |= TUART_TBE;
-        }
+    if (!xptr->txp && !(xptr->stb & TUART_TBE) && uptr->flags & UNIT_ATT) {
+        tmxr_poll_tx(xptr->tmxr);
+        xptr->stb |= (tmxr_txdone_ln(xptr->tmln) && xptr->conn) ? TUART_TBE : 0;
     }
 
     /* Check for Data if RX buffer empty */
-    if (!(xptr->stb & TUART_RDA)) {
+    if (dr && !(xptr->stb & TUART_RDA)) {
         if (uptr->flags & UNIT_ATT) {
             tmxr_poll_rx(xptr->tmxr);
 
@@ -451,6 +448,7 @@ static t_stat tuart_svc(UNIT *uptr)
             xptr->rxb = c & 0xff;
             xptr->stb |= TUART_RDA;
             xptr->stb &= ~(TUART_FME | TUART_ORE);
+
             if (xptr->intmask & TUART_RDAIE) {
                 xptr->intadr = TUART_RDAIA;
                 tuart_int(uptr);
@@ -458,11 +456,10 @@ static t_stat tuart_svc(UNIT *uptr)
         }
     }
 
-    sim_activate_after_abs(uptr, uptr->wait);
+    sim_activate_abs(uptr, uptr->wait);
 
     return SCPE_OK;
 }
-
 
 /* Attach routine */
 static t_stat tuart_attach(UNIT *uptr, CONST char *cptr)
@@ -478,8 +475,6 @@ static t_stat tuart_attach(UNIT *uptr, CONST char *cptr)
         xptr->tmln->rcve = 1;
 
         r = tuart_config_line(uptr);
-
-        sim_activate_after_abs(uptr, uptr->wait);
     }
 
     return r;
@@ -500,11 +495,7 @@ static t_stat tuart_detach(UNIT *uptr)
     if (uptr->flags & UNIT_ATT) {
         xptr = (TUART_CTX *) uptr->dptr->ctxt;
 
-        if (uptr->flags & UNIT_TUART_CONSOLE) {
-            uptr->wait = TUART_WAIT;
-        } else {
-            sim_cancel(uptr);
-        }
+        sim_cancel(uptr);
 
         return (tmxr_detach(xptr->tmxr, uptr));
     }
@@ -575,17 +566,8 @@ static t_stat tuart_config_line(UNIT *uptr)
     if (xptr != NULL) {
         sprintf(config, "%d-8N%d", TUART_BAUD(xptr), xptr->sbits);
 
-        if (uptr->flags & UNIT_ATT) {
+        if ((uptr->flags & UNIT_ATT) && (xptr->tmln->serport)) {
             r = tmxr_set_config_line(xptr->tmln, config);
-
-            if (xptr->tmln->serport) {
-                uptr->wait = 9600000 / TUART_BAUD(xptr);
-            } else {
-                uptr->wait = TUART_WAIT;
-            }
-
-            xptr->tmln->txbps = 0;   /* Get TMXR's timing out of our way */
-            xptr->tmln->rxbps = 0;   /* Get TMXR's timing out of our way */
         }
 
         sim_debug(STATUS_MSG, uptr->dptr, "Port configuration set to '%s'.\n", config);
@@ -689,8 +671,8 @@ static int32 tuart_data(DEVICE *dptr, int32 io, int32 data)
         xptr->stb &= ~(TUART_RDA | TUART_FME | TUART_ORE | TUART_IPG);
     } else {
         xptr->txb = data;
-        xptr->stb &= ~(TUART_TBE | TUART_IPG);
         xptr->txp = TRUE;
+        xptr->stb &= ~(TUART_TBE | TUART_IPG);
     }
 
     return r;
