@@ -1160,7 +1160,9 @@ else {
     fprintf (stderr, "Can't properly determine host system clock capabilities.\n");
     fprintf (stderr, "Minimum Host Sleep Time:       %u ms\n", sim_os_sleep_min_ms);
     fprintf (stderr, "Minimum Host Sleep Incr Time:  %u ms\n", sim_os_sleep_inc_ms);
+    fprintf (stderr, "Idle Rate Milliseconds:        %u ms\n", sim_idle_rate_ms);
     fprintf (stderr, "Host Clock Resolution:         %u ms\n", sim_os_clock_resoluton_ms);
+    sim_idle_rate_ms = 0;                       /* Force error return */
     }
 return ((sim_idle_rate_ms == 0) || (sim_os_clock_resoluton_ms == 0));
 }
