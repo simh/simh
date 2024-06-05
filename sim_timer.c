@@ -1972,6 +1972,7 @@ t_stat sim_set_throt (int32 arg, CONST char *cptr)
 CONST char *tptr;
 char c;
 uint32 saved_throt_type = sim_throt_type;
+int factor = 1;
 t_value val, val2 = 0;
 
 if (arg == 0) {
@@ -1993,13 +1994,13 @@ if (cptr == tptr)
 sim_throt_sleep_time = sim_idle_rate_ms;
 c = (char)toupper (*tptr++);
 if (c == 'M') {
-    val *= 1000000;
+    factor = 1000000;
     if (*tptr != '\0')
         c = (char)toupper (*tptr++);
     }
 else {
     if (c == 'K') {
-        val *= 1000;
+        factor = 1000;
         if (*tptr != '\0')
             c = (char)toupper (*tptr++);
         }
@@ -2034,7 +2035,8 @@ if (sim_throttle_has_been_active) {
     sim_messagef (SCPE_ARG, "Throttling was previously active.\n");
     return sim_messagef (SCPE_ARG, "Restart the simulator to change the throttling mode\n");
     }
-if ((sim_precalibrate_ips != SIM_INITIAL_IPS) && (val > sim_precalibrate_ips)) {
+if ((sim_precalibrate_ips != SIM_INITIAL_IPS) && 
+    ((val * factor) > sim_precalibrate_ips)) {
     sim_throt_type = saved_throt_type;
     return sim_messagef (SCPE_ARG, "The current host CPU is too slow to simulate at %s %s per sec.\n", cptr, sim_vm_interval_units);
     }
@@ -2050,16 +2052,18 @@ else {                                          /* otherwise use best guess base
     RTC *rtc = NULL;
 
     if (sim_throt_type == SIM_THROT_SPC) {
-        if (val2 >= sim_idle_rate_ms)
+        if (val2 >= sim_idle_rate_ms) {
             sim_throt_sleep_time = (uint32) val2;
+            sim_throt_val = (uint32) (val * factor);
+            }
         else {
             if ((sim_idle_rate_ms % val2) == 0) {
                 sim_throt_sleep_time = sim_idle_rate_ms;
-                sim_throt_val = (uint32) (val * (sim_idle_rate_ms / val2));
+                sim_throt_val = (uint32) (val * factor * (sim_idle_rate_ms / val2));
                 }
             else {
                 sim_throt_sleep_time = sim_idle_rate_ms;
-                sim_throt_val = (uint32) (val * (1 + (sim_idle_rate_ms / val2)));
+                sim_throt_val = (uint32) (val * factor * (1 + (sim_idle_rate_ms / val2)));
                 }
             }
         sim_throt_state = SIM_THROT_STATE_THROTTLE;     /* force state */
@@ -2117,8 +2121,10 @@ else {
         break;
 
     case SIM_THROT_SPC:
-        if (sim_throt_cps > 0.0)
-            fprintf (st, "Throttle:                      %d/%d (~%.0f %s per second)\n", sim_throt_val, sim_throt_sleep_time, sim_throt_cps, sim_vm_interval_units);
+        if (sim_throt_cps > 0.0) {
+            fprintf (st, "Throttle:                      %s", sim_fmt_numeric ((double)sim_throt_val));
+            fprintf (st, "/%d (about %s %s per second)\n", sim_throt_sleep_time, sim_fmt_numeric (sim_throt_cps), sim_vm_interval_units);
+            }
         else
             fprintf (st, "Throttle:                      %d/%d\n", sim_throt_val, sim_throt_sleep_time);
         fprintf (st, "Throttling by sleeping for:    %d ms every %d %s\n", sim_throt_sleep_time, sim_throt_val, sim_vm_interval_units);
