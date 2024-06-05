@@ -1973,7 +1973,6 @@ CONST char *tptr;
 char c;
 uint32 saved_throt_type = sim_throt_type;
 t_value val, val2 = 0;
-double d_cps = 0.0;
 
 if (arg == 0) {
     if ((cptr != NULL) && (*cptr != 0))
@@ -1993,6 +1992,18 @@ if (cptr == tptr)
     return sim_messagef (SCPE_ARG, "Invalid throttle specification: %s\n", cptr);
 sim_throt_sleep_time = sim_idle_rate_ms;
 c = (char)toupper (*tptr++);
+if (c == 'M') {
+    val *= 1000000;
+    if (*tptr != '\0')
+        c = (char)toupper (*tptr++);
+    }
+else {
+    if (c == 'K') {
+        val *= 1000;
+        if (*tptr != '\0')
+            c = (char)toupper (*tptr++);
+        }
+    }
 if (c == '/') {
     if (val == 0)
         return sim_messagef (SCPE_ARG, "Invalid %s count specifier: %s\n", cptr, sim_vm_interval_units);
@@ -2002,15 +2013,11 @@ if (c == '/') {
     if ((*tptr != '\0') && (*tptr != '='))
         return sim_messagef (SCPE_ARG, "Invalid throttle delay specifier: %s\n", cptr);
     }
-if (c == 'M') {
+if (c == 'M')
     sim_throt_type = SIM_THROT_MCYC;
-    d_cps = val * 1000000.0;
-    }
 else {
-    if (c == 'K') {
+    if (c == 'K')
         sim_throt_type = SIM_THROT_KCYC;
-        d_cps = val * 1000.0;
-        }
     else {
         if ((c == '%') && (val > 0) && (val < 100))
             sim_throt_type = SIM_THROT_PCT;
@@ -2027,7 +2034,8 @@ if (sim_throttle_has_been_active) {
     sim_messagef (SCPE_ARG, "Throttling was previously active.\n");
     return sim_messagef (SCPE_ARG, "Restart the simulator to change the throttling mode\n");
     }
-if ((sim_precalibrate_ips != SIM_INITIAL_IPS) && (d_cps > sim_precalibrate_ips)) {
+if ((sim_precalibrate_ips != SIM_INITIAL_IPS) && (val > sim_precalibrate_ips)) {
+    sim_throt_type = saved_throt_type;
     return sim_messagef (SCPE_ARG, "The current host CPU is too slow to simulate at %s %s per sec.\n", cptr, sim_vm_interval_units);
     }
 if (sim_idle_enab) {
@@ -2035,8 +2043,7 @@ if (sim_idle_enab) {
     sim_clr_idle (NULL, 0, NULL, NULL);
     }
 sim_throt_val = (uint32) val;
-if ((sim_throt_type != SIM_THROT_SPC) &&
-    (sim_precalibrate_ips == SIM_INITIAL_IPS))
+if (sim_throt_type != SIM_THROT_SPC)
     sim_throt_cps = sim_precalibrate_ips;       /* Set initial value while correct one is determined */
 else {                                          /* otherwise use best guess based on measured execution and sleep times */
     int32 tmr;

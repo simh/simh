@@ -1473,6 +1473,7 @@ static const char simh_help1[] =
       "3Throttle\n"
       " Simulator instruction execution rate can be controlled by specifying\n"
       " one of the following throttle commands:\n\n"
+      "+SET THROTTLE x              execute x %C per second\n"
       "+SET THROTTLE xM             execute x million %C per second\n"
       "+SET THROTTLE xK             execute x thousand %C per second\n"
       "+SET THROTTLE x%%             occupy x percent of the host capacity\n"
