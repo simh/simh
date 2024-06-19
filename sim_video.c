@@ -3061,6 +3061,11 @@ void vid_set_window_size (VID_DISPLAY *vptr, int32 w, int32 h)
 return;
 }
 
+void vid_render_set_logical_size (VID_DISPLAY *vptr, int32 w, int32 h)
+{
+return;
+}
+
 const char *vid_key_name (uint32 key)
 {
 return "";
