@@ -274,10 +274,12 @@ endif
 ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,apt-get)))
   ifneq (Android,$(shell uname -o))
     PKG_MGR = APT
+    PKG_CMD = apt-get install
   else
     PKG_MGR = TERMUX
+    PKG_CMD = pkg install
+    PKG_NO_SUDO = YES
   endif
-  PKG_CMD = apt-get install
 endif
 ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,yum)))
   PKG_MGR = YUM
@@ -323,7 +325,7 @@ DPKG_ZLIB      = 8
 DPKG_SDL_TTF   = 9
 DPKG_GMAKE     = 10
 ifneq (3,${SIM_MAJOR})
-  # Platform Pkg Names  COMPILER PCAP          VDE            PCRE         EDITLINE      SDL           PNG            ZLIB       SDL_TTF           GMAKE CURL
+  # Platform Pkg Names  COMPILER PCAP          VDE            PCRE         EDITLINE      SDL             PNG            ZLIB       SDL_TTF           GMAKE CURL
   PKGS_SRC_HOMEBREW   = -        -             vde            pcre         libedit       sdl2          libpng         zlib       sdl2_ttf          make  -
   PKGS_SRC_MACPORTS   = -        -             vde2           pcre         libedit       libsdl2       libpng         zlib       libsdl2_ttf       gmake -
   PKGS_SRC_APT        = gcc      libpcap-dev   libvdeplug-dev libpcre3-dev libedit-dev   libsdl2-dev   libpng-dev     -          libsdl2-ttf-dev   -     curl
@@ -333,7 +335,7 @@ ifneq (3,${SIM_MAJOR})
   PKGS_SRC_PKGSRC     = -        -             -              pcre         editline      SDL2          png            zlib       SDL2_ttf          gmake -
   PKGS_SRC_PKGBSD     = -        -             -              pcre         libedit       sdl2          png            -          sdl2_ttf          gmake -
   PKGS_SRC_PKGADD     = -        -             -              pcre         -             sdl2          png            -          sdl2-ttf          gmake -
-  PKGS_SRC_TERMUX     = -        libpcap       -              -            -             sdl2          -              -          -                 -     -
+  PKGS_SRC_TERMUX     = clang    libpcap       -              pcre         -             -             -              -          -                 -     curl
   ifneq (0,$(TESTS))
     ifneq (,${TEST_ARG})
       export TEST_ARG
