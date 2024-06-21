@@ -7324,7 +7324,7 @@ if (flag) {
             pclose (f);
             if (proc_name[0] != '\0')
                 fprintf (st, "\n        Processor Name: %s", proc_name);
-            if ((arch[0] != '\0') || (procs[0] != '\0') || (cores[0] != '\0'));
+            if ((arch[0] != '\0') || (procs[0] != '\0') || (cores[0] != '\0'))
                 fprintf (st, "\n        ");
             if (arch[0] != '\0')
                 fprintf (st, "Architecture: %s", arch);
