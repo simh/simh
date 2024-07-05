@@ -2574,6 +2574,11 @@ static const char simh_help2[] =
       " specifies the offset into the both files where the comparison should\n"
       " start, thus skipping the initial bytes of the file before beginning\n"
       " the comparison.\n\n"
+      "5Device Existence Expressions\n"
+      " Devices existence (or enable state) can be determined with:\n\n"
+      "++{NOT} DEVICE <device-name>\n\n"
+      " Specifies a true (false {NOT}) condition if the device exists and is\n"
+      " enabled.\n\n"
       "5Debugging Expression Evaluation\n"
       " Debug output can be produced which will walk through the details\n"
       " involved during expression evaluation.  This output can, for example,\n"
@@ -5445,6 +5450,7 @@ uint32 idx = 0;
 t_stat r;
 t_bool Not = FALSE;
 t_bool Exist = FALSE;
+t_bool Device = FALSE;
 t_bool result;
 t_addr addr = 0;
 t_stat reason;
@@ -5472,7 +5478,11 @@ if (!strcmp (gbuf, "NOT")) {                            /* Conditional Inversion
     tptr = get_glyph (cptr, gbuf, 0);                   /* get next token */
     }
 if (!strcmp (gbuf, "EXIST")) {                          /* File Exist Test? */
-    Exist = TRUE;                                       /* remember that, and */
+    Exist = TRUE;                                       /* remember that */
+    cptr = (CONST char *)tptr;
+    }
+if (!strcmp (gbuf, "DEVICE")) {                         /* Device Exist+Enabled Test? */
+    Device = TRUE;                                      /* remember that, and */
     cptr = (CONST char *)tptr;
     }
 tptr = _get_string (cptr, gbuf, ' ');                   /* get first string */
@@ -5562,60 +5572,65 @@ else {
         result = (value != 0);
         }
     else {
-        cptr = get_glyph (cptr, gbuf, 0);                   /* get register */
-        rptr = find_reg (gbuf, &gptr, sim_dfdev);           /* parse register */
-        if (rptr) {                                         /* got register? */
-            if (*gptr == '[') {                             /* subscript? */
-                if (rptr->depth <= 1)                       /* array register? */
-                    return SCPE_ARG;
-                idx = (uint32) strtotv (++gptr, &tptr, 0);  /* convert index */
-                if ((gptr == tptr) || (*tptr++ != ']'))
-                    return SCPE_ARG;
-                gptr = tptr;                                /* update */
+        cptr = get_glyph (cptr, gbuf, 0);               /* get register */
+        if (Device) {
+            result = (NULL == find_dev (gbuf)) ? 0 : 1;
+            }
+        else {
+            rptr = find_reg (gbuf, &gptr, sim_dfdev);   /* parse register */
+            if (rptr) {                                 /* got register? */
+                if (*gptr == '[') {                     /* subscript? */
+                    if (rptr->depth <= 1)               /* array register? */
+                        return SCPE_ARG;
+                    idx = (uint32) strtotv (++gptr, &tptr, 0);/* convert index */
+                    if ((gptr == tptr) || (*tptr++ != ']'))
+                        return SCPE_ARG;
+                    gptr = tptr;                        /* update */
+                    }
+                else
+                    idx = 0;                            /* not array */
+                if (idx >= rptr->depth)                 /* validate subscript */
+                    return SCPE_SUB;
                 }
-            else
-                idx = 0;                                    /* not array */
-            if (idx >= rptr->depth)                         /* validate subscript */
-                return SCPE_SUB;
-            }
-        else {                                              /* not reg, check for memory */
-            if (sim_dfdev && sim_vm_parse_addr)             /* get addr */
-                addr = sim_vm_parse_addr (sim_dfdev, gbuf, &gptr);
-            else
-                addr = (t_addr) strtotv (gbuf, &gptr, sim_dfdev ? sim_dfdev->dradix : sim_dflt_dev->dradix);
-            if (gbuf == gptr)                               /* not register? */
-                return sim_messagef (SCPE_NXREG, "Non-existant register: %s\n", gbuf);
-            }
-        if (*gptr != 0)                                     /* more? must be search */
-            get_glyph (gptr, gbuf, 0);
-        else {
-            if (*cptr == 0)                                 /* must be more */
-                return SCPE_2FARG;
-            cptr = get_glyph (cptr, gbuf, 0);               /* get search cond */
-            }
-        if (*cptr) {                                        /* more? */
-            if (flag)                                       /* ASSERT has no more args */
-                return SCPE_2MARG;
-            }
-        else {
-            if (!flag)                                      
-                return SCPE_2FARG;                          /* IF needs actions! */
-            }
-        if (rptr) {                                         /* Handle register case */
-            if (!get_rsearch (gbuf, rptr->radix, &sim_stabr) ||  /* parse condition */
-                (sim_stabr.boolop == -1))                   /* relational op reqd */
-                return SCPE_MISVAL;
-            sim_eval[0] = get_rval (rptr, idx);             /* get register value */
-            result = test_search (sim_eval, &sim_stabr);    /* test condition */
-            }
-        else {                                              /* Handle memory case */
-            if (!get_asearch (gbuf, sim_dfdev ? sim_dfdev->dradix : sim_dflt_dev->dradix, &sim_staba) ||  /* parse condition */
-                (sim_staba.boolop == -1))                    /* relational op reqd */
-                return SCPE_MISVAL;
-            reason = get_aval (addr, sim_dfdev, sim_dfunit);/* get data */
-            if (reason != SCPE_OK)                          /* return if error */
-                return reason;
-            result = test_search (sim_eval, &sim_staba);    /* test condition */
+            else {                                      /* not reg, check for memory */
+                if (sim_dfdev && sim_vm_parse_addr)     /* get addr */
+                    addr = sim_vm_parse_addr (sim_dfdev, gbuf, &gptr);
+                else
+                    addr = (t_addr) strtotv (gbuf, &gptr, sim_dfdev ? sim_dfdev->dradix : sim_dflt_dev->dradix);
+                if (gbuf == gptr)                       /* not register? */
+                    return sim_messagef (SCPE_NXREG, "Non-existant register: %s\n", gbuf);
+                }
+            if (*gptr != 0)                             /* more? must be search */
+                get_glyph (gptr, gbuf, 0);
+            else {
+                if (*cptr == 0)                         /* must be more */
+                    return SCPE_2FARG;
+                cptr = get_glyph (cptr, gbuf, 0);       /* get search cond */
+                }
+            if (*cptr) {                                /* more? */
+                if (flag)                               /* ASSERT has no more args */
+                    return SCPE_2MARG;
+                }
+            else {
+                if (!flag)                                      
+                    return SCPE_2FARG;                  /* IF needs actions! */
+                }
+            if (rptr) {                                 /* Handle register case */
+                if (!get_rsearch (gbuf, rptr->radix, &sim_stabr) ||  /* parse condition */
+                    (sim_stabr.boolop == -1))           /* relational op reqd */
+                    return SCPE_MISVAL;
+                sim_eval[0] = get_rval (rptr, idx);     /* get register value */
+                result = test_search (sim_eval, &sim_stabr);    /* test condition */
+                }
+            else {                                      /* Handle memory case */
+                if (!get_asearch (gbuf, sim_dfdev ? sim_dfdev->dradix : sim_dflt_dev->dradix, &sim_staba) ||  /* parse condition */
+                    (sim_staba.boolop == -1))           /* relational op reqd */
+                    return SCPE_MISVAL;
+                reason = get_aval (addr, sim_dfdev, sim_dfunit);/* get data */
+                if (reason != SCPE_OK)                  /* return if error */
+                    return reason;
+                result = test_search (sim_eval, &sim_staba);    /* test condition */
+                }
             }
         }
     }
