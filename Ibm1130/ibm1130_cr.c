@@ -726,7 +726,7 @@ extern int cgi;
 static int16 ascii_to_card[256];
 
 static CPCODE *cardcode;
-static int ncardcode;
+static size_t ncardcode;
 static FILE *deckfile = NULL;
 static char tempfile[128];
 static int any_punched = 0;
@@ -758,7 +758,7 @@ t_bool program_is_loaded = FALSE;
 
 /* lookup_codetable - use code flag setting to get code table pointer and length */
 
-static t_bool lookup_codetable (int32 match, CPCODE **pcode, int *pncode)
+static t_bool lookup_codetable (int32 match, CPCODE **pcode, size_t *pncode)
 {
     switch (match) {
         case CODE_029:
@@ -791,7 +791,7 @@ static t_bool lookup_codetable (int32 match, CPCODE **pcode, int *pncode)
 t_stat set_active_cr_code (int match)
 {
     CPCODE *code;
-    int i, ncode;
+    size_t ncode;
 
     SET_ACTCODE(cr_unit, match);
 
@@ -799,6 +799,8 @@ t_stat set_active_cr_code (int match)
         return SCPE_ARG;
 
     if (code != NULL) {                 /* if an ASCII mode was selected */
+        size_t i;
+
         memset(ascii_to_card, 0, sizeof(ascii_to_card));
 
         for (i = 0; i < ncode; i++)     /* set ascii to card code table */
@@ -879,7 +881,7 @@ static int32 guess_cr_code (void)
 static t_stat cp_set_code (UNIT *uptr, int32 match, CONST char *cptr, void *desc)
 {
     CPCODE *code;
-    int ncode;
+    size_t ncode;
 
     if (! lookup_codetable(match, &code, &ncode))
         return SCPE_ARG;
@@ -1018,7 +1020,7 @@ t_stat cr_boot (int32 unitno, DEVICE *dptr)
 
 char card_to_ascii (uint16 hol)
 {
-    int i;
+    size_t i;
 
     for (i = 0; i < ncardcode; i++)
         if (cardcode[i].hollerith == hol)
@@ -1031,7 +1033,7 @@ char card_to_ascii (uint16 hol)
 
 char hollerith_to_ascii (uint16 hol)
 {
-    int i;
+    size_t i;
 
     for (i = 0; i < ncardcode; i++)
         if (cardcode_029[i].hollerith == hol)
@@ -1220,6 +1222,9 @@ static char * skipbl (char *str)
     return str;
 }
 
+#if THIS_IS_EVER_NEEDED
+/* This function is never called. Leaving it in if the IBM-1130 author
+ * deems it significant. */
 static char * trim (char *str)
 {
     char *s, *lastnb;
@@ -1232,6 +1237,7 @@ static char * trim (char *str)
 
     return str;
 }
+#endif
 
 /* alltrim - remove all leading and trailing whitespace from a string */
 
@@ -2380,7 +2386,7 @@ static DWORD CALLBACK pcr_thread (LPVOID arg)
                 if (! GetOverlappedResult(hpcr, &ovRd, &nrcvd, TRUE))
                     report_error("PCR_Read", GetLastError());
                 else if (cr_unit.flags & UNIT_DEBUG)
-                    printf("PCR_Read: event, %d rcvd\n", nrcvd);
+                    printf("PCR_Read: event, %ld rcvd\n", nrcvd);
                 break;
 
             case WAIT_OBJECT_0+1:                       /* write complete */
@@ -2389,7 +2395,7 @@ static DWORD CALLBACK pcr_thread (LPVOID arg)
                 if (! GetOverlappedResult(hpcr, &ovWr, &nwritten, TRUE))
                     report_error("PCR_Write", GetLastError());
                 else if (cr_unit.flags & UNIT_DEBUG)
-                    printf("PCR_Write: event, %d sent\n", nwritten);
+                    printf("PCR_Write: event, %ld sent\n", nwritten);
                 continue;
 
             case WAIT_OBJECT_0+2:                       /* reset request from simulator */
