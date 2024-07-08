@@ -843,7 +843,7 @@ void deck_print_echo(uint16 * DeckImage, int nCards, int bPrint, int bEcho)
         sim_trim_endspc(line); 
         // echo on console (add CR LF)
         if (bEcho) {
-            for (i=0;i<(int)strlen(line);i++) sim_putchar(line[i]);     
+            for (i=0;line[i];i++) sim_putchar(line[i]);
             sim_putchar(13);sim_putchar(10);
         }
         // printout will be directed to file attached to CDP0 unit, if any
