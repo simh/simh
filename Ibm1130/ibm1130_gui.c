@@ -106,8 +106,6 @@ extern t_bool program_is_loaded;
     void disk_ready (int ready)               {}
     void disk_unlocked (int unlocked)         {}
     void gui_run (int running)                {} 
-    static void init_console_window (void)    {}
-    static void destroy_console_window (void) {}
 
     t_stat console_reset (DEVICE *dptr)                         {return SCPE_OK;}
     long   stuff_cmd (char *cmd)                                {return 0;}

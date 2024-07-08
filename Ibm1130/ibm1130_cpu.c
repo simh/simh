@@ -246,8 +246,6 @@ extern UNIT cr_unit, prt_unit[];
 #  define ARFSET(v)                         /* without GUI, no need for setting ARF */
 #endif
 
-static void   init_console_window (void);
-static void   destroy_console_window (void);
 static t_stat view_cmd (int32 flag, CONST char *cptr);
 static t_stat cpu_attach (UNIT *uptr, CONST char *cptr);
 static t_bool bsctest (int32 DSPLC, t_bool reset_V);
