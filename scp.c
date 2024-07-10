@@ -9699,7 +9699,7 @@ for (j=0, r = SCPE_OK; j<attcnt; j++) {
             set_cmd (0, cmd);
         dptr = find_dev_from_unit (attunits[j]);
         if ((!force_restore) && 
-            (!stat(attnames[j], &fstat)))
+            (!stat(filename, &fstat)))
             if (fstat.st_mtime > rstat.st_mtime + 30) {
                 r = SCPE_INCOMP;
                 sim_printf ("Error Attaching %s to %s - the restore state is %d seconds older than the attach file\n", sim_dname (dptr), attnames[j], (int)(fstat.st_mtime - rstat.st_mtime));
@@ -9708,10 +9708,10 @@ for (j=0, r = SCPE_OK; j<attcnt; j++) {
                 }
         saved_pos = attunits[j]->pos;
         sim_switches = attswitches[j];
-        r = scp_attach_unit (dptr, attunits[j], attnames[j]);/* reattach unit */
+        r = scp_attach_unit (dptr, attunits[j], filename);/* reattach unit */
         attunits[j]->pos = saved_pos;
         if (r != SCPE_OK)
-            sim_printf ("Error Attaching %s to %s\n", sim_dname (dptr), attnames[j]);
+            sim_printf ("Error Attaching %s to %s%s%s\n", sim_uname (attunits[j]), filename, drivetype[0] ? " as " : "", drivetype);
         }
     else {
         if ((r == SCPE_OK) && (dont_detach_attach)) {
