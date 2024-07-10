@@ -211,10 +211,6 @@ static BITFIELD tmr_csr_bits[] = {
 };
 
 
-/* SSC timer intervals */
-
-#define TMR_INC         10000U                          /* usec/interval */
-
 /* SSC timer vector */
 
 #define TMR_VEC_MASK    0x000003FC                      /* vector */
@@ -248,6 +244,7 @@ uint32 tmr_tir[2] = { 0 };                              /* curr interval */
 uint32 tmr_tnir[2] = { 0 };                             /* next interval */
 int32 tmr_tivr[2] = { 0 };                              /* vector */
 t_bool tmr_inst[2] = { 0 };                             /* wait instructions vs usecs */
+uint32 tmr_inst_remain[2] = { 0 };                      /* wait instructions remaining */
 int32 ssc_adsm[2] = { 0 };                              /* addr strobes */
 int32 ssc_adsk[2] = { 0 };
 int32 cdg_dat[CDASIZE >> 2];                            /* cache data */
@@ -295,6 +292,7 @@ int32 tmr_tir_rd (int32 tmr);
 void tmr_csr_wr (int32 tmr, int32 val);
 int32 tmr_csr_rd (int32 tmr);
 void tmr_sched (int32 tmr);
+void tmr_sched_inst (int32 tmr, uint32 usecs);
 void tmr_incr (int32 tmr, uint32 inc);
 int32 tmr0_inta (void);
 int32 tmr1_inta (void);
@@ -484,11 +482,13 @@ REG sysd_reg[] = {
     { HRDATAD (TNIR0,  tmr_tnir[0], 32, "SSC timer 0 next interval register") },
     { HRDATAD (TIVEC0, tmr_tivr[0],  9, "SSC timer 0 interrupt vector register") },
     { FLDATAD (TINST0, tmr_inst[0],  0, "SSC timer 0 last wait instructions") },
+    { FLDATAD (TINSTR0, tmr_inst_remain[0],  0, "SSC timer 0 wait instructions remaining") },
     { HRDATADF (TCSR1, tmr_csr[1],  32, "SSC timer 1 control/status register", tmr_csr_bits) },
     { HRDATAD (TIR1,   tmr_tir[1],  32, "SSC timer 1 interval register") },
     { HRDATAD (TNIR1,  tmr_tnir[1], 32, "SSC timer 1 next interval register") },
     { HRDATAD (TIVEC1, tmr_tivr[1],  9, "SSC timer 1 interrupt vector register") },
     { FLDATAD (TINST1, tmr_inst[1],  0, "SSC timer 1 last wait instructions") },
+    { FLDATAD (TINSTR1, tmr_inst_remain[1],  0, "SSC timer 1 wait instructions remaining") },
     { HRDATAD (ADSM0,  ssc_adsm[0], 32, "SSC address match 0 address") },
     { HRDATAD (ADSK0,  ssc_adsk[0], 32, "SSC address match 0 mask") },
     { HRDATAD (ADSM1,  ssc_adsm[1], 32, "SSC address match 1 address") },
@@ -892,6 +892,8 @@ switch (rg) {
 
     case MT_TODR:                                       /* TODR */
         val = todr_rd ();
+        if (ADDR_IS_ROM(fault_PC))                      /* running from ROM */
+            val = 1 + (sim_grtime () / 10000);          /* instruction count presuming 1 usec per instruction 10 ms tick (non-zero) */
         sim_debug (DBG_TODR, &sysd_dev, "ReadIPR() = 0x%X\n", val);
         break;
 
@@ -1483,7 +1485,7 @@ switch (rg) {
    that ROM based code execute instructions at 1 instruction per usec.
    To accommodate this, we not only throttle memory accesses to ROM space,
    but we also use instruction based delays when the interval timers are
-   programmed from the ROM for short duration delays.
+   programmed from the ROM.
 */
 
 int32 tmr_tir_rd (int32 tmr)
@@ -1491,22 +1493,26 @@ int32 tmr_tir_rd (int32 tmr)
 if (tmr_csr[tmr] & TMR_CSR_RUN) {           /* running? then interpolate */
     uint32 usecs_remaining, cur_tir;
     const char *tmr_units = NULL;
+    const char *tmr_how = NULL;
 
     if ((ADDR_IS_ROM(fault_PC)) &&                  /* running from ROM and */
         (tmr_inst[tmr])) {                          /* waiting instructions? */
         usecs_remaining = sim_activate_time (&sysd_dev.units[tmr]) - 1;
+        usecs_remaining += tmr_inst_remain[tmr];
         tmr_units = "Instructions";
+        tmr_how = "";
         }
     else {
         usecs_remaining = (uint32)(0xFFFFFFFFLL & (t_uint64)sim_activate_time_usecs (&sysd_dev.units[tmr]));
         tmr_units = "Microseconds";
+        tmr_how = ", Interpolated while running";
         }
     cur_tir = ~usecs_remaining + 1;
-    sim_debug (DBG_REGR, &sysd_dev, "tmr_tir_rd(tmr=%d) - 0x%X %s - %u usecs, Interpolated while running\n", tmr, cur_tir, tmr_units, usecs_remaining);
+    sim_debug (DBG_REGR, &sysd_dev, "tmr_tir_rd(tmr=%d) - %u(0x%X) %s - %u(0x%X) usecs%s\n", tmr, cur_tir, cur_tir, tmr_units, usecs_remaining, usecs_remaining, tmr_how);
     return cur_tir;
     }
 
-sim_debug (DBG_REGR, &sysd_dev, "tmr_tir_rd(tmr=%d) - 0x%X\n", tmr, tmr_tir[tmr]);
+sim_debug (DBG_REGR, &sysd_dev, "tmr_tir_rd(tmr=%d) - %u(0x%X)\n", tmr, tmr_tir[tmr], tmr_tir[tmr]);
 
 return tmr_tir[tmr];
 }
@@ -1533,6 +1539,7 @@ if ((val & TMR_CSR_RUN) == 0) {                         /* clearing run? */
     if (tmr_csr[tmr] & TMR_CSR_RUN)                     /* run 1 -> 0? */
         tmr_tir[tmr] = tmr_tir_rd (tmr);                /* update itr */
     sim_cancel (&sysd_unit[tmr]);                       /* cancel timer */
+    tmr_inst_remain[tmr] = 0;
     }
 tmr_csr[tmr] = tmr_csr[tmr] & ~(val & TMR_CSR_W1C);     /* W1C csr */
 tmr_csr[tmr] = (tmr_csr[tmr] & ~TMR_CSR_RW) |           /* new r/w */
@@ -1544,8 +1551,10 @@ if (val & TMR_CSR_XFR) {                                /* xfr set? */
     sim_debug (DBG_REGW, &sysd_dev, "tmr_csr_wr(tmr=%d) - XFR set TIR=0x%X\n", tmr, tmr_tir[tmr]);
     }
 if (val & TMR_CSR_RUN)  {                               /* run? */
-    if (val & TMR_CSR_XFR)                              /* new tir? */
+    if (val & TMR_CSR_XFR) {                            /* new tir? */
         sim_cancel (&sysd_unit[tmr]);                   /* stop prev */
+        tmr_inst_remain[tmr] = 0;
+        }
     if (!sim_is_active (&sysd_unit[tmr]))               /* not running? */
         tmr_sched (tmr);                                /* activate */
     }
@@ -1572,7 +1581,10 @@ t_stat tmr_svc (UNIT *uptr)
 int32 tmr = uptr - sysd_dev.units;                      /* get timer # */
 uint32 delta_usecs = ~tmr_tir[tmr] + 1;
 
-tmr_incr (tmr, delta_usecs);                            /* incr timer */
+if (tmr_inst_remain[tmr])
+    tmr_sched_inst (tmr, tmr_inst_remain[tmr]);        /* schedule remaining usecs */
+else
+    tmr_incr (tmr, delta_usecs);                        /* incr timer */
 return SCPE_OK;
 }
 
@@ -1611,16 +1623,28 @@ else {
 
 /* Timer scheduling */
 
+void tmr_sched_inst (int32 tmr, uint32 usecs)
+{
+if (usecs & 0x80000000) {   /* High bit set? */
+    sim_activate_abs (&sysd_unit[tmr], usecs >> 1);
+    tmr_inst_remain[tmr] = usecs - (usecs >> 1);
+    sim_debug (DBG_SCHD, &sysd_dev, "tmr_sched_inst(tmr=%d) - scheduling for %u instructions with %u remaining\n", tmr, (usecs >> 1), tmr_inst_remain[tmr]);
+    }
+else {
+    sim_activate_abs (&sysd_unit[tmr], usecs);
+    tmr_inst_remain[tmr] = 0;
+    }
+}
+
 void tmr_sched (int32 tmr)
 {
 uint32 usecs_sched = tmr_tir[tmr] ? (~tmr_tir[tmr] + 1) : 0xFFFFFFFF;
 double usecs_sched_d = tmr_tir[tmr] ? (double)(~tmr_tir[tmr] + 1) : (1.0 + (double)0xFFFFFFFFu);
 
 sim_cancel (&sysd_unit[tmr]);                       /* Make sure not active */
-if ((ADDR_IS_ROM(fault_PC)) &&                      /* running from ROM and */
-    (usecs_sched < TMR_INC)) {                      /* short delay? */
+if (ADDR_IS_ROM(fault_PC)) {                        /* running from ROM */
     tmr_inst[tmr] = TRUE;                           /* wait for instructions */
-    sim_activate (&sysd_unit[tmr], usecs_sched);
+    tmr_sched_inst (tmr, usecs_sched);
     sim_debug (DBG_SCHD, &sysd_dev, "tmr_sched(tmr=%d) - after %u instructions - activate after: %.0f usecs\n", tmr, usecs_sched, sim_activate_time_usecs (&sysd_unit[tmr]));
     }
 else {
@@ -1763,6 +1787,7 @@ if (sim_switches & SWMASK ('P')) sysd_powerup ();       /* powerup? */
 for (i = 0; i < 2; i++) {
     tmr_csr[i] = tmr_tnir[i] = tmr_tir[i] = 0;
     tmr_inst[i] = FALSE;
+    tmr_inst_remain[i] = 0;
     sim_cancel (&sysd_unit[i]);
     }
 csi_csr = 0;
