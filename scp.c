@@ -539,7 +539,7 @@ FILE *stdnul;
 SCHTAB *get_rsearch (CONST char *cptr, int32 radix, SCHTAB *schptr);
 SCHTAB *get_asearch (CONST char *cptr, int32 radix, SCHTAB *schptr);
 int32 test_search (t_value *val, SCHTAB *schptr);
-static const char *get_glyph_gen (const char *iptr, char *optr, char mchar, t_bool uc, t_bool quote, char escape_char);
+static const char *get_glyph_gen (const char *iptr, char *optr, char mchar, t_bool ws_match, t_bool uc, t_bool quote, char escape_char);
 typedef enum {
     SW_ERROR,           /* Parse Error */
     SW_BITMASK,         /* Bitmask Value or Not a switch */
@@ -5425,7 +5425,7 @@ const char *ap;
 CONST char *tptr, *gptr;
 REG *rptr;
 
-tptr = (CONST char *)get_glyph_gen (iptr, optr, mchar, (sim_switches & SWMASK ('I')), TRUE, '\\');
+tptr = (CONST char *)get_glyph_gen (iptr, optr, mchar, TRUE, (sim_switches & SWMASK ('I')), TRUE, '\\');
 if ((*optr != '"') && (*optr != '\'')) {
     ap = getenv (optr);
     if (!ap)
@@ -5436,7 +5436,7 @@ if ((*optr != '"') && (*optr != '\'')) {
     if (rptr)
         return tptr;
     snprintf (optr, CBUFSIZE - 1, "\"%s\"", ap);
-    get_glyph_gen (optr, optr, 0, (sim_switches & SWMASK ('I')), TRUE, '\\');
+    get_glyph_gen (optr, optr, 0, TRUE, (sim_switches & SWMASK ('I')), TRUE, '\\');
     }
 return tptr;
 }
@@ -9689,7 +9689,7 @@ for (j=0, r = SCPE_OK; j<attcnt; j++) {
             cmd[0] = drivetype[0] = '\0';
             }
         else {
-            const char *fname = get_glyph (attnames[j] + 11, drivetype, '\001');
+            const char *fname = get_glyph_gen (attnames[j] + 11, drivetype, '\001', FALSE, TRUE, FALSE, 0);
 
             strlcpy (filename, fname, sizeof (filename));
             snprintf (cmd, sizeof (cmd), "%s %s", sim_uname (attunits[j]), drivetype);
@@ -11129,6 +11129,7 @@ return cptr;
 }
 
 /* get_glyph            get next glyph (force upper case)
+   get_glyph_sp         get next glyph (only delimited by the match char (no whitespace))
    get_glyph_nc         get next glyph (no conversion)
    get_glyph_quoted     get next glyph (potentially enclosed in quotes, no conversion)
    get_glyph_cmd        get command glyph (force upper case, extract leading !)
@@ -11137,7 +11138,8 @@ return cptr;
    Inputs:
         iptr        =   pointer to input string
         optr        =   pointer to output string
-        mchar       =   optional end of glyph character
+        mchar       =   optional end of glyph character (0 means whitespace ends glyph)
+        ws_match    =   white space also ends glyph (when mchar isn't 0)
         uc          =   TRUE for convert to upper case (_gen only)
         quote       =   TRUE to allow quote enclosing values (_gen only)
         escape_char =   optional escape character within quoted strings (_gen only)
@@ -11146,15 +11148,18 @@ return cptr;
         result      =   pointer to next character in input string
 */
 
-static const char *get_glyph_gen (const char *iptr, char *optr, char mchar, t_bool uc, t_bool quote, char escape_char)
+static const char *get_glyph_gen (const char *iptr, char *optr, char mchar, t_bool ws_match, t_bool uc, t_bool quote, char escape_char)
 {
 t_bool quoting = FALSE;
 t_bool escaping = FALSE;
 t_bool got_quoted = FALSE;
 char quote_char = 0;
+t_bool match_ws = (mchar == 0) || ws_match;
 
 while ((*iptr != 0) && (!got_quoted) &&
-       ((quote && quoting) || ((sim_isspace (*iptr) == 0) && (*iptr != mchar)))) {
+       ((quote && quoting) || 
+        ((!match_ws || (sim_isspace (*iptr) == 0)) && 
+         (*iptr != mchar)))) {
     if (quote) {
         if (quoting) {
             if (!escaping) {
@@ -11178,30 +11183,39 @@ while ((*iptr != 0) && (!got_quoted) &&
         }
     if (sim_islower (*iptr) && uc)
         *optr = (char)sim_toupper (*iptr);
-    else *optr = *iptr;
+    else 
+        *optr = *iptr;
     iptr++; optr++;
     }
-if (mchar && (*iptr == mchar))              /* skip input terminator */
-    iptr++;
 *optr = 0;                                  /* terminate result string */
-while (sim_isspace (*iptr))                 /* absorb additional input spaces */
+if (((mchar != 0) && (*iptr == mchar)) ||   /* skip input terminator */
+    (match_ws && sim_isspace (*iptr)))
     iptr++;
+while ((*iptr != 0) &&                      /* more input? */
+       ((match_ws && sim_isspace (*iptr)) ||
+        ((mchar != 0) && (*iptr == mchar))))
+    iptr++;                                 /* skip additional input terminators */
 return iptr;
 }
 
 CONST char *get_glyph (const char *iptr, char *optr, char mchar)
 {
-return (CONST char *)get_glyph_gen (iptr, optr, mchar, TRUE, FALSE, 0);
+return (CONST char *)get_glyph_gen (iptr, optr, mchar, TRUE, TRUE, FALSE, 0);
+}
+
+CONST char *get_glyph_sp (const char *iptr, char *optr, char mchar)
+{
+return (CONST char *)get_glyph_gen (iptr, optr, mchar, FALSE, TRUE, FALSE, 0);
 }
 
 CONST char *get_glyph_nc (const char *iptr, char *optr, char mchar)
 {
-return (CONST char *)get_glyph_gen (iptr, optr, mchar, FALSE, FALSE, 0);
+return (CONST char *)get_glyph_gen (iptr, optr, mchar, TRUE, FALSE, FALSE, 0);
 }
 
 CONST char *get_glyph_quoted (const char *iptr, char *optr, char mchar)
 {
-return (CONST char *)get_glyph_gen (iptr, optr, mchar, FALSE, TRUE, '\\');
+return (CONST char *)get_glyph_gen (iptr, optr, mchar, TRUE, FALSE, TRUE, '\\');
 }
 
 CONST char *get_glyph_cmd (const char *iptr, char *optr)
@@ -11211,7 +11225,7 @@ if ((iptr[0] == '!') && (!sim_isspace(iptr[1]))) {
     strcpy (optr, "!");                     /* return ! as command glyph */
     return (CONST char *)(iptr + 1);        /* and skip over the leading ! */
     }
-return (CONST char *)get_glyph_gen (iptr, optr, 0, TRUE, FALSE, 0);
+return (CONST char *)get_glyph_gen (iptr, optr, 0, TRUE, TRUE, FALSE, 0);
 }
 
 /* get_yn               yes/no question
@@ -16521,7 +16535,7 @@ else {
             }
         else {                               /* Special Characters (operators) */
             if ((*cptr == '"') || (*cptr == '\'')) {
-                cptr = (CONST char *)get_glyph_gen (cptr, buf, 0, (sim_switches & SWMASK ('I')), TRUE, '\\');
+                cptr = (CONST char *)get_glyph_gen (cptr, buf, 0, TRUE, (sim_switches & SWMASK ('I')), TRUE, '\\');
                 }
             else {
                 Operator *op;
@@ -17253,6 +17267,10 @@ static struct parse_function_test {
     const char *input;
     struct function_test_data test_data[10];
     } parse_function_tests[] = {
+        {"get_glyph",        get_glyph,         "Ab;c;De", {
+            {';',  "AB",      "c;De"},
+            {';',  "C",       "De"},
+            {';',  "DE",      ""}    } },
         {"get_glyph",        get_glyph,         "AbcDe",   {
             {0,    "ABCDE",   ""}    } },
         {"get_glyph",        get_glyph,         "AbcDe",   {
@@ -17261,6 +17279,8 @@ static struct parse_function_test {
         {"get_glyph",        get_glyph,         "Ab cde",  {
             {0,    "AB",      "cde"},
             {0,    "CDE",     ""}    } },
+        {"get_glyph_sp",     get_glyph_sp,      "Ab De",   {
+            {'c',  "AB DE",   ""}    } },
         {"get_glyph_nc",     get_glyph_nc,      "AbcDe",   {
             {0,    "AbcDe",   ""}    } },
         {"get_glyph_nc",     get_glyph_nc,      "AbcDe",   {
