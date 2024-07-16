@@ -3078,6 +3078,7 @@ if (*argv[0]) {                                         /* sim name arg? */
 sim_quiet = sim_switches & SWMASK ('Q');                /* -q means quiet */
 sim_on_inherit = sim_switches & SWMASK ('O');           /* -o means inherit on state */
 
+sim_debug (SIM_DBG_INIT, &sim_scp_dev, "Beginning SCP module initializations\n");
 sim_init_sock ();                                       /* init socket capabilities */
 AIO_INIT;                                               /* init Asynch I/O */
 sim_finit ();                                           /* init fio package */
@@ -3106,6 +3107,7 @@ if ((argc > 2) &&
     return EXIT_FAILURE;
     }
 
+sim_debug (SIM_DBG_INIT, &sim_scp_dev, "Merging External Environment variables overriding SCP commands\n");
 for (i = 0; cmd_table[i].name; i++) {
     size_t alias_len = strlen (cmd_table[i].name);
     char *cmd_name = (char *)calloc (1 + alias_len, sizeof (*cmd_name));
@@ -13212,6 +13214,7 @@ t_stat sim_brk_init (void)
 {
 int32 i;
 
+sim_debug (SIM_DBG_INIT, &sim_scp_dev, "sim_brk_init()\n");
 for (i=0; i<sim_brk_lnt; i++) {
     BRKTAB *bp = sim_brk_tab[i];
 

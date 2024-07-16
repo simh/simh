@@ -3759,6 +3759,7 @@ UNIT precalib_unit = { UDATA (&sim_timer_stop_svc, 0, 0) };
 
 if (cmd == NULL)
     return;
+sim_debug (SIM_DBG_INIT, &sim_scp_dev, "Starting sim_timer_precalibrate_execution_rate()\n");
 sim_run_boot_prep (RU_GO);
 while (sim_clock_queue != QUEUE_LIST_END)
     sim_cancel (sim_clock_queue);
@@ -3790,7 +3791,8 @@ for (tmr=0; tmr<=SIM_NTIMERS; tmr++) {
     }
 sim_inst_per_sec_last = sim_precalibrate_ips;
 sim_idle_stable = 0;
-exdep_cmd (EX_D, "ALL 0");      /* Leave memory in its initial state */
+sim_debug (SIM_DBG_INIT, &sim_scp_dev, "Precalibration Rate: %s %s Per Sec\n", sim_fmt_numeric (sim_inst_per_sec_last), sim_vm_interval_units);
+sim_debug (SIM_DBG_INIT, &sim_scp_dev, "Done sim_timer_precalibrate_execution_rate()\n");
 }
 
 double
