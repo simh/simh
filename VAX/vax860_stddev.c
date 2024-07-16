@@ -35,6 +35,7 @@
 
 #include "vax_defs.h"
 #include "sim_tmxr.h"
+#include "sim_disk.h"
 
 /* Terminal definitions */
 
@@ -131,6 +132,15 @@ static BITFIELD tmr_iccs_bits [] = {
 #define RL_NUMSF        2                               /* surfaces/cylinder */
 #define RL_NUMCY        512                             /* cylinders/drive */
 #define RL02_SIZE (RL_NUMCY * RL_NUMSF * RL_NUMSC * RL_NUMWD)  /* words/drive */
+
+#define RL_DRV(d)                                \
+    { RL_NUMSC, RL_NUMSF, RL_NUMCY, RL02_SIZE/RL_NUMWD, #d, \
+      RL_NUMBY, DRVFL_DEC144|DRVFL_NOCHNG }
+
+static DRVTYP drv_typ[] = {
+    RL_DRV(RL02),
+    { 0 }
+    };
 
 /* Parameters in the unit descriptor */
 
@@ -263,6 +273,7 @@ t_stat clk_detach (UNIT *uptr);
 t_stat tmr_reset (DEVICE *dptr);
 t_stat rlcs_reset (DEVICE *dptr);
 t_stat rlcs_attach (UNIT *uptr, CONST char *cptr);
+t_stat rlcs_detach (UNIT *uptr);
 int32 icr_rd (void);
 void tmr_sched (uint32 incr);
 t_stat todr_resync (void);
@@ -426,7 +437,8 @@ DEVICE tmr_dev = {
    rlcs_mod       CS modifier list
 */
 
-UNIT rlcs_unit = { UDATA (&rlcs_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_ROABLE, RL02_SIZE) };
+
+UNIT rlcs_unit = { 0 };
 
 REG rlcs_reg[] = {
     { HRDATAD (CSR,     rlcs_csr, 16, "control/status register") },
@@ -444,13 +456,27 @@ MTAB rlcs_mod[] = {
     { 0 }
     };
 
+/* Debug detail levels */
+
+#define RLDEB_OPS      0001                             /* transactions */
+#define RLDEB_TRC      0010                             /* trace */
+#define RLDEB_DAT      0100                             /* transfer data */
+
+DEBTAB rlcs_deb[] = {
+    { "OPS",   RLDEB_OPS, "transactions" },
+    { "TRACE", RLDEB_TRC, "trace" },
+    { "DATA",  RLDEB_DAT, "data transfer"},
+    { NULL, 0 }
+    };
+
 DEVICE rlcs_dev = {
     "CS", &rlcs_unit, rlcs_reg, rlcs_mod,
     1, 10, 24, 1, 16, 16,
     NULL, NULL, &rlcs_reset,
-    NULL, &rlcs_attach, NULL,
-    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
-    &rlcs_description
+    NULL, &rlcs_attach, &rlcs_detach,
+    NULL, DEV_DISK | DEV_DEBUG, 0, 
+    rlcs_deb, NULL, NULL, NULL, NULL, NULL, 
+    &rlcs_description, NULL, &drv_typ
     };
 
 /* Terminal MxPR routines
@@ -1186,7 +1212,8 @@ return SCPE_OK;
 
 t_stat rlcs_svc (UNIT *uptr)
 {
-int32 bcnt;
+t_seccnt sectsread, sectswritten;
+t_stat err;
 uint32 da;
 
 switch (rlcs_state) {
@@ -1203,12 +1230,11 @@ switch (rlcs_state) {
                     rlcs_state = RL_IDLE;               /* now idle */
                     break;
                     }
-                da = STXCS_GETDA(cso_csr) * 512;        /* get byte offset */
-                if (sim_fseek (uptr->fileref, da, SEEK_SET))
+                da = STXCS_GETDA(cso_csr);              /* get disk sector address */
+                err = sim_disk_rdsect (uptr, da*(RL_NUMBY/RL_NUMWD), (uint8 *)rlcs_buf, &sectsread, 2);
+                sim_disk_data_trace (uptr, (uint8 *)rlcs_buf, da*(RL_NUMBY/RL_NUMWD), sectsread*RL_NUMWD*sizeof(*rlcs_buf), "sim_disk_rdsect", RLDEB_DAT & uptr->dptr->dctrl, RLDEB_OPS);
+                if ((err != SCPE_OK) || (sectsread != (RL_NUMBY/RL_NUMWD)))
                     return SCPE_IOERR;
-                bcnt = sim_fread (rlcs_buf, sizeof (int16), RL_NUMBY, uptr->fileref);
-                for ( ; bcnt < RL_NUMBY; bcnt++)                            /* fill buffer */
-                    rlcs_buf[bcnt] = 0;
                 }
             if (rlcs_bcnt < RL_NUMBY) {                 /* more data in buffer? */
                 cso_buf = rlcs_buf[rlcs_bcnt++];        /* return next word */
@@ -1240,11 +1266,10 @@ switch (rlcs_state) {
                 (RLST_CONT << STXCS_V_STS);
             }
         else {
-            da = STXCS_GETDA(cso_csr) * 512;            /* get byte offset */
-            if (sim_fseek (uptr->fileref, da, SEEK_SET))
-                return SCPE_IOERR;
-            bcnt = sim_fwrite (rlcs_buf, sizeof (int16), RL_NUMBY, uptr->fileref);
-            if (bcnt != RL_NUMBY)
+            da = STXCS_GETDA(cso_csr);                  /* get disk sector address */
+            sim_disk_data_trace (uptr, (uint8 *)rlcs_buf, da*(RL_NUMBY/RL_NUMWD), RL_NUMWD*sizeof(uint16)*(RL_NUMBY/RL_NUMWD), "sim_disk_wrsect", RLDEB_DAT & uptr->dptr->dctrl, RLDEB_OPS);
+            err = sim_disk_wrsect (uptr, da*(RL_NUMBY/RL_NUMWD), (uint8 *)rlcs_buf, &sectswritten, 2);
+            if ((err != SCPE_OK) || (sectswritten != (RL_NUMBY/RL_NUMWD)))
                 return SCPE_IOERR;
             rlcs_state = RL_IDLE;                       /* now idle */
             rlcs_bcnt = 0;
@@ -1310,6 +1335,14 @@ return SCPE_OK;
 
 t_stat rlcs_reset (DEVICE *dptr)
 {
+static t_bool inited = FALSE;
+
+if (!inited) {
+    inited = TRUE;
+    dptr->units->action = &rlcs_svc;
+    dptr->units->flags = UNIT_FIX|UNIT_ATTABLE|UNIT_ROABLE;
+    sim_disk_set_drive_type_by_name (dptr->units, "RL02");
+    }
 cso_buf = 0;
 cso_csr = CSR_DONE;
 csi_int = 0;
@@ -1332,19 +1365,20 @@ return "Console RL02 disk";
 
 t_stat rlcs_attach (UNIT *uptr, CONST char *cptr)
 {
-uint32 p;
 t_stat r;
 
-uptr->capac = RL02_SIZE;
-r = attach_unit (uptr, cptr);                           /* attach unit */
+r = sim_disk_attach (uptr, cptr, RL_NUMBY,
+                     sizeof (uint8), TRUE, 0,
+                     "RL02", RL_NUMSC, 0);
+
 if (r != SCPE_OK)                                       /* error? */
     return r;
 uptr->TRK = 0;                                          /* cylinder 0 */
 uptr->STAT = RLDS_VCK;                                  /* new volume */
-if ((p = sim_fsize (uptr->fileref)) == 0) {             /* new disk image? */
-    if (uptr->flags & UNIT_RO)                          /* if ro, done */
-        return SCPE_OK;
-    return pdp11_bad_block (uptr, RL_NUMSC, RL_NUMWD);
-    }
 return SCPE_OK;
+}
+
+t_stat rlcs_detach (UNIT *uptr)
+{
+return sim_disk_detach (uptr);
 }
