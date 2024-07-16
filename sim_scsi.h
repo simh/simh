@@ -69,7 +69,7 @@
 
 #define SCSI_WLK        (UNIT_WLK|UNIT_RO)              /* hwre write lock */
 
-/* This structure has been obsoleted and its role is now provided by 
+/* This structure has been obsoleted and its role is now provided by
    the DRVTYP structure */
 #if 0
 struct scsi_dev_t {

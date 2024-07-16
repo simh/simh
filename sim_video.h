@@ -234,14 +234,14 @@ t_stat vid_set_alpha_mode (VID_DISPLAY *vptr, int mode);
 
 /* A device simulator can optionally set the vid_display_kb_event_process
  * routine pointer to the address of a routine.
- * Simulator code which uses the display library which processes window 
+ * Simulator code which uses the display library which processes window
  * keyboard data with code in display/sim_ws.c can use this routine to
- * explicitly get access to keyboard events that arrive in the display 
+ * explicitly get access to keyboard events that arrive in the display
  * window.  This routine should return 0 if it has handled the event that
  * was passed, and non zero if it didn't handle it.  If the routine address
  * is not set or a non zero return value occurs, then the keyboard event
  * will be processed by the display library which may then be handled as
- * console character input if the device console code is implemented to 
+ * console character input if the device console code is implemented to
  * accept this.
  */
 extern int (*vid_display_kb_event_process)(SIM_KEY_EVENT *kev);

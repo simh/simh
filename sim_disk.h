@@ -19,12 +19,12 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the names of Robert M Supnik and 
+   Except as contained in this notice, the names of Robert M Supnik and
    Mark Pizzolato shall not be used in advertising or otherwise to promote
-   the sale, use or other dealings in this Software without prior written 
+   the sale, use or other dealings in this Software without prior written
    authorization from Robert M Supnik and Mark Pizzolato.
 
-   25-Jan-11    MP      Initial Implemementation
+   25-Jan-11    MP      Initial Implementation
 */
 
 #ifndef SIM_DISK_H_
@@ -79,19 +79,19 @@ typedef void (*DISK_PCALLBACK)(UNIT *unit, t_stat status);
 /* Prototypes */
 
 t_stat sim_disk_init (void);
-t_stat sim_disk_attach (UNIT *uptr, 
-                        const char *cptr, 
+t_stat sim_disk_attach (UNIT *uptr,
+                        const char *cptr,
                         size_t memory_sector_size,  /* memory footprint of sector data */
-                        size_t xfer_element_size, 
+                        size_t xfer_element_size,
                         t_bool dontchangecapac,     /* if false just change uptr->capac as needed */
                         uint32 debugbit,            /* debug bit */
                         const char *drivetype,      /* drive type */
                         uint32 pdp11_tracksize,     /* BAD144 track */
                         int completion_delay);      /* Minimum Delay for asynch I/O completion */
-t_stat sim_disk_attach_ex (UNIT *uptr, 
-                           const char *cptr, 
+t_stat sim_disk_attach_ex (UNIT *uptr,
+                           const char *cptr,
                            size_t memory_sector_size,   /* memory footprint of sector data */
-                           size_t xfer_element_size, 
+                           size_t xfer_element_size,
                            t_bool dontchangecapac,      /* if false just change uptr->capac as needed */
                            uint32 dbit,                 /* debug bit */
                            const char *dtype,           /* drive type */
@@ -99,10 +99,10 @@ t_stat sim_disk_attach_ex (UNIT *uptr,
                            int completion_delay,        /* Minimum Delay for asynch I/O completion */
                            const char **drivetypes);    /* list of drive types (from smallest to largest) */
                                                         /* to try and fit the container/file system into */
-t_stat sim_disk_attach_ex2 (UNIT *uptr, 
-                            const char *cptr, 
+t_stat sim_disk_attach_ex2 (UNIT *uptr,
+                            const char *cptr,
                             size_t memory_sector_size,  /* memory footprint of sector data */
-                            size_t xfer_element_size, 
+                            size_t xfer_element_size,
                             t_bool dontchangecapac,     /* if false just change uptr->capac as needed */
                             uint32 dbit,                /* debug bit */
                             const char *dtype,          /* drive type */
@@ -186,7 +186,7 @@ struct DRVTYP {
 /* Contents/Values in DRVTYP.flags field */
 
 #define DRVFL_V_TYPE    0                       /* Interface Type */
-#define DRVFL_W_TYPE    5       
+#define DRVFL_W_TYPE    5
 #define DRVFL_M_TYPE    ((1u << DRVFL_W_TYPE) - 1)
 #define DRVFL_TYPE_MFM  (0 << DRVFL_V_TYPE)
 #define DRVFL_TYPE_SDI  (1 << DRVFL_V_TYPE)

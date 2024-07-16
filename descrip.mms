@@ -10,7 +10,7 @@
 # HP C V7.3-009-48GBT (AXP), HP C V7.2-001 (IA64) and v6.4-005(VAX).
 #
 # Notes:  On VAX, the PDP-10, Eclipse, IBM 7094 and BESM6 simulators will
-#         not be built due to the fact that INT64 is required for these 
+#         not be built due to the fact that INT64 is required for these
 #         simulators.
 #
 # This build script will accept the following build options.
@@ -25,9 +25,9 @@
 #            ECLIPSE           Just Build The Data General Eclipse.
 #            GRI               Just Build The GRI Corporation GRI-909.
 #            LGP               Just Build The Royal-McBee LGP-30.
-#            H316              Just Build The Honewell 316/516.
-#            HP2100            Just Build The Hewlett-Packard HP-2100. 
-#            HP3000            Just Build The Hewlett-Packard HP-3000. 
+#            H316              Just Build The Honeywell 316/516.
+#            HP2100            Just Build The Hewlett-Packard HP-2100.
+#            HP3000            Just Build The Hewlett-Packard HP-3000.
 #            I1401             Just Build The IBM 1401.
 #            I1620             Just Build The IBM 1620.
 #            I7094             Just Build The IBM 7094.
@@ -75,22 +75,22 @@
 #            VAX8600           Just Build The DEC VAX8600.
 #            CLEAN             Will Clean Files Back To Base Kit.
 #
-# To build with debugging enabled (which will also enable traceback 
+# To build with debugging enabled (which will also enable traceback
 # information) use..
 #
 #        MMK/MACRO=(DEBUG=1)
 #
 # This will produce an executable named {Simulator}-{I64|VAX|AXP}-DBG.EXE
 #
-# To build on older Alpha VMS platforms, SIM_ASYNCH_IO must be disabled. 
+# To build on older Alpha VMS platforms, SIM_ASYNCH_IO must be disabled.
 # use..
 #
 #        MMK/MACRO=(NOASYNCH=1)
 #
-# On AXP and IA64 the VMS PCAP components are built and used to provide 
+# On AXP and IA64 the VMS PCAP components are built and used to provide
 # network support for the VAX and PDP11 simulators.
 #
-# The AXP PCAP components can only be built using a version of the 
+# The AXP PCAP components can only be built using a version of the
 # DEC/Compaq/HP Compiler version V6.5-001 or later.  To build using an
 # older compiler, networking support must be disabled.  Use...
 #
@@ -716,7 +716,7 @@ S3_OPTIONS = /INCL=($(SIMH_DIR),$(S3_DIR))/DEF=($(CC_DEFS))
 #
 SDS_DIR = SYS$DISK:[.SDS]
 SDS_LIB = $(LIB_DIR)SDS-$(ARCH).OLB
-SDS_SOURCE = $(SDS_DIR)SDS_CPU.C,$(SDS_DIR)SDS_DRM.C,$(SDS_DIR)SDS_DSK.C,\ 
+SDS_SOURCE = $(SDS_DIR)SDS_CPU.C,$(SDS_DIR)SDS_DRM.C,$(SDS_DIR)SDS_DSK.C,\
              $(SDS_DIR)SDS_IO.C,$(SDS_DIR)SDS_LP.C,$(SDS_DIR)SDS_MT.C,\
              $(SDS_DIR)SDS_MUX.C,$(SDS_DIR)SDS_RAD.C,$(SDS_DIR)SDS_STDDEV.C,\
              $(SDS_DIR)SDS_SYS.C,$(SDS_DIR)SDS_CR.C,$(SDS_DIR)SDS_CP.C
@@ -1431,7 +1431,7 @@ ALL : ALTAIR GRI H316 HP2100 I1401 I1620 IBM1130 ID16 ID32 \
         $! No further actions necessary
 .ENDIF
 
-CLEAN : 
+CLEAN :
         $!
         $! Clean out all targets and building Remnants
         $!
@@ -1578,7 +1578,7 @@ $(ECLIPSE_LIB) : $(ECLIPSE_SOURCE)
 #
 # We Are On VAX And Due To The Use of INT64 We Can't Build It.
 #
-$(ECLIPSE_LIB) : 
+$(ECLIPSE_LIB) :
         $! Due To The Use Of INT64 We Can't Build The
         $! $(MMS$TARGET) Library On VAX.
 .ENDIF
@@ -1832,19 +1832,19 @@ $(KI10_LIB) : $(KI10_SOURCE)
 #
 # We Are On VAX And Due To The Use of INT64 We Can't Build It.
 #
-$(PDP10_LIB) : 
+$(PDP10_LIB) :
         $! Due To The Use Of INT64 We Can't Build The
         $! $(MMS$TARGET) Library On VAX.
 
-$(PDP6_LIB) : 
+$(PDP6_LIB) :
         $! Due To The Use Of INT64 We Can't Build The
         $! $(MMS$TARGET) Library On VAX.
 
-$(KA10_LIB) : 
+$(KA10_LIB) :
         $! Due To The Use Of INT64 We Can't Build The
         $! $(MMS$TARGET) Library On VAX.
 
-$(KI10_LIB) : 
+$(KI10_LIB) :
         $! Due To The Use Of INT64 We Can't Build The
         $! $(MMS$TARGET) Library On VAX.
 .ENDIF
@@ -1955,7 +1955,7 @@ $(BESM6_LIB) : $(BESM6_SOURCE)
 #
 # We Are On VAX And Due To The Use of INT64 We Can't Build It.
 #
-$(BESM6_LIB) : 
+$(BESM6_LIB) :
         $! Due To The Use Of INT64 We Can't Build The
         $! $(MMS$TARGET) Library On VAX.
 .ENDIF
@@ -1978,7 +1978,7 @@ $(B5500_LIB) : $(B5500_SOURCE)
 #
 # We Are On VAX And Due To The Use of INT64 We Can't Build It.
 #
-$(B5500_LIB) : 
+$(B5500_LIB) :
         $! Due To The Use Of INT64 We Can't Build The
         $! $(MMS$TARGET) Library On VAX.
 .ENDIF
@@ -2001,7 +2001,7 @@ $(CDC1700_LIB) : $(CDC1700_SOURCE)
 #
 # We Are On VAX And Due To The Use of INT64 We Can't Build It.
 #
-$(CDC1700_LIB) : 
+$(CDC1700_LIB) :
         $! Due To The Use Of INT64 We Can't Build The
         $! $(MMS$TARGET) Library On VAX.
 .ENDIF
@@ -2499,7 +2499,7 @@ $(I7094_LIB) : $(I7094_SOURCE)
 #
 # We Are On VAX And Due To The Use of INT64 We Can't Build It.
 #
-$(I7094_LIB) : 
+$(I7094_LIB) :
         $! Due To The Use Of INT64 We Can't Build The
         $! $(MMS$TARGET) Library On VAX.
 .ENDIF
@@ -2519,7 +2519,7 @@ ATT3B2 : $(BIN_DIR)ATT3B2-$(ARCH).EXE
 # Else We Are On VAX And Tell The User We Can't Build On VAX
 # Due To The Use Of INT64.
 #
-ATT3B2 : 
+ATT3B2 :
         $! Sorry, Can't Build $(BIN_DIR)ATT3B2-$(ARCH).EXE Simulator
         $! Because It Requires The Use Of INT64.
 .ENDIF
@@ -2557,7 +2557,7 @@ ALTAIRZ80 : $(BIN_DIR)ALTAIRZ80-$(ARCH).EXE
 # Else We Are On VAX And Tell The User We Can't Build On VAX
 # Due To The Use Of INT64.
 #
-ALTAIRZ80 : 
+ALTAIRZ80 :
         $! Sorry, Can't Build $(BIN_DIR)ALTAIRZ80-$(ARCH).EXE Simulator
         $! Because It Requires The Use Of INT64.
 .ENDIF
@@ -2583,7 +2583,7 @@ ECLIPSE : $(BIN_DIR)ECLIPSE-$(ARCH).EXE
 # Else We Are On VAX And Tell The User We Can't Build On VAX
 # Due To The Use Of INT64.
 #
-ECLIPSE : 
+ECLIPSE :
         $! Sorry, Can't Build $(BIN_DIR)ECLIPSE-$(ARCH).EXE Simulator
         $! Because It Requires The Use Of INT64.
 .ENDIF
@@ -2847,19 +2847,19 @@ $(BIN_DIR)PDP10-KI-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_NONET_LIB) $(PCAP_LIBD) $(K
 # Else We Are On VAX And Tell The User We Can't Build On VAX
 # Due To The Use Of INT64.
 #
-PDP10 : 
+PDP10 :
         $! Sorry, Can't Build $(BIN_DIR)PDP10-$(ARCH).EXE Simulator
         $! Because It Requires The Use Of INT64.
 
-PDP6 : 
+PDP6 :
         $! Sorry, Can't Build $(BIN_DIR)PDP6-$(ARCH).EXE Simulator
         $! Because It Requires The Use Of INT64.
 
-PDP10-KA : 
+PDP10-KA :
         $! Sorry, Can't Build $(BIN_DIR)PDP10-KA-$(ARCH).EXE Simulator
         $! Because It Requires The Use Of INT64.
 
-PDP10-KI : 
+PDP10-KI :
         $! Sorry, Can't Build $(BIN_DIR)PDP10-KI-$(ARCH).EXE Simulator
         $! Because It Requires The Use Of INT64.
 .ENDIF
@@ -2968,7 +2968,7 @@ $(BIN_DIR)BESM6-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_NONET_LIB) $(BESM6_LIB)
 # Else We Are On VAX And Tell The User We Can't Build On VAX
 # Due To The Use Of INT64.
 #
-BESM6 : 
+BESM6 :
         $! Sorry, Can't Build $(BIN_DIR)BESM6-$(ARCH).EXE Simulator
         $! Because It Requires The Use Of INT64.
 .ENDIF
@@ -2994,7 +2994,7 @@ $(BIN_DIR)B5500-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_NONET_LIB) $(B5500_LIB)
 # Else We Are On VAX And Tell The User We Can't Build On VAX
 # Due To The Use Of INT64.
 #
-B5500 : 
+B5500 :
         $! Sorry, Can't Build $(BIN_DIR)B5500-$(ARCH).EXE Simulator
         $! Because It Requires The Use Of INT64.
 .ENDIF
@@ -3020,7 +3020,7 @@ $(BIN_DIR)CDC1700-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_NONET_LIB) $(CDC1700_LIB)
 # Else We Are On VAX And Tell The User We Can't Build On VAX
 # Due To The Use Of INT64.
 #
-CDC1700 : 
+CDC1700 :
         $! Sorry, Can't Build $(BIN_DIR)CDC1700-$(ARCH).EXE Simulator
         $! Because It Requires The Use Of INT64.
 .ENDIF
@@ -3363,7 +3363,7 @@ $(BIN_DIR)I7094-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_NONET_LIB) $(I7094_LIB)
 # Else We Are On VAX And Tell The User We Can't Build On VAX
 # Due To The Use Of INT64.
 #
-I7094 : 
+I7094 :
         $! Sorry, Can't Build $(BIN_DIR)I7094-$(ARCH).EXE Simulator
         $! Because It Requires The Use Of INT64.
 .ENDIF
@@ -3375,9 +3375,9 @@ $(PCAP_VCI) : $(PCAP_VCMDIR)PCAPVCM.EXE
         $!
         $! Installing the PCAP VCI Execlet in SYS$LOADABLE_IMAGES
         $!
-        $ COPY $(PCAP_VCMDIR)PCAPVCM.EXE SYS$COMMON:[SYS$LDR]PCAPVCM.EXE 
+        $ COPY $(PCAP_VCMDIR)PCAPVCM.EXE SYS$COMMON:[SYS$LDR]PCAPVCM.EXE
 
-$(PCAP_VCMDIR)PCAPVCM.EXE : $(PCAP_VCM_SOURCES) 
+$(PCAP_VCMDIR)PCAPVCM.EXE : $(PCAP_VCM_SOURCES)
         $!
         $! Building The PCAP VCI Execlet
         $!

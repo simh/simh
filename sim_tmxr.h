@@ -26,7 +26,7 @@
    Based on the original DZ11 simulator by Thord Nilson, as updated by
    Arthur Krewat.
 
-   10-Oct-12    MP      Added extended attach support for serial, per line 
+   10-Oct-12    MP      Added extended attach support for serial, per line
                         listener and outgoing connections
    17-Jan-11    MP      Added buffered line capabilities
    20-Nov-08    RMS     Added three new standardized SHOW routines
@@ -119,7 +119,7 @@ typedef struct SERPORT *SERHANDLE;
 #define TMLN_SPD_115200_BPS     86 /* usec per character */
 
 /* Internal struct */
-struct framer_data;    
+struct framer_data;
 
 typedef struct tmln TMLN;
 typedef struct tmxr TMXR;
@@ -342,7 +342,7 @@ t_stat tmxr_add_debug (DEVICE *dptr);
 #define sim_activate_abs tmxr_activate_abs
 #define sim_activate_after tmxr_activate_after
 #define sim_activate_after_abs tmxr_activate_after_abs
-#define sim_clock_coschedule tmxr_clock_coschedule 
+#define sim_clock_coschedule tmxr_clock_coschedule
 #define sim_clock_coschedule_abs tmxr_clock_coschedule_abs
 #define sim_clock_coschedule_tmr tmxr_clock_coschedule_tmr
 #define sim_clock_coschedule_tmr_abs tmxr_clock_coschedule_tmr_abs

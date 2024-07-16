@@ -226,7 +226,7 @@ while( <STDIN> ) {
 		next;
 	    } elsif ($tok eq 'word' && $val =~ /^fprint_(set|show|reg)_help(?:_ex)?$/) {
 		my %alt = ( set  => "\$Set commands", 
-			    show => "\$Show commmands", 
+			    show => "\$Show commands", 
 			    reg  => "\$Registers" );
 		$b .= "/* Use \"$alt{$1}\" topic instead:\n";
 		do {
@@ -272,7 +272,7 @@ while( <STDIN> ) {
     " The SET commands for the device will automagically display above\n"
     " this line.  Add any special notes.\n"
     "2 OSNAME1\n"
-    " Operating System-specif configuration details\n"
+    " Operating System-specific configuration details\n"
     " If the device needs special configuration for a particular OS, a subtopic\n"
     " for each such OS goes here.\n"
     "2 Files\n"
@@ -299,7 +299,7 @@ while( <STDIN> ) {
     "1 Related Devices\n"
     " If devices are configured or used together, list the other devices here.\n"
     " E.G. The DEC KMC/DUP are two hardware devices that are closely related;\n"
-    " The KMC controlls the DUP on behalf of the OS.\n"
+    " The KMC controls the DUP on behalf of the OS.\n"
 
     /* **** Your converted help text starts hare **** */
 

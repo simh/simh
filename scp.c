@@ -29,26 +29,26 @@
                         REG "maxval" field now determines maximum allowed value
    08-Mar-16    RMS     Added shutdown flag for detach_all
    20-Mar-12    MP      Fixes to "SHOW <x> SHOW" commands
-   06-Jan-12    JDB     Fixed "SHOW DEVICE" with only one enabled unit (Dave Bryan)  
-   25-Sep-11    MP      Added the ability for a simulator built with 
+   06-Jan-12    JDB     Fixed "SHOW DEVICE" with only one enabled unit (Dave Bryan)
+   25-Sep-11    MP      Added the ability for a simulator built with
                         SIM_ASYNCH_IO to change whether I/O is actually done
-                        asynchronously by the new scp command SET ASYNCH and 
+                        asynchronously by the new scp command SET ASYNCH and
                         SET NOASYNCH
-   22-Sep-11    MP      Added signal catching of SIGHUP and SIGTERM to cause 
+   22-Sep-11    MP      Added signal catching of SIGHUP and SIGTERM to cause
                         simulator STOP.  This allows an externally signalled
                         event (i.e. system shutdown, or logoff) to signal a
-                        running simulator of these events and to allow 
-                        reasonable actions to be taken.  This will facilitate 
-                        running a simulator as a 'service' on *nix platforms, 
-                        given a sufficiently flexible simulator .ini file.  
+                        running simulator of these events and to allow
+                        reasonable actions to be taken.  This will facilitate
+                        running a simulator as a 'service' on *nix platforms,
+                        given a sufficiently flexible simulator .ini file.
    20-Apr-11    MP      Added expansion of %STATUS% and %TSTATUS% in do command
-                        arguments.  STATUS is the numeric value of the last 
+                        arguments.  STATUS is the numeric value of the last
                         command error status and TSTATUS is the text message
                         relating to the last command error status
    17-Apr-11    MP      Changed sim_rest to defer attaching devices until after
                         device register contents have been restored since some
                         attach activities may reference register contained info.
-   29-Jan-11    MP      Adjusted sim_debug to: 
+   29-Jan-11    MP      Adjusted sim_debug to:
                           - include the simulator timestamp (sim_gtime)
                             as part of the prefix for each line of output
                           - write complete lines at a time (avoid asynch I/O issues).
@@ -347,10 +347,10 @@ return "SCP Event and Internal Command Processing and Testing";
 static UNIT scp_test_units[4];
 
 DEVICE sim_scp_dev = {
-    "SCP-PROCESS", scp_test_units, NULL, NULL, 
-    4, 0, 0, 0, 0, 0, 
-    NULL, NULL, NULL, NULL, NULL, NULL, 
-    NULL, DEV_NOSAVE|DEV_DEBUG, 0, 
+    "SCP-PROCESS", scp_test_units, NULL, NULL,
+    4, 0, 0, 0, 0, 0,
+    NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, DEV_NOSAVE|DEV_DEBUG, 0,
     scp_debug, NULL, NULL, NULL, NULL, NULL,
     sim_scp_description};
 
@@ -458,13 +458,13 @@ t_bool sim_asynch_enabled = FALSE;
 #endif
 
 /* The per-simulator init routine is a weak global that defaults to NULL
-   The other per-simulator pointers can be overrriden by the init routine
+   The other per-simulator pointers can be overridden by the init routine
 
 WEAK void (*sim_vm_init) (void);
 
    This routine is no longer invoked this way since it doesn't work reliably
-   on all simh supported compile environments.  A simulator that needs these 
-   initializations can perform them in the CPU device reset routine which will 
+   on all simh supported compile environments.  A simulator that needs these
+   initializations can perform them in the CPU device reset routine which will
    always be called before anything else can be processed.
 
  */
@@ -720,10 +720,10 @@ return "Step/Next facility";
 
 static UNIT sim_step_unit = { UDATA (&step_svc, UNIT_IDLE, 0) };
 DEVICE sim_step_dev = {
-    "INT-STEP", &sim_step_unit, NULL, NULL, 
-    1, 0, 0, 0, 0, 0, 
-    NULL, NULL, NULL, NULL, NULL, NULL, 
-    NULL, DEV_NOSAVE, 0, 
+    "INT-STEP", &sim_step_unit, NULL, NULL,
+    1, 0, 0, 0, 0, 0,
+    NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, DEV_NOSAVE, 0,
     NULL, NULL, NULL, NULL, NULL, NULL,
     sim_int_step_description};
 
@@ -745,10 +745,10 @@ return SCPE_OK;
 
 static UNIT sim_runlimit_unit = { UDATA (&runlimit_svc, UNIT_IDLE, 0) };
 DEVICE sim_runlimit_dev = {
-    "INT-RUNLIMIT", &sim_runlimit_unit, NULL, NULL, 
-    1, 0, 0, 0, 0, 0, 
-    NULL, NULL, &sim_int_runlimit_reset, NULL, NULL, NULL, 
-    NULL, DEV_NOSAVE, 0, 
+    "INT-RUNLIMIT", &sim_runlimit_unit, NULL, NULL,
+    1, 0, 0, 0, 0, 0,
+    NULL, NULL, &sim_int_runlimit_reset, NULL, NULL, NULL,
+    NULL, DEV_NOSAVE, 0,
     NULL, NULL, NULL, NULL, NULL, NULL,
     sim_int_runlimit_description};
 
@@ -759,10 +759,10 @@ return "Expect facility";
 
 static UNIT sim_expect_unit = { UDATA (&expect_svc, 0, 0) };
 DEVICE sim_expect_dev = {
-    "INT-EXPECT", &sim_expect_unit, NULL, NULL, 
-    1, 0, 0, 0, 0, 0, 
-    NULL, NULL, NULL, NULL, NULL, NULL, 
-    NULL, DEV_NOSAVE, 0, 
+    "INT-EXPECT", &sim_expect_unit, NULL, NULL,
+    1, 0, 0, 0, 0, 0,
+    NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, DEV_NOSAVE, 0,
     NULL, NULL, NULL, NULL, NULL, NULL,
     sim_int_expect_description};
 
@@ -779,10 +779,10 @@ static REG sim_flush_reg[] = {
 
 static UNIT sim_flush_unit = { UDATA (&flush_svc, UNIT_IDLE, 0) };
 DEVICE sim_flush_dev = {
-    "INT-FLUSH", &sim_flush_unit, sim_flush_reg, NULL, 
-    1, 0, 0, 0, 0, 0, 
-    NULL, NULL, NULL, NULL, NULL, NULL, 
-    NULL, DEV_NOSAVE, 0, 
+    "INT-FLUSH", &sim_flush_unit, sim_flush_reg, NULL,
+    1, 0, 0, 0, 0, 0,
+    NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, DEV_NOSAVE, 0,
     NULL, NULL, NULL, NULL, NULL, NULL,
     sim_int_flush_description};
 
@@ -1450,7 +1450,7 @@ static const char simh_help1[] =
       " RADIX-50 characters.\n"
       "5-F\n"
       " The -F switch causes duplicate successive lines of debug NOT to be\n"
-      " summarized to reduce repetative noise from the debug data stream.\n"
+      " summarized to reduce repetitive noise from the debug data stream.\n"
       "5-E\n"
       " The -E switch causes data blob output to also display the data as\n"
       " EBCDIC characters.\n"
@@ -1672,16 +1672,16 @@ static const char simh_help2[] =
       "+sh{ow} cons{ole} {arg}       show console options\n"
       "+sh{ow} {-ei} dev{ices}       show devices\n"
       "+sh{ow} {-ei} fea{tures}      show system devices with descriptions\n"
-      "+sh{ow} m{odifiers}           show modifiers for all devices\n" 
-      "+sh{ow} s{how}                show SHOW commands for all devices\n" 
+      "+sh{ow} m{odifiers}           show modifiers for all devices\n"
+      "+sh{ow} s{how}                show SHOW commands for all devices\n"
       "+sh{ow} n{ames}               show logical names\n"
       "+sh{ow} q{ueue}               show event queue\n"
       "+sh{ow} ti{me}                show simulated time\n"
       "+sh{ow} th{rottle}            show simulation rate\n"
-      "+sh{ow} a{synch}              show asynchronous I/O state\n" 
+      "+sh{ow} a{synch}              show asynchronous I/O state\n"
       "+sh{ow} ve{rsion}             show simulator version\n"
-      "+sh{ow} def{ault}             show current directory\n" 
-      "+sh{ow} re{mote}              show remote console configuration\n" 
+      "+sh{ow} def{ault}             show current directory\n"
+      "+sh{ow} re{mote}              show remote console configuration\n"
       "+sh{ow} <dev> RADIX           show device display radix\n"
       "+sh{ow} <dev> DEBUG           show device debug flags\n"
       "+sh{ow} <dev> MODIFIERS       show device modifiers\n"
@@ -1733,7 +1733,7 @@ static const char simh_help2[] =
        /***************** 80 character line width template *************************/
       "2HELP\n"
       "+h{elp}                      type this message\n"
-      "+h{elp} <command>            type help for command\n" 
+      "+h{elp} <command>            type help for command\n"
       "+h{elp} <dev>                type help for device\n"
       "+h{elp} <dev> registers      type help for device register variables\n"
       "+h{elp} <dev> attach         type help for device specific ATTACH command\n"
@@ -1810,7 +1810,7 @@ static const char simh_help2[] =
       "+The input sequence \"%%%%\" represents a literal \"%%\".  All other\n"
       "+character combinations are rendered literally.\n\n"
       "+Omitted parameters result in null-string substitutions.\n\n"
-      "+Tokens preceeded and followed by %% characters are expanded as\n"
+      "+Tokens preceded and followed by %% characters are expanded as\n"
       "+environment variables, and if an environment variable isn't found then\n"
       "+it can be one of several special variables:\n\n"
       "++%%DATE%%                 yyyy-mm-dd\n"
@@ -1880,10 +1880,10 @@ static const char simh_help2[] =
       "++++++++       (instructions, cycles or time)\n\n"
       "+Environment variable lookups are done first with the precise name\n"
       "+between the %% characters and if that fails, then the name between\n"
-      "+the %% characters is upcased and a lookup of that valus is attempted.\n\n"
+      "+the %% characters is upcased and a lookup of that value is attempted.\n\n"
       "+The first Space delimited token on a sim> command line is extracted\n"
       "+in uppercase and then looked up as an environment variable.  If found\n"
-      "+it the value is supstituted for the original string before expanding\n"
+      "+it the value is substituted for the original string before expanding\n"
       "+everything else.  If it is not found, then the original beginning\n"
       "+token on the line is left untouched.\n\n"
       "+Environment variable string substitution:\n\n"
@@ -1924,7 +1924,7 @@ static const char simh_help2[] =
       "+++++       only\n\n"
       " In the above example above %%I%% can be replaced by other\n"
       " environment variables or numeric parameters to a DO command\n"
-      " invokation.\n"
+      " invocation.\n"
       " Examples:\n\n"
       "++sim> set env FNAME='xyzzy.ini'\n"
       "++sim> echo ~FNAME=%%~FNAME%%\n"
@@ -1939,7 +1939,7 @@ static const char simh_help2[] =
       "3GOTO\n"
       " Commands in a command file execute in sequence until either an error\n"
       " trap occurs (when a command completes with an error status), or when an\n"
-      " explict request is made to start command execution elsewhere with the\n"
+      " explicit request is made to start command execution elsewhere with the\n"
       " GOTO command:\n\n"
       "++GOTO <label>\n\n"
       " Labels are lines in a command file which the first non whitespace\n"
@@ -2215,7 +2215,7 @@ static const char simh_help2[] =
       "++\\e  Sends the ASCII Escape character (Decimal value 27)\n"
       " as well as octal character values of the form:\n"
       "++\\n{n{n}} where each n is an octal digit (0-7)\n"
-      " and hext character values of the form:\n"
+      " and hex character values of the form:\n"
       "++\\xh{h} where each h is a hex digit (0-9A-Fa-f)\n"
        /***************** 80 character line width template *************************/
 #define HLP_SEND        "*Commands Executing_Command_Files Injecting_Console_Input"
@@ -2276,7 +2276,7 @@ static const char simh_help2[] =
       "++\\e  Sends the ASCII Escape character (Decimal value 27)\n"
       " as well as octal character values of the form:\n"
       "++\\n{n{n}} where each n is an octal digit (0-7)\n"
-      " and hext character values of the form:\n"
+      " and hex character values of the form:\n"
       "++\\xh{h} where each h is a hex digit (0-9A-Fa-f)\n"
       "4Switches\n"
       " Switches can be used to influence the behavior of SEND commands\n\n"
@@ -2588,7 +2588,7 @@ static const char simh_help2[] =
       "++sim> SET SCP-PROCESS DEBUG=EXPEVAL   - Expression Evaluation Activities\n"
       "3Debugging Do File Processing\n"
       " Debug output can be produced which will walk through the details\n"
-      " involved during DO file proccessing.  This output can, for example,\n"
+      " involved during DO file processing.  This output can, for example,\n"
       " be enabled as follows:\n\n"
       "++sim> SET DEBUG STDOUT\n"
       "++sim> SET SCP-PROCESS DEBUG=DO  - Debug Output DO processing\n"
@@ -2645,7 +2645,7 @@ static const char simh_help2[] =
       " Many tests are capable of producing various amounts of debug output\n"
       " during their execution.  The -d switch enables that output\n"
       "2File Tools\n"
-      " Tools to manipulate file containers and to tranfer files/data into or\n"
+      " Tools to manipulate file containers and to transfer files/data into or\n"
       " out of a simulated environment are provided.\n\n"
       " In general, these are tools natively found on the host operating system.\n"
       " They are explicitly supported directly from SCP to allow for platform\n"
@@ -3052,7 +3052,7 @@ for (i = 1; i < argc; i++) {                            /* loop thru args */
             return EXIT_FAILURE;
             }
         if (*cbuf)                                      /* concat args */
-            strlcat (cbuf, " ", sizeof (cbuf)); 
+            strlcat (cbuf, " ", sizeof (cbuf));
         sprintf(&cbuf[strlen(cbuf)], "%s%s%s", strchr(argv[i], ' ') ? "\"" : "", argv[i], strchr(argv[i], ' ') ? "\"" : "");
         lookswitch = FALSE;                             /* no more switches */
         }
@@ -3063,7 +3063,7 @@ if (*argv[0]) {                                         /* sim name arg? */
     strlcpy (nbuf, argv[0], PATH_MAX + 2);              /* copy sim name */
     if ((np = (char *)match_ext (nbuf, "EXE")))         /* remove .exe */
         *np = 0;
-    np = strrchr (nbuf, '/');                           /* stript path and try again in cwd */
+    np = strrchr (nbuf, '/');                           /* strip path and try again in cwd */
     if (np == NULL)
         np = strrchr (nbuf, '\\');                      /* windows path separator */
     if (np == NULL)
@@ -3096,7 +3096,7 @@ if (sim_tape_init () != SCPE_OK) {                      /* init tape package */
     return EXIT_FAILURE;
     }
 sim_exp_initialize ();                                  /* init expect package regex support */
-if ((argc > 2) && 
+if ((argc > 2) &&
     (sim_strcasecmp (argv[1], "CheckSourceCode") == 0)) {
     if (sim_pcre_regex_available)
         return sim_check_source (argc - 1, argv + 1);
@@ -3183,7 +3183,7 @@ if ((stat = reset_all_p (0)) != SCPE_OK) {
     goto cleanup_and_exit;
     }
 if (register_check) {
-    /* This test is explicitly run after the above reset_all_p() so that any devices 
+    /* This test is explicitly run after the above reset_all_p() so that any devices
        which dynamically manipulate their register lists have already done that. */
     sim_printf (" Running internal register sanity checks on %s simulator.\n", sim_name);
     if ((stat = sim_sanity_check_register_declarations (NULL)) != SCPE_OK) {
@@ -3216,7 +3216,7 @@ if (device_unit_tests) {
     DEVICE *dptr;
     int devices_with_tests = 0;
 
-    /* This test is explicitly run after the above reset_all_p() so that 
+    /* This test is explicitly run after the above reset_all_p() so that
        the simulator is in its well initialized state before testing. */
     for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
         if (dptr->unit_test)
@@ -3283,7 +3283,7 @@ if (docmdp) {
             strlcat (nbuf, ".ini\"", sizeof (nbuf));       /* add .ini" */
             stat = docmdp->action (-1, nbuf) & ~SCPE_NOMESSAGE; /* proc default cmd file */
             if (stat == SCPE_OPENERR) {                    /* didn't exist/can't open? */
-                np = strrchr (nbuf, '/');                  /* stript path and try again in cwd */
+                np = strrchr (nbuf, '/');                  /* strip path and try again in cwd */
                 if (np == NULL)
                     np = strrchr (nbuf, '\\');             /* windows path separator */
                 if (np == NULL)
@@ -3329,7 +3329,7 @@ stat = SCPE_BARE_STATUS(stat);                          /* remove possible flag 
 while (stat != SCPE_EXIT) {                             /* in case exit */
     if (stop_cpu) {                                     /* SIGINT happened? */
         stop_cpu = FALSE;
-        if ((!sim_ttisatty()) || 
+        if ((!sim_ttisatty()) ||
             sigterm_received) {
             stat = SCPE_EXIT;
             break;
@@ -3383,7 +3383,7 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
         }
     else
         stat = SCPE_UNK;
-    stat_nomessage = stat & SCPE_NOMESSAGE;             /* extract possible message supression flag */
+    stat_nomessage = stat & SCPE_NOMESSAGE;             /* extract possible message suppression flag */
     stat_nomessage = stat_nomessage || (!sim_show_message);/* Apply global suppression */
     stat = SCPE_BARE_STATUS(stat);                      /* remove possible flag */
     sim_last_cmd_stat = stat;                           /* save command error status */
@@ -3394,7 +3394,7 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
             if (stat >= SCPE_BASE)                      /* error? */
                 sim_printf ("%s\n", sim_error_text (stat));
         }
-    if ((sim_on_check[sim_do_depth]) && 
+    if ((sim_on_check[sim_do_depth]) &&
         (stat != SCPE_OK)) {
         if ((stat <= SCPE_MAX_ERR) && sim_on_actions[sim_do_depth][stat])
             sim_brk_setact (sim_on_actions[sim_do_depth][stat]);
@@ -3404,7 +3404,7 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
     if (sim_vm_post != NULL)
         (*sim_vm_post) (TRUE);
     }                                                   /* end while */
-if (do_called && cmdp && 
+if (do_called && cmdp &&
     (cmdp->action == &return_cmd) && (0 != *cptr)) {    /* return command with argument? */
     sim_string_to_stat (cptr, &stat);
     sim_last_cmd_stat = stat;                           /* save explicit status as command error status */
@@ -3692,8 +3692,8 @@ else {
     if (side_effects)
         fprintf (st, "\n  +  Deposits to %s register%s will have some additional\n"
                        "     side effects which can be suppressed if the deposit is\n"
-                       "     done with the -Z switch specified\n", 
-                                 (side_effects == 1) ? "this" : "these", 
+                       "     done with the -Z switch specified\n",
+                                 (side_effects == 1) ? "this" : "these",
                                  (side_effects == 1) ? "" : "s");
     }
 }
@@ -3784,7 +3784,7 @@ if (dptr->modifiers) {
                 const char *rem;
 
                 rem = get_glyph (mptr->help, gbuf, 0);
-                if ((strcasecmp (gbuf, "Display") == 0) || 
+                if ((strcasecmp (gbuf, "Display") == 0) ||
                     (strcasecmp (gbuf, "Show") == 0)) {
                     char *thelp = (char *)malloc (9 + strlen (rem));
 
@@ -3885,7 +3885,7 @@ if ((dptr->modifiers) && (dptr->units)) {   /* handle unit specific modifiers */
                 const char *rem;
 
                 rem = get_glyph (mptr->help, gbuf, 0);
-                if ((strcasecmp (gbuf, "Display") == 0) || 
+                if ((strcasecmp (gbuf, "Display") == 0) ||
                     (strcasecmp (gbuf, "Show") == 0)) {
                     char *thelp = (char *)malloc (9 + strlen (rem));
 
@@ -3904,7 +3904,7 @@ if ((dptr->modifiers) && (dptr->units)) {   /* handle unit specific modifiers */
 if (enabled_units) {
     for (unit=0; unit < dptr->numunits; unit++)
         if ((!(dptr->units[unit].flags & UNIT_DIS)) &&
-            (dptr->units[unit].flags & UNIT_SEQ) && 
+            (dptr->units[unit].flags & UNIT_SEQ) &&
             (!(dptr->units[unit].flags & UNIT_MUSTBUF))) {
             snprintf (buf, sizeof (buf), "set %s%s APPEND", sim_uname (&dptr->units[unit]), (enabled_units > 1) ? "n" : "");
             snprintf (extra, sizeof (extra), "Sets %s%s position to EOF", sim_uname (&dptr->units[unit]), (enabled_units > 1) ? "n" : "");
@@ -4142,7 +4142,7 @@ if (*cptr) {
         cptr = get_glyph (cptr, gbuf, 0);
         }
     dptr = find_unit (gbuf, &uptr);
-    if ((dptr == NULL) && 
+    if ((dptr == NULL) &&
         ((dptr = find_dev (gbuf)) == NULL)) {
         if (explicit_device) {
             int i;
@@ -4196,7 +4196,7 @@ if (*cptr) {
                     for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
                         if (dptr->help)
                             sim_printf ("h{elp} %-17s display help for device %s\n", dptr->name, dptr->name);
-                        if (dptr->attach_help || 
+                        if (dptr->attach_help ||
                             (DEV_TYPE(dptr) == DEV_MUX) ||
                             (DEV_TYPE(dptr) == DEV_DISK) ||
                             (DEV_TYPE(dptr) == DEV_TAPE)) {
@@ -4238,7 +4238,7 @@ if (*cptr) {
 
                 for (cmdpa=cmd_table; cmdpa->name != NULL; cmdpa++)
                     if ((cmdpa->action == cmdp->action) && (cmdpa->help)) {
-                        sim_printf ("%s is an alias for the %s command:\n%s", 
+                        sim_printf ("%s is an alias for the %s command:\n%s",
                                     cmdp->name, cmdpa->name, cmdpa->help);
                         break;
                         }
@@ -4401,7 +4401,7 @@ CONST char *cptr;
 FILE *fpin = NULL;
 CTAB *cmdp = NULL;
 int32 echo, nargs, errabort, i;
-int32 saved_sim_do_echo = sim_do_echo, 
+int32 saved_sim_do_echo = sim_do_echo,
       saved_sim_show_message = sim_show_message,
       saved_sim_on_inherit = sim_on_inherit,
       saved_sim_quiet = sim_quiet;
@@ -4482,7 +4482,7 @@ if (NULL == (c = sim_filepath_parts (cbuf, "f"))) {
     stat = SCPE_MEM;
     goto Cleanup_Return;
     }
-strlcpy( sim_do_filename[sim_do_depth], strcasecmp (cbuf, "<stdin>") ? c : cbuf, 
+strlcpy( sim_do_filename[sim_do_depth], strcasecmp (cbuf, "<stdin>") ? c : cbuf,
          sizeof (sim_do_filename[sim_do_depth]));       /* stash away full path of do file name for possible use by 'call' command */
 free (c);
 sim_do_label[sim_do_depth] = label;                     /* stash away do label for possible use in messages */
@@ -4565,7 +4565,7 @@ do {
         stat = SCPE_UNK;                                /* bad cmd given */
     sim_debug (SIM_DBG_DO, &sim_scp_dev, "Command '%s', Result: 0x%X - %s\n", cmdp ? cmdp->name : "", stat, sim_error_text (stat));
     echo = sim_do_echo;                                 /* Allow for SET VERIFY */
-    stat_nomessage = stat & SCPE_NOMESSAGE;             /* extract possible message supression flag */
+    stat_nomessage = stat & SCPE_NOMESSAGE;             /* extract possible message suppression flag */
     stat_nomessage = stat_nomessage || (!sim_show_message);/* Apply global suppression */
     stat = SCPE_BARE_STATUS(stat);                      /* remove possible flag */
     if (((stat != SCPE_OK) && (stat != SCPE_EXPECT)) ||
@@ -4608,7 +4608,7 @@ do {
     if (stat == SCPE_EXPECT)                            /* EXPECT status is non actionable */
         stat = SCPE_OK;                                 /* so adjust it to SCPE_OK */
     if (staying &&
-        (sim_on_check[sim_do_depth]) && 
+        (sim_on_check[sim_do_depth]) &&
         (stat != SCPE_OK)) {
         if ((stat <= SCPE_MAX_ERR) && sim_on_actions[sim_do_depth][stat])
             sim_brk_setact (sim_on_actions[sim_do_depth][stat]);
@@ -4658,8 +4658,8 @@ return stat | SCPE_NOMESSAGE;                           /* suppress message sinc
    main_like_routine =  the routine that is to be called with parsed arguments
    cptr              =  the command argument string to be broken down into argc, argv
 
-   When the main_like_routine is called, argc and argv are populated.  
-   
+   When the main_like_routine is called, argc and argv are populated.
+
       argc is the number of tokens parsed from the input string plus 1
       argv is an array of parsed tokens where argv[0] is the unparsed input string
 
@@ -4722,25 +4722,25 @@ return result;
 }
 
 /* Substitute_args - replace %n tokens in 'instr' with the do command's arguments
-                     and other enviroment variables
+                     and other environment variables
 
    Calling sequence
    instr        =       input string
    instr_size   =       sizeof input string buffer
    do_arg[10]   =       arguments
 
-   Token %0 expands to the command file name. 
+   Token %0 expands to the command file name.
    Token %n (n being a single digit) expands to the n'th argument
-   Tonen %* expands to the whole set of arguments (%1 ... %9)
+   Token %* expands to the whole set of arguments (%1 ... %9)
 
-   The input sequence "%%" represents a literal "%".  All other 
+   The input sequence "%%" represents a literal "%".  All other
    character combinations are rendered literally.
 
    Omitted parameters result in null-string substitutions.
 
-   Tokens preceeded and followed by % characters are expanded as environment
-   variables, and if one isn't found then can be one of several special 
-   variables: 
+   Tokens preceded and followed by % characters are expanded as environment
+   variables, and if one isn't found then can be one of several special
+   variables:
           %DATE%              yyyy-mm-dd
           %TIME%              hh:mm:ss
           %DATETIME%          yyyy-mm-ddThh:mm:ss
@@ -4753,14 +4753,14 @@ return result;
           %SIM_VERBOSE%       The Verify/Verbose mode of the current Do command file
           %SIM_QUIET%         The Quiet mode of the current Do command file
           %SIM_MESSAGE%       The message display status of the current Do command file
-   Environment variable lookups are done first with the precise name between 
+   Environment variable lookups are done first with the precise name between
    the % characters and if that fails, then the name between the % characters
-   is upcased and a lookup of that valus is attempted.
+   is upcased and a lookup of that value is attempted.
 
-   The first Space delimited token on the line is extracted in uppercase and 
-   then looked up as an environment variable.  If found it the value is 
-   supstituted for the original string before expanding everything else.  If 
-   it is not found, then the original beginning token on the line is left 
+   The first Space delimited token on the line is extracted in uppercase and
+   then looked up as an environment variable.  If found it the value is
+   substituted for the original string before expanding everything else.  If
+   it is not found, then the original beginning token on the line is left
    untouched.
 */
 
@@ -4982,7 +4982,7 @@ if (!ap) {                              /* no environment variable found? */
         int leaps = days/4 - days/100 + days/400;
         int lyear = ((year % 4) == 0) && (((year % 100) != 0) || ((year % 400) == 0));
         int selector = ((days + leaps + 7) % 7) + lyear * 7;
-        static int years[] = {90, 91, 97, 98, 99, 94, 89, 
+        static int years[] = {90, 91, 97, 98, 99, 94, 89,
                               96, 80, 92, 76, 88, 72, 84};
         int cal_year = years[selector];
 
@@ -5233,7 +5233,7 @@ for (; *ip && (op < oend); ) {
                         get_glyph_nc (ip, gbuf, '%');   /* get the literal name */
                         ap = _sim_get_env_special (gbuf, rbuf, sizeof (rbuf));
                         ip += strlen (gbuf);
-                        if (*ip == '%') 
+                        if (*ip == '%')
                             ++ip;
                         }
                     }
@@ -5393,8 +5393,8 @@ return 1;
    Syntax: IF {NOT} {<dev>} <reg>{<logical-op><value>}<conditional-op><value> commandtoprocess{; additionalcommandtoprocess}...
 
        If NOT is specified, the resulting expression value is inverted.
-       If <dev> is not specified, sim_dflt_dev (CPU) is assumed.  
-       <value> is expressed in the radix specified for <reg>.  
+       If <dev> is not specified, sim_dflt_dev (CPU) is assumed.
+       <value> is expressed in the radix specified for <reg>.
        <logical-op> and <conditional-op> are the same as that
        allowed for examine and deposit search specifications.
 
@@ -5403,7 +5403,7 @@ return 1;
 
        If -i is specified, the comparisons are done in a case insensitive manner.
        If NOT is specified, the resulting expression value is inverted.
-       "<string1>" and "<string2>" are quote delimited strings which include 
+       "<string1>" and "<string2>" are quote delimited strings which include
        expansion references to environment variables in the simulator.
        <compare-op> can be any one of:
             ==  - equal
@@ -5430,7 +5430,7 @@ if ((*optr != '"') && (*optr != '\'')) {
     ap = getenv (optr);
     if (!ap)
         return tptr;
-    /* for legacy ASSERT/IF behavior give precidence to REGister names over Environment Variables */
+    /* for legacy ASSERT/IF behavior give precedence to REGister names over Environment Variables */
     get_glyph (optr, optr, 0);
     rptr = find_reg (optr, &gptr, sim_dfdev);
     if (rptr)
@@ -5455,7 +5455,7 @@ t_bool result;
 t_addr addr = 0;
 t_stat reason;
 
-cptr = (CONST char *)get_sim_opt (CMD_OPT_SW|CMD_OPT_DFT, (CONST char *)cptr, &r);  
+cptr = (CONST char *)get_sim_opt (CMD_OPT_SW|CMD_OPT_DFT, (CONST char *)cptr, &r);
                                                         /* get sw, default */
 sim_stabr.boolop = sim_staba.boolop = -1;               /* no relational op dflt */
 if (*cptr == 0)                                         /* must be more */
@@ -5612,7 +5612,7 @@ else {
                     return SCPE_2MARG;
                 }
             else {
-                if (!flag)                                      
+                if (!flag)
                     return SCPE_2FARG;                  /* IF needs actions! */
                 }
             if (rptr) {                                 /* Handle register case */
@@ -5655,23 +5655,23 @@ return SCPE_OK;
 
    Syntax: SEND {After=m},{Delay=n},"string-to-send"
 
-   After  - is an integer (>= 0) representing a number of instruction 
-            delay before the initial characters is sent.  The after 
-            parameter can is set by itself (with SEND AFTER=n). 
-            The value specified then persists across SEND commands, 
-            and is the default value used in subsequent SEND commands 
+   After  - is an integer (>= 0) representing a number of instruction
+            delay before the initial characters is sent.  The after
+            parameter can is set by itself (with SEND AFTER=n).
+            The value specified then persists across SEND commands,
+            and is the default value used in subsequent SEND commands
             which don't specify an explicit AFTER parameter.  This default
             value is visible externally via an environment variable.
-   Delay  - is an integer (>= 0) representing a number of instruction 
+   Delay  - is an integer (>= 0) representing a number of instruction
             delay before and between characters being sent.  The
-            delay parameter can is set by itself (with SEND DELAY=n) 
+            delay parameter can is set by itself (with SEND DELAY=n)
             The value specified persists across SEND commands, and is
             the default value used in subsequent SEND commands which
             don't specify an explicit DELAY parameter.  This default
             value is visible externally via an environment variable.
    String - must be quoted.  Quotes may be either single or double but the
-            opening anc closing quote characters must match.  Within quotes 
-            C style character escapes are allowed.  
+            opening and closing quote characters must match.  Within quotes
+            C style character escapes are allowed.
             The following character escapes are explicitly supported:
         \r  Sends the ASCII Carriage Return character (Decimal value 13)
         \n  Sends the ASCII Linefeed character (Decimal value 10)
@@ -5686,7 +5686,7 @@ return SCPE_OK;
         \e  Sends the ASCII Escape character (Decimal value 27)
      as well as octal character values of the form:
         \n{n{n}} where each n is an octal digit (0-7)
-     and hext character values of the form:
+     and hex character values of the form:
         \xh{h} where each h is a hex digit (0-9A-Fa-f)
    */
 
@@ -5934,7 +5934,7 @@ long fpos;
 int32 saved_do_echo = sim_do_echo;
 int32 saved_goto_line = sim_goto_line[sim_do_depth];
 
-if ((NULL == sim_gotofile) || 
+if ((NULL == sim_gotofile) ||
     (0 == strcasecmp (sim_do_filename[sim_do_depth], "<stdin>")))
     return SCPE_UNK;                                    /* only valid inside of do_cmd */
 
@@ -6015,9 +6015,9 @@ const char *cptr;
 if (NULL == sim_gotofile) return SCPE_UNK;              /* only valid inside of do_cmd */
 cptr = get_glyph (fcptr, gbuf, 0);
 if ('\0' == gbuf[0]) return SCPE_ARG;                   /* unspecified goto target */
-snprintf (cbuf, sizeof (cbuf), "%s%s%s %s", (NULL != strchr (sim_do_filename[sim_do_depth], ' ')) ? "\"" : "", 
-                                            sim_do_filename[sim_do_depth], 
-                                            (NULL != strchr (sim_do_filename[sim_do_depth], ' ')) ? "\"" : "", 
+snprintf (cbuf, sizeof (cbuf), "%s%s%s %s", (NULL != strchr (sim_do_filename[sim_do_depth], ' ')) ? "\"" : "",
+                                            sim_do_filename[sim_do_depth],
+                                            (NULL != strchr (sim_do_filename[sim_do_depth], ' ')) ? "\"" : "",
                                             cptr);
 sim_switches |= SWMASK ('O');                           /* inherit ON state and actions */
 return do_cmd_label (flag, cbuf, gbuf);
@@ -6036,7 +6036,7 @@ if (0 == strcmp("ERROR", gbuf))
     cond = 0;
 else {
     if (SCPE_OK != sim_string_to_stat (gbuf, &cond)) {
-        if ((MATCH_CMD (gbuf, "CONTROL_C") == 0) || 
+        if ((MATCH_CMD (gbuf, "CONTROL_C") == 0) ||
             (MATCH_CMD (gbuf, "SIGINT") == 0))
             cond = ON_SIGINT_ACTION;                    /* Special case */
         else
@@ -6049,7 +6049,7 @@ if ((NULL == cptr) || ('\0' == *cptr)) {                /* Empty Action */
 else {
     if ((cptr > sim_sub_instr_buf) && ((size_t)(cptr - sim_sub_instr_buf) < sim_sub_instr_size))
         cptr = &sim_sub_instr[sim_sub_instr_off[cptr - sim_sub_instr_buf]]; /* get un-substituted string */
-    sim_on_actions[sim_do_depth][cond] = 
+    sim_on_actions[sim_do_depth][cond] =
         (char *)realloc(sim_on_actions[sim_do_depth][cond], 1+strlen(cptr));
     strcpy(sim_on_actions[sim_do_depth][cond], cptr);
     }
@@ -6087,13 +6087,13 @@ if ((flag) && (cptr) && (*cptr)) {                      /* Set ON with arg */
 if (cptr && (*cptr != 0))                               /* now eol? */
     return SCPE_2MARG;
 sim_on_check[sim_do_depth] = flag;
-if ((sim_do_depth != 0) && 
+if ((sim_do_depth != 0) &&
     (NULL == sim_on_actions[sim_do_depth][0])) {        /* default handler set? */
     sim_on_actions[sim_do_depth][0] =                   /* No, so make "RETURN" */
         (char *)malloc(1+strlen("RETURN"));             /* be the default action */
     strcpy(sim_on_actions[sim_do_depth][0], "RETURN");
     }
-if ((sim_do_depth != 0) && 
+if ((sim_do_depth != 0) &&
     (NULL == sim_on_actions[sim_do_depth][SCPE_AFAIL])) {/* handler set for AFAIL? */
     sim_on_actions[sim_do_depth][SCPE_AFAIL] =          /* No, so make "RETURN" */
         (char *)malloc(1+strlen("RETURN"));             /* be the action */
@@ -6251,12 +6251,12 @@ else {
 
         cptr = cbuf;
         get_glyph_quoted (cptr, cbuf, 0);
-        if (SCPE_OK != sim_decode_quoted_string (cbuf, (uint8 *)cbuf, &str_size)) 
+        if (SCPE_OK != sim_decode_quoted_string (cbuf, (uint8 *)cbuf, &str_size))
             return sim_messagef (SCPE_ARG, "Invalid quoted string: %s\n", cbuf);
         cbuf[str_size] = '\0';
         }
     else {
-        if (sim_switches & SWMASK ('A')) {              /* Arithmentic Expression Evaluation argument? */
+        if (sim_switches & SWMASK ('A')) {              /* Arithmetic Expression Evaluation argument? */
             t_svalue val;
             t_stat stat;
             const char *eptr = cptr;
@@ -6351,7 +6351,7 @@ else {
         }
     }
 if ((*cptr == 0) ||                                     /* must be more */
-    (*cptr == ';') || 
+    (*cptr == ';') ||
     (*cptr == '#'))
     return SCPE_2FARG;
 GET_SWITCHES (cptr);                                    /* get more switches */
@@ -6389,13 +6389,13 @@ while (*cptr != 0) {                                    /* do all mods */
                     if (r != SCPE_OK)
                         return r;
                     }
-                else 
+                else
                     if (!mptr->desc)                    /* value desc? */
                         break;
-                    else 
+                    else
                         if (cvptr)                      /* = value? */
                             return SCPE_ARG;
-                        else 
+                        else
                             *((int32 *) mptr->desc) = mptr->match;
                 }                                       /* end if xtd */
             else {                                      /* old style */
@@ -6734,9 +6734,9 @@ size_t prefix_len = prefix ? strlen (prefix) : 0;
 size_t name_len = name ? strlen (name) : 0;
 size_t string_len = prefix_len + name_len;
 
-snprintf (nambuf, sizeof (nambuf), "%s%*s", prefix ? prefix : "", 
-                                            ((string_len <= 6) && (max_name_len <= 6)) ? -((int)(8 - prefix_len)) : 
-                                                                                        -((int)(max_name_len + 2)), 
+snprintf (nambuf, sizeof (nambuf), "%s%*s", prefix ? prefix : "",
+                                            ((string_len <= 6) && (max_name_len <= 6)) ? -((int)(8 - prefix_len)) :
+                                                                                        -((int)(max_name_len + 2)),
                                                                                         name ? name : "");
 return nambuf;
 }
@@ -6873,7 +6873,7 @@ int32 toks = -1;
 
 if (flag > 1)
     fprintf (st, "%s", _sim_uname_prefix (uptr, "  "));
-else 
+else
     if (flag < 0)
         fprintf (st, "%s", _sim_uname (uptr));
     else
@@ -6894,7 +6894,7 @@ else {
         fprintf (st, "not attached");
         }
     }
-show_all_mods (st, dptr, uptr, MTAB_VUN, &toks);        /* show unit mods */ 
+show_all_mods (st, dptr, uptr, MTAB_VUN, &toks);        /* show unit mods */
 if (toks || (flag < 0) || (flag > 1))
     fprintf (st, "\n");
 return SCPE_OK;
@@ -6916,7 +6916,7 @@ if (dptr->flags & DEV_SECTORS)
     psize = psize * 512;
 if ((dptr->dwidth / dptr->aincr) > 8)
     width = "W";
-else 
+else
     width = "B";
 if ((psize < (kval * 10)) &&
     (0 != (psize % kval))) {
@@ -7153,7 +7153,7 @@ if (flag) {
         fprintf (st, "\n        Ethernet packet info: %s", eth_version());
 #if defined(__VMS)
     if (1) {
-        char *arch = 
+        char *arch =
 #if defined(__ia64)
             "I64";
 #elif defined(__ALPHA)
@@ -7538,7 +7538,7 @@ else {
                                             (*tim) ? " (" : "", tim, (*tim) ? " total)" : "",
                                             (uptr->flags & UNIT_IDLE) ? " (Idle capable)" : "");
         else
-            fprintf (st, " at %d%s%s%s%s\n", _sim_activate_queue_time (uptr) - 1, 
+            fprintf (st, " at %d%s%s%s%s\n", _sim_activate_queue_time (uptr) - 1,
                                             (*tim) ? " (" : "", tim, (*tim) ? ")" : "",
                                             (uptr->flags & UNIT_IDLE) ? " (Idle capable)" : "");
         }
@@ -7585,7 +7585,7 @@ t_stat r;
 
 if (cptr && (*cptr != 0))
     r = ssh_break (st, cptr, 1);  /* more? */
-else 
+else
     r = sim_brk_showall (st, sim_switches);
 return r;
 }
@@ -7765,9 +7765,9 @@ t_stat r = SCPE_OK;
 if (dptr->modifiers == NULL)
     return SCPE_OK;
 for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
-    if (mptr->pstring && 
+    if (mptr->pstring &&
         ((mptr->mask & MTAB_XTD)?
-            (MODMASK(mptr,flag) && !MODMASK(mptr,MTAB_NMO)): 
+            (MODMASK(mptr,flag) && !MODMASK(mptr,MTAB_NMO)):
             ((MTAB_VUN == (uint32)flag) && ((uptr->flags & mptr->mask) == mptr->match)))) {
         if ((*toks > 2) && (r == SCPE_OK)) {/* something emitted already? */
             fprintf (st, "\n");
@@ -7804,7 +7804,7 @@ DEVICE *dptr;
 
 if (cptr && (*cptr != 0))                               /* now eol? */
     return SCPE_2MARG;
-for (i = 0; (dptr = sim_devices[i]) != NULL; i++) 
+for (i = 0; (dptr = sim_devices[i]) != NULL; i++)
     show_dev_show_commands (st, dptr, NULL, flag, cptr);
 for (i = 0; sim_internal_device_count && (dptr = sim_internal_devices[i]); ++i)
     show_dev_show_commands (st, dptr, NULL, flag, cptr);
@@ -7817,7 +7817,7 @@ fprint_show_help (st, dptr);
 return SCPE_OK;
 }
 
-/* Show/change the current working directiory commands */
+/* Show/change the current working directory commands */
 
 t_stat show_default (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr)
 {
@@ -7861,7 +7861,7 @@ typedef struct {
     t_offset ByteCount;
     } DIR_CTX;
 
-static void sim_dir_entry (const char *directory, 
+static void sim_dir_entry (const char *directory,
                         const char *filename,
                         t_offset FileSize,
                         const struct stat *filestat,
@@ -7962,7 +7962,7 @@ typedef struct {
     t_stat stat;
     } TYPE_CTX;
 
-static void sim_type_entry (const char *directory, 
+static void sim_type_entry (const char *directory,
                             const char *filename,
                             t_offset FileSize,
                             const struct stat *filestat,
@@ -7982,7 +7982,7 @@ sim_printf ("\n%s\n\n", FullPath);
 lbuf[sizeof(lbuf)-1] = '\0';
 if (sim_type_file_offset)
     (void)fseek (file, sim_type_file_offset, SEEK_SET);
-while ((NULL != fgets (lbuf, sizeof(lbuf)-1, file)) && 
+while ((NULL != fgets (lbuf, sizeof(lbuf)-1, file)) &&
        (lines++ < sim_type_line_count)) {
     sim_printf ("%s", lbuf);
     if (stop_cpu) {
@@ -8044,7 +8044,7 @@ if (file == NULL) {                         /* open failed? */
 lbuf[sizeof(lbuf)-1] = '\0';
 if (sim_type_file_offset)
     (void)fseek (file, sim_type_file_offset, SEEK_SET);
-while ((NULL != fgets (lbuf, sizeof(lbuf)-1, file)) && 
+while ((NULL != fgets (lbuf, sizeof(lbuf)-1, file)) &&
        (lines++ < sim_type_line_count))
     sim_printf ("%s", lbuf);
 fclose (file);
@@ -8055,7 +8055,7 @@ typedef struct {
     t_stat stat;
     } DEL_CTX;
 
-static void sim_delete_entry (const char *directory, 
+static void sim_delete_entry (const char *directory,
                               const char *filename,
                               t_offset FileSize,
                               const struct stat *filestat,
@@ -8092,7 +8092,7 @@ typedef struct {
     char destname[CBUFSIZE];
     } COPY_CTX;
 
-static void sim_copy_entry (const char *directory, 
+static void sim_copy_entry (const char *directory,
                             const char *filename,
                             t_offset FileSize,
                             const struct stat *filestat,
@@ -8173,7 +8173,7 @@ while ((c = strchr (path, '\\')))
     *c = '/';
 if (path[strlen (path) - 1] == '/')     /* trim any trailing / from the path */
     path[strlen (path) - 1] = '\0';
-while ((c = strstr (path, "//")))        
+while ((c = strstr (path, "//")))
     memmove (c, c + 1, strlen (c + 1) + 1); /* clean out any empty directories // */
 if ((!sim_stat (path, &filestat)) && (filestat.st_mode & S_IFDIR))
     return sim_messagef (SCPE_OK, "directory %s already exists\n", path);
@@ -8635,10 +8635,10 @@ for (mtab = dptr->modifiers; (mtab != NULL) && ((mtab->mstring != NULL) || (mtab
    du[mp] filename {arg}        dump to specified file
 */
 
-/* Memory File use (for internal memory static ROM images) 
+/* Memory File use (for internal memory static ROM images)
 
     when used to read ROM image with internally generated
-    load commands, calling code setups with sim_set_memory_file() 
+    load commands, calling code setups with sim_set_memory_file()
     sim_load uses Fgetc() instead of fgetc() or getc()
 */
 
@@ -9007,7 +9007,7 @@ if ((dptr->flags & DEV_TAPE) && ((dptr->flags & DEV_DISK) == 0))
     return sim_tape_detach (uptr);
 if ((uptr->flags & UNIT_BUF) && (uptr->filebuf)) {
     uint32 cap = (uptr->hwmark + dptr->aincr - 1) / dptr->aincr;
-    if (((uptr->flags & UNIT_RO) == 0) && 
+    if (((uptr->flags & UNIT_RO) == 0) &&
         (memcmp (uptr->filebuf, uptr->filebuf2, (size_t)(SZ_D (dptr) * (uptr->capac / dptr->aincr))) != 0)) {
         sim_messagef (SCPE_OK, "%s: writing buffer to file: %s\n", sim_uname (uptr), sim_attach_name (uptr));
         rewind (uptr->fileref);
@@ -9461,7 +9461,7 @@ READ_I (sim_rtime);                                     /* [V2.6+] sim rel time 
 if (v40) {
     READ_S (buf);                                       /* read git commit id */
 #if defined(SIM_GIT_COMMIT_ID)
-    if ((memcmp (buf, "git commit id: " __STR(SIM_GIT_COMMIT_ID), 23)) && 
+    if ((memcmp (buf, "git commit id: " __STR(SIM_GIT_COMMIT_ID), 23)) &&
         (!sim_quiet) && (!suppress_warning)) {
         sim_printf ("warning - different simulator git versions.\nSaved commit id: %8.8s, Running commit id: %8.8s\n", buf + 15, __STR(SIM_GIT_COMMIT_ID));
         warned = TRUE;
@@ -9499,7 +9499,7 @@ for ( ;; ) {                                            /* device loop */
     if (buf[0] != '\0')
         sim_debug (SIM_DBG_RESTORE, &sim_scp_dev, "logical name=%s\n", buf);
     deassign_device (dptr);                             /* delete old name */
-    if ((buf[0] != 0) && 
+    if ((buf[0] != 0) &&
         ((r = assign_device (dptr, buf)) != SCPE_OK)) {
         r = SCPE_INCOMP;
         goto Cleanup_Return;
@@ -9625,7 +9625,7 @@ for ( ;; ) {                                            /* device loop */
                 for (j = 0; j < limit; j++, k = k + (dptr->aincr)) {
                     if (blkcnt < 0)                     /* compressed? */
                         val = 0;
-                    else 
+                    else
                         SZ_LOAD (sz, val, mbuf, j);     /* saved value */
                     r = dptr->deposit (val, k, uptr, SIM_SW_REST);
                     if (r != SCPE_OK) {
@@ -9675,8 +9675,8 @@ for ( ;; ) {                                            /* device loop */
             }
         }                                               /* end register loop */
     }                                                   /* end device loop */
-/* Now that all of the register state has been imported, we can attach 
-   units which were originally attached.  Some of these attach operations 
+/* Now that all of the register state has been imported, we can attach
+   units which were originally attached.  Some of these attach operations
    may depend on the state of the device (in registers) to work correctly */
 for (j=0, r = SCPE_OK; j<attcnt; j++) {
     if ((r == SCPE_OK) && (!dont_detach_attach)) {
@@ -9698,7 +9698,7 @@ for (j=0, r = SCPE_OK; j<attcnt; j++) {
         if (cmd[0])
             set_cmd (0, cmd);
         dptr = find_dev_from_unit (attunits[j]);
-        if ((!force_restore) && 
+        if ((!force_restore) &&
             (!stat(filename, &fstat)))
             if (fstat.st_mtime > rstat.st_mtime + 30) {
                 r = SCPE_INCOMP;
@@ -9715,7 +9715,7 @@ for (j=0, r = SCPE_OK; j<attcnt; j++) {
         }
     else {
         if ((r == SCPE_OK) && (dont_detach_attach)) {
-            if ((!suppress_warning) && 
+            if ((!suppress_warning) &&
                 ((!attunits[j]->filename) || (strcmp (attunits[j]->filename, attnames[j]) != 0))) {
                 warned = TRUE;
                 sim_printf ("warning - %s was attached to '%s'", sim_uname (attunits[j]), attnames[j]);
@@ -9788,14 +9788,14 @@ return SCPE_OK;
    go [new PC]          start simulation
    co[nt]               start simulation
    s[tep] [step limit]  start simulation for 'limit' instructions
-   next                 start simulation for 1 instruction 
+   next                 start simulation for 1 instruction
                         stepping over subroutine calls
    b[oot] device        bootstrap from device and start simulation
 
    switches:
     -Q                  quiet return status
-    -T                  (only for step), causes the step limit to 
-                        be a number of microseconds to run for            
+    -T                  (only for step), causes the step limit to
+                        be a number of microseconds to run for
 */
 
 t_stat run_cmd (int32 flag, CONST char *cptr)
@@ -9848,7 +9848,7 @@ if ((flag == RU_RUN) || (flag == RU_GO)) {              /* run or go */
         if (MATCH_CMD (gbuf, "UNTIL") != 0)
             cptr = get_glyph (cptr, gbuf, 0);           /* get next glyph */
         if (MATCH_CMD (gbuf, "UNTIL") != 0)
-            return sim_messagef (SCPE_2MARG, "Unexpected %s command argument: %s %s\n", 
+            return sim_messagef (SCPE_2MARG, "Unexpected %s command argument: %s %s\n",
                                              (flag == RU_RUN) ? "RUN" : "GO", gbuf, cptr);
         sim_switches = 0;
         GET_SWITCHES (cptr);
@@ -9938,7 +9938,7 @@ else if (flag == RU_BOOT) {                             /* boot */
         return r;
     }
 
-else 
+else
     if (flag != RU_CONT)                                /* must be cont */
         return SCPE_IERR;
     else                                                /* CONTINUE command */
@@ -10109,7 +10109,7 @@ if ((r == SCPE_OK) && (flag == RU_RUN)) {
 return r;
 }
 
-/* Print stopped message 
+/* Print stopped message
  * For VM stops, if a VM-specific "sim_vm_fprint_stopped" pointer is defined,
  * call the indicated routine to print additional information after the message
  * and before the PC value is printed.  If the routine returns FALSE, skip
@@ -10330,7 +10330,7 @@ for (gptr = gbuf, reason = SCPE_OK;
         strlcpy (gbuf, ap, sizeof (gbuf));
         gptr = gbuf;
         }
-    /* Special handling of EXAMINE to cover the case of ALL (detected in 
+    /* Special handling of EXAMINE to cover the case of ALL (detected in
        get_range) so that all of memory isn't output at once without any
        ability to interrupt that output */
     tptr = get_range (sim_dfdev, gptr, &low, &high, sim_dfdev->aradix,
@@ -10514,9 +10514,9 @@ if ((rptr->flags & REG_VMAD) && sim_vm_fprint_addr)
     sim_vm_fprint_addr (ofile, sim_dflt_dev, (t_addr) val);
 else {
     sim_snprint_sym (sim_last_val, sizeof (sim_last_val), !(rptr->flags & REG_VMFLAGS),
-                     (t_addr)((rptr->flags & REG_UFMASK) | rdx), 
+                     (t_addr)((rptr->flags & REG_UFMASK) | rdx),
                      ((rptr->flags & REG_DOUBLE) == 0) ? sim_eval : (t_value *)rptr->loc,
-                     NULL, sim_switches | SIM_SW_REG, 0, rdx, rptr->width, 
+                     NULL, sim_switches | SIM_SW_REG, 0, rdx, rptr->width,
                      rptr->flags & REG_FMT);
     fprintf (ofile, "%s", sim_last_val);
     }
@@ -10666,7 +10666,7 @@ t_value mask;
 void    *ptr;
 t_value prev_val = 0;
 
-if ((!(sim_switches & SWMASK ('Z'))) && 
+if ((!(sim_switches & SWMASK ('Z'))) &&
     (rptr->flags & REG_DEPOSIT) && sim_vm_reg_update)
     prev_val = get_rval (rptr, idx);
 
@@ -10690,7 +10690,7 @@ else
         *((uint16 *) ptr) =
           (uint16) ((*((uint16 *) ptr) & mask) | val);
 
-    else 
+    else
         if (rptr->size == sizeof (uint32))
             *((uint32 *) ptr) =
               (uint32) ((*((uint32 *) ptr) & mask) | val);
@@ -10699,7 +10699,7 @@ else
             *((t_value *) ptr) =                        /*   then access using the largest size permitted */
               (*((t_value *) ptr) & mask) | val;
 
-if ((!(sim_switches & SWMASK ('Z'))) && 
+if ((!(sim_switches & SWMASK ('Z'))) &&
     (rptr->flags & REG_DEPOSIT) && sim_vm_reg_update)
     sim_vm_reg_update (rptr, idx, prev_val, val);
 }
@@ -10737,7 +10737,7 @@ if (flag == EX_DONE) {
     if (same >= 0) {
         if (sim_vm_fprint_addr)
             sim_vm_fprint_addr (ofile, dptr, same_start_addr);
-        else 
+        else
             fprint_val (ofile, same_start_addr, dptr->aradix, dptr->awidth, PV_LEFT);
         if (same == 0)
             fprintf (ofile, ":\t%s\n", sim_last_val);
@@ -10745,7 +10745,7 @@ if (flag == EX_DONE) {
             fprintf (ofile, ": thru ");
             if (sim_vm_fprint_addr)
                 sim_vm_fprint_addr (ofile, dptr, addr - (1 - dfltinc));
-            else 
+            else
                 fprint_val (ofile, addr - (1 - dfltinc), dptr->aradix, dptr->awidth, PV_LEFT);
             fprintf (ofile, ": same as above.\n");
             }
@@ -10769,7 +10769,7 @@ if ((flag == EX_E) && (strcmp (sim_last_val, sim_current_last_val) == 0)) {
 if (same >= 0) {
     if (sim_vm_fprint_addr)
         sim_vm_fprint_addr (ofile, dptr, same_start_addr);
-    else 
+    else
         fprint_val (ofile, same_start_addr, dptr->aradix, dptr->awidth, PV_LEFT);
     if (same == 0)
         fprintf (ofile, ":\t%s\n", sim_last_val);
@@ -10777,7 +10777,7 @@ if (same >= 0) {
         fprintf (ofile, ": thru ");
         if (sim_vm_fprint_addr)
             sim_vm_fprint_addr (ofile, dptr, addr - (1 - dfltinc));
-        else 
+        else
             fprint_val (ofile, addr - (1 - dfltinc), dptr->aradix, dptr->awidth, PV_LEFT);
         fprintf (ofile, ": same as above.\n");
         }
@@ -10910,7 +10910,7 @@ if (flag & EX_I) {
     }
 if (uptr->flags & UNIT_RO)                              /* read only? */
     return sim_messagef (SCPE_RO, "%s is read only.\n"
-                                  "%sse a writable device to change %s\n", 
+                                  "%sse a writable device to change %s\n",
                                   sim_uname (uptr), (uptr->flags & UNIT_ROABLE) ? "Attach Read/Write or u" : "U",
                                   uptr->filename ? sim_attach_name (uptr) : "it");
 mask = width_mask[dptr->dwidth];
@@ -10936,7 +10936,7 @@ for (i = 0, j = addr; i < count; i++, j = j + dptr->aincr) {
     else {
         if (!(uptr->flags & UNIT_ATT))
             return SCPE_UNATT;
-        if ((uptr->dynflags & UNIT_NO_FIO) || 
+        if ((uptr->dynflags & UNIT_NO_FIO) ||
             (sim_can_seek (uptr->fileref) == FALSE))
             return SCPE_NOFNC;
         if ((uptr->flags & UNIT_FIX) && (j >= uptr->capac))
@@ -11183,7 +11183,7 @@ while ((*iptr != 0) && (!got_quoted) &&
         }
     if (sim_islower (*iptr) && uc)
         *optr = (char)sim_toupper (*iptr);
-    else 
+    else
         *optr = *iptr;
     iptr++; optr++;
     }
@@ -11305,7 +11305,7 @@ return val;
         cptr    =       pointer to input string
         *lo     =       pointer to low result
         *hi     =       pointer to high result
-        aradix  =       radix
+        rdx     =       radix
         max     =       default high value
         term    =       terminating character, 0 if none
    Outputs:
@@ -11325,9 +11325,9 @@ if (max && strncmp (cptr, "ALL", strlen ("ALL")) == 0) {/* ALL? */
     }
 else {
     if ((strncmp (cptr, ".", strlen (".")) == 0) &&     /* .? */
-        ((cptr[1] == '\0') || 
-         (cptr[1] == '-')  || 
-         (cptr[1] == ':')  || 
+        ((cptr[1] == '\0') ||
+         (cptr[1] == '-')  ||
+         (cptr[1] == ':')  ||
          (cptr[1] == '/'))) {
         tptr = cptr + strlen (".");
         *lo = *hi = sim_last_addr;
@@ -11384,17 +11384,17 @@ return tptr;
    Inputs:
         iptr        =   pointer to input string
         optr        =   pointer to output buffer
-                        the output buffer must be allocated by the caller 
-                        and to avoid overrunat it must be at least as big 
+                        the output buffer must be allocated by the caller
+                        and to avoid overrun it must be at least as big
                         as the input string.
 
    Outputs
         result      =   status of decode SCPE_OK when good, SCPE_ARG otherwise
         osize       =   size of the data in the optr buffer
 
-   The input string must be quoted.  Quotes may be either single or 
-   double but the opening anc closing quote characters must match.  
-   Within quotes C style character escapes are allowed.  
+   The input string must be quoted.  Quotes may be either single or
+   double but the opening and closing quote characters must match.
+   Within quotes C style character escapes are allowed.
 
    The following character escapes are explicitly supported:
         \r  ASCII Carriage Return character (Decimal value 13)
@@ -11410,9 +11410,9 @@ return tptr;
         \e  ASCII Escape character (Decimal value 27)
      as well as octal character values of the form:
         \n{n{n}} where each n is an octal digit (0-7)
-     and hext character values of the form:
+     and hex character values of the form:
         \xh{h} where each h is a hex digit (0-9A-Fa-f)
-        
+
 */
 
 t_stat sim_decode_quoted_string (const char *iptr, uint8 *optr, uint32 *osize)
@@ -11421,7 +11421,7 @@ char quote_char;
 uint8 *ostart = optr;
 
 *osize = 0;
-if ((strlen(iptr) == 1) || 
+if ((strlen(iptr) == 1) ||
     (iptr[0] != iptr[strlen(iptr)-1]) ||
     ((iptr[strlen(iptr)-1] != '"') && (iptr[strlen(iptr)-1] != '\'')))
     return sim_messagef (SCPE_ARG, "String must be quote delimited: %s\n", iptr);
@@ -11533,9 +11533,9 @@ return SCPE_OK;
         \e  ASCII Escape character (Decimal value 27)
      as well as octal character values of the form:
         \n{n{n}} where each n is an octal digit (0-7)
-     and hext character values of the form:
+     and hex character values of the form:
         \xh{h} where each h is a hex digit (0-9A-Fa-f)
-        
+
 */
 
 char *sim_encode_quoted_string (const uint8 *iptr, uint32 size)
@@ -11564,7 +11564,7 @@ if (double_quote_found && (!single_quote_found))
 *tptr++ = quote;
 while (size--) {
     switch (*iptr) {
-        case '\r': 
+        case '\r':
             *tptr++ = '\\'; *tptr++ = 'r'; break;
         case '\n':
             *tptr++ = '\\'; *tptr++ = 'n'; break;
@@ -11871,7 +11871,7 @@ return NULL;
         cptr    =       pointer to input string
    Outputs:
         *sw      =       switch bit mask
-        *mumber  =       numeric value
+        *number  =       numeric value
    Return value:        SW_ERROR     if error
                         SW_BITMASK   if switch bitmask or not a switch
                         SW_NUMBER    if numeric
@@ -11937,7 +11937,7 @@ return cptr;
         opt     =       command options
         cptr    =       pointer to input string
    Outputs:
-        ptr     =       pointer to next glypsh, NULL if error
+        ptr     =       pointer to next glyphs, NULL if error
         *stat   =       error status
 */
 
@@ -11950,7 +11950,7 @@ DEVICE *tdptr;
 UNIT *tuptr;
 
 sim_switches = 0;                                       /* no switches */
-sim_switch_number = 0;                                  /* no numberuc switch */
+sim_switch_number = 0;                                  /* no number switch */
 sim_ofile = NULL;                                       /* no output file */
 sim_schrptr = NULL;                                     /* no search */
 sim_schaptr = NULL;                                     /* no search */
@@ -12327,21 +12327,21 @@ return ret;
 
    On an error, the endptr will equal the inptr.
 
-   If the value of radix is zero, the syntax expected is similar 
+   If the value of radix is zero, the syntax expected is similar
    to that of integer constants, which is formed by a succession of:
 
       - An optional sign character (+ or -) {only for strtotsv}
-      - An optional prefix indicating octal or hexadecimal radix 
+      - An optional prefix indicating octal or hexadecimal radix
         ("0" or "0x"/"0X" respectively)
-      - A sequence of decimal digits (if no radix prefix was specified) 
-        or one of binary, octal or hexadecimal digits if a specific 
+      - A sequence of decimal digits (if no radix prefix was specified)
+        or one of binary, octal or hexadecimal digits if a specific
         prefix is present
 
-   If the radix value is between 2 and 36, the format expected for 
-   the integral number is a succession of any of the valid digits 
-   and/or letters needed to represent integers of the specified 
-   radix (starting from '0' and up to 'z'/'Z' for radix 36). The 
-   sequence may optionally be preceded by a sign (either + or -) and, 
+   If the radix value is between 2 and 36, the format expected for
+   the integral number is a succession of any of the valid digits
+   and/or letters needed to represent integers of the specified
+   radix (starting from '0' and up to 'z'/'Z' for radix 36). The
+   sequence may optionally be preceded by a sign (either + or -) and,
    if base is 16, an optional "0x" or "0X" prefix.  If the base is 2,
    an optional "0b" or "0B" prefix.
 
@@ -12359,12 +12359,12 @@ if (((radix < 2) || (radix > 36)) && (radix != 0))
     return 0;
 while (sim_isspace (*inptr))                            /* bypass white space */
     inptr++;
-if (((radix == 0) || (radix == 16)) && 
+if (((radix == 0) || (radix == 16)) &&
     ((!memcmp("0x", inptr, 2)) || (!memcmp("0X", inptr, 2)))) {
     radix = 16;
     inptr += 2;
     }
-if (((radix == 0) || (radix == 2)) && 
+if (((radix == 0) || (radix == 2)) &&
     ((!memcmp("0b", inptr, 2)) || (!memcmp("0B", inptr, 2)))) {
     radix = 2;
     inptr += 2;
@@ -12382,7 +12382,7 @@ for (c = *inptr; sim_isalnum(c); c = *++inptr) {        /* loop through char */
     else {
         if (radix <= 10)                                /* stop if not expected */
             break;
-        else 
+        else
             digit = c + 10 - (uint32) 'A';              /* convert letter */
         }
     if (digit >= radix)                                 /* valid in radix? */
@@ -12416,12 +12416,12 @@ if ((*inptr == '-') ||
         negate = -1;
     ++inptr;
     }
-if (((radix == 0) || (radix == 16)) && 
+if (((radix == 0) || (radix == 16)) &&
     ((!memcmp("0x", inptr, 2)) || (!memcmp("0X", inptr, 2)))) {
     radix = 16;
     inptr += 2;
     }
-if (((radix == 0) || (radix == 2)) && 
+if (((radix == 0) || (radix == 2)) &&
     ((!memcmp("0b", inptr, 2)) || (!memcmp("0B", inptr, 2)))) {
     radix = 2;
     inptr += 2;
@@ -12686,8 +12686,8 @@ else {
 sprintf (tmpbuf, "%.0f", number);
 len = strlen (tmpbuf);
 for (c=0, p=buf; c < len; c++) {
-    if ((c > 0) && 
-        (sim_isdigit (tmpbuf[c])) && 
+    if ((c > 0) &&
+        (sim_isdigit (tmpbuf[c])) &&
         (0 == ((len - c) % 3)))
         *(p++) = ',';
     *(p++) = tmpbuf[c];
@@ -12763,10 +12763,10 @@ if (sim_interval < 0) {
     sim_interval_catchup = sim_interval;
     sim_interval = 0;
     UPDATE_SIM_TIME;                          /* update sim time */
-    sim_debug (SIM_DBG_EVENT_NEG, &sim_scp_dev, "Processing event for %s with sim_interval = %d, event time = %.0f\n", 
+    sim_debug (SIM_DBG_EVENT_NEG, &sim_scp_dev, "Processing event for %s with sim_interval = %d, event time = %.0f\n",
         sim_uname (sim_clock_queue), sim_interval_catchup, sim_gtime ());
     if (sim_clock_queue->next != QUEUE_LIST_END)
-        sim_debug (SIM_DBG_EVENT_NEG, &sim_scp_dev, "- Next event for %s after = %d\n", 
+        sim_debug (SIM_DBG_EVENT_NEG, &sim_scp_dev, "- Next event for %s after = %d\n",
             sim_uname (sim_clock_queue->next), sim_clock_queue->next->time);
     sim_time -= sim_clock_queue->time;
     sim_rtime -= sim_clock_queue->time;
@@ -12809,18 +12809,18 @@ do {
         (bare_reason >= SCPE_BASE)    &&
         (bare_reason != SCPE_EXPECT)  &&
         (bare_reason != SCPE_REMOTE)  &&
-        (bare_reason != SCPE_MTRLNT)  && 
-        (bare_reason != SCPE_STOP)    && 
-        (bare_reason != SCPE_STEP)    && 
-        (bare_reason != SCPE_RUNTIME) && 
+        (bare_reason != SCPE_MTRLNT)  &&
+        (bare_reason != SCPE_STOP)    &&
+        (bare_reason != SCPE_STEP)    &&
+        (bare_reason != SCPE_RUNTIME) &&
         (bare_reason != SCPE_EXIT)) {
-        if (bare_reason == SCPE_UNATT) 
+        if (bare_reason == SCPE_UNATT)
             sim_messagef (reason, "\nUnexpected I/O error while processing event for %s - %s\n", sim_uname (uptr), sim_error_text (reason));
         else
             sim_messagef (reason, "\nUnexpected internal error while processing event for %s which returned %d - %s\n", sim_uname (uptr), reason, sim_error_text (reason));
         }
-    } while ((reason == SCPE_OK) && 
-             ((sim_interval + sim_interval_catchup) <= 0) && 
+    } while ((reason == SCPE_OK) &&
+             ((sim_interval + sim_interval_catchup) <= 0) &&
              (sim_clock_queue != QUEUE_LIST_END) &&
              (!stop_cpu));
 
@@ -13182,7 +13182,7 @@ return cnt;
         addr                    address of the breakpoint
         type                    types of breakpoints set on the address
                                 a bit mask representing letters A-Z
-        cnt                     number of iterations before breakp is taken
+        cnt                     number of iterations before breakpoint is taken
         action                  pointer command string to be executed
                                 when break is taken
         next                    list of other breakpoints with the same addr specifier
@@ -13243,7 +13243,7 @@ int32 lo, hi, p;
 BRKTAB *bp;
 
 if (sim_brk_ent == 0) {                                 /* table empty? */
-    sim_brk_ins = 0;                                    /* insrt at head */
+    sim_brk_ins = 0;                                    /* insert at head */
     return NULL;                                        /* sch fails */
     }
 lo = 0;                                                 /* initial bounds */
@@ -13261,7 +13261,7 @@ do {
         else
             lo = p + 1;                                 /* go up? p is lower */
     } while (lo <= hi);
-if (loc < bp->addr)                                     /* insrt before or */
+if (loc < bp->addr)                                     /* insert before or */
     sim_brk_ins = p;
 else
     sim_brk_ins = p + 1;                                /* after last sch */
@@ -13273,7 +13273,7 @@ BRKTAB *sim_brk_fnd_ex (t_addr loc, uint32 btyp, t_bool any_typ, uint32 spc)
 BRKTAB *bp = sim_brk_fnd (loc);
 
 while (bp) {
-    if (any_typ ? ((bp->typ & btyp) && (bp->time_fired[spc] != sim_gtime())) : 
+    if (any_typ ? ((bp->typ & btyp) && (bp->time_fired[spc] != sim_gtime())) :
                   (bp->typ == btyp))
         return bp;
     bp = bp->next;
@@ -13420,7 +13420,7 @@ if (sw == 0)
 for (i = 0; i < sim_brk_ent;) {
     t_addr loc = sim_brk_tab[i]->addr;
     sim_brk_clr (loc, sw);
-    if ((i < sim_brk_ent) && 
+    if ((i < sim_brk_ent) &&
         (loc == sim_brk_tab[i]->addr))
         ++i;
     }
@@ -13589,7 +13589,7 @@ if ((ep != NULL) && (*ep != ';')) {                     /* if a quoted string is
         if (ep [0] == '\\' && ep [1] == quote)          /*   if an escaped quote sequence follows */
             ep = ep + 2;                                /*     then skip over the pair */
         else                                            /*   otherwise */
-            ep = ep + 1;                                /*     skip the non-quote character */  
+            ep = ep + 1;                                /*     skip the non-quote character */
     ep = strchr (ep, ';');                              /* the next semicolon is outside the quotes if it exists */
     }
 if (ep != NULL) {                                       /* if a semicolon is present */
@@ -13698,7 +13698,7 @@ char buf[32];
 msg[0] = '\0';
 if (sim_vm_sprint_addr)
     sim_vm_sprint_addr (addr, sim_dflt_dev, (t_value)sim_brk_match_addr);
-else 
+else
     sprint_val (addr, (t_value)sim_brk_match_addr, sim_dflt_dev->aradix, sim_dflt_dev->awidth, PV_LEFT);
 if (sim_brk_type_desc) {
     BRKTYPTAB *brk = sim_brk_type_desc;
@@ -13719,7 +13719,7 @@ return msg;
 
 /* Expect package.  This code provides a mechanism to stop and control simulator
    execution based on traffic coming out of simulated ports and as well as a means
-   to inject data into those ports.  It can conceptually viewed as a string 
+   to inject data into those ports.  It can conceptually viewed as a string
    breakpoint package.
 
    Expect rules are stored in tables associated with each port which can use this
@@ -13742,7 +13742,7 @@ return msg;
    The package contains the following public routines:
 
         sim_exp_initialize      initialize the expect facility regex sypport
-        sim_set_expect          expect command parser and intializer
+        sim_set_expect          expect command parser and initializer
         sim_set_noexpect        noexpect command parser
         sim_exp_init            initialize an expect context
         sim_exp_set             set or add an expect rule
@@ -13834,7 +13834,7 @@ if ((*cptr != '\0') && (*cptr != '"') && (*cptr != '\''))
     return sim_messagef (SCPE_ARG, "String must be quote delimited\n");
 cptr = get_glyph_quoted (cptr, gbuf, 0);
 
-/* Hsndle a bare HALTAFTER=nnn command */
+/* Handle a bare HALTAFTER=nnn command */
 if ((gbuf[0] == '\0') && (*cptr == '\0') && after_set) {
     set_default_env_parameter (dev_name, "SIM_EXPECT_HALTAFTER", after);
     return SCPE_OK;
@@ -13971,7 +13971,7 @@ if (switches & EXP_TYP_REGEX) {
 else {
     if (switches & EXP_TYP_REGEX_I) {
         free (match_buf);
-        return sim_messagef (SCPE_ARG, "Case independed matching is only valid for RegEx expect rules\n");
+        return sim_messagef (SCPE_ARG, "Case independent matching is only valid for RegEx expect rules\n");
         }
     sim_data_trace(exp->dptr, exp->dptr->units, (const uint8 *)match, "", strlen(match)+1, "Expect Match String", exp->dbit);
     if (SCPE_OK != sim_decode_quoted_string (match, match_buf, &match_size)) {
@@ -14130,7 +14130,7 @@ EXPTAB *ep = NULL;
 int regex_checks = 0;
 char *tstr = NULL;
 
-if ((!exp) || (!exp->rules))                            /* Anying to check? */
+if ((!exp) || (!exp->rules))                            /* Anything to check? */
     return SCPE_OK;
 
 exp->buf[exp->buf_ins++] = data;                        /* Save new data */
@@ -14199,9 +14199,9 @@ for (i=0; i < exp->size; i++) {
     else {
         if (exp->buf_data < ep->size)                           /* Too little data to match yet? */
             continue;                                           /* Yes, Try next one. */
-        if (exp->buf_ins < ep->size) {                          /* Match might stradle end of buffer */
-            /* 
-             * First compare the newly deposited data at the beginning 
+        if (exp->buf_ins < ep->size) {                          /* Match might straddle end of buffer */
+            /*
+             * First compare the newly deposited data at the beginning
              * of buffer with the end of the match string
              */
             if (exp->buf_ins) {
@@ -14248,10 +14248,10 @@ for (i=0; i < exp->size; i++) {
     }
 if (exp->buf_ins == exp->buf_size) {                    /* At end of match buffer? */
     if (regex_checks) {
-        /* When processing regular expressions, let the match buffer fill 
+        /* When processing regular expressions, let the match buffer fill
            up and then shuffle the buffer contents down by half the buffer size
-           so that the regular expression has a single contiguous buffer to 
-           match against instead of the wrapping buffer paradigm which is 
+           so that the regular expression has a single contiguous buffer to
+           match against instead of the wrapping buffer paradigm which is
            used when no regular expression rules are in effect */
         memmove (exp->buf, &exp->buf[exp->buf_size/2], exp->buf_size-(exp->buf_size/2));
         exp->buf_ins -= exp->buf_size/2;
@@ -14268,7 +14268,7 @@ if (i != exp->size) {                                   /* Found? */
     setenv ("_EXPECT_MATCH_PATTERN", ep->match_pattern, 1);   /* Make the match detail available as an environment variable */
     if (ep->cnt > 0) {
         ep->cnt -= 1;
-        sim_debug (exp->dbit, exp->dptr, "Waiting for %d more match%s before stopping\n", 
+        sim_debug (exp->dbit, exp->dptr, "Waiting for %d more match%s before stopping\n",
                                          ep->cnt, (ep->cnt == 1) ? "" : "es");
         }
     else {
@@ -14290,7 +14290,7 @@ if (i != exp->size) {                                   /* Found? */
             }
         sim_activate (&sim_expect_unit,                 /* schedule simulation stop when indicated */
                       (switches & EXP_TYP_TIME) ?
-                            (int32)((sim_timer_inst_per_sec ()*after)/1000000.0) : 
+                            (int32)((sim_timer_inst_per_sec ()*after)/1000000.0) :
                             after);
         }
     /* Matched data is no longer available for future matching */
@@ -14319,10 +14319,10 @@ snd->insoff += size;
 snd->delay = (sim_switches & SWMASK ('T')) ? (uint32)((sim_timer_inst_per_sec()*delay)/1000000.0) : delay;
 snd->after = (sim_switches & SWMASK ('T')) ? (uint32)((sim_timer_inst_per_sec()*after)/1000000.0) : after;
 if (sim_switches & SWMASK ('T'))
-    sim_debug (snd->dbit, snd->dptr, "%d bytes queued for input. Delay %d usecs = %d insts, After %d usecs = %d insts\n", 
+    sim_debug (snd->dbit, snd->dptr, "%d bytes queued for input. Delay %d usecs = %d insts, After %d usecs = %d insts\n",
                                      (int)size, (int)delay, (int)snd->delay, (int)after, (int)snd->after);
 else
-    sim_debug (snd->dbit, snd->dptr, "%d bytes queued for input. Delay=%d, After=%d\n", 
+    sim_debug (snd->dbit, snd->dptr, "%d bytes queued for input. Delay=%d, After=%d\n",
                                      (int)size, (int)delay, (int)after);
 snd->next_time = sim_gtime() + snd->after;
 return SCPE_OK;
@@ -14434,7 +14434,7 @@ if (cond == (1+SCPE_MAX_ERR-SCPE_BASE)) {       /* not found? */
 *stat = cond;
 if (cond > SCPE_MAX_ERR)
     return SCPE_ARG;
-return SCPE_OK;    
+return SCPE_OK;
 }
 
 /* Abort and sanely close output files */
@@ -14554,8 +14554,8 @@ while ((eol = strchr (debug_line_buf, '\n')) || flush) {
             debug_line_count = 1;
             }
         else {
-            if (0 == memcmp (&debug_line_buf[endprefix - debug_line_buf], 
-                             &debug_line_buf_last[debug_line_buf_last_endprefix_offset], 
+            if (0 == memcmp (&debug_line_buf[endprefix - debug_line_buf],
+                             &debug_line_buf_last[debug_line_buf_last_endprefix_offset],
                              (eol - endprefix)+ 1)) {
                 ++debug_line_count;
                 memcpy (debug_line_last_prefix, debug_line_buf, (endprefix - debug_line_buf) + 3);
@@ -14611,8 +14611,8 @@ if (sim_deb == sim_log) {                               /* debug is log */
 
 if ((saved_deb_switches & SWMASK ('B')) != 0) {
     char saved_debug_filename[CBUFSIZE];
-    
-    snprintf (saved_debug_filename, sizeof (saved_debug_filename), "%u \"%s\"", 
+
+    snprintf (saved_debug_filename, sizeof (saved_debug_filename), "%u \"%s\"",
                            (uint32)(sim_deb_buffer_size / (1024 * 1024)), sim_logfile_name (sim_deb, sim_deb_ref));
     sim_quiet = 1;
     sim_set_deboff (0, NULL);
@@ -14678,8 +14678,8 @@ if (sim_deb_switches & (SWMASK ('T') | SWMASK ('R') | SWMASK ('A'))) {
     }
 if (sim_deb_switches & SWMASK ('P')) {
     t_value val;
-    
-    /* Some simulators expose the PC as a register, some don't expose it or expose a register 
+
+    /* Some simulators expose the PC as a register, some don't expose it or expose a register
        which is not a variable which is updated during instruction execution (i.e. only upon
        exit of sim_instr()).  For the -P debug option to be effective, such a simulator should
        provide a routine which returns the value of the current PC and set the sim_vm_pc_value
@@ -14743,7 +14743,7 @@ for (i = fields-1; i >= 0; i--) {                   /* print xlation, transition
    indicating the state and transition of the bit and bitfields. States:
    0=steady(0->0), 1=steady(1->1), _=falling(1->0), ^=rising(0->1) */
 
-void sim_debug_bits_hdr(uint32 dbits, DEVICE* dptr, const char *header, 
+void sim_debug_bits_hdr(uint32 dbits, DEVICE* dptr, const char *header,
     BITFIELD* bitdefs, uint32 before, uint32 after, int terminate)
 {
 if (sim_deb && dptr && (dptr->dctrl & dbits)) {
@@ -14931,9 +14931,9 @@ return stat | ((stat != SCPE_OK) ? SCPE_NOMESSAGE : 0);
    set and the bitmask matches the current device debug options.
    Extra returns are added for un*x systems, since the output
    device is set into 'raw' mode when the cpu is booted,
-   and the extra returns don't hurt any other systems. 
+   and the extra returns don't hurt any other systems.
    Callers should be calling sim_debug() which is a macro
-   defined in scp.h which evaluates the action condition before 
+   defined in scp.h which evaluates the action condition before
    incurring call overhead. */
 void _sim_vdebug (uint32 dbits, DEVICE* dptr, UNIT *uptr, const char* fmt, va_list arglist)
 {
@@ -15164,8 +15164,8 @@ if (sim_mfile || (sim_deb && (f == sim_deb))) {
 #endif                                                  /* NO_vsnprintf */
         va_end (arglist);
 
-        /* If the formatted result didn't fit into the buffer, 
-         * then grow the buffer and try again 
+        /* If the formatted result didn't fit into the buffer,
+         * then grow the buffer and try again
          */
 
         if ((len < 0) || (len >= bufsize-1)) {
@@ -15183,7 +15183,7 @@ if (sim_mfile || (sim_deb && (f == sim_deb))) {
         break;
         }
 
-    /* Store the formatted data with priority to a 
+    /* Store the formatted data with priority to a
        memory file vs debug de-duplication*/
 
     if (sim_mfile) {
@@ -15292,7 +15292,7 @@ static void appendText (TOPIC *topic, const char *text, size_t len)
 {
 char *newt;
 
-if (!len) 
+if (!len)
     return;
 
 newt = (char *)realloc (topic->text, topic->len + len +1);
@@ -15439,7 +15439,7 @@ for (hblock = astrings; (htext = *hblock) != NULL; hblock++) {
                                                 appendText (topic, "    ", 4);
                                             }
                                         start = ep;
-                                        } 
+                                        }
                                     else
                                         ep++;
                                     }
@@ -15475,7 +15475,7 @@ for (hblock = astrings; (htext = *hblock) != NULL; hblock++) {
             if (n <= topic->level) {            /* Find level for new topic */
                 while (n <= topic->level)
                     topic = topic->parent;
-                } 
+                }
             else {
                 if (n > topic->level +1) {      /* Skipping down more than 1 */
                     FAIL (SCPE_ARG, Level not contiguous, htext); /* E.g. 1 3, not reasonable */
@@ -15582,7 +15582,7 @@ if (topic->level == 0) {
         FAIL (SCPE_MEM, No memory, NULL);
         }
     prefix[0] = '\n';
-    } 
+    }
 else
     prefix = helpPrompt (topic->parent, "", oneword);
 
@@ -15627,7 +15627,7 @@ if (!tmp) {
     fprintf (st, "Unable to create temporary file: %s\n", strerror (errno));
     return;
     }
-    
+
 if (topic->title) {
     fprintf (st, "%s\n", topic->title+1);
 
@@ -15678,7 +15678,7 @@ if (topic->flags & HLP_MAGIC_TOPIC) {
     }
 else
     fprintf (st, "\n%s %s\n", topic->label, topic->title);
-    
+
 /* Topic text (for magic topics, follows for explanations)
  * It's possible/reasonable for a magic topic to have no text.
  */
@@ -15712,7 +15712,7 @@ for (i = 0; i < topic->kids; i++) {
     while (*cptr) {
         if (blankch (*cptr)) {
             *cptr++ = '_';
-            } 
+            }
         else {
             *cptr = (char)sim_toupper (*cptr);
             cptr++;
@@ -15766,11 +15766,11 @@ if ((failed = setjmp (help_env)) != 0) {
     fprintf (stderr, "\nHelp was unable to process the help for this device.\n"
                      "Error in block %u line %u: %s\n"
                      "%s%*.*s%s"
-                     " Please contact the device maintainer.\n", 
-             (int)help_where.block, (int)help_where.line, help_where.error, 
-             help_where.prox ? "Near '" : "", 
-             help_where.prox ? 15 : 0, help_where.prox ? 15 : 0, 
-             help_where.prox ? help_where.prox : "", 
+                     " Please contact the device maintainer.\n",
+             (int)help_where.block, (int)help_where.line, help_where.error,
+             help_where.prox ? "Near '" : "",
+             help_where.prox ? 15 : 0, help_where.prox ? 15 : 0,
+             help_where.prox ? help_where.prox : "",
                  help_where.prox ? "'" : "");
     cleanHelp (&top);
     return failed;
@@ -15876,7 +15876,7 @@ while (TRUE) {
 
         fprintf (st, "\n    Additional information available:\n\n");
         for (i = 0; i < topic->kids; i++) {
-            strlcpy (tbuf, topic->children[i]->title + 
+            strlcpy (tbuf, topic->children[i]->title +
                     ((topic->children[i]->flags & HLP_MAGIC_TOPIC)? 1 : 0),
                     sizeof (tbuf));
             for (p = tbuf; *p; p++) {
@@ -16028,13 +16028,13 @@ if (fp == NULL) {
         if ((p = strrchr (fbuf, '\\'))) {
             p[1] = '\0';
             d = "%s\\";
-            } 
+            }
         else {
             if ((p = strrchr (fbuf, '/'))) {
                 p[1] = '\0';
                 d = "%s/";
 #ifdef VMS
-                } 
+                }
             else {
                 if ((p = strrchr (fbuf, ']'))) {
                     p[1] = '\0';
@@ -16112,7 +16112,7 @@ return r;
 
 /*
  * Expression evaluation package
- * 
+ *
  * Derived from code provided by Gabriel Pizzolato
  */
 
@@ -16204,10 +16204,10 @@ strcpy (data, this_Stack->elements[this_Stack->pointer-1].data);
 --this_Stack->pointer;
 
 if (*op)
-    sim_debug (SIM_DBG_EXP_STACK, &sim_scp_dev, "[Stack %d - Popping '%s'(precedence %d)]\n", 
+    sim_debug (SIM_DBG_EXP_STACK, &sim_scp_dev, "[Stack %d - Popping '%s'(precedence %d)]\n",
                                                 this_Stack->id, (*op)->string, (*op)->precedence);
 else
-    sim_debug (SIM_DBG_EXP_STACK, &sim_scp_dev, "[Stack %d - Popping %s]\n", 
+    sim_debug (SIM_DBG_EXP_STACK, &sim_scp_dev, "[Stack %d - Popping %s]\n",
                                                 this_Stack->id, data);
 
 return TRUE;                      /* Success */
@@ -16232,10 +16232,10 @@ strlcpy (this_Stack->elements[this_Stack->pointer].data, data, sizeof (this_Stac
 ++this_Stack->pointer;
 
 if (op)
-    sim_debug (SIM_DBG_EXP_STACK, &sim_scp_dev, "[Stack %d - Pushing '%s'(precedence %d)]\n", 
+    sim_debug (SIM_DBG_EXP_STACK, &sim_scp_dev, "[Stack %d - Pushing '%s'(precedence %d)]\n",
                                                 this_Stack->id, op->string, op->precedence);
 else
-    sim_debug (SIM_DBG_EXP_STACK, &sim_scp_dev, "[Stack %d - Pushing %s]\n", 
+    sim_debug (SIM_DBG_EXP_STACK, &sim_scp_dev, "[Stack %d - Pushing %s]\n",
                                                 this_Stack->id, data);
 
 return TRUE;                      /* Success */
@@ -16253,10 +16253,10 @@ strcpy (data, this_Stack->elements[this_Stack->pointer-1].data);
 *op = this_Stack->elements[this_Stack->pointer-1].op;
 
 if (*op)
-    sim_debug (SIM_DBG_EXP_STACK, &sim_scp_dev, "[Stack %d - Topping '%s'(precedence %d)]\n", 
+    sim_debug (SIM_DBG_EXP_STACK, &sim_scp_dev, "[Stack %d - Topping '%s'(precedence %d)]\n",
                                                 this_Stack->id, (*op)->string, (*op)->precedence);
 else
-    sim_debug (SIM_DBG_EXP_STACK, &sim_scp_dev, "[Stack %d - Topping %s]\n", 
+    sim_debug (SIM_DBG_EXP_STACK, &sim_scp_dev, "[Stack %d - Topping %s]\n",
                                                 this_Stack->id, data);
 
 return TRUE;                      /* Success */
@@ -16405,8 +16405,8 @@ static t_svalue _op_str_gt (const char *str1, const char *str2)
 return (0 > _i_strcmp (str2, str1));
 }
 
-/* 
- * The order of elements in this array is significant.  
+/*
+ * The order of elements in this array is significant.
  * Care must be taken so that longer strings which have
  * shorter strings contained in them must come first.
  * For example "!=" must come before "!".
@@ -16562,8 +16562,8 @@ return cptr;
 }
 
 /*
- * Translate a string containing an infix ordered expression 
- * into a stack containing that expression in postfix order 
+ * Translate a string containing an infix ordered expression
+ * into a stack containing that expression in postfix order
  */
 static const char *sim_into_postfix (Stack *stack1, const char *cptr, t_stat *stat, t_bool parens_required)
 {
@@ -16663,7 +16663,7 @@ if (sim_isalpha (*data) || (*data == '_')) {
     REG *rptr = NULL;
     DEVICE *dptr = sim_dfdev;
     const char *dot;
-    
+
     dot = strchr (data, '.');
     if (dot) {
         char devnam[CBUFSIZE];
@@ -16722,7 +16722,7 @@ return ((*gptr == '\0') && (*string));
 }
 
 /*
- * Evaluate a given stack1 containing a postfix expression 
+ * Evaluate a given stack1 containing a postfix expression
  */
 static t_svalue sim_eval_postfix (Stack *stack1, t_stat *stat)
 {
@@ -16737,10 +16737,10 @@ char temp_string[CBUFSIZE + 2];
 while (!isempty_Stack(stack1)) {
     pop_Stack (stack1, temp_data, &temp_op);
     if (temp_op)
-        sim_debug (SIM_DBG_EXP_EVAL, &sim_scp_dev, "[Expression element: %s (%d)\n", 
+        sim_debug (SIM_DBG_EXP_EVAL, &sim_scp_dev, "[Expression element: %s (%d)\n",
                                                    temp_op->string, temp_op->precedence);
     else
-        sim_debug (SIM_DBG_EXP_EVAL, &sim_scp_dev, "[Expression element: %s\n", 
+        sim_debug (SIM_DBG_EXP_EVAL, &sim_scp_dev, "[Expression element: %s\n",
                                                    temp_data);
     push_Stack (stack2, temp_data, temp_op);
     }
@@ -16766,7 +16766,7 @@ while (!isempty_Stack(stack2)) {
         if (temp_op->unary)
             strlcpy (item2, "0", sizeof (item2));
         else {
-            if ((!pop_Stack (stack1, item2, &op2)) && 
+            if ((!pop_Stack (stack1, item2, &op2)) &&
                 (temp_op->string[0] != '-') &&
                 (temp_op->string[0] != '+')) {
                 *stat = SCPE_INVEXPR;
@@ -16818,7 +16818,7 @@ return cptr;
 
 /*
  * To avoid Coverity complaints about the use of rand() we define the function locally
- * This implementation of Lehmer's minimal standard algorithm is derived 
+ * This implementation of Lehmer's minimal standard algorithm is derived
  * from the integer solution provided in:
  " "Communications of the ACM, October 1988, Volume 31, Number 10, page 1195"
  */
@@ -16916,8 +16916,8 @@ free (f);
 
 /*
  * This sanity check walks through the all of simulator's device registers
- * to verify that each contains a reasonable description of a method to 
- * access the devices simulator data and that description stays within the 
+ * to verify that each contains a reasonable description of a method to
+ * access the devices simulator data and that description stays within the
  * device state variables it is supposed to reference.
  */
 
@@ -16981,8 +16981,8 @@ for (i = 0; (dptr = devices[i]) != NULL; i++) {
             }
 
         if (sim_switches & SWMASK ('R'))            /* Debug output */
-            sim_printf ("%5s:%-9.9s %s%s%s(rdx=%u, wd=%u, off=%u, dep=%u, strsz=%u, objsz=%u, oobjsz=%u, elesz=%u, rsz=%u, %s%s%s%s membytes=%u)\n", 
-                        dptr->name, rptr->name, rptr->desc ? rptr->desc : "", rptr->desc ? "\n\t" : "", rptr->macro ? rptr->macro : "", 
+            sim_printf ("%5s:%-9.9s %s%s%s(rdx=%u, wd=%u, off=%u, dep=%u, strsz=%u, objsz=%u, oobjsz=%u, elesz=%u, rsz=%u, %s%s%s%s membytes=%u)\n",
+                        dptr->name, rptr->name, rptr->desc ? rptr->desc : "", rptr->desc ? "\n\t" : "", rptr->macro ? rptr->macro : "",
                         rptr->radix, rptr->width, rptr->offset, rptr->depth, (uint32)rptr->stride, (uint32)rptr->obj_size, (uint32)rptr->pobj_size, (uint32)rptr->size, rsz,
                         (rptr->flags & REG_VMAD) ? " REG_VMAD" : "", (rptr->flags & REG_VMIO) ? " REG_VMIO" : "",
                         (rptr->flags & REG_DEPOSIT) ? " REG_DEPOSIT" : "", (rptr->flags & REG_DEPOSIT) ? " REG_DOUBLE" : "", memsize);
@@ -17019,7 +17019,7 @@ for (i = 0; (dptr = devices[i]) != NULL; i++) {
                     Bad = TRUE;
                     Mprintf (f, "%s %s:%s array seems to not have naturally aligned elements with a stride of %u and depth of %u\n", sim_name, dptr->name, rptr->name, (uint32)rptr->stride, (uint32)rptr->depth);
                     }
-                if ((memcmp (rptr->macro, "BRDATA", 6) == 0) && 
+                if ((memcmp (rptr->macro, "BRDATA", 6) == 0) &&
                     ((rptr->depth * rptr->stride) > rptr->obj_size)) {
                     Bad = TRUE;
                     Mprintf (f, "%s %s:%s stride of %u and depth of %u is unreasonable and access will reach beyond the array upper bound\n", sim_name, dptr->name, rptr->name, (uint32)rptr->stride, (uint32)rptr->depth);
@@ -17074,7 +17074,7 @@ for (i = 0; (dptr = devices[i]) != NULL; i++) {
                     if (!Bad)
                         if ((rsz * rptr->depth == rptr->pobj_size)                                                   ||
                             ((rptr->macro && (strstr (rptr->macro, "STRDATA") != NULL)) && (rsz <= rptr->pobj_size)) ||
-                            ((rptr->depth == 1) && 
+                            ((rptr->depth == 1) &&
                              ((rptr->pobj_size == sizeof (t_value)) || (rsz < rptr->pobj_size)))         ||
                             ((rptr->depth != 1) && (bytes == rptr->pobj_size))                           ||
                             ((rptr->depth != 1) && (rptr->offset == 0) && (rptr->width == 8) &&
@@ -17232,13 +17232,13 @@ static struct validation_test {
     };
 
 static DEVICE validate_test = {
-    "TEST-REG", validate_units, NULL, NULL, 
+    "TEST-REG", validate_units, NULL, NULL,
     3, 16, 22, 4, 16, 16};
 
 static t_stat test_register_validation (void)
 {
 struct validation_test *v;
-DEVICE *v_devs[] = {&validate_test, 
+DEVICE *v_devs[] = {&validate_test,
                    NULL};
 t_stat tstat, stat = SCPE_OK;
 
@@ -17358,7 +17358,7 @@ while (t->function_name) {
         remainder = t->function (input, gbuf, d->end_char);
         if (sim_switches & SWMASK ('T'))
             sim_messagef (SCPE_OK, "%s (\"%s\", gbuf, %s);\n", t->function_name, input, end_char_string);
-        if ((0 != strcmp (gbuf, d->expected_result)) || 
+        if ((0 != strcmp (gbuf, d->expected_result)) ||
             (remainder == NULL) || (0 != strcmp (remainder, d->expected_remainder))) {
             if (0 != strcmp (gbuf, d->expected_result))
                 result = sim_messagef (SCPE_IERR, "function: %s (\"%s\", gbuf, %s); returned an unexpected result string: \"%s\" instead of \"%s\"\n", t->function_name, input, end_char_string, gbuf, d->expected_result);
@@ -17396,9 +17396,9 @@ static struct parse_arg_function_test {
                  {2, {"", "1", NULL}}},
         {"1 2 3 4",
                  {5, {"", "1", "2", "3", "4", NULL}}},
-        {"'1 2 3 4'",  
+        {"'1 2 3 4'",
                  {2, {"", "1 2 3 4", NULL}}},
-        {"1 \"2\" 3 4",  
+        {"1 \"2\" 3 4",
                  {5, {"", "1", "2", "3", "4", NULL}}},
         {NULL}
     };
@@ -17555,7 +17555,7 @@ return r;
 }
 
 /*
- * Compiled in unit tests for the various device oriented library 
+ * Compiled in unit tests for the various device oriented library
  * modules: sim_card, sim_disk, sim_tape, sim_ether, sim_tmxr, etc.
  */
 

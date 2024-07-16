@@ -118,10 +118,10 @@ return "SCP FIO Testing";
 static UNIT sim_fio_unit = { 0 };
 
 static DEVICE sim_fio_test_dev = {
-    "SCP-FIO", &sim_fio_unit, NULL, NULL, 
-    1, 0, 0, 0, 0, 0, 
-    NULL, NULL, NULL, NULL, NULL, NULL, 
-    NULL, DEV_NOSAVE|DEV_DEBUG, 0, 
+    "SCP-FIO", &sim_fio_unit, NULL, NULL,
+    1, 0, 0, 0, 0, 0,
+    NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, DEV_NOSAVE|DEV_DEBUG, 0,
     fio_debug, NULL, NULL, NULL, NULL, NULL,
     sim_fio_test_description};
 
@@ -170,7 +170,7 @@ unsigned char by, *sptr, *dptr;
 if (sim_end || (count == 0) || (size == sizeof (char)))
     return;
 for (j = 0, dptr = sptr = (unsigned char *) bptr;       /* loop on items */
-     j < count; j++) { 
+     j < count; j++) {
     for (k = (int32)(size - 1); k >= (((int32) size + 1) / 2); k--) {
         by = *sptr;                                     /* swap end-for-end */
         *sptr++ = *(dptr + k);
@@ -435,7 +435,7 @@ return dest;
  *      1 - 20 21 22 23 24 25 26 27
  *      1 - 28 29 30 31 32 33 34 35
  *
- *  DLD9 packing/encoding is:   
+ *  DLD9 packing/encoding is:
  *          9 character per pair of 36 bit words.
  *
  *    36b   Bit numbers using              bit
@@ -462,27 +462,27 @@ return dest;
  *      1 - B0  1  2  3  4  5  6  7
  */
 
-uint32 int32_data[] = {  0x00000000,  0x00000001,  0x00000002,  0x00000003, 
-                         0x00000004,  0x00000005,  0x00000006,  0x00000007, 
+uint32 int32_data[] = {  0x00000000,  0x00000001,  0x00000002,  0x00000003,
+                         0x00000004,  0x00000005,  0x00000006,  0x00000007,
                          0x00000008,  0x00000009,  0x0000000A,  0x0000000B,
                          0x0000000C,  0x0000000D,  0x0000000E,  0x0000000F};
-uint32 res_32bitM[] = {  0x00000000,  0x01000000,  0x02000000,  0x03000000, 
-                         0x04000000,  0x05000000,  0x06000000,  0x07000000, 
+uint32 res_32bitM[] = {  0x00000000,  0x01000000,  0x02000000,  0x03000000,
+                         0x04000000,  0x05000000,  0x06000000,  0x07000000,
                          0x08000000,  0x09000000,  0x0A000000,  0x0B000000,
                          0x0C000000,  0x0D000000,  0x0E000000,  0x0F000000};
-uint32 res_32_1[] =   {  0,  1,  0,  1, 
-                         0,  1,  0,  1, 
+uint32 res_32_1[] =   {  0,  1,  0,  1,
+                         0,  1,  0,  1,
                          0,  1,  0,  1,
                          0,  1,  0,  1};
 uint16 int16_data[] = { 0x1234, 0x5678,
                         0x9ABC, 0xDEF0};
 uint16 res_16bit[] =  { 0x3412, 0x7856,
                         0xBC9A, 0xF0DE};
-uint8 res_8bit[] = {  0,  1,  2,  3, 
-                      4,  5,  6,  7, 
+uint8 res_8bit[] = {  0,  1,  2,  3,
+                      4,  5,  6,  7,
                       8,  9, 10, 11,
                      12, 13, 14, 15};
-uint8 res_4bit[] = {  0x10,  0x32, 0x54, 0x76, 
+uint8 res_4bit[] = {  0x10,  0x32, 0x54, 0x76,
                       0x98,  0xba, 0xdc, 0xfe};
 uint8 res_2bit[] = {  0xE4,  0xE4, 0xE4, 0xE4};
 uint8 res_1bit[] = {  0xAA,  0xAA};
@@ -642,9 +642,9 @@ static struct get_filelist_test {
           NULL},
          "file.txt", 1},
         {"test-similar deep file names",
-         {"aab/bbc/ccd/eef/file.txt", 
-          "aab/bbc/ccd/eef/file2.txt", 
-          "aac/bbd/cce/eef/file2.txt", 
+         {"aab/bbc/ccd/eef/file.txt",
+          "aab/bbc/ccd/eef/file2.txt",
+          "aac/bbd/cce/eef/file2.txt",
           NULL},
          "file.txt", 1},
         {"test-single file no subdirectories",
@@ -652,15 +652,15 @@ static struct get_filelist_test {
           NULL},
          "file.txt", 1},
         {"test-3 text files in the same 4 deep subdirectory",
-         {"aab/bbc/ccd/eef/file.txt", 
-          "aab/bbc/ccd/eef/file2.txt", 
-          "aac/bbd/cce/eef/file2.txt", 
+         {"aab/bbc/ccd/eef/file.txt",
+          "aab/bbc/ccd/eef/file2.txt",
+          "aac/bbd/cce/eef/file2.txt",
           NULL},
          "*.txt", 3},
         {"test-2 text files",
-         {"xab/bbc/ccd/eef/file.txt", 
-          "xab/bbc/ccd/eef/file2.bbb", 
-          "xac/bbd/cce/eef/file2.txt", 
+         {"xab/bbc/ccd/eef/file.txt",
+          "xab/bbc/ccd/eef/file2.bbb",
+          "xac/bbd/cce/eef/file2.txt",
           NULL},
          "*.txt", 2},
         {NULL},
@@ -774,7 +774,7 @@ for (rt = r_test, tests = 0; rt->input; ++rt) {
     sim_chdir (origcwd);
     if ((rt->extra_dir != NULL) && (mkdir_stat == SCPE_OK)) {
         char *xdir = strdup (rt->extra_dir);
-        
+
         sim_rmdir (rt->extra_dir);
         while ((cp = strrchr (xdir, '/')) != NULL) {
             *cp = '\0';
@@ -784,7 +784,7 @@ for (rt = r_test, tests = 0; rt->input; ++rt) {
         }
     if ((rt->working_dir != NULL) && (mkdir_stat == SCPE_OK)) {
         char *xdir = strdup (rt->working_dir);
-        
+
         sim_rmdir (rt->working_dir);
         while ((cp = strrchr (xdir, '/')) != NULL) {
             *cp = '\0';
@@ -843,7 +843,7 @@ for (gt = get_test, tests = 0; gt->name; ++gt) {
     snprintf (xpath, sizeof (xpath), "%s", gt->search);
     filelist = sim_get_filelist (xpath);
     sim_chdir ("..");
-    r |= sim_messagef ((gt->expected_count != sim_count_filelist (filelist)) ? SCPE_IERR : SCPE_OK, 
+    r |= sim_messagef ((gt->expected_count != sim_count_filelist (filelist)) ? SCPE_IERR : SCPE_OK,
                       "sim_get_filelist (\"%s\") yielded %d entries, expected %d entries:\n", xpath, sim_count_filelist (filelist), gt->expected_count);
     sim_print_filelist (filelist);
     sim_free_filelist (&filelist);
@@ -1022,7 +1022,7 @@ void sim_clear_get_filelist_skip_directories (void)
 sim_free_filelist (&filelist_skip_directories);
 }
 
-static void _sim_dirlist_entry (const char *directory, 
+static void _sim_dirlist_entry (const char *directory,
                                  const char *filename,
                                  t_offset FileSize,
                                  const struct stat *filestat,
@@ -1078,13 +1078,13 @@ if (*filename != '\0') {
 
 /*
  * Compare two file names ignoring possibly different path separators
- * 
+ *
  * Return value
  *    -1 - names are different
  *     0 - names are equal
- *     1 - names equal first one is preferred on this platform - 
+ *     1 - names equal first one is preferred on this platform -
  *         path separators are locally appropriate.
- *     2 - names equal second one is preferred on this platform - 
+ *     2 - names equal second one is preferred on this platform -
  *         path separators are locally appropriate.
  */
 static int _sim_filename_compare (const char *name1,
@@ -1162,7 +1162,7 @@ sim_debug (FIO_DBG_SCAN, &sim_fio_test_dev, "_sim_filename_compare(\"%s\", \"%s\
 return result;
 }
 
-static void _sim_filelist_entry (const char *directory, 
+static void _sim_filelist_entry (const char *directory,
                                  const char *filename,
                                  t_offset FileSize,
                                  const struct stat *filestat,
@@ -1369,9 +1369,9 @@ return (t_offset)(ftello64 (st));
 
 /* Apple OS/X */
 
-#if defined (__APPLE__) || defined (__FreeBSD__) || defined(__NetBSD__) || defined (__OpenBSD__) || defined (__CYGWIN__) 
+#if defined (__APPLE__) || defined (__FreeBSD__) || defined(__NetBSD__) || defined (__OpenBSD__) || defined (__CYGWIN__)
 #define S_SIM_IO_FSEEK_EXT_ 1
-int sim_fseeko (FILE *st, t_offset xpos, int origin) 
+int sim_fseeko (FILE *st, t_offset xpos, int origin)
 {
 return fseeko (st, (off_t)xpos, origin);
 }
@@ -1442,7 +1442,7 @@ static void _time_t_to_filetime (time_t ttime, FILETIME *filetime)
 {
 t_uint64 time64;
 
-time64 = 134774;                /* Days betwen Jan 1, 1601 and Jan 1, 1970 */
+time64 = 134774;                /* Days between Jan 1, 1601 and Jan 1, 1970 */
 time64 *= 24;                   /* Hours */
 time64 *= 3600;                 /* Seconds */
 time64 += (t_uint64)ttime;      /* include time_t seconds */
@@ -1540,7 +1540,7 @@ if (AlreadyExists) {
 else
     *((DWORD *)((*shmem)->shm_base)) = (DWORD)size;     /* Save Size in first page */
 
-*addr = ((char *)(*shmem)->shm_base + SysInfo.dwPageSize);      /* Point to the second paget for data */
+*addr = ((char *)(*shmem)->shm_base + SysInfo.dwPageSize);      /* Point to the second page for data */
 return SCPE_OK;
 }
 
@@ -1801,8 +1801,8 @@ return FALSE;
 #endif /* defined (_WIN32) */
 
 #if defined(__VAX)
-/* 
- * We privide a 'basic' snprintf, which 'might' overrun a buffer, but
+/*
+ * We provide a 'basic' snprintf, which 'might' overrun a buffer, but
  * the actual use cases don't on other platforms and none of the callers
  * care about the function return value.
  */
@@ -1846,11 +1846,11 @@ return result;
  *    %~pnI%      - expands filepath value to a path and name only
  *    %~nxI%      - expands filepath value to a file name and extension only
  *
- * In the above example above %I% can be replaced by other 
+ * In the above example above %I% can be replaced by other
  * environment variables or numeric parameters to a DO command
  * invocation.
  *
- * This routine returns an allocated buffer which must be freed by the 
+ * This routine returns an allocated buffer which must be freed by the
  * caller as needed to avoid leaking memory.
  */
 
@@ -1873,7 +1873,7 @@ filepath = namebuf;
 
 /* Check for full or current directory relative path */
 if ((filepath[1] == ':')  ||
-    (filepath[0] == '/')  || 
+    (filepath[0] == '/')  ||
     (filepath[0] == '\\')){
         tot_len = 1 + strlen (filepath);
         fullpath = (char *)malloc (tot_len);
@@ -2005,7 +2005,7 @@ return result;
 /*
  * relative file path processing
  *
- *    Input is a filepath which may contain either / or \ directory 
+ *    Input is a filepath which may contain either / or \ directory
  *    separators (or both) and always returns a relative or complete path
  *    with / directory separators.
  */
@@ -2079,7 +2079,7 @@ else {
     }
 if (updirs > 0) {
     if ((offset == 3) &&                /* if only match windows drive letter? */
-        (wd[1] == ':') && 
+        (wd[1] == ':') &&
         (wd[2] == dsep))
         offset = 0;                     /* */
     if ((offset > 0) && (updirs != cwd_dirs)) {
@@ -2126,7 +2126,7 @@ if ((hFind =  FindFirstFileA (cptr, &File)) != INVALID_HANDLE_VALUE) {
     c = strrchr (DirName, '\\');
     *c = '\0';                                  /* Truncate to just directory path */
     if (!pathsep ||                             /* Separator wasn't mentioned? */
-        (slash && (0 == strcmp (slash, "/*")))) 
+        (slash && (0 == strcmp (slash, "/*"))))
         pathsep = "\\";                         /* Default to Windows backslash */
     if (*pathsep == '/') {                      /* If slash separator? */
         while ((c = strchr (DirName, '\\')))
@@ -2622,10 +2622,10 @@ static t_bool _source_problem_check (FILE_STATS *Stats)
 {
 t_bool result = FALSE;
 
-if ((!Stats->IsInScpDir) && 
-    ((Stats->MissingIncludeCount != 0) || 
-     (Stats->OtherSysIncludeCount != 0) || 
-     (Stats->PlatformDefineCount != 0)  || 
+if ((!Stats->IsInScpDir) &&
+    ((Stats->MissingIncludeCount != 0) ||
+     (Stats->OtherSysIncludeCount != 0) ||
+     (Stats->PlatformDefineCount != 0)  ||
      (Stats->ScpAPICount != 0))) {
     result |= _source_problem_emit (Stats->RelativePath, "MissingInclude", Stats->MissingIncludeCount, Stats->MissingIncludes);
     result |= _source_problem_emit (Stats->RelativePath, "OtherSysInclude", Stats->OtherSysIncludeCount, Stats->OtherSysIncludes);
@@ -2635,9 +2635,9 @@ if ((!Stats->IsInScpDir) &&
 return result;
 }
 
-static void _check_source_check_file (const char *directory, 
-                                      const char *filename, 
-                                      t_offset FileSize, 
+static void _check_source_check_file (const char *directory,
+                                      const char *filename,
+                                      t_offset FileSize,
                                       FILE_STATS *Stats)
 {
 char filepath[PATH_MAX + 1];
@@ -2646,10 +2646,10 @@ char *data;
 char *extension;
 char *dir;
 t_offset byte;
-size_t lfcount = 0, 
-       crlfcount = 0, 
-       tabcount = 0, 
-       wscount = 0, 
+size_t lfcount = 0,
+       crlfcount = 0,
+       tabcount = 0,
+       wscount = 0,
        bincount = 0;
 const char *errmsg;
 
@@ -2678,7 +2678,7 @@ if ((!Stats->IsInScpDir) && (sim_check_scp_dir != NULL)) {
     }
 free (dir);
 f = fopen (filepath, "rb");
-if ((f == NULL) || 
+if ((f == NULL) ||
     ((size_t)FileSize != fread (data, 1, (size_t)FileSize, f))) {
     fprintf (stderr, "Error Opening or Reading: %s - %s\n", filepath, strerror (errno));
     fclose (f);
@@ -2816,7 +2816,7 @@ if (Stats->IsSource) {
             char before = *(found - 1);
             char after = *(found + strlen (*platform_define));
 
-            if ((isalpha (before) || (before == '_') || 
+            if ((isalpha (before) || (before == '_') ||
                 (isalpha (after)  || (after  == '_'))))
                 continue;
             ++Stats->PlatformDefineCount;
@@ -2849,7 +2849,7 @@ typedef struct CHECK_STATS {
     FILE_STATS **Files;
     } CHECK_STATS;
 
-static void _check_source_directory_check (const char *directory, 
+static void _check_source_directory_check (const char *directory,
                                            const char *filename,
                                            t_offset FileSize,
                                            const struct stat *filestat,
@@ -2864,10 +2864,10 @@ if (filestat->st_mode & S_IFDIR) {
     char pathsep = directory[strlen (directory) - 1];
 
     /* Ignore directory self and parent */
-    if ((0 == strcmp (filename, ".")) || 
+    if ((0 == strcmp (filename, ".")) ||
         (0 == strcmp (filename, "..")))
         return;
-        
+
     /* Ignore uninteresting directories */
     while (*skip_dir != NULL) {
         if (0 == strcmp (filename, *skip_dir))
@@ -2886,7 +2886,7 @@ else {
     }
 }
 
-static void _check_source_scp_check (const char *directory, 
+static void _check_source_scp_check (const char *directory,
                        const char *filename,
                        t_offset FileSize,
                        const struct stat *filestat,
@@ -2920,8 +2920,8 @@ free (list);
 
 static void _sim_check_source_file_report (FILE_STATS *File, int maxnamelen, t_stat stat, int *SourceLineCount, int *SourceByteCount)
 {
-if ((sim_switches & SWMASK ('D')) || (File->ProblemFile) || 
-    ((stat != SCPE_OK) && 
+if ((sim_switches & SWMASK ('D')) || (File->ProblemFile) ||
+    ((stat != SCPE_OK) &&
      ((File->HasSimSockInclude) || (File->BenignIncludeCount != 0)))) {
     sim_printf ("%*.*s   ", -maxnamelen, -maxnamelen, File->RelativePath);
     sim_printf ("%8u bytes", (unsigned int)File->FileSize);
@@ -3062,7 +3062,7 @@ for (file = 0; file < Stats->FileCount; file++) {
         ++Stats->ProblemFiles;
     }
 /* Report Results */
-if ((sim_check_scp_dir != NULL) && 
+if ((sim_check_scp_dir != NULL) &&
     ((sim_switches & SWMASK ('D')) || (Stats->ProblemFiles > 0))) {
     sim_printf ("scp.c directory: %s\n", sim_relative_path (sim_check_scp_dir));
     free (sim_check_scp_dir);

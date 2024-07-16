@@ -31,12 +31,12 @@
   01-Mar-12  AGN  Cygwin doesn't have non-blocking pcap I/O pcap (it uses WinPcap)
   17-Nov-11  MP   Added dynamic loading of libpcap on *nix platforms
   30-Oct-11  MP   Added support for vde (Virtual Distributed Ethernet) networking
-  18-Apr-11  MP   Fixed race condition with self loopback packets in 
+  18-Apr-11  MP   Fixed race condition with self loopback packets in
                   multithreaded environments
   09-Dec-10  MP   Added support to determine if network address conflicts exist
   07-Dec-10  MP   Reworked DECnet self detection to the more general approach
                   of loopback self when any Physical Address is being set.
-  04-Dec-10  MP   Changed eth_write to do nonblocking writes when 
+  04-Dec-10  MP   Changed eth_write to do nonblocking writes when
                   USE_READER_THREAD is defined.
   07-Feb-08  MP   Added eth_show_dev to display ethernet state
   28-Jan-08  MP   Added eth_set_async
@@ -52,7 +52,7 @@
   14-Nov-03  DTH  Added #ifdef DECNET_FIX for problematic duplicate detection code
   07-Jun-03  MP   Added WIN32 support for DECNET duplicate address detection.
   05-Jun-03  DTH  Added used to struct eth_packet
-  01-Feb-03  MP   Changed some uint8 strings to char* to reflect usage 
+  01-Feb-03  MP   Changed some uint8 strings to char* to reflect usage
   22-Oct-02  DTH  Added all_multicast and promiscuous support
   21-Oct-02  DTH  Corrected copyright again
   16-Oct-02  DTH  Fixed copyright
@@ -82,7 +82,7 @@ extern "C" {
 #define USE_SETNONBLOCK 1
 #endif
 
-/* cygwin dowsn't have the right features to use the threaded network I/O */
+/* cygwin doesn't have the right features to use the threaded network I/O */
 #if defined(__CYGWIN__) || defined(__ZAURUS__) // psco added check for Zaurus platform
 #define DONT_USE_READER_THREAD
 #endif
@@ -135,9 +135,9 @@ extern "C" {
 #endif
 
 /*
-  USE_BPF is defined to let this code leverage the libpcap/OS kernel provided 
-  BPF packet filtering.  This generally will enhance performance.  It may not 
-  be available in some environments and/or it may not work correctly, so 
+  USE_BPF is defined to let this code leverage the libpcap/OS kernel provided
+  BPF packet filtering.  This generally will enhance performance.  It may not
+  be available in some environments and/or it may not work correctly, so
   undefining this will still provide working code here.
 */
 #if defined(HAVE_PCAP_NETWORK)
@@ -332,7 +332,7 @@ t_stat eth_open   (ETH_DEV* dev, const char* name,      /* open ethernet interfa
                    DEVICE* dptr, uint32 dbit);
 t_stat eth_close  (ETH_DEV* dev);                       /* close ethernet interface */
 t_stat eth_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
-t_stat eth_write  (ETH_DEV* dev, ETH_PACK* packet,      /* write sychronous packet; */
+t_stat eth_write  (ETH_DEV* dev, ETH_PACK* packet,      /* write synchronous packet; */
                    ETH_PCALLBACK routine);              /*  callback when done */
 int eth_read      (ETH_DEV* dev, ETH_PACK* packet,      /* read single packet; */
                    ETH_PCALLBACK routine);              /*  callback when done*/
@@ -351,7 +351,7 @@ t_stat eth_filter_hash_ex (ETH_DEV* dev, int addr_count,/* set filter on incomin
                            ETH_BOOL promiscuous,
                            ETH_BOOL match_broadcast,
                            ETH_MULTIHASH* const hash);  /* AUTODIN II based 8 byte imperfect hash */
-t_stat eth_check_address_conflict (ETH_DEV* dev, 
+t_stat eth_check_address_conflict (ETH_DEV* dev,
                                    ETH_MAC* const address);
 const char *eth_version (void);                         /* Version of dynamically loaded library (pcap) */
 void eth_setcrc   (ETH_DEV* dev, int need_crc);         /* enable/disable CRC mode */
@@ -380,7 +380,7 @@ void ethq_remove (ETH_QUE* que);                        /* remove item from FIFO
 void ethq_insert (ETH_QUE* que, int32 type,             /* insert item into FIFO queue */
                   ETH_PACK* packet, int32 status);
 void ethq_insert_data(ETH_QUE* que, int32 type,         /* insert item into FIFO queue */
-                  const uint8 *data, int used, size_t len, 
+                  const uint8 *data, int used, size_t len,
                   size_t crc_len, const uint8 *crc_data, int32 status);
 t_stat ethq_destroy(ETH_QUE* que);                      /* release FIFO queue */
 const char *eth_capabilities(void);

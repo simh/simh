@@ -28,9 +28,9 @@
 */
 
 #if defined(HAVE_LIBPNG) && defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
-/* 
+/*
     png.h is included here (before sim_video.h) since some older
-    versions of png.h report errors when included after setjmp.h 
+    versions of png.h report errors when included after setjmp.h
     which is included in sim_defs.h.
 */
 #include <png.h>
@@ -120,20 +120,20 @@ char vid_release_key[64] = "Ctrl-Right-Shift";
 #include <SDL.h>
 #include <SDL_thread.h>
 
-static const char *key_names[] = 
-    {"F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12", 
-     "0",   "1",  "2",  "3",  "4",  "5",  "6",  "7",  "8",  "9",    
-     "A",   "B",  "C",  "D",  "E",  "F",  "G",  "H",  "I",  "J", 
-     "K",   "L",  "M",  "N",  "O",  "P",  "Q",  "R",  "S",  "T", 
-     "U",   "V",  "W",  "X",  "Y",  "Z", 
-     "BACKQUOTE",   "MINUS",   "EQUALS", "LEFT_BRACKET", "RIGHT_BRACKET", 
-     "SEMICOLON", "SINGLE_QUOTE", "BACKSLASH", "LEFT_BACKSLASH", "COMMA", 
-     "PERIOD", "SLASH", "PRINT", "SCRL_LOCK", "PAUSE", "ESC", "BACKSPACE", 
-     "TAB", "ENTER", "SPACE", "INSERT", "DELETE", "HOME", "END", "PAGE_UP", 
-     "PAGE_DOWN", "UP", "DOWN", "LEFT", "RIGHT", "CAPS_LOCK", "NUM_LOCK", 
-     "ALT_L", "ALT_R", "CTRL_L", "CTRL_R", "SHIFT_L", "SHIFT_R", 
-     "WIN_L", "WIN_R", "MENU", "KP_ADD", "KP_SUBTRACT", "KP_END", "KP_DOWN", 
-     "KP_PAGE_DOWN", "KP_LEFT", "KP_RIGHT", "KP_HOME", "KP_UP", "KP_PAGE_UP", 
+static const char *key_names[] =
+    {"F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12",
+     "0",   "1",  "2",  "3",  "4",  "5",  "6",  "7",  "8",  "9",
+     "A",   "B",  "C",  "D",  "E",  "F",  "G",  "H",  "I",  "J",
+     "K",   "L",  "M",  "N",  "O",  "P",  "Q",  "R",  "S",  "T",
+     "U",   "V",  "W",  "X",  "Y",  "Z",
+     "BACKQUOTE",   "MINUS",   "EQUALS", "LEFT_BRACKET", "RIGHT_BRACKET",
+     "SEMICOLON", "SINGLE_QUOTE", "BACKSLASH", "LEFT_BACKSLASH", "COMMA",
+     "PERIOD", "SLASH", "PRINT", "SCRL_LOCK", "PAUSE", "ESC", "BACKSPACE",
+     "TAB", "ENTER", "SPACE", "INSERT", "DELETE", "HOME", "END", "PAGE_UP",
+     "PAGE_DOWN", "UP", "DOWN", "LEFT", "RIGHT", "CAPS_LOCK", "NUM_LOCK",
+     "ALT_L", "ALT_R", "CTRL_L", "CTRL_R", "SHIFT_L", "SHIFT_R",
+     "WIN_L", "WIN_R", "MENU", "KP_ADD", "KP_SUBTRACT", "KP_END", "KP_DOWN",
+     "KP_PAGE_DOWN", "KP_LEFT", "KP_RIGHT", "KP_HOME", "KP_UP", "KP_PAGE_UP",
      "KP_INSERT", "KP_DELETE", "KP_5", "KP_ENTER", "KP_MULTIPLY", "KP_DIVIDE"
      };
 
@@ -165,7 +165,7 @@ static char tmp_key_name[40];
  *
  * This code is free software, available under zlib/libpng license.
  * http://www.libpng.org/pub/png/src/libpng-LICENSE.txt
- * This code has been slightly modified to leverage indirect pointers 
+ * This code has been slightly modified to leverage indirect pointers
  * to the various png routines.
  */
 #include <SDL.h>
@@ -187,7 +187,7 @@ static char tmp_key_name[40];
 #define amask 0xFF000000
 #endif
 
-/* libpng callbacks */ 
+/* libpng callbacks */
 static void png_error_SDL(png_structp ctx, png_const_charp str)
 {
     SDL_SetError("libpng: %s\n", str);
@@ -198,12 +198,12 @@ static void png_write_SDL(png_structp png_ptr, png_bytep data, png_size_t length
     SDL_RWwrite(rw, data, sizeof(png_byte), length);
 }
 
-static SDL_Surface *SDL_PNGFormatAlpha(SDL_Surface *src) 
+static SDL_Surface *SDL_PNGFormatAlpha(SDL_Surface *src)
 {
     SDL_Surface *surf;
     SDL_Rect rect = { 0 };
 
-    /* NO-OP for images < 32bpp and 32bpp images that already have Alpha channel */ 
+    /* NO-OP for images < 32bpp and 32bpp images that already have Alpha channel */
     if (src->format->BitsPerPixel <= 24 || src->format->Amask) {
         src->refcount++;
         return src;
@@ -219,7 +219,7 @@ static SDL_Surface *SDL_PNGFormatAlpha(SDL_Surface *src)
     return surf;
 }
 
-static int SDL_SavePNG_RW(SDL_Surface *surface, SDL_RWops *dst, int freedst) 
+static int SDL_SavePNG_RW(SDL_Surface *surface, SDL_RWops *dst, int freedst)
 {
     png_structp png_ptr;
     png_infop info_ptr;
@@ -242,7 +242,7 @@ static int SDL_SavePNG_RW(SDL_Surface *surface, SDL_RWops *dst, int freedst)
         return (ERROR);
     }
     png_ptr = p_png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, png_error_SDL, NULL); /* err_ptr, err_fn, warn_fn */
-    if (!png_ptr) 
+    if (!png_ptr)
     {
         SDL_SetError("Unable to png_create_write_struct on %s\n", PNG_LIBPNG_VER_STRING);
         if (freedst) SDL_RWclose(dst);
@@ -318,19 +318,19 @@ static int SDL_SavePNG_RW(SDL_Surface *surface, SDL_RWops *dst, int freedst)
 }
 #endif /* defined(HAVE_LIBPNG) */
 
-/* 
-    Some platforms (OS X), require that ALL input event processing be 
+/*
+    Some platforms (OS X), require that ALL input event processing be
     performed by the main thread of the process.
 
-    To satisfy this requirement, we leverage the SDL_MAIN functionality 
+    To satisfy this requirement, we leverage the SDL_MAIN functionality
     which does:
-    
+
              #defines main SDL_main
-     
-     and we define the main() entry point here.  Locally, we run the 
+
+     and we define the main() entry point here.  Locally, we run the
      application's SDL_main in a separate thread, and while that thread
      is running, the main thread performs event handling and dispatch.
-     
+
  */
 
 #define EVENT_REDRAW      1                              /* redraw event for SDL */
@@ -500,9 +500,9 @@ SDL_GetVersion(&ver);
 
 sim_messagef (SCPE_IERR,
               "\nSIMH has encountered a bug in SDL2 (or in SIMH's use of SDL2).\n");
-sim_messagef (SCPE_IERR, 
+sim_messagef (SCPE_IERR,
               "Create an issue at https://github.com/simh/simh/issues and report\n");
-sim_messagef (SCPE_IERR, 
+sim_messagef (SCPE_IERR,
               "your simulator setup and the above details\n");
 return NULL;
 }
@@ -658,7 +658,7 @@ int i, n;
 if (vid_gamepad_inited++)
     return;
 
-/* Chech that the SDL_GameControllerFromInstanceID function is
+/* Check that the SDL_GameControllerFromInstanceID function is
    available at run time. */
 SDL_GetVersion(&ver);
 vid_gamepad_ok = (ver.major > 2 ||
@@ -1016,7 +1016,7 @@ if (vptr->vid_flags & SIM_VID_INPUTCAPTURED)
 
 if ((x_delta) || (y_delta)) {
     sim_debug (SIM_VID_DBG_CURSOR, vptr->vid_dev, "vid_set_cursor_position(%d, %d) - Cursor position changed\n", x, y);
-    /* Any queued mouse motion events need to have their relative 
+    /* Any queued mouse motion events need to have their relative
        positions adjusted since they were queued based on different info. */
     if (SDL_SemWait (vid_mouse_events.sem) == 0) {
         int32 i;
@@ -1469,9 +1469,9 @@ if (vptr->vid_mouse_captured) {
 
     if (!KeyStates)
         KeyStates = SDL_GetKeyboardState(&numkeys);
-    if ((vptr->vid_flags & SIM_VID_INPUTCAPTURED) && 
-        (event->state == SDL_PRESSED) && 
-        KeyStates[SDL_SCANCODE_RSHIFT] && 
+    if ((vptr->vid_flags & SIM_VID_INPUTCAPTURED) &&
+        (event->state == SDL_PRESSED) &&
+        KeyStates[SDL_SCANCODE_RSHIFT] &&
         (KeyStates[SDL_SCANCODE_LCTRL] || KeyStates[SDL_SCANCODE_RCTRL])) {
         sim_debug (SIM_VID_DBG_KEY, vptr->vid_dev, "vid_key() - Cursor Release\n");
         if (SDL_SetRelativeMouseMode(SDL_FALSE) < 0)    /* release cursor, show cursor */
@@ -1529,7 +1529,7 @@ if (!sim_is_running)
     return;
 if (!vptr->vid_cursor_visible)
     return;
-sim_debug (SIM_VID_DBG_MOUSE, vptr->vid_dev, "Mouse Move Event: pos:(%d,%d) rel:(%d,%d) buttons:(%d,%d,%d)\n", 
+sim_debug (SIM_VID_DBG_MOUSE, vptr->vid_dev, "Mouse Move Event: pos:(%d,%d) rel:(%d,%d) buttons:(%d,%d,%d)\n",
            event->x, event->y, event->xrel, event->yrel, (event->state & SDL_BUTTON(SDL_BUTTON_LEFT)) ? 1 : 0, (event->state & SDL_BUTTON(SDL_BUTTON_MIDDLE)) ? 1 : 0, (event->state & SDL_BUTTON(SDL_BUTTON_RIGHT)) ? 1 : 0);
 while (SDL_PeepEvents (&dummy_event, 1, SDL_GETEVENT, SDL_MOUSEMOTION, SDL_MOUSEMOTION)) {
     /* Coalesce motion activity to avoid thrashing */
@@ -1538,7 +1538,7 @@ while (SDL_PeepEvents (&dummy_event, 1, SDL_GETEVENT, SDL_MOUSEMOTION, SDL_MOUSE
     event->x = dev->x;
     event->y = dev->y;
     event->state = dev->state;
-    sim_debug (SIM_VID_DBG_MOUSE, vptr->vid_dev, "Mouse Move Event: Additional Event Coalesced:pos:(%d,%d) rel:(%d,%d) buttons:(%d,%d,%d)\n", 
+    sim_debug (SIM_VID_DBG_MOUSE, vptr->vid_dev, "Mouse Move Event: Additional Event Coalesced:pos:(%d,%d) rel:(%d,%d) buttons:(%d,%d,%d)\n",
         dev->x, dev->y, dev->xrel, dev->yrel, (dev->state & SDL_BUTTON(SDL_BUTTON_LEFT)) ? 1 : 0, (dev->state & SDL_BUTTON(SDL_BUTTON_MIDDLE)) ? 1 : 0, (dev->state & SDL_BUTTON(SDL_BUTTON_RIGHT)) ? 1 : 0);
     };
 if (SDL_SemWait (vid_mouse_events.sem) == 0) {
@@ -1549,7 +1549,7 @@ if (SDL_SemWait (vid_mouse_events.sem) == 0) {
     vid_mouse_b1 = (event->state & SDL_BUTTON(SDL_BUTTON_LEFT)) ? TRUE : FALSE;
     vid_mouse_b2 = (event->state & SDL_BUTTON(SDL_BUTTON_MIDDLE)) ? TRUE : FALSE;
     vid_mouse_b3 = (event->state & SDL_BUTTON(SDL_BUTTON_RIGHT)) ? TRUE : FALSE;
-    sim_debug (SIM_VID_DBG_MOUSE, vptr->vid_dev, "Mouse Move Event: pos:(%d,%d) rel:(%d,%d) buttons:(%d,%d,%d) - Count: %d vid_cursor:(%d,%d)\n", 
+    sim_debug (SIM_VID_DBG_MOUSE, vptr->vid_dev, "Mouse Move Event: pos:(%d,%d) rel:(%d,%d) buttons:(%d,%d,%d) - Count: %d vid_cursor:(%d,%d)\n",
                                             event->x, event->y, event->xrel, event->yrel, (event->state & SDL_BUTTON(SDL_BUTTON_LEFT)) ? 1 : 0, (event->state & SDL_BUTTON(SDL_BUTTON_MIDDLE)) ? 1 : 0, (event->state & SDL_BUTTON(SDL_BUTTON_RIGHT)) ? 1 : 0, vid_mouse_events.count, vid_cursor_x, vid_cursor_y);
     if (vid_mouse_events.count < MAX_EVENTS) {
         SIM_MOUSE_EVENT *tail = &vid_mouse_events.events[(vid_mouse_events.tail+MAX_EVENTS-1)%MAX_EVENTS];
@@ -1564,13 +1564,13 @@ if (SDL_SemWait (vid_mouse_events.sem) == 0) {
         ev.y_pos = event->y;
         if ((vid_mouse_events.count > 0) &&             /* Is there a tail event? */
             (ev.b1_state == tail->b1_state) &&          /* With the same button state? */
-            (ev.b2_state == tail->b2_state) && 
+            (ev.b2_state == tail->b2_state) &&
             (ev.b3_state == tail->b3_state)) {          /* Merge the motion */
             tail->x_rel += ev.x_rel;
             tail->y_rel += ev.y_rel;
             tail->x_pos = ev.x_pos;
             tail->y_pos = ev.y_pos;
-            sim_debug (SIM_VID_DBG_MOUSE, vptr->vid_dev, "Mouse Move Event: Coalesced into pending event: (%d,%d)\n", 
+            sim_debug (SIM_VID_DBG_MOUSE, vptr->vid_dev, "Mouse Move Event: Coalesced into pending event: (%d,%d)\n",
                 tail->x_rel, tail->y_rel);
             }
         else {                                          /* Add a new event */
@@ -1774,7 +1774,7 @@ void vid_update_cursor (VID_DISPLAY *vptr, SDL_Cursor *cursor, t_bool visible)
 {
 if (!cursor)
     return;
-sim_debug (SIM_VID_DBG_VIDEO, vptr->vid_dev, "Cursor Update Event: Previously %s, Now %s, New Cursor object at: %p, Old Cursor object at: %p\n", 
+sim_debug (SIM_VID_DBG_VIDEO, vptr->vid_dev, "Cursor Update Event: Previously %s, Now %s, New Cursor object at: %p, Old Cursor object at: %p\n",
                             SDL_ShowCursor(-1) ? "visible" : "invisible", visible ? "visible" : "invisible", cursor, vptr->vid_cursor);
 SDL_SetCursor (cursor);
 if ((vptr->vid_window == SDL_GetMouseFocus ()) && visible)
@@ -1811,7 +1811,7 @@ SDL_UnlockMutex (vptr->vid_draw_mutex);
 
 if (vptr->vid_blending) {
     SDL_UpdateTexture(vptr->vid_texture, vid_dst, buf, vid_dst->w*sizeof(*buf));
-    SDL_RenderCopy (vptr->vid_renderer, vptr->vid_texture, vid_dst, vid_dst); 
+    SDL_RenderCopy (vptr->vid_renderer, vptr->vid_texture, vid_dst, vid_dst);
     }
 else
     if (SDL_UpdateTexture(vptr->vid_texture, vid_dst, buf, vid_dst->w*sizeof(*buf)))
@@ -2066,14 +2066,14 @@ if (!initialized) {
      */
     eventtypes[SDL_USEREVENT] = "USEREVENT";
 
-    /** 
-     * The SDL_HINT_VIDEO_ALLOW_SCREENSAVER at init time enables 
-     * the screensaver.  Once a video window is created, we default 
-     * to being consistent with behavior since SDL 2.0.2 and we disable 
+    /**
+     * The SDL_HINT_VIDEO_ALLOW_SCREENSAVER at init time enables
+     * the screensaver.  Once a video window is created, we default
+     * to being consistent with behavior since SDL 2.0.2 and we disable
      * the screen saver.
-     * 
-     * We allow an environment variable SDL_VIDEO_ALLOW_SCREENSAVER 
-     * to specifically change this to enable the screensaver if the 
+     *
+     * We allow an environment variable SDL_VIDEO_ALLOW_SCREENSAVER
+     * to specifically change this to enable the screensaver if the
      * value is "1".
      */
     if ((getenv ("SDL_VIDEO_ALLOW_SCREENSAVER") == NULL) ||
@@ -2343,10 +2343,10 @@ SDLVersion[sizeof (SDLVersion) - 1] = '\0';
 if ((compiled.major == running.major) &&
     (compiled.minor == running.minor) &&
     (compiled.patch == running.patch))
-    snprintf(SDLVersion, sizeof (SDLVersion) - 1, "SDL Version %d.%d.%d", 
+    snprintf(SDLVersion, sizeof (SDLVersion) - 1, "SDL Version %d.%d.%d",
                         compiled.major, compiled.minor, compiled.patch);
 else
-    snprintf(SDLVersion, sizeof (SDLVersion) - 1, "SDL Version (Compiled: %d.%d.%d, Runtime: %d.%d.%d)", 
+    snprintf(SDLVersion, sizeof (SDLVersion) - 1, "SDL Version (Compiled: %d.%d.%d, Runtime: %d.%d.%d)",
                         compiled.major, compiled.minor, compiled.patch,
                         running.major, running.minor, running.patch);
 #if defined (HAVE_LIBPNG)
@@ -2354,26 +2354,26 @@ if (sim_libpng_available) {
     png_structp png = p_png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
 
     if (strcmp (PNG_LIBPNG_VER_STRING, p_png_get_libpng_ver (png))) {
-        snprintf(&SDLVersion[strlen (SDLVersion)], sizeof (SDLVersion) - (strlen (SDLVersion) + 1), 
-                            ", PNG Version (Compiled: %s, Runtime: %s - png screenshots disabled)", 
+        snprintf(&SDLVersion[strlen (SDLVersion)], sizeof (SDLVersion) - (strlen (SDLVersion) + 1),
+                            ", PNG Version (Compiled: %s, Runtime: %s - png screenshots disabled)",
                             PNG_LIBPNG_VER_STRING, p_png_get_libpng_ver (png));
         sim_libpng_available = FALSE;
         }
     else
-        snprintf(&SDLVersion[strlen (SDLVersion)], sizeof (SDLVersion) - (strlen (SDLVersion) + 1), 
+        snprintf(&SDLVersion[strlen (SDLVersion)], sizeof (SDLVersion) - (strlen (SDLVersion) + 1),
                             ", PNG Version %s", PNG_LIBPNG_VER_STRING);
     p_png_destroy_read_struct(&png, NULL, NULL);
 #if defined (ZLIB_VERSION)
     if (strcmp (ZLIB_VERSION, p_zlibVersion ()))
-        snprintf(&SDLVersion[strlen (SDLVersion)], sizeof (SDLVersion) - (strlen (SDLVersion) + 1), 
+        snprintf(&SDLVersion[strlen (SDLVersion)], sizeof (SDLVersion) - (strlen (SDLVersion) + 1),
                             ", zlib: (Compiled: %s, Runtime: %s)", ZLIB_VERSION, p_zlibVersion ());
     else
-        snprintf(&SDLVersion[strlen (SDLVersion)], sizeof (SDLVersion) - (strlen (SDLVersion) + 1), 
+        snprintf(&SDLVersion[strlen (SDLVersion)], sizeof (SDLVersion) - (strlen (SDLVersion) + 1),
                             ", zlib: %s", ZLIB_VERSION);
 #endif
     }
 else
-    snprintf(&SDLVersion[strlen (SDLVersion)], sizeof (SDLVersion) - (strlen (SDLVersion) + 1), 
+    snprintf(&SDLVersion[strlen (SDLVersion)], sizeof (SDLVersion) - (strlen (SDLVersion) + 1),
                         ", PNG Not currently available");
 #endif
 return (const char *)SDLVersion;
@@ -2721,7 +2721,7 @@ char *extension = strrchr ((char *)_screenshot_filename, '.');
 if (name == NULL) {
     _screenshot_stat = SCPE_NXM;
     return;
-    }   
+    }
 if (extension)
     n = extension - _screenshot_filename;
 else {
@@ -2844,7 +2844,7 @@ while (SDL_PushEvent (&user_event) < 0)
 #else
 vid_beep_event ();
 #endif
-SDL_Delay (vid_beep_duration + 100);/* Wait for sound to finnish */
+SDL_Delay (vid_beep_duration + 100);/* Wait for sound to finish */
 }
 
 #else /* !(defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)) */
@@ -2926,10 +2926,10 @@ SDLVersion[sizeof (SDLVersion) - 1] = '\0';
 if ((compiled.major == running.major) &&
     (compiled.minor == running.minor) &&
     (compiled.patch == running.patch))
-    snprintf(SDLVersion, sizeof (SDLVersion), "SDL Version %d.%d.%d", 
+    snprintf(SDLVersion, sizeof (SDLVersion), "SDL Version %d.%d.%d",
                         compiled.major, compiled.minor, compiled.patch);
 else
-    snprintf(SDLVersion, sizeof (SDLVersion), "SDL Version (Compiled: %d.%d.%d, Runtime: %d.%d.%d)", 
+    snprintf(SDLVersion, sizeof (SDLVersion), "SDL Version (Compiled: %d.%d.%d, Runtime: %d.%d.%d)",
                         compiled.major, compiled.minor, compiled.patch,
                         running.major, running.minor, running.patch);
 #if defined(HAVE_LIBSDL_TTF)
@@ -2938,12 +2938,12 @@ running = *TTF_Linked_Version();
 if ((compiled.major == running.major) &&
     (compiled.minor == running.minor) &&
     (compiled.patch == running.patch))
-    snprintf(&SDLVersion[strlen (SDLVersion)], sizeof (SDLVersion) - (strlen (SDLVersion) + 1), 
-                        ", SDL TTF Version %d.%d.%d", 
+    snprintf(&SDLVersion[strlen (SDLVersion)], sizeof (SDLVersion) - (strlen (SDLVersion) + 1),
+                        ", SDL TTF Version %d.%d.%d",
                         compiled.major, compiled.minor, compiled.patch);
 else
-    snprintf(&SDLVersion[strlen (SDLVersion)], sizeof (SDLVersion) - (strlen (SDLVersion) + 1), 
-                        ", SDL TTF Version (Compiled: %d.%d.%d, Runtime: %d.%d.%d)", 
+    snprintf(&SDLVersion[strlen (SDLVersion)], sizeof (SDLVersion) - (strlen (SDLVersion) + 1),
+                        ", SDL TTF Version (Compiled: %d.%d.%d, Runtime: %d.%d.%d)",
                         compiled.major, compiled.minor, compiled.patch,
                         running.major, running.minor, running.patch);
 #define _SDL_TTF_VERSION_ATLEAST(X, Y, Z)                                               \
@@ -2956,13 +2956,13 @@ if (1) {
 
     TTF_Init();
     TTF_GetFreeTypeVersion(&major, &minor, &patch);
-    snprintf(&SDLVersion[strlen (SDLVersion)], sizeof (SDLVersion) - (strlen (SDLVersion) + 1), 
-                        ", FreeType Version %d.%d.%d", 
+    snprintf(&SDLVersion[strlen (SDLVersion)], sizeof (SDLVersion) - (strlen (SDLVersion) + 1),
+                        ", FreeType Version %d.%d.%d",
                         major, minor, patch);
     TTF_GetHarfBuzzVersion(&major, &minor, &patch);
     if ((major != 0) || (minor != 0) || (patch != 0))
-        snprintf(&SDLVersion[strlen (SDLVersion)], sizeof (SDLVersion) - (strlen (SDLVersion) + 1), 
-                            ", HarfBuzz Version %d.%d.%d", 
+        snprintf(&SDLVersion[strlen (SDLVersion)], sizeof (SDLVersion) - (strlen (SDLVersion) + 1),
+                            ", HarfBuzz Version %d.%d.%d",
                             major, minor, patch);
     }
 #endif /* _SDL_TTF_VERSION_ATLEAST(2, 0, 18) */

@@ -23,7 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   05-Dec-10    MP      Added macro invocation of sim_debug 
+   05-Dec-10    MP      Added macro invocation of sim_debug
    09-Aug-06    JDB     Added assign_device and deassign_device
    14-Jul-06    RMS     Added sim_activate_abs
    06-Jan-06    RMS     Added fprint_stopped_gen
@@ -259,7 +259,7 @@ void sim_perror (const char *msg);
 t_stat sim_call_argv (int (*main_like)(int argc, char *argv[]), const char *cptr);
 t_stat sim_messagef (t_stat stat, const char *fmt, ...) GCC_FMT_ATTR(2, 3);
 void sim_data_trace(DEVICE *dptr, UNIT *uptr, const uint8 *data, const char *position, size_t len, const char *txt, uint32 reason);
-void sim_debug_bits_hdr (uint32 dbits, DEVICE* dptr, const char *header, 
+void sim_debug_bits_hdr (uint32 dbits, DEVICE* dptr, const char *header,
     BITFIELD* bitdefs, uint32 before, uint32 after, int terminate);
 void sim_debug_bits (uint32 dbits, DEVICE* dptr, BITFIELD* bitdefs,
     uint32 before, uint32 after, int terminate);
@@ -370,13 +370,13 @@ extern t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val
     int32 sw);
 
 /* The per-simulator init routine is a weak global that defaults to NULL
-   The other per-simulator pointers can be overrriden by the init routine
+   The other per-simulator pointers can be overridden by the init routine
 
 extern void (*sim_vm_init) (void);
 
    This routine is no longer invoked this way since it doesn't work reliably
-   on all simh supported compile environments.  A simulator that needs these 
-   initializations can perform them in the CPU device reset routine which will 
+   on all simh supported compile environments.  A simulator that needs these
+   initializations can perform them in the CPU device reset routine which will
    always be called before anything else can be processed.
 
  */

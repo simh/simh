@@ -28,18 +28,18 @@
    03-Apr-15    MP      Added logic to pass simulator startup messages in
                         panel error text if the connection to the simulator
                         shuts down while it is starting.
-   04-Apr-15    MP      Added mount and dismount routines to connect and 
+   04-Apr-15    MP      Added mount and dismount routines to connect and
                         disconnect removable media
 
    This module defines interface between a front panel application and a simh
-   simulator.  Facilities provide ways to gather information from and to 
+   simulator.  Facilities provide ways to gather information from and to
    observe and control the state of a simulator.
 
    Any application which wants to use this API needs to:
       1) include this file in the application code
-      2) compile sim_frontpanel.c and sim_sock.c from the top level directory 
+      2) compile sim_frontpanel.c and sim_sock.c from the top level directory
          of the simh source.
-      3) link the sim_frontpanel and sim_sock object modules and libpthreads 
+      3) link the sim_frontpanel and sim_sock object modules and libpthreads
          into the application.
       4) Use a simh simulator built from the same version of simh that the
          sim_frontpanel and sim_sock modules came from.
@@ -60,21 +60,21 @@ extern "C" {
 
 /**
 
-    sim_panel_start_simulator       A starts a simulator with a particular 
+    sim_panel_start_simulator       A starts a simulator with a particular
                                     configuration
 
         sim_path            the path to the simulator binary
         sim_config          the configuration to run the simulator with
         device_panel_count  the number of sub panels for connected devices
 
-    Note 1: - The path specified must be either a fully specified path or 
+    Note 1: - The path specified must be either a fully specified path or
               it could be merely the simulator name if the simulator binary
               is located in the current PATH.
-            - The simulator binary must be built from the same version 
-              simh source code that the frontpanel API was acquired fron 
-              (the API and the simh framework must speak the same language) 
+            - The simulator binary must be built from the same version
+              simh source code that the frontpanel API was acquired from
+              (the API and the simh framework must speak the same language)
 
-    Note 2: - Configuration file specified should contain device setup 
+    Note 2: - Configuration file specified should contain device setup
               statements (enable, disable, CPU types and attach commands).
               It should not start a simulator running.
  */
@@ -94,7 +94,7 @@ sim_panel_start_simulator_debug (const char *sim_path,
 
 /**
 
-    sim_panel_add_device_panel - creates a sub panel associated 
+    sim_panel_add_device_panel - creates a sub panel associated
                                  with a specific simulator panel
 
         simulator_panel     the simulator panel to connect to
@@ -109,7 +109,7 @@ sim_panel_add_device_panel (PANEL *simulator_panel,
 
     sim_panel_destroy   to shutdown a panel or sub panel.
 
-    Note: destroying a simulator panel will also destroy any 
+    Note: destroying a simulator panel will also destroy any
           related sub panels
  */
 
@@ -118,18 +118,18 @@ sim_panel_destroy (PANEL **ppanel);
 
 /**
 
-   The frontpanel API exposes the state of a simulator via access to 
+   The frontpanel API exposes the state of a simulator via access to
    simh register variables that the simulator and its devices define.
-   These registers certainly include any architecturally described 
+   These registers certainly include any architecturally described
    registers (PC, PSL, SP, etc.), but also include anything else
-   the simulator uses as internal state to implement the running 
+   the simulator uses as internal state to implement the running
    simulator.
 
-   The registers that a particular frontpanel application might need 
-   access to are specified by the application when it calls: 
-   
+   The registers that a particular frontpanel application might need
+   access to are specified by the application when it calls:
+
    sim_panel_add_register
-   sim_panel_add_register_bits 
+   sim_panel_add_register_bits
    sim_panel_add_register_array
 and
    sim_panel_add_register_indirect
@@ -142,31 +142,31 @@ and
         element_count number of elements in the register array
         size         the size (in local storage) of the buffer which will
                      receive the data in the simulator's register
-        addr         a pointer to the location of the buffer which will 
+        addr         a pointer to the location of the buffer which will
                      be loaded with the data in the simulator's register
         bit_width    the number of values to populate in the bits array
-        bits         an array of integers which is bit_width long that 
+        bits         an array of integers which is bit_width long that
                      will receive each bit's current accumulated value.
-                     The accumulated value will range from 0 thru the 
-                     the sample_depth specified when calling 
+                     The accumulated value will range from 0 thru the
+                     the sample_depth specified when calling
                      sim_panel_set_sampling_parameters().
 
     Notes:    There are two categories of REGisters in simulators:
            1) Many simulators contain every interesting simh REGisters
-              in single variables and use those variables directly 
-              throughout the simulator as needed by the system being 
+              in single variables and use those variables directly
+              throughout the simulator as needed by the system being
               simulated.
-           2) Some simulators have some of their REGisters in a single 
-              variable, but during instruction execution, the actual 
+           2) Some simulators have some of their REGisters in a single
+              variable, but during instruction execution, the actual
               contents of that REGister is split into possibly multiple
               pieces which are assembled into the single variable when
               the simulator stops instruction execution and split apart
               again when simulation starts executing instructions again.
-              An example of this case is the PSL on the VAX simulator.  
-              In the VAX architecture, the PSL register contains the 
+              An example of this case is the PSL on the VAX simulator.
+              In the VAX architecture, the PSL register contains the
               condition code information which is a field in the PSL.
-              For efficiency sake, while sim_instr() is executing 
-              instructions, the condition code is stored a separate 
+              For efficiency sake, while sim_instr() is executing
+              instructions, the condition code is stored a separate
               variable CC.  Whenever sim_instr() exits, the pieces
               that comprise this register are put together into the
               PSL variable.  This allows the PSL register to be examined
@@ -175,14 +175,14 @@ and
               into pieces during sim_instr() execution and reassembling
               it upon exit.
 
-              Therefore, if every REGister that an application that 
+              Therefore, if every REGister that an application that
               uses the sim_frontpanel register APIs is always stored
-              in single variables (case 1 above), then front panel 
-              access to registers can be most efficient if, at 
-              initialization time, the simulator calls the 
+              in single variables (case 1 above), then front panel
+              access to registers can be most efficient if, at
+              initialization time, the simulator calls the
               sim_set_stable_registers_state() API.
-              Having called this API allows the internals of the 
-              frontpanel access activities to be significantly more 
+              Having called this API allows the internals of the
+              frontpanel access activities to be significantly more
               efficient.
 
  */
@@ -225,58 +225,58 @@ sim_panel_add_register_indirect_bits (PANEL *panel,
 
 /**
 
-    A panel application has a choice of two different methods of getting 
+    A panel application has a choice of two different methods of getting
     the values contained in the set of registers it has declared interest in via
     the sim_panel_add_register APIs.
-    
+
        1)  The values can be polled (whenever it is desired) by calling
            sim_panel_get_registers().
-       2)  The panel can call sim_panel_set_display_callback_interval() to 
-           specify a callback routine and a periodic rate that the callback 
-           routine should be called.  The panel API will make a best effort 
+       2)  The panel can call sim_panel_set_display_callback_interval() to
+           specify a callback routine and a periodic rate that the callback
+           routine should be called.  The panel API will make a best effort
            to deliver the current register state at the desired rate.
 
 
-   Note 1: The buffers described in a panel's register set will be 
-           dynamically revised as soon as data is available from the 
-           simulator.  The callback routine merely serves as a notification 
+   Note 1: The buffers described in a panel's register set will be
+           dynamically revised as soon as data is available from the
+           simulator.  The callback routine merely serves as a notification
            that a complete register set has arrived.
    Note 2: The callback routine should, in general, not run for a long time
-           or frontpanel interactions with the simulator may be disrupted.  
-           Setting a flag, signaling an event or posting a message are 
+           or frontpanel interactions with the simulator may be disrupted.
+           Setting a flag, signaling an event or posting a message are
            reasonable activities to perform in a callback routine.
  */
 
 int
 sim_panel_get_registers (PANEL *panel, unsigned long long *simulation_time);
 
-typedef void (*PANEL_DISPLAY_PCALLBACK)(PANEL *panel, 
+typedef void (*PANEL_DISPLAY_PCALLBACK)(PANEL *panel,
                                         unsigned long long simulation_time,
                                         void *context);
 
 int
-sim_panel_set_display_callback_interval (PANEL *panel, 
-                                         PANEL_DISPLAY_PCALLBACK callback, 
-                                         void *context, 
+sim_panel_set_display_callback_interval (PANEL *panel,
+                                         PANEL_DISPLAY_PCALLBACK callback,
+                                         void *context,
                                          int usecs_between_callbacks);
 
 /**
 
     When a front panel application wants to get averaged bit sample
     values, it must first declare the sampling parameters that will
-    be used while collecting the bit values.  The dithering 
+    be used while collecting the bit values.  The dithering
     percentage must be 25% or less and when non 0 causes the sample
-    frequency to vary by plus or minus a random percentage value up 
+    frequency to vary by plus or minus a random percentage value up
     to the specified value.
 
-   sim_panel_set_sampling_parameters 
-   sim_panel_set_sampling_parameters_ex 
+   sim_panel_set_sampling_parameters
+   sim_panel_set_sampling_parameters_ex
 
         sample_frequency    cycles/instructions between sample captures
         sample_dither_pct   percentage of sample_frequency to vary randomly
         sample_depth        how many samples to accumulate in the rolling
                             average for each bit sample.  Returned bit
-                            sample values will range from 0 thru this 
+                            sample values will range from 0 thru this
                             value.
  */
 
@@ -293,13 +293,13 @@ sim_panel_set_sampling_parameters (PANEL *panel,
 /**
 
     When a front panel application needs to change the running
-    state of a simulator one of the following routines should 
-    be called:  
-    
+    state of a simulator one of the following routines should
+    be called:
+
     sim_panel_exec_halt     - Stop instruction execution
     sim_panel_exec_boot     - Boot a simulator from a specific device
     sim_panel_exec_run      - Start/Resume a simulator running instructions
-    sim_panel_exec_start    - Start a simulator running instructions 
+    sim_panel_exec_start    - Start a simulator running instructions
                               after resetting all devices
     sim_panel_exec_step     - Have a simulator execute a single step
  */
@@ -325,7 +325,7 @@ sim_panel_exec_step (PANEL *panel);
     A simulator often displays some useful information as it stops
     executing instructions.
 
-    sim_panel_halt_text     - Returns the simulator output immediately prior 
+    sim_panel_halt_text     - Returns the simulator output immediately prior
                               to the most recent transition to the Halt state.
  */
 
@@ -334,20 +334,20 @@ sim_panel_halt_text (PANEL *panel);
 
 /**
 
-    When a front panel application wants to describe conditions that 
+    When a front panel application wants to describe conditions that
     should stop instruction execution an execution or an output
-    breakpoint should be used.  To established or clear a breakpoint, 
-    one of the following routines should be called:  
-    
+    breakpoint should be used.  To established or clear a breakpoint,
+    one of the following routines should be called:
+
     sim_panel_break_set          - Establish a simulation breakpoint
     sim_panel_break_clear        - Cancel/Delete a previously defined
                                    breakpoint
-    sim_panel_break_output_set   - Establish a simulator output 
+    sim_panel_break_output_set   - Establish a simulator output
                                    breakpoint
     sim_panel_break_output_clear - Cancel/Delete a previously defined
                                    output breakpoint
-    
-    Note: Any breakpoint switches/flags must be located at the 
+
+    Note: Any breakpoint switches/flags must be located at the
           beginning of the condition string
  */
 
@@ -367,16 +367,16 @@ sim_panel_break_output_clear (PANEL *panel, const char *condition);
 /**
 
     When a front panel application needs to change or access
-    memory or a register one of the following routines should 
-    be called:  
-    
+    memory or a register one of the following routines should
+    be called:
+
     sim_panel_gen_examine               - Examine register or memory
     sim_panel_gen_deposit               - Deposit to register or memory
     sim_panel_mem_examine               - Examine memory location
     sim_panel_mem_deposit               - Deposit to memory location
-    sim_panel_mem_deposit_instruction   - Deposit instruction to memory 
+    sim_panel_mem_deposit_instruction   - Deposit instruction to memory
                                           location
-    sim_panel_set_register_value        - Deposit to a register or memory 
+    sim_panel_set_register_value        - Deposit to a register or memory
                                           location
  */
 
@@ -393,7 +393,7 @@ sim_panel_break_output_clear (PANEL *panel, const char *condition);
  */
 
 int
-sim_panel_gen_examine (PANEL *panel, 
+sim_panel_gen_examine (PANEL *panel,
                        const char *name_or_addr,
                        size_t size,
                        void *value);
@@ -405,12 +405,12 @@ sim_panel_gen_examine (PANEL *panel,
         name_or_addr the name the simulator knows this register by
         size         the size (in local storage) of the buffer which
                      contains the data to be deposited into the simulator
-        value        a pointer to the buffer which contains the data to 
+        value        a pointer to the buffer which contains the data to
                      be deposited into the simulator
  */
 
 int
-sim_panel_gen_deposit (PANEL *panel, 
+sim_panel_gen_deposit (PANEL *panel,
                        const char *name_or_addr,
                        size_t size,
                        const void *value);
@@ -419,7 +419,7 @@ sim_panel_gen_deposit (PANEL *panel,
 
    sim_panel_mem_examine
 
-        addr_size    the size (in local storage) of the buffer which 
+        addr_size    the size (in local storage) of the buffer which
                      contains the memory address of the data to be examined
                      in the simulator
         addr         a pointer to the buffer containing the memory address
@@ -431,7 +431,7 @@ sim_panel_gen_deposit (PANEL *panel,
  */
 
 int
-sim_panel_mem_examine (PANEL *panel, 
+sim_panel_mem_examine (PANEL *panel,
                        size_t addr_size,
                        const void *addr,
                        size_t value_size,
@@ -441,7 +441,7 @@ sim_panel_mem_examine (PANEL *panel,
 
    sim_panel_mem_deposit
 
-        addr_size    the size (in local storage) of the buffer which 
+        addr_size    the size (in local storage) of the buffer which
                      contains the memory address of the data to be deposited
                      into the simulator
         addr         a pointer to the buffer containing the memory address
@@ -453,7 +453,7 @@ sim_panel_mem_examine (PANEL *panel,
  */
 
 int
-sim_panel_mem_deposit (PANEL *panel, 
+sim_panel_mem_deposit (PANEL *panel,
                        size_t addr_size,
                        const void *addr,
                        size_t value_size,
@@ -463,17 +463,17 @@ sim_panel_mem_deposit (PANEL *panel,
 
    sim_panel_mem_deposit_instruction
 
-        addr_size    the size (in local storage) of the buffer which 
+        addr_size    the size (in local storage) of the buffer which
                      contains the memory address of the data to be deposited
                      into the simulator
         addr         a pointer to the buffer containing the memory address
                      of the data to be deposited into the simulator
-        instruction  a pointer to the buffer that contains the mnemonic 
+        instruction  a pointer to the buffer that contains the mnemonic
                      instruction to be deposited at the indicated address
  */
 
 int
-sim_panel_mem_deposit_instruction (PANEL *panel, 
+sim_panel_mem_deposit_instruction (PANEL *panel,
                                    size_t addr_size,
                                    const void *addr,
                                    const char *instruction);
@@ -484,8 +484,8 @@ sim_panel_mem_deposit_instruction (PANEL *panel,
 
         name        the name of a simulator register or a memory address
                     which is to receive a new value
-        value       the new value in character string form.  The string 
-                    must be in the native/natural radix that the simulator 
+        value       the new value in character string form.  The string
+                    must be in the native/natural radix that the simulator
                     uses when referencing that register
  */
 int
@@ -496,9 +496,9 @@ sim_panel_set_register_value (PANEL *panel,
 /**
 
     A front panel application might want to have access to the
-    instruction execution history that a simulator may be capable 
+    instruction execution history that a simulator may be capable
     of providing.  If this functionality is desired, enabling of
-    recording instruction history should be explicitly enabled 
+    recording instruction history should be explicitly enabled
     in the sim_config file that the simulator is started with.
  */
 
@@ -514,7 +514,7 @@ sim_panel_set_register_value (PANEL *panel,
  */
 
 int
-sim_panel_get_history (PANEL *panel, 
+sim_panel_get_history (PANEL *panel,
                        int count,
                        size_t size,
                        char *buffer);
@@ -523,7 +523,7 @@ sim_panel_get_history (PANEL *panel,
 /**
 
     A front panel application might want some details of simulator
-    and/or device behavior that is provided by a particular simulator 
+    and/or device behavior that is provided by a particular simulator
     via debug information.  Debugging for particular device(s)
     and/or simulator debug settings can be controlled via the
     sim_panel_device_debug_mode API.
@@ -534,15 +534,15 @@ sim_panel_get_history (PANEL *panel,
    sim_panel_device_debug_mode
 
         device       the device whose debug mode is to change
-        set_untset   1 to set debug flags, 0 to clear debug flags
-        mode_bits    character string with different debug mode bits 
+        set_unset    1 to set debug flags, 0 to clear debug flags
+        mode_bits    character string with different debug mode bits
                      to enable or disable.  An empty string will
-                     enable or disable all mode bits for the specified 
+                     enable or disable all mode bits for the specified
                      device
  */
 
 int
-sim_panel_device_debug_mode (PANEL *panel, 
+sim_panel_device_debug_mode (PANEL *panel,
                              const char *device,
                              int set_unset,
                              const char *mode_bits);
@@ -551,11 +551,11 @@ sim_panel_device_debug_mode (PANEL *panel,
 /**
 
     When a front panel application needs to change the media
-    in a simulated removable media device one of the following 
+    in a simulated removable media device one of the following
     routines should be called:
 
     sim_panel_mount    - mounts the indicated media file on a device
-    sim_panel_dismount - dismounts the currently mounted media file 
+    sim_panel_dismount - dismounts the currently mounted media file
                          from a device
  */
 
@@ -599,13 +599,13 @@ sim_panel_get_state (PANEL *panel);
 
 /**
 
-    All API routines which return an int return 0 for 
-    success and -1 for an error.  
+    All API routines which return an int return 0 for
+    success and -1 for an error.
 
     An API which returns an error (-1), will not change the panel state
     except to possibly set the panel state to Error if the panel
     condition is no longer useful.
-    
+
     sim_panel_get_error     - the details of the most recent error
     sim_panel_clear_error   - clears the error buffer
  */
@@ -615,8 +615,8 @@ void sim_panel_clear_error (void);
 
 /**
 
-    The panek<->simulator wire protocol can be traced if protocol problems arise.
-    
+    The panel<->simulator wire protocol can be traced if protocol problems arise.
+
     sim_panel_set_debug_mode    - Specifies the debug detail to be recorded
     sim_panel_flush_debug       - Flushes debug output to disk
     sim_panel_debug       -       Write message to the debug file

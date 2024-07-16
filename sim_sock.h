@@ -23,10 +23,10 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   15-Oct-12    MP      Added definitions needed to detect possible tcp 
+   15-Oct-12    MP      Added definitions needed to detect possible tcp
                         connect failures
    25-Sep-12    MP      Reworked for RFC3493 interfaces supporting IPv6 and IPv4
-   04-Jun-08    RMS     Addes sim_create_sock, for IBM 1130
+   04-Jun-08    RMS     Added sim_create_sock, for IBM 1130
    14-Apr-05    RMS     Added WSAEINPROGRESS (from Tim Riker)
    20-Aug-04    HV      Added missing definition for OS/2 (from Holger Veit)
    22-Oct-03    MP      Changed WIN32 winsock include to use winsock2.h to
@@ -86,7 +86,7 @@ extern "C" {
 
 #define WSAGetLastError()       errno                   /* Windows macros */
 #define WSASetLastError(err) errno = err
-#define closesocket     close 
+#define closesocket     close
 #define SOCKET          int
 #if defined(__hpux)
 #define WSAEWOULDBLOCK  EAGAIN
@@ -128,10 +128,10 @@ extern "C" {
 #define sim_printf printf
 #endif
 
-int sim_parse_addr (const char *cptr, char *host, size_t hostlen, const char *default_host, 
-                                      char *port, size_t port_len, const char *default_port, 
+int sim_parse_addr (const char *cptr, char *host, size_t hostlen, const char *default_host,
+                                      char *port, size_t port_len, const char *default_port,
                                       const char *validate_addr);
-int sim_parse_addr_ex (const char *cptr, char *host, size_t hostlen, const char *default_host, 
+int sim_parse_addr_ex (const char *cptr, char *host, size_t hostlen, const char *default_host,
                                          char *port, size_t port_len, char *localport, size_t local_port_len, const char *default_port);
 int sim_addr_acl_check (const char *validate_addr, const char *acl);
 #define SIM_SOCK_OPT_REUSEADDR      0x0001

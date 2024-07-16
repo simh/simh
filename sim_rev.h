@@ -49,11 +49,11 @@
 #endif
 
 /*
-  Simh's git commit id would be undefined when working with an 
-  extracted archive (zip file or tar ball).  To address this 
-  problem and record the commit id that the archive was created 
-  from, the archive creation process populates the below 
-  information as a consequence of the "sim_rev.h export-subst" 
+  Simh's git commit id would be undefined when working with an
+  extracted archive (zip file or tar ball).  To address this
+  problem and record the commit id that the archive was created
+  from, the archive creation process populates the below
+  information as a consequence of the "sim_rev.h export-subst"
   line in the .gitattributes file.
  */
 #define SIM_ARCHIVE_GIT_COMMIT_ID $Format:%H$
@@ -61,9 +61,9 @@
 
 /*
   The comment section below reflects the manual editing process which was in place
-  prior to the use of the git source control system on at https://gihub.com/simh/simh
+  prior to the use of the git source control system on at https://github.com/simh/simh
 
-  Details about all future fixes will be visible in the source control system's 
+  Details about all future fixes will be visible in the source control system's
   history.
 
 */
@@ -92,7 +92,7 @@ patch   date            module(s) and fix(es)
                           connected LANs
 
                         sim_tmxr.c:
-                        - made telnet option negotiation more reliable, VAX simulator now 
+                        - made telnet option negotiation more reliable, VAX simulator now
                           works with PuTTY as console (Mark Pizzolato)
 
                         h316_cpu.c:
@@ -153,7 +153,7 @@ patch   date            module(s) and fix(es)
 
                         hp2100_dp.c (Dave Bryan):
                         - Added CNTLR_TYPE cast to dp_settype
- 
+
                         hp2100_ds.c (Dave Bryan):
                         - Rewritten to use the MAC/ICD disc controller library
                         - ioIOO now notifies controller service of parameter output
@@ -184,21 +184,21 @@ patch   date            module(s) and fix(es)
 
                         hp2100_ms.c (Dave Bryan):
                         - Added CNTLR_TYPE cast to ms_settype
- 
+
                         hp2100_mt.c (Dave Bryan):
                         - Removed redundant MTAB_VUN from "format" MTAB entry
                         - Fixed command scanning error in mtcio ioIOO handler
 
                         hp2100_stddev.c (Dave Bryan):
                         - Add TBG as a logical name for the CLK device
- 
+
                         hp2100_sys.c (Dave Bryan):
                         - Deprecated DEVNO in favor of SC
                         - Added hp_setsc, hp_showsc functions to support SC modifier
                         - Added DA and dummy DC devices
                         - DMA channels renamed from 0,1 to 1,2 to match documentation
                         - Changed DIB access for revised signal model
- 
+
                         hp_disclib.c, hp_disclib.h (Dave Bryan)
                         - Created MAC/ICD disc controller library
 
@@ -235,7 +235,7 @@ patch   date            module(s) and fix(es)
                         - fixed misuse of & instead of && in Ea_ch (Michael Bloom)
 
                         pdp1_stddev.c:
-                        - fixed unitialized variable in tty output service (Michael Bloom)
+                        - fixed uninitialized variable in tty output service (Michael Bloom)
 
                         pdp10_fe.c:
                         - revised to use clock coscheduling
@@ -247,7 +247,7 @@ patch   date            module(s) and fix(es)
                         - fixed Qbus interrupts to treat all IO devices (except clock) as BR4
                         - fixed order of int_internal (Jordi Guillaumes i Pons)
 
-                        ppd11_rf.c
+                        pdp11_rf.c
                         - fixed bug in updating mem addr extension (Peter Schorn)
 
                         pdp11_rk.c:
@@ -260,7 +260,7 @@ patch   date            module(s) and fix(es)
                         - added RD32 support
 
                         pdp11_tq.c: (Mark Pizzolato)
-                        - set UNIT_SXC flag when a tape mark is encountered 
+                        - set UNIT_SXC flag when a tape mark is encountered
                           during forward motion read operations
                         - fixed logic which clears UNIT_SXC to check command modifier
                         - added CMF_WR flag to tq_cmf entry for OP_WTM
@@ -270,7 +270,7 @@ patch   date            module(s) and fix(es)
                         - added more debug output after positioning operations
                         - added textual display of the command being performed
                         - fixed comments about register addresses
-                        
+
                         pdp11_ts.c:
                         - fixed t_addr printouts for 64b big-endian systems (Mark Pizzolato)
 
@@ -284,34 +284,34 @@ patch   date            module(s) and fix(es)
 
                         pdp11_xq.c: (Mark Pizzolato)
                         - Fixed missing information from save/restore which
-                          caused operations to not complete correctly after 
+                          caused operations to not complete correctly after
                           a restore until the OS reset the controller.
                         - Added address conflict check during attach.
                         - Fixed loopback processing to correctly handle forward packets.
-                        - Fixed interrupt dispatch issue which caused delivered packets 
+                        - Fixed interrupt dispatch issue which caused delivered packets
                           (in and out) to sometimes not interrupt the CPU after processing.
-                        - Fixed the SCP visibile SA registers to always display the 
+                        - Fixed the SCP visible SA registers to always display the
                           ROM mac address, even after it is changed by SET XQ MAC=.
-                        - Added changes so that the Console DELQA diagnostic (>>>TEST 82) 
+                        - Added changes so that the Console DELQA diagnostic (>>>TEST 82)
                           will succeed.
                         - Added DELQA-T (aka DELQA Plus) device emulation support.
                         - Added dropped frame statistics to record when the receiver discards
                           received packets due to the receiver being disabled, or due to the
                           XQ device's packet receive queue being full.
                         - Fixed bug in receive processing when we're not polling.  This could
-                          cause receive processing to never be activated again if we don't 
-                          read all available packets via eth_read each time we get the 
+                          cause receive processing to never be activated again if we don't
+                          read all available packets via eth_read each time we get the
                           opportunity.
                         - Added the ability to Coalesce received packet interrupts.  This
-                          is enabled by SET XQ POLL=DELAY=nnn where nnn is a number of 
+                          is enabled by SET XQ POLL=DELAY=nnn where nnn is a number of
                           microseconds to delay the triggering of an interrupt when a packet
                           is received.
-                        - Added SET XQ POLL=DISABLE (aka SET XQ POLL=0) to operate without 
+                        - Added SET XQ POLL=DISABLE (aka SET XQ POLL=0) to operate without
                           polling for packet read completion.
                         - Changed the sanity and id timer mechanisms to use a separate timer
-                          unit so that transmit and recieve activities can be dealt with
+                          unit so that transmit and receive activities can be dealt with
                           by the normal xq_svc routine.
-                          Dynamically determine the timer polling rate based on the 
+                          Dynamically determine the timer polling rate based on the
                           calibrated tmr_poll and clk_tps values of the simulator.
                         - Enabled the SET XQ POLL to be meaningful if the simulator currently
                           doesn't support idling.
@@ -319,7 +319,7 @@ patch   date            module(s) and fix(es)
                           all debug output goes to the same place.
                         - Restored the call to xq_svc after all successful calls to eth_write
                           to allow receive processing to happen before the next event
-                          service time.  This must have been inadvertently commented out 
+                          service time.  This must have been inadvertently commented out
                           while other things were being tested.
 
                         pdp11_xu.c: (Mark Pizzolato)
@@ -334,7 +334,7 @@ patch   date            module(s) and fix(es)
                         pdp18b_stddev.c:
                         - added clock coscheduling
                         - revised TTI to use clock coscheduling and to fix perpetual CAF bug
-                        
+
                         pdp18b_ttx.c:
                         - revised to use clock coscheduling
 
@@ -348,7 +348,7 @@ patch   date            module(s) and fix(es)
                         - revised to use clock coscheduling and to fix perpetual CAF bug
 
                         pdp8_ttx.c:
-                        - revised to use clock cosheduling
+                        - revised to use clock coscheduling
 
                         pdp8_sys.c:
                         - added link to FPP
@@ -407,7 +407,7 @@ patch   date            module(s) and fix(es)
                         - decommitted MTAB_VAL
                         - fixed implementation of MTAB_NC
                         - fixed warnings in help printouts
-                        - fixed "SHOW DEVICE" with only one enabled unit (Dave Bryan)  
+                        - fixed "SHOW DEVICE" with only one enabled unit (Dave Bryan)
 
                         sim_tape.c:
                         - fixed signed/unsigned warning in sim_tape_set_fmt (Dave Bryan)
@@ -429,7 +429,7 @@ patch   date            module(s) and fix(es)
                         - Moved non-existent memory checks to WritePW
                         - Fixed mp_dms_jmp to accept lower bound, check write protection
                         - Corrected DMS violation register set conditions
-                        - Refefined ABORT to pass address, moved def to hp2100_cpu.h
+                        - Redefined ABORT to pass address, moved def to hp2100_cpu.h
                         - Combined dms and dms_io routines
                         - JSB to 0/1 with W5 out and fence = 0 erroneously causes MP abort
                         - Unified I/O slot dispatch by adding DIBs for CPU, MP, and DMA
@@ -455,7 +455,7 @@ patch   date            module(s) and fix(es)
                         - Updated mp_dms_jmp calling sequence
                         - Fixed DJP, SJP, and UJP jump target validation
                         - RVA/B conditionally updates dms_vr before returning value
-                        
+
                         hp2100_cpu3.c (Dave Bryan):
                         - Moved microcode function prototypes to hp2100_cpu1.h
                         - Removed option-present tests (now in UIG dispatchers)
@@ -512,7 +512,7 @@ patch   date            module(s) and fix(es)
                         hp2100_mt.c (Dave Bryan):
                         - Fixed missing flag after CLR command
                         - Moved write enable and format commands from MTD to MTC
-                        
+
                         hp2100_mux.c (Dave Bryan):
                         - SHOW MUX CONN/STAT with SET MUX DIAG is no longer disallowed
                         - Changed Telnet poll to connect immediately after reset or attach
@@ -750,7 +750,7 @@ patch   date            module(s) and fix(es)
                         - fixed declarations (Mark Pizzolato)
 
 
-   V3.7 revision history 
+   V3.7 revision history
 
   3     02-Sep-07       scp.c:
                         - fixed bug in SET THROTTLE command
@@ -777,7 +777,7 @@ patch   date            module(s) and fix(es)
 
                         sim_timer.c:
                         - fixed idle timer event selection algorithm
-  
+
                         h316_lp.c:
                         - fixed loss of last print line (Theo Engel)
 
@@ -833,7 +833,7 @@ patch   date            module(s) and fix(es)
                         - fixed to set "mux_rchp" when a line break is received
                         - fixed incorrect "odd_par" table values
                         - reversed test in "RCV_PAR" to return "LIL_PAR" on odd parity
-                        - rixed mux reset (ioCRS) to clear port parameters
+                        - fixed mux reset (ioCRS) to clear port parameters
                         - fixed to use PUT_DCH instead of PUT_CCH for data channel status
                         - added DIAG/TERM modifiers to implement diagnostic mode
 
@@ -1022,7 +1022,7 @@ patch   date            module(s) and fix(es)
                         - fixed operand order in EIS instructions (W.F.J. Mueller)
 
 
-   V3.6 revision history 
+   V3.6 revision history
 
   1     25-Jul-06       sim_console.c:
                         - implemented SET/SHOW PCHAR
@@ -1173,7 +1173,7 @@ patch   date            module(s) and fix(es)
                         - fixed POLYD, POLYG to not exit prematurely if arg = 0
                         - fixed POLYD, POLYG to do full 64b multiply
                         - fixed POLYF, POLYD, POLYG to remove truncation on add
-                        - fixed POLYF, POLYD, POLYG to mask mul reslt to 31b/63b/63b
+                        - fixed POLYF, POLYD, POLYG to mask mul result to 31b/63b/63b
                         - fixed fp add routine to test for zero via fraction
                           to support "denormal" argument from POLYF, POLYD, POLYG
                         - fixed bug in 32b floating multiply routine
@@ -1189,14 +1189,14 @@ patch   date            module(s) and fix(es)
                         - fixed ACBH to set cc's on result
                         - fixed POLYH to set R3 correctly
                         - fixed POLYH to not exit prematurely if arg = 0
-                        - fixed POLYH to mask mul reslt to 127b
+                        - fixed POLYH to mask mul result to 127b
                         - fixed fp add routine to test for zero via fraction
                           to support "denormal" argument from POLYH
                         - fixed EMODH to concatenate 15b of 16b extension
                         - fixed bug in reported VA on faulting cross-page write
 
 
-   V3.5 revision history 
+   V3.5 revision history
 
 patch   date            module(s) and fix(es)
 
@@ -1332,7 +1332,7 @@ patch   date            module(s) and fix(es)
 
                         vax_io.c: revised autoconfiguration algorithm and interface
 
-   V3.4 revision history 
+   V3.4 revision history
 
   0     01-May-04       scp.c:
                         - fixed ASSERT code
@@ -1370,7 +1370,7 @@ patch   date            module(s) and fix(es)
 
                         pdp11_tu.c: fixed error reporting
 
-   V3.3 revision history 
+   V3.3 revision history
 
   2     08-Mar-05       scp.c: added ASSERT command (Dave Bryan)
 
@@ -1552,7 +1552,7 @@ patch   date            module(s) and fix(es)
                         - TMK is cleared by new motion command, not DCLR
                         - DONE is set on data transfers, ATA on non data transfers
 
-                        pdp11_defs.h: 
+                        pdp11_defs.h:
                         - revised Unibus/Qbus DMA API's
                         - added CPU type and options flags
 
@@ -1588,7 +1588,7 @@ patch   date            module(s) and fix(es)
                         vax_defs.h:
                         - added octaword, compatibility mode support
 
-                        vax_moddefs.h: 
+                        vax_moddefs.h:
                         - revised Unibus/Qbus DMA API's
 
                         vax_cpu.c:
@@ -1622,7 +1622,7 @@ patch   date            module(s) and fix(es)
                         - split from vax_sys.c
                         - removed PTR, PTP
 
-   V3.2 revision history 
+   V3.2 revision history
 
   3     03-Sep-04       scp.c:
                         - added ECHO command (Dave Bryan)
@@ -1707,7 +1707,7 @@ patch   date            module(s) and fix(es)
                         - revised SR values to preserve SR<5:3>
 
                         hp2100_lps.c, hp2100_lpt.c: fixed timing
-                        
+
                         hp2100_dp.c: fixed interpretation of SR<0>
 
                         hp2100_dr.c: revised boot code to use IBL algorithm
@@ -1874,7 +1874,7 @@ patch   date            module(s) and fix(es)
 
                         pdp1_drm.c:
                         - added parallel drum support
-                        - fixed bug in serial drum instructin decoding
+                        - fixed bug in serial drum instruction decoding
 
                         pdp1_sys.c: added parallel drum support, mnemonics
 
@@ -1899,7 +1899,7 @@ patch   date            module(s) and fix(es)
                         pdp11_xq.c (Dave Hittner, Mark Pizzolato):
                         - fixed second controller interrupts
                         - fixed bugs in multicast and promiscuous setup
-  
+
                         pdp18b_cpu.c:
                         - added instruction history
                         - fixed PDP-4,-7,-9 autoincrement bug
@@ -1934,7 +1934,7 @@ patch   date            module(s) and fix(es)
                         - revised instruction decoding
                         - added instruction history
 
-   V3.0 revision history 
+   V3.0 revision history
 
   2     15-Sep-03       scp.c:
                         - fixed end-of-file problem in dep, idep
@@ -1946,7 +1946,7 @@ patch   date            module(s) and fix(es)
                         - added address switch functionality to PTR BOOT
 
                         pdp1_sys.c: added multibank capability to LOAD
-  
+
                         pdp18b_cpu.c:
                         - fixed priorities in PDP-15 API (PI between 3 and 4)
                         - fixed sign handling in PDP-15 unsigned mul/div
@@ -2435,7 +2435,7 @@ patch   date            module(s) and fix(es)
                         pdp11_cpu.c: fixed bugs (John Dundas)
                         - added special case for PS<15:12> = 1111 to MFPI
                         - removed special case from MTPI
-                        - added masking of relocation adds 
+                        - added masking of relocation adds
 
                         i1401_cpu.c:
                         - added multiply/divide
@@ -2452,7 +2452,7 @@ patch   date            module(s) and fix(es)
                         - changed LOG/NOLOG to SET LOG/NOLOG
                         - added SHOW LOG
                         - added SET VT/NOVT and SHOW VT for VT emulation
-  
+
                         sim_sock.h: changed VMS stropt.h include to ioctl.h
 
                         vax_cpu.c
@@ -2461,12 +2461,12 @@ patch   date            module(s) and fix(es)
                         - fixed register logging in autoincrement indexed
 
                         vax_stddev.c: added TODR powerup routine
-                        
+
                         vax_cpu1.c: fixed exception flows to clear trap request
 
   7     30-Apr-02       scp.c: fixed bug in clock calibration when (real) clock
                            jumps forward due too far (Jonathan Engdahl)
-  
+
                         pdp11_cpu.c: fixed bugs, added features (John Dundas
                            and Wolfgang Helbig)
                         - added HTRAP and BPOK to maintenance register
@@ -2475,7 +2475,7 @@ patch   date            module(s) and fix(es)
                         - fixed RTS SP, don't increment restored SP
                         - fixed TSTSET, write dst | 1 rather than prev R0 | 1
                         - fixed DIV, set N=0,Z=1 on div by zero (J11, 11/70)
-                        - fixed DIV, set set N=Z=0 on overfow (J11, 11/70)
+                        - fixed DIV, set set N=Z=0 on overflow (J11, 11/70)
                         - fixed ASH, ASHC, count = -32 used implementation-
                            dependent 32 bit right shift
                         - fixed illegal instruction test to detect 000010
@@ -2606,7 +2606,7 @@ patch   date            module(s) and fix(es)
                         - cleaned up volatile state for GNU C longjmp
 
                         pdp11_cpu.c: cleaned up declarations
-  
+
                         pdp11_rq.c: added RA-class disks
 
 4       17-Dec-01       pdp11_rq.c: added delayed processing of packets

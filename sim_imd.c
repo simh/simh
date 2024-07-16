@@ -155,7 +155,7 @@ static t_stat diskParse(DISK_INFO *myDisk, uint32 isVerbose)
         sim_debug(myDisk->debugmask, myDisk->device, "start of track %d at file offset %ld\n", myDisk->ntracks, ftell(myDisk->file));
 
         hdrBytes = sim_fread(&imd, 1, 5, myDisk->file);
-  
+
         if ((hdrBytes == 0) && feof(myDisk->file))
             break; /* detected end of IMD file */
 
@@ -669,7 +669,7 @@ t_stat sectWrite(DISK_INFO *myDisk,
  * does not involve changing the disk image size.)
  *
  * Any existing data on the disk image will be destroyed when Track 0, Head 0 is formatted.
- * At that time, the IMD file is truncated.  So for the trackWrite to be used to sucessfully
+ * At that time, the IMD file is truncated.  So for the trackWrite to be used to successfully
  * format a disk image, then format program must format tracks starting with Cyl 0, Head 0,
  * and proceed sequentially through all tracks/heads on the disk.
  *

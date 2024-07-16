@@ -60,11 +60,11 @@
 
 
     ASCII mode recognizes some additional forms of input which allows the
-    intermixing of binary cards with text cards. 
+    intermixing of binary cards with text cards.
 
     Lines beginning with ~raw are taken as a number of 4 digit octal values
     with represent each column of the card from 12 row down to 9 row. If there
-    is not enough octal numbers to span a full card the remainder of the 
+    is not enough octal numbers to span a full card the remainder of the
     card will not be punched.
 
     Also ~eor, will generate a 7/8/9 punch card. An ~eof will gernerate a
@@ -110,7 +110,7 @@ typedef int t_cdstat;
 #define CDSE_OK     0   /* Good */
 #define CDSE_EOF    1   /* End of File */
 #define CDSE_EMPTY  2   /* Input Hopper Empty */
-#define CDSE_ERROR  3   /* Error Card Read */  
+#define CDSE_ERROR  3   /* Error Card Read */
 
 /* Generic routines. */
 

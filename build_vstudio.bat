@@ -4,7 +4,7 @@
 :: If this procedure is not invoked from a Developer command prompt
 :: then the VS2008 tools are preferred if VS2008 is installed, 
 :: otherwise the installed Visual Studio tools will be used 
-:: prefering newer Visual Studio versions over older ones.
+:: preferring newer Visual Studio versions over older ones.
 ::
 :: If this is invoked with Visual Studio 2022 installed along with
 :: the "C++ for Windows XP Support for VS 2017 (v141) tools" option

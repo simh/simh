@@ -185,7 +185,7 @@ extern "C" {
 
 /* Length specific integer declarations */
 
-/* Handle the special/unusual cases first with everything else leveraging stdints.h */
+/* Handle the special/unusual cases first with everything else leveraging stdint.h */
 #if defined (VMS)
 #include <ints.h>
 #elif defined(_MSC_VER) && (_MSC_VER < 1600)
@@ -197,7 +197,7 @@ typedef unsigned __int16 uint16;
 typedef unsigned __int32 uint32;
 #else
 /* All modern/standard compiler environments */
-/* any other environment needa a special case above */
+/* any other environment needs a special case above */
 #include <stdint.h>
 typedef int8_t          int8;
 typedef int16_t         int16;
@@ -414,7 +414,7 @@ typedef uint32          t_addr;
 #define SCPE_MAX_ERR    (SCPE_BASE + 52)                /* Maximum SCPE Error Value */
 #define SCPE_KFLAG      0x10000000                      /* tti data flag */
 #define SCPE_BREAK      0x20000000                      /* tti break flag */
-#define SCPE_NOMESSAGE  0x40000000                      /* message display supression flag */
+#define SCPE_NOMESSAGE  0x40000000                      /* message display suppression flag */
 #define SCPE_BARE_STATUS(stat) ((stat) & ~(SCPE_NOMESSAGE|SCPE_KFLAG|SCPE_BREAK))
 
 /* Print value format codes */

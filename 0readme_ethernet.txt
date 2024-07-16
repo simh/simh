@@ -3,7 +3,7 @@ This file contains information about the SIMH Ethernet package.
 -------------------------------------------------------------------------------
 
 The XQ emulator is a host-independent software emulation of Digital's
-DELQA-T (M7516-YM), DELQA (M7516) and DEQNA (M7504) Q-bus Ethernet cards 
+DELQA-T (M7516-YM), DELQA (M7516) and DEQNA (M7504) Q-bus Ethernet cards
 for the SIMH emulator.
 
 The XU emulator is a host-independent software emulation of Digital's DEUNA
@@ -25,29 +25,29 @@ most of the undesirable traffic. You will only see "excessive" traffic if you
 are on a direct or hub(repeater) segment.
 
 On Windows using the WinPcap interface, the simulated computer can "talk" to
-the host computer on the same interface.  On other platforms with libpcap 
-(*nix), the simulated computer can not "talk" to the host computer via the 
+the host computer on the same interface.  On other platforms with libpcap
+(*nix), the simulated computer can not "talk" to the host computer via the
 selected interface, since simulator transmitted packets are not received
-by the host's network stack. The workaround for this is to use a second NIC 
-in the host and connect them both into the same network; then the host and 
+by the host's network stack. The workaround for this is to use a second NIC
+in the host and connect them both into the same network; then the host and
 the simulator can communicate over the physical LAN.
 
-Integrated Universal TUN/TAP support provides another solution for the above 
+Integrated Universal TUN/TAP support provides another solution for the above
 dual-NIC problem for systems that support Universal TUN/TAP. Since the TUN/TAP
-interface is a pseudo network interface, the host can create a TAP device for 
-the simulator and then bridge or route packets between the TAP device and the 
-real network interface. Note that the TAP device and any bridging or routing 
-must be established before running the simulator; SIMH does not create, 
+interface is a pseudo network interface, the host can create a TAP device for
+the simulator and then bridge or route packets between the TAP device and the
+real network interface. Note that the TAP device and any bridging or routing
+must be established before running the simulator; SIMH does not create,
 bridge, or route TAP devices for you.
 
 Integrated Universal TUN/TAP support can be used for host<->simulator network
 traffic (on the platforms where it is available) by using the SIMH command:
 "attach xq tap:tapN" (i.e. attach xq tap:tap0).  Platforms that this has been
-tested on include: Linux, FreeBSD, OpenBSD, NetBSD and OSX.  Each of these 
-platforms has some way to create a tap pseudo device (and possibly then to 
+tested on include: Linux, FreeBSD, OpenBSD, NetBSD and OSX.  Each of these
+platforms has some way to create a tap pseudo device (and possibly then to
 bridge it with a physical network interface).
 
-The following steps were performed to get a working SIMH vax simulator 
+The following steps were performed to get a working SIMH vax simulator
 sharing a physical NIC and allowing Host<->SIMH vax communications:
 
 Linux (Ubuntu 10.04):
@@ -79,7 +79,7 @@ Linux (Ubuntu 10.04):
     /sbin/ifconfig tap0 0.0.0.0
 
     # Run simulator and "attach xq tap:tap0"
-    
+
 
 Linux (Fedora Core 18, 20, CentOS, RedHat, etc.):
     yum install gcc
@@ -90,7 +90,7 @@ Linux (Centos 6.x):
     yum install gcc
     yum install libpcap-devel
     yum install uml_utilities
-    
+
 OpenBSD (OpenBSD 4.6)
 
     /sbin/ifconfig tun0 create
@@ -103,10 +103,10 @@ OpenBSD (OpenBSD 4.6)
     /sbin/brconfig bridge0 up
 
     # Run simulator and "attach xq tap:tun0"
-    
+
 FreeBSD (FreeBSD 11.3)
 
-    /sbin/sysctl net.link.tap.up_on_open=1 
+    /sbin/sysctl net.link.tap.up_on_open=1
     /sbin/ifconfig tap0 create
     /sbin/ifconfig tap0 up
 
@@ -131,38 +131,38 @@ NetBSD (NetBSD 5.0.2)
 OSX (Snow Leopard)
     OSX Does NOT have native support for tun/tap interfaces.  It also does not have native
     support for bridging.
-    
-    Mattias Nissler has created tun/tap functionality available at http://tuntaposx,sourceforge.net/
-    
+
+    Mattias Nissler has created tun/tap functionality available at http://tuntaposx.sourceforge.net/
+
     We'll punt on bridging for the sake of this example and move on to use a basic tap
     based internal network so a host and guest can communicate directly.
-    
-    Download the install package from: 
+
+    Download the install package from:
     http://sourceforge.net/projects/tuntaposx/files/tuntap/20111101/tuntap_20111101.tar.gz
-    
+
     Expand the tarball to a directory.
     Invoke the package installer tuntap_20111101.pkg
     Click through the various prompts accepting things and eventually installing the package.
-    
+
     # Build and Run simulator and:
        sim> attach xq tap:tap0
        sim> ! ifconfig tap0 192.168.6.1 netmask 255.255.255.0
 
-    Simulated system uses IP address 192.168.6.2 and host uses 192.168.6.1 
+    Simulated system uses IP address 192.168.6.2 and host uses 192.168.6.1
     and things work.
     You must run as root for this to work.
-    
+
 -------------------------------------------------------------------------------
-An alternative to direct pcap and tun/tap networking on *nix environments is 
+An alternative to direct pcap and tun/tap networking on *nix environments is
 VDE (Virtual Distributed Ethernet).
 
-Note 1: Using vde based networking is likely more flexible, but it isn't 
-        nearly as efficient.  Host OS overhead will always be higher when 
-        vde networking is used as compared to native pcap and/or tun/tap 
+Note 1: Using vde based networking is likely more flexible, but it isn't
+        nearly as efficient.  Host OS overhead will always be higher when
+        vde networking is used as compared to native pcap and/or tun/tap
         networking.
-Note 2: Root access will likely be needed to configure or start the vde 
+Note 2: Root access will likely be needed to configure or start the vde
         environment prior to starting a simulator which may use it.
-Note 3: Simulators running using VDE networking can run without root 
+Note 3: Simulators running using VDE networking can run without root
         privilege.
 
 Linux (Ubuntu 11.10):
@@ -172,44 +172,44 @@ Linux (Ubuntu 11.10):
 
     vde_switch -s /tmp/switch1 -tap tap0 -m 666
     ifconfig tap0 192.168.6.1 netmask 255.255.255.0 up
-    
+
     # Build and Run simulator and:
        sim> attach xq vde:/tmp/switch1  #simulator uses IP address 192.168.6.2
 
 OSX:
-    The macports package manager (http://www.macports.org) can be used to 
+    The macports package manager (http://www.macports.org) can be used to
     install the net/vde2 package.
 
 -------------------------------------------------------------------------------
-Another alternative to direct pcap and tun/tap networking on all environments is 
+Another alternative to direct pcap and tun/tap networking on all environments is
 NAT (SLiRP) networking.  NAT networking is limited to only IP network protocols
 so DECnet, LAT and Clusting can't work on a NAT connected interface, but this may
 be the easiest solution for many folks.
 
        sim> attach xq nat:
-       
-The simulator can use static IP addresses of 10.0.2.4 thru 10.0.2.14 with a 
+
+The simulator can use static IP addresses of 10.0.2.4 thru 10.0.2.14 with a
 netmask of 255.255.255.0 and a gateway of 10.0.2.2 and a nameserver of 10.0.2.3.
-If the simulated machine uses DHCP it will get the address 10.0.2.15.  Various 
-NAT based parameters can be configured on the attach command.  HELP XQ ATTACH 
-will provide useful information.  Host to simulator connectivitiy can be 
-achieved for a simulator which gets its IP address via DHCP with the following 
+If the simulated machine uses DHCP it will get the address 10.0.2.15.  Various
+NAT based parameters can be configured on the attach command.  HELP XQ ATTACH
+will provide useful information.  Host to simulator connectivity can be
+achieved for a simulator which gets its IP address via DHCP with the following
 command:
 
        sim> attach xq nat:tcp=2323:10.0.2.15:23,tcp=2121:10.0.2.15:21
-       
-The host computer can telnet to localhost:2323 to reach the simulator via 
+
+The host computer can telnet to localhost:2323 to reach the simulator via
 telnet, etc.
 
-Additionally NAT based networking is useful to allow host systems with WiFi 
+Additionally NAT based networking is useful to allow host systems with WiFi
 networking to a) reach the simulated system and b) allow the simulated system
 to reach out to the Internet.
 
-Note: As mentioned above, NAT networking is specifically capable of providing 
-      TCP/IP connectivity.  Only expect TCP and UDP traffic to pass through 
-      the interface.  Do not expect ICMP traffic (ping mostly) to traverse 
-      the NAT boundary.  This restriction is a conseqence of host platform 
-      and network limitations regarding direct user mode code generating ICMP 
+Note: As mentioned above, NAT networking is specifically capable of providing
+      TCP/IP connectivity.  Only expect TCP and UDP traffic to pass through
+      the interface.  Do not expect ICMP traffic (ping mostly) to traverse
+      the NAT boundary.  This restriction is a consequence of host platform
+      and network limitations regarding direct user mode code generating ICMP
       packets.
 
 
@@ -217,34 +217,34 @@ Note: As mentioned above, NAT networking is specifically capable of providing
 
 Windows notes:
  1. The Npcap package available from https://nmap.org/npcap is the preferred
-    interface for Windows 7 onward since the original WinPCAP 4.1.3 package 
+    interface for Windows 7 onward since the original WinPCAP 4.1.3 package
     from https://www.winpcap.org/install/bin/WinPcap_4_1_3.exe is no longer
-    developed or supported. These packages for windows simulate the libpcap 
-    package that is freely available for un*x systems.  
+    developed or supported. These packages for windows simulate the libpcap
+    package that is freely available for un*x systems.
 
  2. You must *install* the Npcap or WinPCAP runtime package.
 
- 3. The first time the Npcap/WinPCAP driver is used, it will be dynamically 
-    loaded, and the user must be an Administrator on the machine to do so. 
-    If you need to run as an unprivileged user, you must set the "npf" driver 
-    to autostart. 
-    Current Npcap and WinPcap installers provide an option to configure this 
+ 3. The first time the Npcap/WinPCAP driver is used, it will be dynamically
+    loaded, and the user must be an Administrator on the machine to do so.
+    If you need to run as an unprivileged user, you must set the "npf" driver
+    to autostart.
+    Current Npcap and WinPcap installers provide an option to configure this
     at installation time, so if that choice is made, then there is no need for
     administrator privileged to run simulators with network support.
 
 
 Building on Windows:
- You should be able to build with any of the free compiler environments 
- available on the Windows platform.  If you want to use the Visual C++ 
- Express 2008 or 2010 interactive development environments, read the file 
+ You should be able to build with any of the free compiler environments
+ available on the Windows platform.  If you want to use the Visual C++
+ Express 2008 or 2010 interactive development environments, read the file
  ".\Visual Studio Projects\0ReadMe_Projects.txt" for details about the
  required dependencies.  Alternatively, you can build simh with networking
- support using the MinGW GCC compiler environment (32 bit) or the cygwin 
- environment.  Each of these Visual C++, MinGW and cygwin build environments 
- require Npcap or WinPcap and Posix threading packages being available.  
- These should be located in a directory structure parallel to the current 
+ support using the MinGW GCC compiler environment (32 bit) or the cygwin
+ environment.  Each of these Visual C++, MinGW and cygwin build environments
+ require Npcap or WinPcap and Posix threading packages being available.
+ These should be located in a directory structure parallel to the current
  simulator source directory.
- 
+
  For Example, the directory structure should look like:
 
     .../simh/simh-master/VAX/vax_cpu.c
@@ -259,20 +259,20 @@ Building on Windows:
 
     https://github.com/simh/windows-build/archive/windows-build.zip
 
- This archive of dependent components for Windows simulators will 
+ This archive of dependent components for Windows simulators will
  automatically be downloaded, if needed, when building with Visual Studio.
 
  There are Windows batch files provided to initiate compiles using the MinGW
- compiler tool chain.  These batch files are located in the same directory 
- as this file and are called: build_mingw.bat, build_mingw_ether.bat, and 
- build_mingw_noasync.bat.  These batch files each presume that the MinGW 
+ compiler tool chain.  These batch files are located in the same directory
+ as this file and are called: build_mingw.bat, build_mingw_ether.bat, and
+ build_mingw_noasync.bat.  These batch files each presume that the MinGW
  toolchain is either in the current path or, if not that it is located at
  C:\MinGW\bin.  These batch files merely invoke the MinGW make (GNU make)
- passing some specific arguments along with the optional arguments the batch 
+ passing some specific arguments along with the optional arguments the batch
  file is invoked with.
- 
- The current windows network built binaries will run on any system without 
- regard to whether or not Npcap or WinPcap is installed, and will provide 
+
+ The current windows network built binaries will run on any system without
+ regard to whether or not Npcap or WinPcap is installed, and will provide
  Network functionality when Npcap or WinPcap is available.
 
 -------------------------------------------------------------------------------
@@ -284,19 +284,19 @@ Linux, {Free|Net|Open}BSD, OS/X, and Un*x notes:
 Sim_Ether has been reworked to be more universal; because of this, you will
 need to get a version of libpcap that is 0.9 or greater. All current Linux
 distributions provide a libpcap-dev package which has the needed version
-of libpcap and the required components to build applications using it.  
-If you are running an older Linux OS, you can download and build the required 
-library from www.tcpdump.org - see the comments at the top of Sim_ether.c 
-for details.  
+of libpcap and the required components to build applications using it.
+If you are running an older Linux OS, you can download and build the required
+library from www.tcpdump.org - see the comments at the top of Sim_ether.c
+for details.
 
 ----- WARNING ----- WARNING ----- WARNING ----- WARNING ----- WARNING -----
 
  1. For all platforms, you must run SIMH(scp) with sufficient privilege to
     allow the Ethernet card to be set into promiscuous mode and to write
-    packets through the driver. 
-      a) For Windows systems this means having administrator privileges to 
-         start the "npf" driver.  The current WinPcap installer offers an 
-         option to autostart the "npf" driver when the system boots. 
+    packets through the driver.
+      a) For Windows systems this means having administrator privileges to
+         start the "npf" driver.  The current WinPcap installer offers an
+         option to autostart the "npf" driver when the system boots.
          Starting the "npf" driver at boot time means that simulators do
          not need to run with administrator privileges.
       b) For more recent Linux systems, The concepts leveraging "Filesystem
@@ -305,76 +305,76 @@ for details.
          http://packetlife.net/blog/2010/mar/19/sniffing-wireshark-non-root-user/
          describes how to do this for wireshark.  The exact same capabilities
          are needed by SIMH for network support.  Use that article as a guide.
-      c) For Unix/Unix-like systems which use bpf devices (NetBSD, 
-         OpenBSD, FreeBSD and OS/X) it is possible to set permissions on 
-         the bpf devices to allow read and write access to users other 
-         than root (For example: chmod 666 /dev/bpf*).  Doing this, has 
+      c) For Unix/Unix-like systems which use bpf devices (NetBSD,
+         OpenBSD, FreeBSD and OS/X) it is possible to set permissions on
+         the bpf devices to allow read and write access to users other
+         than root (For example: chmod 666 /dev/bpf*).  Doing this, has
          its own security issues.
       d) For other platforms this will likely mean running as root.
-    Additional alternative methods for avoiding the 'run as root' requirement 
+    Additional alternative methods for avoiding the 'run as root' requirement
     will be welcomed.
 
  2. If you want to use TAP devices, and any surrounding system network/bridge
-    setup must be done before running SIMH.  However, once that is done 
+    setup must be done before running SIMH.  However, once that is done
     (possibly at system boot time), using the TAP devices can be done without
     root privileges.
 
 Building on Linux, {Free|Net|Open}BSD, OS/X, Solaris, other *nix:
 
- 1. Get/make/install the libpcap-dev package (or libpcap-devel) for your 
+ 1. Get/make/install the libpcap-dev package (or libpcap-devel) for your
     operating system. Sources:
       All    : http://www.tcpdump.org/
       Older versions of libpcap can be found, for various systems, at:
-      Linux  : 
-                Debian Based distributions: 
+      Linux  :
+                Debian Based distributions:
                        # apt-get install libpcap-dev
                 RedHat/Fedora Based distributions:
                        # yum install libpcap-devel
-                       
-      OS/X   : The libpcap components are installed as part of the Xcode 
-               developer package.  Instructions to install Xcode on various 
-               OSX versions are available at: 
+
+      OS/X   : The libpcap components are installed as part of the Xcode
+               developer package.  Instructions to install Xcode on various
+               OSX versions are available at:
                   https://guide.macports.org/chunked/installing.xcode.html
                Be sure to install the command line tools which are installed
-               with the command "xcode-select --install" in more recent 
+               with the command "xcode-select --install" in more recent
                versions of the Apple developer support.
-                  
+
       HP-UX  : ftp://hpux.connect.org.uk/hpux/Networking/Admin/
 
 	    NOTE: The repositories for older versions of these platforms
 	          don't contain a version of libpcap greater than 0.8.1.
-	          However, most(all) recent releases of *nix environments 
-	          ship with sufficiently recent versions of libpcap either 
-	          automatically installed or available for installation as 
-	          part of the distribution.  
-	          The OS provided libpcap-dev components will be prefereable 
+	          However, most(all) recent releases of *nix environments
+	          ship with sufficiently recent versions of libpcap either
+	          automatically installed or available for installation as
+	          part of the distribution.
+	          The OS provided libpcap-dev components will be preferable
 	          to a package built from www.tcpdump.org sources.  This is
-	          due to the fact that various OS supplied packages will 
-	          depend on the OS supplied libpcap.  The improper build or 
-	          install of the www.tcpdump.org source package can conflict 
-	          with the OS provided one and break the OS provided 
+	          due to the fact that various OS supplied packages will
+	          depend on the OS supplied libpcap.  The improper build or
+	          install of the www.tcpdump.org source package can conflict
+	          with the OS provided one and break the OS provided
 	          applications (i.e. tcpdump and/or wireshark) as well as
 	          not working correctly for use by simh.
 
  2. If you install the vendor supplied libpcap-dev package then the simh
-    makefile will automatically use the vendor supplied library without any 
-    additional arguments.  If you have downloaded and built libpcap from 
+    makefile will automatically use the vendor supplied library without any
+    additional arguments.  If you have downloaded and built libpcap from
     www.tcpdump.org, then the existing makefile will detect that this is
     the case and try to use that.
 
  3. The makefile defaults to building simulators with network support which
     dynamically load the libpcap library.  This means that the same simulator
-    binaries will run on any system whether or not libpcap is installed.  If 
-    you want to force direct libpcap linking during a build you do so by 
-    typing 'make USE_NETWORK=1'.  You must build with gcc to do this.  There 
+    binaries will run on any system whether or not libpcap is installed.  If
+    you want to force direct libpcap linking during a build you do so by
+    typing 'make USE_NETWORK=1'.  You must build with gcc to do this.  There
     is no observable benefit to directly linking against libpcap.  Support
     for directly linking libpcap is deprecated on all platforms except
     Linux and macOS where it has already been removed.
-    
- 4. Some platforms (HP-UX in particular) may not have vendor supplied libpcap 
+
+ 4. Some platforms (HP-UX in particular) may not have vendor supplied libpcap
     components available and installed with the operating system.  The packages
-    which are available for this platform install include and library files in 
-    user specified locations.  When building on these platforms the library 
+    which are available for this platform install include and library files in
+    user specified locations.  When building on these platforms the library
     path must be specified on the make command line.  This can be done with:
     'make LPATH=/usr/lib:/usr/local/lib'
 
@@ -382,7 +382,7 @@ Building on Linux, {Free|Net|Open}BSD, OS/X, Solaris, other *nix:
 
 -------------------------------------------------------------------------------
 
-OpenVMS Alpha and OpenVMS Integrety (IA64) notes:
+OpenVMS Alpha and OpenVMS Integrity (IA64) notes:
   1. Ethernet support will only work on Alpha VMS 7.3-1 or later, which is
      when required VCI promiscuous mode support was added. Hobbyists can
      get the required version of VMS from the OpenVMS Alpha Hobbyist Kit 3.0.
@@ -415,13 +415,13 @@ OpenVMS Alpha and OpenVMS Integrety (IA64) notes:
      adapter prior trying to connect with SIMH, or the host may crash.
      The execlet is not written to create an I/O structure for the device.
 
-Building on OpenVMS Alpha and OpenVMS Integrety (IA64):
+Building on OpenVMS Alpha and OpenVMS Integrity (IA64):
   The current descrip.mms file will build simulators capable of using
-  Ethernet support with them automatically.  These currently are: VAX, 
+  Ethernet support with them automatically.  These currently are: VAX,
   VAX780, and PDP11.  The descrip.mms driven builds will also build the
   pcap library and build and install the VCI execlet.
-  
-  1. Fetch the VMS-PCAP zip file from:  
+
+  1. Fetch the VMS-PCAP zip file from:
 	    http://simh.trailing-edge.com/sources/vms-pcap.zip
   2. Unzip it into the base of the SIMH distribution directory.
   3. Build the simulator(s) with MMS or MMK:
@@ -443,7 +443,7 @@ Other testers have reported that RSX with DECNET and the NetBSD operating
 systems also work. RSTS/E v10.1 has preliminary support - RSTS/E boots and
 enables the XH (XQ) device - DECNET and LAT software have not been tested.
 
-The XU module has been tested by a third party for basic packet functionality 
+The XU module has been tested by a third party for basic packet functionality
 under a modified RSX11M environment. I am unable to test it in-house until
 someone can arrange to send me a disk image containing a stock RSTS/E or
 RSX11M+ system image that also contains DECNET, LAT, and/or TCP/IP software.
@@ -488,9 +488,9 @@ Dave
 ===============================================================================
                                Change Log
 ===============================================================================
-  
+
   01-Mar-12  AGN  Added support for building using Cygwin on Windows
-  01-Mar-12  MP   Made host NIC address detection more robust on *nix platforms 
+  01-Mar-12  MP   Made host NIC address detection more robust on *nix platforms
                   and mad it work when compiling under Cygwin
   29-Feb-12  MP   Fixed MAC Address Conflict detection support
   28-Feb-12  MP   Fixed overrun bug in eth_devices which caused SEGFAULTs
@@ -500,95 +500,95 @@ Dave
   17-Nov-11  MP   Added dynamic loading of libpcap on *nix platforms
   30-Oct-11  MP   Added support for vde (Virtual Distributed Ethernet) networking
   29-Oct-11  MP   Added support for integrated Tap networking interfaces on OSX
-  17-Aug-11  RMS  Fix from Sergey Oboguev relating to XU and XQ Auto Config and 
+  17-Aug-11  RMS  Fix from Sergey Oboguev relating to XU and XQ Auto Config and
                   vector assignments
   12-Aug-11  MP   Cleaned up payload length determination
-                  Fixed race condition detecting reflections when threaded 
+                  Fixed race condition detecting reflections when threaded
                   reading and writing is enabled
   07-Jul-11  MB   VMS Pcap (from Mike Burke)
                      - Fixed Alpha issues
-                     - Added OpenVMS Integrety support
+                     - Added OpenVMS Integrity support
   20-Apr-11  MP   Fixed save/restore behavior
   12-Jan-11  DTH  Added SHOW XU FILTERS modifier
   11-Jan-11  DTH  Corrected DEUNA/DELUA SELFTEST command, enabling use by
                   VMS 3.7, VMS 4.7, and Ultrix 1.1
-  09-Jan-11  MP   Fixed missing crc data when USE_READER_THREAD is defined and 
+  09-Jan-11  MP   Fixed missing crc data when USE_READER_THREAD is defined and
                   crc's are needed (only the pdp11_xu)
-  16-Dec-10  MP   added priority boost for read and write threads when 
+  16-Dec-10  MP   added priority boost for read and write threads when
                   USE_READER_THREAD does I/O in separate threads.  This helps
-                  throughput since it allows these I/O bound threads to preempt 
-                  the main thread (which is executing simulated instructions).                  
+                  throughput since it allows these I/O bound threads to preempt
+                  the main thread (which is executing simulated instructions).
   09-Dec-10  MP   allowed more flexible parsing of MAC address strings
   09-Dec-10  MP   Added support to determine if network address conflicts exist
   07-Dec-10  MP   Reworked DECnet self detection to the more general approach
                   of loopback self when any Physical Address is being set.
   06-Dec-10  MP   Added loopback processing support to pdp11_xu.c
   06-Dec-10  MP   Fixed loopback processing to correctly handle forward packets.
-  04-Dec-10  MP   Changed eth_write to do nonblocking writes when 
+  04-Dec-10  MP   Changed eth_write to do nonblocking writes when
                   USE_READER_THREAD is defined.
   30-Nov-10  MP   Fixed the fact that no broadcast packets were received by the DEUNA
-  29-Nov-10  MP   Fixed interrupt dispatch issue which caused delivered packets 
+  29-Nov-10  MP   Fixed interrupt dispatch issue which caused delivered packets
                   (in and out) to sometimes not interrupt the CPU after processing.
   17-Jun-10  MP   Fixed bug in the AUTODIN II hash filtering.
-  14-Jun-10  MP   Added support for integrated Tap networking interfaces on BSD 
+  14-Jun-10  MP   Added support for integrated Tap networking interfaces on BSD
                   platforms.
-  13-Jun-10  MP   Added support for integrated Tap networking interfaces on Linux 
+  13-Jun-10  MP   Added support for integrated Tap networking interfaces on Linux
                   platforms.
   31-May-10  MP   Added support for more TOE (TCP Offload Engine) features for IPv4
                   network traffic from the host and/or from hosts on the LAN.  These
                   new TOE features are: LSO (Large Send Offload) and Jumbo packet
                   fragmentation support.  These features allow a simulated network
-                  device to support traffic when a host leverages a NIC's Large 
-                  Send Offload capabilities to fragment and/or segment outgoing 
-                  network traffic.  Additionally a simulated network device can 
+                  device to support traffic when a host leverages a NIC's Large
+                  Send Offload capabilities to fragment and/or segment outgoing
+                  network traffic.  Additionally a simulated network device can
                   reasonably exist on a LAN which is configured to use Jumbo frames.
-  21-May-10  MP   Added functionality to fix up IP header checksums to accommodate 
+  21-May-10  MP   Added functionality to fix up IP header checksums to accommodate
                   packets from a host with a NIC which has TOE (TCP Offload Engine)
                   enabled which is expected to implement the checksum computations
                   in hardware.  Since we catch packets before they arrive at the
                   NIC the expected checksum insertions haven't been performed yet.
-                  This processing is only done for packets sent from the host to 
-                  the guest we're supporting.  In general this will be a relatively 
+                  This processing is only done for packets sent from the host to
+                  the guest we're supporting.  In general this will be a relatively
                   small number of packets so it is done for all IP frame packets
-                  coming from the host to the guest.  In order to make the 
+                  coming from the host to the guest.  In order to make the
                   determination of packets specifically arriving from the host we
                   need to know the hardware MAC address of the host NIC.  Currently
                   determining a NIC's MAC address is relatively easy on Windows.
-                  The non-windows code works on linux and may work on other *nix 
-                  platforms either as is or with slight modifications.  The code, 
-                  as implemented, only messes with this activity if the host 
+                  The non-windows code works on linux and may work on other *nix
+                  platforms either as is or with slight modifications.  The code,
+                  as implemented, only messes with this activity if the host
                   interface MAC address can be determined.
-  20-May-10  MP   Added general support to deal with receiving packets smaller 
+  20-May-10  MP   Added general support to deal with receiving packets smaller
                   than ETH_MIN_PACKET in length.  These come from packets
                   looped back by some bridging mechanism and need to be padded
-                  to the minimum frame size.  A real NIC won't pass us any 
+                  to the minimum frame size.  A real NIC won't pass us any
                   packets like that.  This fix belongs here since this layer
-                  is responsible for interfacing to the physical layer 
+                  is responsible for interfacing to the physical layer
                   devices, AND it belongs here to get CRC processing right.
   15-Aug-08  MP   Fixed transmitted packets to have the correct source MAC address.
                   Fixed incorrect address filter setting calling eth_filter().
-  07-Mar-08  MP   Fixed the SCP visible SA registers to always display the 
+  07-Mar-08  MP   Fixed the SCP visible SA registers to always display the
                   ROM MAC address, even after it is changed by SET XQ MAC=.
-  07-Mar-08  MP   Added changes so that the Console DELQA diagnostic (>>>TEST 82) 
+  07-Mar-08  MP   Added changes so that the Console DELQA diagnostic (>>>TEST 82)
                   will succeed.
   03-Mar-08  MP   Added DELQA-T (aka DELQA Plus) device emulation support.
   06-Feb-08  MP   Added dropped frame statistics to record when the receiver discards
                   received packets due to the receiver being disabled, or due to the
                   XQ device's packet receive queue being full.
                   Fixed bug in receive processing when we're not polling.  This could
-                  cause receive processing to never be activated again if we don't 
-                  read all available packets via eth_read each time we get the 
+                  cause receive processing to never be activated again if we don't
+                  read all available packets via eth_read each time we get the
                   opportunity.
   31-Jan-08  MP   Added the ability to Coalesce received packet interrupts.  This
-                  is enabled by SET XQ POLL=DELAY=nnn where nnn is a number of 
+                  is enabled by SET XQ POLL=DELAY=nnn where nnn is a number of
                   microseconds to delay the triggering of an interrupt when a packet
                   is received.
-  29-Jan-08  MP   Added SET XQ POLL=DISABLE (aka SET XQ POLL=0) to operate without 
+  29-Jan-08  MP   Added SET XQ POLL=DISABLE (aka SET XQ POLL=0) to operate without
                   polling for packet read completion.
   29-Jan-08  MP   Changed the sanity and id timer mechanisms to use a separate timer
                   unit so that transmit and receive activities can be dealt with
                   by the normal xq_svc routine.
-                  Dynamically determine the timer polling rate based on the 
+                  Dynamically determine the timer polling rate based on the
                   calibrated tmr_poll and clk_tps values of the simulator.
   25-Jan-08  MP   Enabled the SET XQ POLL to be meaningful if the simulator currently
                   doesn't support idling.
@@ -596,7 +596,7 @@ Dave
                   all debug output goes to the same place.
   25-Jan-08  MP   Restored the call to xq_svc after all successful calls to eth_write
                   to allow receive processing to happen before the next event
-                  service time.  This must have been inadvertently commented out 
+                  service time.  This must have been inadvertently commented out
                   while other things were being tested.
   23-Jan-08  MP   Added debugging support to display packet headers and packet data
   18-Jun-07  RMS  Added UNIT_IDLE flag
@@ -610,21 +610,21 @@ Dave
                   LANCE style AUTODIN II based hashed filtering.
   07-Feb-08  MP   Added eth_show_dev to display Ethernet state
                   Changed the return value from eth_read to return whether
-                  or not a packet was read.  No existing callers used or 
+                  or not a packet was read.  No existing callers used or
                   checked constant return value that previously was being
                   supplied.
-  29-Jan-08  MP   Added eth_set_async to provide a mechanism (when 
-                  USE_READER_THREAD is enabled) to allow packet reception 
-                  to dynamically update the simulator event queue and 
-                  potentially avoid polling for I/O.  This provides a minimal 
-                  overhead (no polling) maximal responsiveness for network 
+  29-Jan-08  MP   Added eth_set_async to provide a mechanism (when
+                  USE_READER_THREAD is enabled) to allow packet reception
+                  to dynamically update the simulator event queue and
+                  potentially avoid polling for I/O.  This provides a minimal
+                  overhead (no polling) maximal responsiveness for network
                   activities.
   29-Jan-08  MP   Properly sequenced activities in eth_close to avoid a race
                   condition when USE_READER_THREAD is enabled.
   25-Jan-08  MP   Changed the following when USE_READER_THREAD is enabled:
-                  - Fixed bug when the simulated device doesn't need crc 
+                  - Fixed bug when the simulated device doesn't need crc
                     in packet data which is read.
-                  - Added call to pcap_setmintocopy to minimize packet 
+                  - Added call to pcap_setmintocopy to minimize packet
                     delivery latencies.
                   - Added ethq_destroy and used it to avoid a memory leak in
                     eth_close.
@@ -634,8 +634,8 @@ Dave
                   Fixed the bpf filter used when no traffic is to be matched.
                   Reworked eth_add_packet_crc32 implementation to avoid an
                   extra buffer copy while reading packets.
-                  Fixed up #ifdef's relating to USE_SHARED so that setting 
-                  USE_SHARED or USE_NETWORK will build a working network 
+                  Fixed up #ifdef's relating to USE_SHARED so that setting
+                  USE_SHARED or USE_NETWORK will build a working network
                   environment.
   23-Jan-08  MP   Reworked eth_packet_trace and eth_packet_trace_ex to allow
                   only output Ethernet header+crc and provide a mechanism for
@@ -721,7 +721,7 @@ Dave
  1. Added VMScluster support (thanks to Mark Pizzolato)
  2. Verified VAX remote boot functionality (>>>B XQA0)
  3. Added major performance enhancements (thanks to Mark Pizzolato again)
- 4. Changed _DEBUG tracers to XQ_DEBUG and ETH_DEBUG 
+ 4. Changed _DEBUG tracers to XQ_DEBUG and ETH_DEBUG
  5. Added local packet processing
  6. Added system id broadcast
 
