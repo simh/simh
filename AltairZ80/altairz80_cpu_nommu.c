@@ -1,6 +1,6 @@
 /*  altairz80_cpu_opt.c: MITS Altair CPU (8080 and Z80)
 
-    Copyright (c) 2002-2023, Peter Schorn
+    Copyright (c) 2002-2024, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,11 @@
 
     Based on work by Charles E Owen (c) 1997
     Code for Z80 CPU from Frank D. Cringle ((c) 1995 under GNU license)
+
+    Contributions from Thomas Eberhardt
+    - Fixed H flag handling for 8080 CPU
+    - Corrected parity flag computation for Z80 CPU for INI, OUTI, IND, OUTD,
+      INIR, OTIR, INDR and OTDR instructions
 */
 
 #include "altairz80_defs.h"
@@ -36,8 +41,8 @@
 #define FLAG_Z  64
 #define FLAG_S  128
 
-#define SETFLAG(f,c)    AF = (c) ? AF | FLAG_ ## f : AF & ~FLAG_ ## f
-#define TSTFLAG(f)      ((AF & FLAG_ ## f) != 0)
+#define SETFLAG(f,c)            AF = (c) ? AF | FLAG_ ## f : AF & ~FLAG_ ## f
+#define TSTFLAG(f)              ((AF & FLAG_ ## f) != 0)
 
 #define LOW_DIGIT(x)            ((x) & 0xf)
 #define HIGH_DIGIT(x)           (((x) >> 4) & 0xf)
@@ -56,8 +61,8 @@
 #define SET_PV2(x)  ((chiptype == CHIP_TYPE_Z80) ? (((temp == (x)) << 2)) : (PARITY(temp)))
 
 /* CHECK_CPU_8080 must be invoked whenever a Z80 only instruction is executed
-    In case a Z80 instruction is executed on an 8080 the following two cases exist:
-    1) Trapping is enabled: execution stops
+    In case a Z80 instruction is executed on an 8080 there are two cases:
+    1) Trapping is enabled:     execution stops
     2) Trapping is not enabled: decoding continues with the next byte
 */
 #define CHECK_CPU_8080                          \
@@ -960,7 +965,6 @@ static uint16 GET_WORD(register uint32 a) {
 /*  Macros for the IN/OUT instructions INI/INIR/IND/INDR/OUTI/OTIR/OUTD/OTDR
 
     Pre condition
-        temp == value of register B at entry of the instruction
         acu == value of transferred byte (IN or OUT)
     Post condition
         F is set correctly
@@ -974,15 +978,18 @@ static uint16 GET_WORD(register uint32 a) {
         x == L              for OUTI and OUTD
         x == (C - 1) & 0xff for IND
 */
-#define INOUTFLAGS(syxz, x)                                             \
-    AF = (AF & 0xff00) | (syxz) |               /* SF, YF, XF, ZF   */  \
+#define INOUTFLAGS_ZERO(x)                                              \
+    AF = (AF & 0xff00) | (FLAG_Z) |             /* SF, YF, XF, ZF   */  \
         ((acu & 0x80) >> 6) |                           /* NF       */  \
         ((acu + (x)) > 0xff ? (FLAG_C | FLAG_H) : 0) |  /* CF, HF   */  \
-        parityTable[((acu + (x)) & 7) ^ temp]           /* PF       */
+        parityTable[((acu + (x)) & 7)] /* PF                        */
 
-#define INOUTFLAGS_ZERO(x)      INOUTFLAGS(FLAG_Z, x)
 #define INOUTFLAGS_NONZERO(x)                                           \
-    INOUTFLAGS((HIGH_REGISTER(BC) & 0xa8) | ((HIGH_REGISTER(BC) == 0) << 6), x)
+    AF = (AF & 0xff00) | (HIGH_REGISTER(BC) & 0xa8) |                   \
+        ((HIGH_REGISTER(BC) == 0) << 6) |       /* SF, YF, XF, ZF   */  \
+        ((acu & 0x80) >> 6) |                           /* NF       */  \
+        ((acu + (x)) > 0xff ? (FLAG_C | FLAG_H) : 0) |  /* CF, HF   */  \
+        parityTable[((acu + (x)) & 7) ^ HIGH_REGISTER(BC)] /* PF    */
 
 t_stat sim_instr_nommu(void) {
     int32 reason = SCPE_OK;
@@ -1056,6 +1063,8 @@ t_stat sim_instr_nommu(void) {
                 BC -= 0x100;
                 temp = HIGH_REGISTER(BC);
                 AF = (AF & ~0xfe) | decTable[temp] | SET_PV2(0x7f); /* SET_PV2 uses temp */
+                if (chiptype == CHIP_TYPE_8080)
+                    AF ^= 0x10;
                 break;
 
             case 0x06:      /* LD B,nn */
@@ -1063,8 +1072,11 @@ t_stat sim_instr_nommu(void) {
                 break;
 
             case 0x07:      /* RLCA */
-                AF = ((AF >> 7) & 0x0128) | ((AF << 1) & ~0x1ff) |
+                temp = ((AF >> 7) & 0x0128) | ((AF << 1) & ~0x1ff) |
                     (AF & 0xc4) | ((AF >> 15) & 1);
+                if (chiptype == CHIP_TYPE_8080)
+                    temp = (temp & ~0x10) | (AF & 0x10);
+                AF = temp;
                 break;
 
             case 0x08:      /* EX AF,AF' */
@@ -1078,7 +1090,10 @@ t_stat sim_instr_nommu(void) {
                 HL &= ADDRMASK;
                 BC &= ADDRMASK;
                 sum = HL + BC;
-                AF = (AF & ~0x3b) | ((sum >> 8) & 0x28) | cbitsTable[(HL ^ BC ^ sum) >> 8];
+                temp = (AF & ~0x3b) | ((sum >> 8) & 0x28) | cbitsTable[(HL ^ BC ^ sum) >> 8];
+                if (chiptype == CHIP_TYPE_8080)
+                    temp = (temp & ~0x10) | (AF & 0x10);
+                AF = temp;
                 HL = sum;
                 break;
 
@@ -1100,6 +1115,8 @@ t_stat sim_instr_nommu(void) {
                 temp = LOW_REGISTER(BC) - 1;
                 SET_LOW_REGISTER(BC, temp);
                 AF = (AF & ~0xfe) | decTable[temp & 0xff] | SET_PV2(0x7f);
+                if (chiptype == CHIP_TYPE_8080)
+                    AF ^= 0x10;
                 break;
 
             case 0x0e:      /* LD C,nn */
@@ -1107,7 +1124,10 @@ t_stat sim_instr_nommu(void) {
                 break;
 
             case 0x0f:      /* RRCA */
-                AF = (AF & 0xc4) | rrcaTable[HIGH_REGISTER(AF)];
+                temp = (AF & 0xc4) | rrcaTable[HIGH_REGISTER(AF)];
+                if (chiptype == CHIP_TYPE_8080)
+                    temp = (temp & ~0x10) | (AF & 0x10);
+                AF = temp;
                 break;
 
             case 0x10:      /* DJNZ dd */
@@ -1141,6 +1161,8 @@ t_stat sim_instr_nommu(void) {
                 DE -= 0x100;
                 temp = HIGH_REGISTER(DE);
                 AF = (AF & ~0xfe) | decTable[temp] | SET_PV2(0x7f); /* SET_PV2 uses temp */
+                if (chiptype == CHIP_TYPE_8080)
+                    AF ^= 0x10;
                 break;
 
             case 0x16:      /* LD D,nn */
@@ -1148,8 +1170,11 @@ t_stat sim_instr_nommu(void) {
                 break;
 
             case 0x17:      /* RLA */
-                AF = ((AF << 8) & 0x0100) | ((AF >> 7) & 0x28) | ((AF << 1) & ~0x01ff) |
+                temp = ((AF << 8) & 0x0100) | ((AF >> 7) & 0x28) | ((AF << 1) & ~0x01ff) |
                     (AF & 0xc4) | ((AF >> 15) & 1);
+                if (chiptype == CHIP_TYPE_8080)
+                    temp = (temp & ~0x10) | (AF & 0x10);
+                AF = temp;
                 break;
 
             case 0x18:      /* JR dd */
@@ -1161,7 +1186,10 @@ t_stat sim_instr_nommu(void) {
                 HL &= ADDRMASK;
                 DE &= ADDRMASK;
                 sum = HL + DE;
-                AF = (AF & ~0x3b) | ((sum >> 8) & 0x28) | cbitsTable[(HL ^ DE ^ sum) >> 8];
+                temp = (AF & ~0x3b) | ((sum >> 8) & 0x28) | cbitsTable[(HL ^ DE ^ sum) >> 8];
+                if (chiptype == CHIP_TYPE_8080)
+                    temp = (temp & ~0x10) | (AF & 0x10);
+                AF = temp;
                 HL = sum;
                 break;
 
@@ -1183,6 +1211,8 @@ t_stat sim_instr_nommu(void) {
                 temp = LOW_REGISTER(DE) - 1;
                 SET_LOW_REGISTER(DE, temp);
                 AF = (AF & ~0xfe) | decTable[temp & 0xff] | SET_PV2(0x7f);
+                if (chiptype == CHIP_TYPE_8080)
+                    AF ^= 0x10;
                 break;
 
             case 0x1e:      /* LD E,nn */
@@ -1190,7 +1220,10 @@ t_stat sim_instr_nommu(void) {
                 break;
 
             case 0x1f:      /* RRA */
-                AF = ((AF & 1) << 15) | (AF & 0xc4) | rraTable[HIGH_REGISTER(AF)];
+                temp = ((AF & 1) << 15) | (AF & 0xc4) | rraTable[HIGH_REGISTER(AF)];
+                if (chiptype == CHIP_TYPE_8080)
+                    temp = (temp & ~0x10) | (AF & 0x10);
+                AF = temp;
                 break;
 
             case 0x20:      /* JR NZ,dd */
@@ -1226,6 +1259,8 @@ t_stat sim_instr_nommu(void) {
                 HL -= 0x100;
                 temp = HIGH_REGISTER(HL);
                 AF = (AF & ~0xfe) | decTable[temp] | SET_PV2(0x7f); /* SET_PV2 uses temp */
+                if (chiptype == CHIP_TYPE_8080)
+                    AF ^= 0x10;
                 break;
 
             case 0x26:      /* LD H,nn */
@@ -1236,7 +1271,7 @@ t_stat sim_instr_nommu(void) {
                 acu = HIGH_REGISTER(AF);
                 temp = LOW_DIGIT(acu);
                 cbits = TSTFLAG(C);
-                if (TSTFLAG(N)) {   /* last operation was a subtract */
+                if (chiptype == CHIP_TYPE_Z80 && TSTFLAG(N)) { /* last operation was a subtract */
                     int hd = cbits || acu > 0x99;
                     if (TSTFLAG(H) || (temp > 9)) { /* adjust low digit */
                         if (temp > 5)
@@ -1268,7 +1303,10 @@ t_stat sim_instr_nommu(void) {
             case 0x29:      /* ADD HL,HL */
                 HL &= ADDRMASK;
                 sum = HL + HL;
-                AF = (AF & ~0x3b) | cbitsDup16Table[sum >> 8];
+                temp = (AF & ~0x3b) | cbitsDup16Table[sum >> 8];
+                if (chiptype == CHIP_TYPE_8080)
+                    temp = (temp & ~0x10) | (AF & 0x10);
+                AF = temp;
                 HL = sum;
                 break;
 
@@ -1292,6 +1330,8 @@ t_stat sim_instr_nommu(void) {
                 temp = LOW_REGISTER(HL) - 1;
                 SET_LOW_REGISTER(HL, temp);
                 AF = (AF & ~0xfe) | decTable[temp & 0xff] | SET_PV2(0x7f);
+                if (chiptype == CHIP_TYPE_8080)
+                    AF ^= 0x10;
                 break;
 
             case 0x2e:      /* LD L,nn */
@@ -1299,7 +1339,10 @@ t_stat sim_instr_nommu(void) {
                 break;
 
             case 0x2f:      /* CPL */
-                AF = (~AF & ~0xff) | (AF & 0xc5) | ((~AF >> 8) & 0x28) | 0x12;
+                temp = (~AF & ~0xff) | (AF & 0xc5) | ((~AF >> 8) & 0x28) | 0x12;
+                if (chiptype == CHIP_TYPE_8080)
+                    temp = (temp & ~0x10) | (AF & 0x10);
+                AF = temp;
                 break;
 
             case 0x30:      /* JR NC,dd */
@@ -1335,6 +1378,8 @@ t_stat sim_instr_nommu(void) {
                 temp = GET_BYTE(HL) - 1;
                 PUT_BYTE(HL, temp);
                 AF = (AF & ~0xfe) | decTable[temp & 0xff] | SET_PV2(0x7f);
+                if (chiptype == CHIP_TYPE_8080)
+                    AF ^= 0x10;
                 break;
 
             case 0x36:      /* LD (HL),nn */
@@ -1342,7 +1387,10 @@ t_stat sim_instr_nommu(void) {
                 break;
 
             case 0x37:      /* SCF */
-                AF = (AF & ~0x3b) | ((AF >> 8) & 0x28) | 1;
+                temp = (AF & ~0x3b) | ((AF >> 8) & 0x28) | 1;
+                if (chiptype == CHIP_TYPE_8080)
+                    temp = (temp & ~0x10) | (AF & 0x10);
+                AF = temp;
                 break;
 
             case 0x38:      /* JR C,dd */
@@ -1357,7 +1405,10 @@ t_stat sim_instr_nommu(void) {
                 HL &= ADDRMASK;
                 SP &= ADDRMASK;
                 sum = HL + SP;
-                AF = (AF & ~0x3b) | ((sum >> 8) & 0x28) | cbitsTable[(HL ^ SP ^ sum) >> 8];
+                temp = (AF & ~0x3b) | ((sum >> 8) & 0x28) | cbitsTable[(HL ^ SP ^ sum) >> 8];
+                if (chiptype == CHIP_TYPE_8080)
+                    temp = (temp & ~0x10) | (AF & 0x10);
+                AF = temp;
                 HL = sum;
                 break;
 
@@ -1381,6 +1432,8 @@ t_stat sim_instr_nommu(void) {
                 AF -= 0x100;
                 temp = HIGH_REGISTER(AF);
                 AF = (AF & ~0xfe) | decTable[temp] | SET_PV2(0x7f); /* SET_PV2 uses temp */
+                if (chiptype == CHIP_TYPE_8080)
+                    AF ^= 0x10;
                 break;
 
             case 0x3e:      /* LD A,nn */
@@ -1388,7 +1441,10 @@ t_stat sim_instr_nommu(void) {
                 break;
 
             case 0x3f:      /* CCF */
-                AF = (AF & ~0x3b) | ((AF >> 8) & 0x28) | ((AF & 1) << 4) | (~AF & 1);
+                temp = (AF & ~0x3b) | ((AF >> 8) & 0x28) | ((AF & 1) << 4) | (~AF & 1);
+                if (chiptype == CHIP_TYPE_8080)
+                    temp = (temp & ~0x10) | (AF & 0x10);
+                AF = temp;
                 break;
 
             case 0x40:      /* LD B,B */
@@ -1773,6 +1829,8 @@ t_stat sim_instr_nommu(void) {
                 sum = acu - temp;
                 cbits = acu ^ temp ^ sum;
                 AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SET_PV);
+                if (chiptype == CHIP_TYPE_8080)
+                    AF ^= 0x10;
                 break;
 
             case 0x91:      /* SUB C */
@@ -1781,6 +1839,8 @@ t_stat sim_instr_nommu(void) {
                 sum = acu - temp;
                 cbits = acu ^ temp ^ sum;
                 AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SET_PV);
+                if (chiptype == CHIP_TYPE_8080)
+                    AF ^= 0x10;
                 break;
 
             case 0x92:      /* SUB D */
@@ -1789,6 +1849,8 @@ t_stat sim_instr_nommu(void) {
                 sum = acu - temp;
                 cbits = acu ^ temp ^ sum;
                 AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SET_PV);
+                if (chiptype == CHIP_TYPE_8080)
+                    AF ^= 0x10;
                 break;
 
             case 0x93:      /* SUB E */
@@ -1797,6 +1859,8 @@ t_stat sim_instr_nommu(void) {
                 sum = acu - temp;
                 cbits = acu ^ temp ^ sum;
                 AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SET_PV);
+                if (chiptype == CHIP_TYPE_8080)
+                    AF ^= 0x10;
                 break;
 
             case 0x94:      /* SUB H */
@@ -1805,6 +1869,8 @@ t_stat sim_instr_nommu(void) {
                 sum = acu - temp;
                 cbits = acu ^ temp ^ sum;
                 AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SET_PV);
+                if (chiptype == CHIP_TYPE_8080)
+                    AF ^= 0x10;
                 break;
 
             case 0x95:      /* SUB L */
@@ -1813,6 +1879,8 @@ t_stat sim_instr_nommu(void) {
                 sum = acu - temp;
                 cbits = acu ^ temp ^ sum;
                 AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SET_PV);
+                if (chiptype == CHIP_TYPE_8080)
+                    AF ^= 0x10;
                 break;
 
             case 0x96:      /* SUB (HL) */
@@ -1821,10 +1889,12 @@ t_stat sim_instr_nommu(void) {
                 sum = acu - temp;
                 cbits = acu ^ temp ^ sum;
                 AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SET_PV);
+                if (chiptype == CHIP_TYPE_8080)
+                    AF ^= 0x10;
                 break;
 
             case 0x97:      /* SUB A */
-                AF = (chiptype == CHIP_TYPE_Z80) ? 0x42 : 0x46;
+                AF = (chiptype == CHIP_TYPE_Z80) ? 0x42 : 0x56;
                 break;
 
             case 0x98:      /* SBC A,B */
@@ -1833,6 +1903,8 @@ t_stat sim_instr_nommu(void) {
                 sum = acu - temp - TSTFLAG(C);
                 cbits = acu ^ temp ^ sum;
                 AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SET_PV);
+                if (chiptype == CHIP_TYPE_8080)
+                    AF ^= 0x10;
                 break;
 
             case 0x99:      /* SBC A,C */
@@ -1841,6 +1913,8 @@ t_stat sim_instr_nommu(void) {
                 sum = acu - temp - TSTFLAG(C);
                 cbits = acu ^ temp ^ sum;
                 AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SET_PV);
+                if (chiptype == CHIP_TYPE_8080)
+                    AF ^= 0x10;
                 break;
 
             case 0x9a:      /* SBC A,D */
@@ -1849,6 +1923,8 @@ t_stat sim_instr_nommu(void) {
                 sum = acu - temp - TSTFLAG(C);
                 cbits = acu ^ temp ^ sum;
                 AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SET_PV);
+                if (chiptype == CHIP_TYPE_8080)
+                    AF ^= 0x10;
                 break;
 
             case 0x9b:      /* SBC A,E */
@@ -1857,6 +1933,8 @@ t_stat sim_instr_nommu(void) {
                 sum = acu - temp - TSTFLAG(C);
                 cbits = acu ^ temp ^ sum;
                 AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SET_PV);
+                if (chiptype == CHIP_TYPE_8080)
+                    AF ^= 0x10;
                 break;
 
             case 0x9c:      /* SBC A,H */
@@ -1865,6 +1943,8 @@ t_stat sim_instr_nommu(void) {
                 sum = acu - temp - TSTFLAG(C);
                 cbits = acu ^ temp ^ sum;
                 AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SET_PV);
+                if (chiptype == CHIP_TYPE_8080)
+                    AF ^= 0x10;
                 break;
 
             case 0x9d:      /* SBC A,L */
@@ -1873,6 +1953,8 @@ t_stat sim_instr_nommu(void) {
                 sum = acu - temp - TSTFLAG(C);
                 cbits = acu ^ temp ^ sum;
                 AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SET_PV);
+                if (chiptype == CHIP_TYPE_8080)
+                    AF ^= 0x10;
                 break;
 
             case 0x9e:      /* SBC A,(HL) */
@@ -1881,43 +1963,72 @@ t_stat sim_instr_nommu(void) {
                 sum = acu - temp - TSTFLAG(C);
                 cbits = acu ^ temp ^ sum;
                 AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SET_PV);
+                if (chiptype == CHIP_TYPE_8080)
+                    AF ^= 0x10;
                 break;
 
             case 0x9f:      /* SBC A,A */
                 cbits = -TSTFLAG(C);
                 AF = subTable[cbits & 0xff] | cbitsTable[cbits & 0x1ff] | (SET_PVS(cbits));
+                if (chiptype == CHIP_TYPE_8080)
+                    AF ^= 0x10;
                 break;
 
             case 0xa0:      /* AND B */
-                AF = andTable[((AF & BC) >> 8) & 0xff];
+                acu = andTable[((AF & BC) >> 8) & 0xff];
+                if (chiptype == CHIP_TYPE_8080 && ((AF | BC) & 0x0800) == 0)
+                    acu &= ~0x10;
+                AF = acu;
                 break;
 
             case 0xa1:      /* AND C */
-                AF = andTable[((AF >> 8) & BC) & 0xff];
+                acu = andTable[((AF >> 8) & BC) & 0xff];
+                if (chiptype == CHIP_TYPE_8080 && (((AF >> 8) | BC) & 0x08) == 0)
+                    acu &= ~0x10;
+                AF = acu;
                 break;
 
             case 0xa2:      /* AND D */
-                AF = andTable[((AF & DE) >> 8) & 0xff];
+                acu = andTable[((AF & DE) >> 8) & 0xff];
+                if (chiptype == CHIP_TYPE_8080 && ((AF | DE) & 0x0800) == 0)
+                    acu &= ~0x10;
+                AF = acu;
                 break;
 
             case 0xa3:      /* AND E */
-                AF = andTable[((AF >> 8) & DE) & 0xff];
+                acu = andTable[((AF >> 8) & DE) & 0xff];
+                if (chiptype == CHIP_TYPE_8080 && (((AF >> 8) | DE) & 0x08) == 0)
+                    acu &= ~0x10;
+                AF = acu;
                 break;
 
             case 0xa4:      /* AND H */
-                AF = andTable[((AF & HL) >> 8) & 0xff];
+                acu = andTable[((AF & HL) >> 8) & 0xff];
+                if (chiptype == CHIP_TYPE_8080 && ((AF | HL) & 0x0800) == 0)
+                    acu &= ~0x10;
+                AF = acu;
                 break;
 
             case 0xa5:      /* AND L */
-                AF = andTable[((AF >> 8) & HL) & 0xff];
+                acu = andTable[((AF >> 8) & HL) & 0xff];
+                if (chiptype == CHIP_TYPE_8080 && (((AF >> 8) | HL) & 0x08) == 0)
+                    acu &= ~0x10;
+                AF = acu;
                 break;
 
             case 0xa6:      /* AND (HL) */
-                AF = andTable[((AF >> 8) & GET_BYTE(HL)) & 0xff];
+                temp = GET_BYTE(HL);
+                acu = andTable[((AF >> 8) & temp) & 0xff];
+                if (chiptype == CHIP_TYPE_8080 && (((AF >> 8) | temp) & 0x08) == 0)
+                    acu &= ~0x10;
+                AF = acu;
                 break;
 
             case 0xa7:      /* AND A */
-                AF = andTable[(AF >> 8) & 0xff];
+                acu = andTable[(AF >> 8) & 0xff];
+                if (chiptype == CHIP_TYPE_8080 && (AF & 0x0800) == 0)
+                    acu &= ~0x10;
+                AF = acu;
                 break;
 
             case 0xa8:      /* XOR B */
@@ -1992,6 +2103,8 @@ t_stat sim_instr_nommu(void) {
                 cbits = acu ^ temp ^ sum;
                 AF = (AF & ~0xff) | cpTable[sum & 0xff] | (temp & 0x28) |
                     (SET_PV) | cbits2Table[cbits & 0x1ff];
+                if (chiptype == CHIP_TYPE_8080)
+                    AF ^= 0x10;
                 break;
 
             case 0xb9:      /* CP C */
@@ -2002,6 +2115,8 @@ t_stat sim_instr_nommu(void) {
                 cbits = acu ^ temp ^ sum;
                 AF = (AF & ~0xff) | cpTable[sum & 0xff] | (temp & 0x28) |
                     (SET_PV) | cbits2Table[cbits & 0x1ff];
+                if (chiptype == CHIP_TYPE_8080)
+                    AF ^= 0x10;
                 break;
 
             case 0xba:      /* CP D */
@@ -2012,6 +2127,8 @@ t_stat sim_instr_nommu(void) {
                 cbits = acu ^ temp ^ sum;
                 AF = (AF & ~0xff) | cpTable[sum & 0xff] | (temp & 0x28) |
                     (SET_PV) | cbits2Table[cbits & 0x1ff];
+                if (chiptype == CHIP_TYPE_8080)
+                    AF ^= 0x10;
                 break;
 
             case 0xbb:      /* CP E */
@@ -2022,6 +2139,8 @@ t_stat sim_instr_nommu(void) {
                 cbits = acu ^ temp ^ sum;
                 AF = (AF & ~0xff) | cpTable[sum & 0xff] | (temp & 0x28) |
                     (SET_PV) | cbits2Table[cbits & 0x1ff];
+                if (chiptype == CHIP_TYPE_8080)
+                    AF ^= 0x10;
                 break;
 
             case 0xbc:      /* CP H */
@@ -2032,6 +2151,8 @@ t_stat sim_instr_nommu(void) {
                 cbits = acu ^ temp ^ sum;
                 AF = (AF & ~0xff) | cpTable[sum & 0xff] | (temp & 0x28) |
                     (SET_PV) | cbits2Table[cbits & 0x1ff];
+                if (chiptype == CHIP_TYPE_8080)
+                    AF ^= 0x10;
                 break;
 
             case 0xbd:      /* CP L */
@@ -2042,6 +2163,8 @@ t_stat sim_instr_nommu(void) {
                 cbits = acu ^ temp ^ sum;
                 AF = (AF & ~0xff) | cpTable[sum & 0xff] | (temp & 0x28) |
                     (SET_PV) | cbits2Table[cbits & 0x1ff];
+                if (chiptype == CHIP_TYPE_8080)
+                    AF ^= 0x10;
                 break;
 
             case 0xbe:      /* CP (HL) */
@@ -2052,10 +2175,12 @@ t_stat sim_instr_nommu(void) {
                 cbits = acu ^ temp ^ sum;
                 AF = (AF & ~0xff) | cpTable[sum & 0xff] | (temp & 0x28) |
                     (SET_PV) | cbits2Table[cbits & 0x1ff];
+                if (chiptype == CHIP_TYPE_8080)
+                    AF ^= 0x10;
                 break;
 
             case 0xbf:      /* CP A */
-                SET_LOW_REGISTER(AF, (HIGH_REGISTER(AF) & 0x28) | (chiptype == CHIP_TYPE_Z80 ? 0x42 : 0x46));
+                SET_LOW_REGISTER(AF, (HIGH_REGISTER(AF) & 0x28) | (chiptype == CHIP_TYPE_Z80 ? 0x42 : 0x56));
                 break;
 
             case 0xc0:      /* RET NZ */
@@ -2309,6 +2434,8 @@ t_stat sim_instr_nommu(void) {
                 sum = acu - temp;
                 cbits = acu ^ temp ^ sum;
                 AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SET_PV);
+                if (chiptype == CHIP_TYPE_8080)
+                    AF ^= 0x10;
                 break;
 
             case 0xd7:      /* RST 10H */
@@ -2947,6 +3074,8 @@ t_stat sim_instr_nommu(void) {
                 sum = acu - temp - TSTFLAG(C);
                 cbits = acu ^ temp ^ sum;
                 AF = subTable[sum & 0xff] | cbitsTable[cbits & 0x1ff] | (SET_PV);
+                if (chiptype == CHIP_TYPE_8080)
+                    AF ^= 0x10;
                 break;
 
             case 0xdf:      /* RST 18H */
@@ -2982,7 +3111,11 @@ t_stat sim_instr_nommu(void) {
                 break;
 
             case 0xe6:      /* AND nn */
-                AF = andTable[((AF >> 8) & RAM_PP(PC)) & 0xff];
+                temp = RAM_PP(PC);
+                acu = andTable[((AF >> 8) & temp) & 0xff];
+                if (chiptype == CHIP_TYPE_8080 && (((AF >> 8) | temp) & 0x08) == 0)
+                    acu &= ~0x10;
+                AF = acu;
                 break;
 
             case 0xe7:      /* RST 20H */
@@ -3333,7 +3466,6 @@ t_stat sim_instr_nommu(void) {
                         acu = in(LOW_REGISTER(BC));
                         PUT_BYTE(HL, acu);
                         ++HL;
-                        temp = HIGH_REGISTER(BC);
                         BC -= 0x100;
                         INOUTFLAGS_NONZERO((LOW_REGISTER(BC) + 1) & 0xff);
                         break;
@@ -3350,7 +3482,6 @@ t_stat sim_instr_nommu(void) {
                         acu = GET_BYTE(HL);
                         out(LOW_REGISTER(BC), acu);
                         ++HL;
-                        temp = HIGH_REGISTER(BC);
                         BC -= 0x100;
                         INOUTFLAGS_NONZERO(LOW_REGISTER(HL));
                         break;
@@ -3387,7 +3518,6 @@ t_stat sim_instr_nommu(void) {
                         acu = in(LOW_REGISTER(BC));
                         PUT_BYTE(HL, acu);
                         --HL;
-                        temp = HIGH_REGISTER(BC);
                         BC -= 0x100;
                         INOUTFLAGS_NONZERO((LOW_REGISTER(BC) - 1) & 0xff);
                         break;
@@ -3396,7 +3526,6 @@ t_stat sim_instr_nommu(void) {
                         acu = GET_BYTE(HL);
                         out(LOW_REGISTER(BC), acu);
                         --HL;
-                        temp = HIGH_REGISTER(BC);
                         BC -= 0x100;
                         INOUTFLAGS_NONZERO(LOW_REGISTER(HL));
                         break;
@@ -3444,7 +3573,6 @@ t_stat sim_instr_nommu(void) {
                             PUT_BYTE(HL, acu);
                             ++HL;
                         } while (--temp);
-                        temp = HIGH_REGISTER(BC);
                         SET_HIGH_REGISTER(BC, 0);
                         INOUTFLAGS_ZERO((LOW_REGISTER(BC) + 1) & 0xff);
                         break;
@@ -3459,7 +3587,6 @@ t_stat sim_instr_nommu(void) {
                             out(LOW_REGISTER(BC), acu);
                             ++HL;
                         } while (--temp);
-                        temp = HIGH_REGISTER(BC);
                         SET_HIGH_REGISTER(BC, 0);
                         INOUTFLAGS_ZERO(LOW_REGISTER(HL));
                         break;
@@ -3507,7 +3634,6 @@ t_stat sim_instr_nommu(void) {
                             PUT_BYTE(HL, acu);
                             --HL;
                         } while (--temp);
-                        temp = HIGH_REGISTER(BC);
                         SET_HIGH_REGISTER(BC, 0);
                         INOUTFLAGS_ZERO((LOW_REGISTER(BC) - 1) & 0xff);
                         break;
@@ -3522,7 +3648,6 @@ t_stat sim_instr_nommu(void) {
                             out(LOW_REGISTER(BC), acu);
                             --HL;
                         } while (--temp);
-                        temp = HIGH_REGISTER(BC);
                         SET_HIGH_REGISTER(BC, 0);
                         INOUTFLAGS_ZERO(LOW_REGISTER(HL));
                         break;
@@ -3563,7 +3688,7 @@ t_stat sim_instr_nommu(void) {
                 break;
 
             case 0xf5:      /* PUSH AF */
-                PUSH(AF);
+                PUSH(chiptype == CHIP_TYPE_8080 ? (AF & ~0x28) | 0x02 : AF);
                 break;
 
             case 0xf6:      /* OR nn */
@@ -4199,6 +4324,8 @@ t_stat sim_instr_nommu(void) {
                 cbits = acu ^ temp ^ sum;
                 AF = (AF & ~0xff) | cpTable[sum & 0xff] | (temp & 0x28) |
                     (SET_PV) | cbits2Table[cbits & 0x1ff];
+                if (chiptype == CHIP_TYPE_8080)
+                    AF ^= 0x10;
                 break;
 
             case 0xff:      /* RST 38H */

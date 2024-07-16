@@ -1,6 +1,6 @@
 /*  altairz80_defs.h: MITS Altair simulator definitions
 
-    Copyright (c) 2002-2023, Peter Schorn
+    Copyright (c) 2002-2024, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -64,11 +64,11 @@ typedef enum {
 } ChipType;
 
 /* simulator stop codes */
-#define STOP_IBKPT      1   /* breakpoint   (program counter)                   */
-#define STOP_MEM        2   /* breakpoint   (memory access)                     */
-#define STOP_INSTR      3   /* breakpoint   (instruction access)                */
-#define STOP_OPCODE     4   /* invalid operation encountered (8080, Z80, 8086)  */
-#define STOP_HALT       5   /* HALT                                             */
+#define STOP_IBKPT              1                           /* breakpoint   (program counter)               */
+#define STOP_MEM                2                           /* breakpoint   (memory access)                 */
+#define STOP_INSTR              3                           /* breakpoint   (instruction access)            */
+#define STOP_OPCODE             4                           /* invalid operation encountered (8080, Z80, 8086) */
+#define STOP_HALT               5                           /* HALT                                         */
 
 #define UNIT_CPU_V_OPSTOP       (UNIT_V_UF+0)               /* stop on invalid operation                    */
 #define UNIT_CPU_OPSTOP         (1 << UNIT_CPU_V_OPSTOP)
