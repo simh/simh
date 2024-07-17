@@ -1,6 +1,6 @@
 /* pdp11_sys.c: PDP-11 simulator interface
 
-   Copyright (c) 1993-2018, Robert M Supnik
+   Copyright (c) 1993-2023, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   18-Dec-23    RMS     Fixed disassembly of ASH,ASHC,MUL,DIV (Paul Koning)
    31-Dec-22    RMS     Floating loads are src,dst (nickd4)
    23-May-18    RMS     Changed UC15 simulator name
    14-Mar-16    RMS     Added UC15 support
@@ -379,8 +380,7 @@ static const int32 masks[] = {
 0177700+I_D, 0177400+I_D, 0177700, 0177400,
 0177400, 0177000, 0177000, 0177400,
 0177400+I_D+I_L, 0170000, 0177777, 0177777,
-0177000+I_D, 0177400+I_D, 0177700, 0177400,
-0177000, 0177700+I_D, 0177400, 0177400+I_D+I_L
+0177000, 0177400+I_D, 0177400, 0177400+I_D+I_L
 };
 
 static const char *opcode[] = {
