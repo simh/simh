@@ -1,6 +1,6 @@
 /* h316_mt.c: H316/516 magnetic tape simulator
 
-   Copyright (c) 2003-2022, Robert M. Supnik
+   Copyright (c) 2003-2023, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    mt           516-4100 seven track magnetic tape
 
+   01-Nov-23    RMS     Reset should use sim_tape_bot
    26-Mar-22    RMS     Added extra case points for new MTSE definitions
    03-Jul-13    RLA     compatibility changes for extended interrupts
    19-Mar-12    RMS     Fixed declaration of chan_req (Mark Pizzolato)
@@ -592,7 +593,9 @@ for (i = 0; i < MT_NUMDR; i++) {                        /* loop thru units */
     uptr = mt_dev.units + i;
     sim_tape_reset (uptr);                              /* reset tape */
     sim_cancel (uptr);                                  /* cancel op */
-    uptr->UST = uptr->pos? 0: STA_BOT;                  /* update status */
+    if ((uptr->flags & UNIT_ATT) && sim_tape_bot (uptr))
+        uptr->UST = STA_BOT;
+    else uptr->UST = 0;
     uptr->FNC = FNC_NOP;
     }
 return SCPE_OK;
