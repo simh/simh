@@ -1,6 +1,6 @@
 /* pdp11_cpumod.c: PDP-11 CPU model-specific features
 
-   Copyright (c) 2004-2022, Robert M Supnik
+   Copyright (c) 2004-2023, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    system       PDP-11 model-specific registers
 
+   10-Oct-23    RMS     Fixed writes to 11/70 RO registers (Tony Lawrence)
    19-Nov-22    RMS     Fixed byte access errors in PIRQ, STKLIM, CDR (Walter Mueller)
    15-Sep-20    RMS     Fixed problem in KDJ11E programmable clock (Paul Koning)
    04-Mar-16    RMS     Fixed maximum memory sizes to exclude IO page
@@ -463,6 +464,12 @@ t_stat CPU44_wr (int32 data, int32 pa, int32 access)
 {
 switch ((pa >> 1) & 017) {                              /* decode pa<4:1> */
 
+    case 000:                                           /* low error */
+        return SCPE_OK;
+
+    case 001:                                           /* high error */
+        return SCPE_OK;
+
     case 002:                                           /* MEMERR */
         MEMERR = 0;
         return SCPE_OK;
@@ -478,6 +485,9 @@ switch ((pa >> 1) & 017) {                              /* decode pa<4:1> */
         return SCPE_OK;
 
     case 005:                                           /* Hit/miss */
+        return SCPE_OK;
+
+    case 012:                                           /* system ID */
         return SCPE_OK;
 
     case 013:                                           /* CPUERR */
