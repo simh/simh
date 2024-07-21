@@ -2941,16 +2941,24 @@ if (f) {
         f = NULL;
         }
     else {
-        /* We've got a valid footer, but it may need to be corrected */
-        if ((NtoHl (f->MediaID) == 0)             ||
+        /* We've got a valid footer, but it may need to be corrected or have missing pieces added */
+        if (((f->MediaID == 0) && (((uptr->drvtyp != NULL) ? uptr->drvtyp->MediaId : 0) != 0)) ||
             ((sim_disk_find_type (uptr, (char *)f->DriveType) != NULL) &&
              (NtoHl (f->Geometry) != sim_disk_drvtype_geometry (sim_disk_find_type (uptr, (char *)f->DriveType), NtoHl (f->SectorCount)))) ||
-            ((NtoHl (f->ElementEncodingSize) == 1) &&
-            ((0 == memcmp (f->DriveType, "RZ", 2)) ||
-             (0 == memcmp (f->DriveType, "RR", 2))))) {
+            ((NtoHl (f->ElementEncodingSize) == 1) &&   /* Encoding still 1 and SCSI disk/cdrom drive */
+             ((0 == memcmp (f->DriveType, "RZ", 2)) ||
+              (0 == memcmp (f->DriveType, "RR", 2))))) {
             f->ElementEncodingSize = NtoHl (2);
-            if ((uptr->flags & UNIT_RO) == 0)
+            if ((uptr->flags & UNIT_RO) == 0) {
+                DEVICE *dptr = uptr->dptr;
+                t_addr saved_capac = uptr->capac;
+                uint32 capac_factor = ((dptr->dwidth / dptr->aincr) >= 32) ? 8 : ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* capacity units (quadword: 8, word: 2, byte: 1) */
+
+                uptr->capac = (t_addr)(((t_offset)NtoHl(f->SectorCount) * NtoHl(f->SectorSize)) / capac_factor);
                 store_disk_footer (uptr, (char *)f->DriveType);
+                uptr->capac = saved_capac;
+                *f = *ctx->footer;                  /* copy updated footer */
+                }
             }
         if ((uptr->flags & UNIT_RO) == 0) {
             if ((NtoHl (f->SectorSize) != 512) &&
@@ -2974,7 +2982,7 @@ if (f) {
                 ctx = (struct disk_context *)uptr->disk_ctx;/* attach repopulates the context */
                 if (pctx != NULL)
                     *pctx = ctx;
-                *f = *ctx->footer;                      /* copy updated footer */
+                *f = *ctx->footer;                  /* copy updated footer */
                 free (filename);
                 }
             }
@@ -3020,6 +3028,7 @@ DEVICE *dptr;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 struct stat statb;
 struct simh_disk_footer *f;
+struct simh_disk_footer *old_f = ctx->footer;
 time_t now = time (NULL);
 t_offset total_sectors;
 t_offset highwater;
@@ -3032,7 +3041,7 @@ if (sim_stat (uptr->filename, &statb))
     memset (&statb, 0, sizeof (statb));
 f = (struct simh_disk_footer *)calloc (1, sizeof (*f));
 f->AccessFormat = DK_GET_FMT (uptr);
-total_sectors = (((t_offset)uptr->capac) * ctx->capac_factor * ((dptr->flags & DEV_SECTORS) ? 512 : 1)) / ctx->sector_size;
+total_sectors = (((t_offset)uptr->capac) * ctx->capac_factor * ((dptr->flags & DEV_SECTORS) ? ctx->sector_size : 1)) / ctx->sector_size;
 memcpy (f->Signature, "simh", 4);
 f->FooterVersion = FOOTER_VERSION;
 memset (f->CreatingSimulator, 0, sizeof (f->CreatingSimulator));
@@ -3055,27 +3064,37 @@ highwater = ((highwater + ctx->sector_size - 1) / ctx->sector_size) * ctx->secto
 f->Highwater[0] = NtoHl ((uint32)(highwater >> 32));
 f->Highwater[1] = NtoHl ((uint32)(highwater & 0xFFFFFFFF));
 f->Checksum = NtoHl (eth_crc32 (0, f, sizeof (*f) - sizeof (f->Checksum)));
-free (ctx->footer);
-ctx->footer = f;
-switch (f->AccessFormat) {
-    case DKUF_F_STD:                                    /* SIMH format */
-        if (sim_fseeko ((FILE *)uptr->fileref, total_sectors * ctx->sector_size, SEEK_SET) == 0) {
-            sim_fwrite (f, sizeof (*f), 1, (FILE *)uptr->fileref);
-            fclose ((FILE *)uptr->fileref);
+if ((old_f != NULL) &&
+    (f->DataWidth           == old_f->DataWidth) &&
+    (f->SectorSize          == old_f->SectorSize) &&
+    (f->MediaID             == old_f->MediaID) &&
+    (f->ElementEncodingSize == old_f->ElementEncodingSize) &&
+    (f->Geometry            == old_f->Geometry) &&
+    (f->FooterVersion       == old_f->FooterVersion)) /* Unchanged? */
+    free(f);
+else {
+    free (ctx->footer);
+    ctx->footer = f;
+    switch (f->AccessFormat) {
+        case DKUF_F_STD:                                    /* SIMH format */
+            if (sim_fseeko ((FILE *)uptr->fileref, total_sectors * ctx->sector_size, SEEK_SET) == 0) {
+                sim_fwrite (f, sizeof (*f), 1, (FILE *)uptr->fileref);
+                fclose ((FILE *)uptr->fileref);
+                sim_set_file_times (uptr->filename, statb.st_atime, statb.st_mtime);
+                uptr->fileref = sim_fopen (uptr->filename, "rb+");
+                }
+            break;
+        case DKUF_F_VHD:                                    /* VHD format */
+            break;
+        case DKUF_F_RAW:                                    /* Raw Physical Disk Access */
+            sim_os_disk_write (uptr, total_sectors * ctx->sector_size, (uint8 *)f, NULL, sizeof (*f));
+            sim_os_disk_close_raw (uptr->fileref);
             sim_set_file_times (uptr->filename, statb.st_atime, statb.st_mtime);
-            uptr->fileref = sim_fopen (uptr->filename, "rb+");
-            }
-        break;
-    case DKUF_F_VHD:                                    /* VHD format */
-        break;
-    case DKUF_F_RAW:                                    /* Raw Physical Disk Access */
-        sim_os_disk_write (uptr, total_sectors * ctx->sector_size, (uint8 *)f, NULL, sizeof (*f));
-        sim_os_disk_close_raw (uptr->fileref);
-        sim_set_file_times (uptr->filename, statb.st_atime, statb.st_mtime);
-        uptr->fileref = sim_os_disk_open_raw (uptr->filename, "rb+");
-        break;
-    default:
-        break;
+            uptr->fileref = sim_os_disk_open_raw (uptr->filename, "rb+");
+            break;
+        default:
+            break;
+        }
     }
 return SCPE_OK;
 }
