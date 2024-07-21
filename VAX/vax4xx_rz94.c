@@ -112,8 +112,6 @@ t_stat rz_attach (UNIT *uptr, CONST char *cptr);
 void rz_sw_reset (void);
 t_stat rz_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 void rz_cmd (uint32 cmd);
-t_stat rz_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
-t_stat rz_show_type (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 const char *rz_description (DEVICE *dptr);
 
 
