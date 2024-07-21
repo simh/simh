@@ -28,18 +28,8 @@
 
 #if defined(VM_PDP11)  &&  !defined(UC15)
 
-#include <assert.h>
-
 #include "pdp11_defs.h"
 #include "sim_disk.h"
-
-/* const_assert() */
-
-#define _Cx(a, b)        a ## b
-#define _Ax(x)           _Cx(_assert, x)
-#define _Sx(n)           (((n) << 1) - 1)
-#define const_assert(c)  do { static const char _Ax(__LINE__)[-_Sx(!(c))] \
-                              = {!(c)};  (void) _Ax(__LINE__); } while (0)
 
 /* Constants */
 
@@ -63,12 +53,6 @@
 #define RP_SIZE_RP03    RP_SIZE(RP_NUMBL*2)             /* RP03 capacity, words */
 #define RP_ROT_12       125                             /* Half rotation, 0.1ms */
 
-/* Flags in the unit flags word */
-#define UNIT_NOAUTO     DKUF_NOAUTOSIZE                 /* autosize disabled */
-#define UNIT_V_RP03     (DKUF_V_UF + 0)
-#define UNIT_RP03       (1 << UNIT_V_RP03)              /* RP03 vs RP02 (0) */
-#define GET_DTYPE(x)    (((x) & UNIT_RP03) >> UNIT_V_RP03)
-
 /* Controller / drive types */
 #define RP_RP11         "RP11-C"
 #define RP_RP02         "RP02"
@@ -87,18 +71,24 @@
 #define RP_IOLN         040
 
 /* RP02/RP03 particulars */
-static struct drv_typ {
-    const char*         name;                           /* device type name */
-    int32               cyl;                            /* cylinders */
-    int32               size;                           /* #blocks */
-    int32               spare;                          /* spare (out of cyl) */
-    int32               seek_1;                         /* one track move, 0.1ms */
-    int32               seek_ave;                       /* average seek, 0.1ms */
-    int32               seek_max;                       /* maximal seek, 0.1ms */
-} drv_tab[] = {
-    { RP_RP02, RP_NUMCY,   RP_NUMBL,   RP_SPARE,   200, 500, 800 },
-    { RP_RP03, RP_NUMCY*2, RP_NUMBL*2, RP_SPARE*2,  75, 290, 550 }
-};
+
+/* RP11 specific drive type parameters */
+#define spare       uint32_01   /* spare (out of cyl) */
+#define seek_1      uint32_02   /* one track move, 0.1ms */
+#define seek_ave    uint32_03   /* average seek, 0.1ms */
+#define seek_max    uint32_04   /* maximal seek, 0.1ms */
+
+#define RP_DRV(d, factor, seek_L, seek_AVG, seek_MAX)                                \
+    { RP_NUMSC, RP_NUMSF, RP_NUMCY*factor, RP_NUMBL*factor, #d, \
+      RP_NUMWD*sizeof(uint16), 0, NULL, 0, 0, NULL, NULL,       \
+      RP_SPARE*factor, seek_L, seek_AVG, seek_MAX}
+
+static DRVTYP drv_typ[] = {
+    RP_DRV(RP02, 1, 200, 500, 800),
+    RP_DRV(RP03, 2,  75, 290, 550),
+    { 0 }
+    };
+
 
 /* RPDS 776710, selected drive status, read-only except for the attention bits */
 static BITFIELD rp_ds_bits[] = {
@@ -287,8 +277,8 @@ static BITFIELD rp_wloa_bits[] = {
 #define RPWLOA_M_DRV    7
 #define RPWLOA_DRV      (RPWLOA_M_DRV << RPWLOA_V_DRV)  /* drive(s) locked */
     BITFFMT(DRV,3,%u),
-#define GET_WLOACYL(x)  ((((x) & RPWLOA_CYL2) << 1) | 1)
-#define GET_WLOADRV(x)  (((x) & RPWLOA_DRV) >> RPWLOA_V_DRV)
+#define GET_WLOACYL(x)  (((((uint32)(x)) & RPWLOA_CYL2) << 1) | 1)
+#define GET_WLOADRV(x)  ((((uint32)(x)) & RPWLOA_DRV) >> RPWLOA_V_DRV)
     BITNCF(4),
 #define RPWLOA_ON       0100000
     BITFNAM(PROTECT,1,offon),
@@ -361,8 +351,6 @@ static t_stat rr_boot (int32 unitno, DEVICE *dptr);
 static t_stat rr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 static t_stat rr_attach (UNIT *uptr, CONST char *cptr);
 static t_stat rr_detach (UNIT *uptr);
-static t_stat rr_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
-static t_stat rr_show_type (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 static t_stat rr_set_wloa (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 static t_stat rr_show_ctrl (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 static const char *rr_description (DEVICE *dptr);
@@ -405,32 +393,7 @@ static REG rr_reg[] = {
     { NULL }
 };
 
-static UNIT rr_unit[RP_NUMDR] = {
-    { UDATA(rr_svc,
-            UNIT_FIX | UNIT_ATTABLE | UNIT_DISABLE | UNIT_ROABLE | UNIT_RP03,
-            RP_SIZE_RP03) },
-    { UDATA(rr_svc,
-            UNIT_FIX | UNIT_ATTABLE | UNIT_DISABLE | UNIT_ROABLE | UNIT_RP03,
-            RP_SIZE_RP03) },
-    { UDATA(rr_svc,
-            UNIT_FIX | UNIT_ATTABLE | UNIT_DISABLE | UNIT_ROABLE | UNIT_RP03,
-            RP_SIZE_RP03) },
-    { UDATA(rr_svc,
-            UNIT_FIX | UNIT_ATTABLE | UNIT_DISABLE | UNIT_ROABLE | UNIT_RP03,
-            RP_SIZE_RP03) },
-    { UDATA(rr_svc,
-            UNIT_FIX | UNIT_ATTABLE | UNIT_DISABLE | UNIT_ROABLE | UNIT_RP03,
-            RP_SIZE_RP03) },
-    { UDATA(rr_svc,
-            UNIT_FIX | UNIT_ATTABLE | UNIT_DISABLE | UNIT_ROABLE | UNIT_RP03,
-            RP_SIZE_RP03) },
-    { UDATA(rr_svc,
-            UNIT_FIX | UNIT_ATTABLE | UNIT_DISABLE | UNIT_ROABLE | UNIT_RP03,
-            RP_SIZE_RP03) },
-    { UDATA(rr_svc,
-            UNIT_FIX | UNIT_ATTABLE | UNIT_DISABLE | UNIT_ROABLE | UNIT_RP03,
-            RP_SIZE_RP03) }
-};
+static UNIT rr_unit[RP_NUMDR] = { 0 };
 
 static MTAB rr_mod[] = {
     { MTAB_VDV, 0,
@@ -449,26 +412,6 @@ static MTAB rr_mod[] = {
         NULL,           "LOCKED", 
         set_writelock,  NULL,           NULL,
         "Write lock disk drive" },
-    { MTAB_VUN, 0,
-        "TYPE",         NULL,
-        NULL,           rr_show_type,   NULL,
-        "Display device type" },
-    { MTAB_VUN, 0/*RP02*/,
-        NULL,           RP_RP02,
-        rr_set_type,    NULL,           NULL,
-        "Set " RP_RP02 " disk type" },
-    { MTAB_VUN, UNIT_RP03,
-        NULL,           RP_RP03,
-        rr_set_type,    NULL,   NULL,
-        "Set " RP_RP03 " disk type"},
-    { UNIT_NOAUTO, 0,
-        "autosize",     "AUTOSIZE", 
-        NULL,           NULL,           NULL,
-        "Set type based on file size at attach" },
-    { UNIT_NOAUTO, UNIT_NOAUTO,
-        "noautosize",   "NOAUTOSIZE",   NULL,
-        NULL,           NULL,
-        "Disable disk autosize on attach" },
     { MTAB_VUN | MTAB_VALR, 0,
         "FORMAT",       "FORMAT={AUTO|SIMH|VHD|RAW}",
         sim_disk_set_fmt, sim_disk_show_fmt, NULL,
@@ -495,7 +438,7 @@ DEVICE rr_dev = {
     0/*debug control*/, rr_deb,
     NULL/*msize()*/, NULL/*logical name*/,
     rr_help, NULL/*attach_help()*/, NULL/*help_ctx*/,
-    rr_description,
+    rr_description, NULL, &drv_typ
 };
 
 /* I/O dispatch routine, I/O addresses 17776710 - 17776736
@@ -550,7 +493,7 @@ static t_stat rr_rd (int32 *data, int32 PA, int32 access)
         rpds &= RPDS_ATTN;                              /* attention bits */
         if (!(uptr->flags & UNIT_DIS)) {                /* not disabled? */
             rpds |= RPDS_ONLN;
-            if (GET_DTYPE(uptr->flags))
+            if (strcmp (uptr->drvtyp->name, RP_RP03) == 0)
                 rpds |= RPDS_RP03;
             if (uptr->flags & UNIT_ATT) {               /* attached? */
                 rpds |= uptr->STATUS & RPDS_REAL;
@@ -696,7 +639,7 @@ static t_stat rr_wr (int32 data, int32 PA, int32 access)
 static t_stat rr_seek_init (UNIT *uptr)
 {
     rr_set_done(0);                                     /* set done */
-    assert(uptr->SEEKING);
+    ASSURE(uptr->SEEKING);
     uptr->action = rr_svc;
     sim_activate(uptr, uptr->SEEKING);                  /* seek ends then */
     return SCPE_OK;
@@ -706,11 +649,11 @@ static t_stat rr_seek_init (UNIT *uptr)
 
 static void rr_go (int16 func)
 {
-    int32 i, type, cyl, head;
+    int32 i, cyl, head;
     t_bool rd, wr;
     UNIT* uptr;
 
-    assert(func == GET_FUNC(rpcs));
+    ASSURE(func == GET_FUNC(rpcs));
 
     if (func == RPCS_RESET) {                           /* control reset? */
         rpds = 0;
@@ -739,15 +682,15 @@ static void rr_go (int16 func)
         return;
     }
 
-    assert(rpcs & CSR_DONE);
+    ASSURE(rpcs & CSR_DONE);
 
     rr_clr_done();                                      /* clear done */
     rper  = 0;                                          /* clear errors */
     rpcs &= ~(CSR_ERR | RPCS_HERR);                     /* clear summary */
     i = GET_DRIVE(rpcs);                                /* get drive no */
     uptr = rr_dev.units + i;                            /* selected unit */
-    assert(uptr->action == rr_svc);
-    assert(uptr->SEEKING  ||  !uptr->FUNC);             /* SEEK underway or idle */
+    ASSURE(uptr->action == rr_svc);
+    ASSURE(uptr->SEEKING  ||  !uptr->FUNC);             /* SEEK underway or idle */
     uptr->STATUS &= ~(RPDS_DKER | RPDS_WLK);            /* clear drive errors */
 
     if (!(uptr->flags & UNIT_ATT)) {                    /* not attached? */
@@ -759,7 +702,7 @@ static void rr_go (int16 func)
         return;
     }
 
-    assert(!uptr->FUNC  ||  uptr->FUNC == RPCS_HOME  ||  uptr->FUNC == RPCS_SEEK);
+    ASSURE(!uptr->FUNC  ||  uptr->FUNC == RPCS_HOME  ||  uptr->FUNC == RPCS_SEEK);
     if ((uptr->FUNC == RPCS_HOME  &&  func != RPCS_HOME)  ||
         (uptr->FUNC == RPCS_SEEK  &&  func == RPCS_SEEK)) {
         rr_set_done(RPER_PGE);                          /* no can't do */
@@ -772,7 +715,7 @@ static void rr_go (int16 func)
      * an initiation for an I/O (which can be a part of the topped SEEK).  OTOH,
      * SEEKING denotes that either a HOME/SEEK command is in progress (per FUNC)
      * or SEEK was in progress before the stacked I/O command (stored in FUNC). */
-    assert(!(uptr->STATUS & RPDS_SEEK));
+    ASSURE(!(uptr->STATUS & RPDS_SEEK));
 
     rd = func == RPCS_READ   ||  func == RPCS_RD_NOSEEK  ||  func == RPCS_WCHK;
     wr = func == RPCS_WRITE  ||  func == RPCS_WR_NOSEEK;
@@ -782,20 +725,19 @@ static void rr_go (int16 func)
         if (sect >= RP_NUMSC)                           /* sect out of range? */
             rper |= RPER_NXS;
     }
-    type = GET_DTYPE(uptr->flags);                      /* get drive type */
     if (func == RPCS_HOME) {
         head = 0;
         cyl  = 0;
     } else if (func == RPCS_RD_NOSEEK  ||  func == RPCS_WR_NOSEEK) {
         head = uptr->HEAD;
         cyl  = uptr->CYL;
-        assert(uptr->CYL < drv_tab[type].cyl  &&  uptr->HEAD < RP_NUMSF);
+        ASSURE(uptr->CYL < (int32)uptr->drvtyp->cyl  &&  uptr->HEAD < RP_NUMSF);
     } else {
         head = GET_TRACK(rpda);
         cyl  = rpca;
         if (head >= RP_NUMSF)                           /* bad head? */
             rper |= RPER_NXT;
-        if (cyl >= drv_tab[type].cyl)                   /* bad cyl? */
+        if (cyl >= (int32)uptr->drvtyp->cyl)                   /* bad cyl? */
             rper |= RPER_NXC;
     }
 
@@ -809,15 +751,15 @@ static void rr_go (int16 func)
 
     /* seek time */
     if (func == RPCS_HOME)
-        i  = drv_tab[type].seek_ave / 2;
+        i  = uptr->drvtyp->seek_ave / 2;
     else if (!(i = abs(cyl - uptr->CYL)))
-        i  = drv_tab[type].seek_1 / 2;
+        i  = uptr->drvtyp->seek_1 / 2;
     else if (i <= 2)
-        i *= drv_tab[type].seek_1;
-    else if (i <= (3 * drv_tab[type].cyl) / 4)
-        i  = drv_tab[type].seek_ave;
+        i *= uptr->drvtyp->seek_1;
+    else if (i <= (3 * (int32)uptr->drvtyp->cyl) / 4)
+        i  = uptr->drvtyp->seek_ave;
     else
-        i  = drv_tab[type].seek_max;
+        i  = uptr->drvtyp->seek_max;
     if (func == RPCS_HOME  ||  func == RPCS_SEEK) {     /* seek? */
         uptr->action = rr_seek_init;
         uptr->SEEKING = i;                              /* drive is seeking */
@@ -838,7 +780,7 @@ static void rr_go (int16 func)
          * using the more correct "MOVB @#RPDS, @#RPDS", instead of BIC. */
     } else {
         if (cyl != uptr->CYL  ||  head != uptr->HEAD) {
-            assert(func != RPCS_RD_NOSEEK  &&  func != RPCS_WR_NOSEEK);
+            ASSURE(func != RPCS_RD_NOSEEK  &&  func != RPCS_WR_NOSEEK);
             uptr->STATUS |= RPDS_SEEK;                  /* drive is seeking */
         }
         i += RP_ROT_12;                                 /* I/O takes longer */
@@ -869,7 +811,7 @@ static void rr_seek_done (UNIT *uptr, t_bool cancel)
     if (n == GET_DRIVE(rpcs))
         suca = cancel ? 0 : uptr->CYL;                  /* update cyl shown */
     if (uptr->SEEKING) {                                /* was seek cmd pending? */
-        assert((1 << n) & RPDS_ATTN);
+        ASSURE((1 << n) & RPDS_ATTN);
         rpds |= 1 << n;                                 /* set attention */
         if (rpcs & RPCS_AIE) {                          /* att ints enabled? */
             sim_debug(RRDEB_INT, &rr_dev, "rr_seek_done(SET_INT)\n");
@@ -895,22 +837,22 @@ static void rr_seek_done (UNIT *uptr, t_bool cancel)
 
 static t_stat rr_svc (UNIT *uptr)
 {
-    int32 n, cyl, head, sect, da, wc;
+    uint32 n, cyl, head, sect, da, wc;
     int16 func = uptr->FUNC;
     t_seccnt todo, done;
     t_stat ioerr;
     uint32 ma;
     t_bool wr;
 
-    assert(func);
+    ASSURE(func);
     uptr->FUNC = 0;                                     /* idle */
 
     rr_seek_done(uptr, 0);                              /* complete seek, if any */
-    assert(!uptr->SEEKING  &&  !(uptr->STATUS & RPDS_SEEK));
+    ASSURE(!uptr->SEEKING  &&  !(uptr->STATUS & RPDS_SEEK));
     if (func == RPCS_HOME  ||  func == RPCS_SEEK)
         return SCPE_OK;                                 /* all done */
 
-    assert(~(rpcs & CSR_DONE));
+    ASSURE(~(rpcs & CSR_DONE));
 
     if (!(uptr->flags & UNIT_ATT)) {                    /* not attached? */
         rr_set_done(RPER_PGE);                          /* unit offline */
@@ -933,7 +875,7 @@ static t_stat rr_svc (UNIT *uptr)
 
     if (wr) {
         if ((wloa & RPWLOA_ON)  &&  !rper/*valid DA*/
-            &&  (n <= GET_WLOADRV(wloa)  ||  cyl <= GET_WLOACYL(wloa))) {
+            &&  ((n <= GET_WLOADRV(wloa))  ||  (cyl <= GET_WLOACYL(wloa)))) {
             uptr->STATUS |= RPDS_WLK;                   /* DA write-locked */
             rper |= RPER_WPV;
         } else if (uptr->flags & UNIT_WPRT)             /* write and locked? */
@@ -945,15 +887,14 @@ static t_stat rr_svc (UNIT *uptr)
         return SCPE_OK;
     }
     /* rper == 0: drive remained selected */
-    assert(n == GET_DRIVE(rpcs));
+    ASSURE(n == GET_DRIVE(rpcs));
 
     wc = 0200000 - rpwc;                                /* get wd cnt */
-    assert(wc <= RP_MAXFR);
-    n = GET_DTYPE(uptr->flags);                         /* get drive type */
-    assert(cyl < drv_tab[n].cyl  &&  head < RP_NUMSF);
+    ASSURE(wc <= RP_MAXFR);
+    ASSURE(cyl < uptr->drvtyp->cyl  &&  head < RP_NUMSF);
     da = GET_DA(cyl, head, sect);                       /* form full disk addr */
-    assert(da < drv_tab[n].size);
-    n = drv_tab[n].size - da;                           /* sectors available */
+    ASSURE(da < uptr->drvtyp->size);
+    n = uptr->drvtyp->size - da;                        /* sectors available */
 
     if (rpcs & RPCS_HDR) {                              /* header ops? */
         if (!(rpcs & RPCS_MODE))                        /* yes: 18b mode? */
@@ -989,7 +930,7 @@ static t_stat rr_svc (UNIT *uptr)
     }
     if (wc > n)
         wc = n;                                         /* trim word count */
-    assert(wc);
+    ASSURE(wc);
 
     /* A note on error handling:
      * RP11 processes data words between drive and memory absolutely sequentially
@@ -1031,7 +972,7 @@ static t_stat rr_svc (UNIT *uptr)
             n = RP_SIZE(done);                          /* words read */
             sim_disk_data_trace(uptr, (uint8*) rpxb, da, n * sizeof(*rpxb), "rr_read",
                                 RRDEB_DAT & (dptr->dctrl | uptr->dctrl), RRDEB_OPS);
-            assert(done <= todo);
+            ASSURE(done <= todo);
             if (done >= todo)
                 ioerr = 0;                              /* good stuff */
             else if (ioerr)
@@ -1079,9 +1020,9 @@ static t_stat rr_svc (UNIT *uptr)
             sim_disk_data_trace(uptr, (uint8*) rpxb, da, m * sizeof(*rpxb), "rr_write",
                                 RRDEB_DAT & (dptr->dctrl | uptr->dctrl), RRDEB_OPS);
             todo = m / RP_NUMWD;                        /* sectors to write */
-            assert(!(m % RP_NUMWD));
+            ASSURE(!(m % RP_NUMWD));
             ioerr = sim_disk_wrsect(uptr, da, (uint8*) rpxb, &done, todo);
-            assert(done <= todo);
+            ASSURE(done <= todo);
             if (done < todo) {                          /* short write? */
                 wc = RP_SIZE(done);                     /* words written */
                 rper |= RPER_FMTE;                      /* report as FMTE */
@@ -1100,9 +1041,9 @@ static t_stat rr_svc (UNIT *uptr)
                 rper |= RPER_NXM;                       /* NXM? set flg */
         }
     }
-    assert(!ioerr  ||  rper);
-    assert(!wc  ||  done);
-    assert(wc  ||  rper);
+    ASSURE(!ioerr  ||  rper);
+    ASSURE(!wc  ||  done);
+    ASSURE(wc  ||  rper);
 
     rpwc += wc;
     rpwc &= RPWC_IMP;
@@ -1114,16 +1055,15 @@ static t_stat rr_svc (UNIT *uptr)
         rper |= RPER_EOP;                               /* disk pack overrun */
 
     da += done ? done : 1;                              /* update DA */
-    n = GET_DTYPE(uptr->flags);                         /* drive type */
-    assert(da <= drv_tab[n].size);
+    ASSURE(da <= uptr->drvtyp->size);
     sect = da % RP_NUMSC;                               /* new sector */
     head = da / RP_NUMSC;                               /* new head (w/cyl) */
     todo = head / RP_NUMSF;                             /* new cyl (tentative) */
-    if (todo == drv_tab[n].cyl) {                       /* at the end? */
-        cyl   = drv_tab[n].cyl - 1;                     /* keep on last cyl */
+    if (todo == uptr->drvtyp->cyl) {                    /* at the end? */
+        cyl   = uptr->drvtyp->cyl - 1;                  /* keep on last cyl */
         todo  = 0;                                      /* wrap cyl for rpda */
         head  = 0;                                      /* ...and head, too */
-        assert(!sect);
+        ASSURE(!sect);
     } else {
         cyl   = todo;                                   /* new cyl */
         head %= RP_NUMSF;                               /* isolate head */
@@ -1133,7 +1073,7 @@ static t_stat rr_svc (UNIT *uptr)
         &&  (uptr->CYL != cyl                           /* ...and: arm moved or... */
              ||  (rper & RPER_EOP))) {                  /* ...boundary exceeded? */
         n = (int32)(uptr - rr_dev.units);               /* get unit number */
-        assert((1 << n) & RPDS_ATTN);
+        ASSURE((1 << n) & RPDS_ATTN);
         rpds |= 1 << n;                                 /* set attention */
         if (rpcs & RPCS_AIE) {                          /* att ints enabled? */
             sim_debug(RRDEB_INT, &rr_dev, "rr_svc(SET_INT)\n");
@@ -1152,7 +1092,7 @@ static t_stat rr_svc (UNIT *uptr)
         const char* file = uptr->filename;
         const char* errstr = errno ? strerror(errno) : "";
         sim_printf("RR%u %s [%s:%s] FUNC=%o(%c) RPER=%06o I/O error (%s)%s%s",
-                   (int) GET_DRIVE(rpcs), GET_DTYPE(uptr->flags) ? RP_RP03 : RP_RP02,
+                   (int) GET_DRIVE(rpcs), uptr->drvtyp->name,
                    name ? name : "???", file ? file : "<NULL>",
                    (int) func, "WR"[!wr], (int) rper, sim_error_text(ioerr),
                    errstr  &&  *errstr ? ": " : "", errstr ? errstr : "");
@@ -1170,7 +1110,7 @@ static t_stat rr_svc (UNIT *uptr)
 
 static void rr_clr_done (void)
 {
-    assert(rpcs & CSR_DONE);
+    ASSURE(rpcs & CSR_DONE);
     rpcs &= ~CSR_DONE;                                  /* clear done */
     if ((rpcs & CSR_IE)  &&  (!(rpcs & RPCS_AIE)  ||  !(rpds & RPDS_ATTN))) {
         sim_debug(RRDEB_INT, &rr_dev, "rr_clr_done(CLR_INT)\n");
@@ -1181,7 +1121,7 @@ static void rr_clr_done (void)
 
 static void rr_set_done (int32 err)
 {
-    assert(~(rpcs & CSR_DONE));
+    ASSURE(~(rpcs & CSR_DONE));
     rper |= err;
     rpcs |= CSR_DONE;                                   /* set done */
     if (rpcs & CSR_IE) {                                /* int enable? */
@@ -1194,7 +1134,7 @@ static void rr_set_done (int32 err)
 static int32 rr_inta (void)
 {
     sim_debug(RRDEB_INT, &rr_dev, "rr_inta()\n");
-    assert(((rpcs & RPCS_AIE)  &&  (rpds & RPDS_ATTN))  ||
+    ASSURE(((rpcs & RPCS_AIE)  &&  (rpds & RPDS_ATTN))  ||
             ((rpcs & CSR_IE)  &&  (rpcs & CSR_DONE)));
     rpcs &= ~RPCS_AIE;                                  /* AIE is one-shot */
     return rr_dib.vec;                                  /* return vector */
@@ -1204,10 +1144,20 @@ static int32 rr_inta (void)
 
 static t_stat rr_reset (DEVICE *dptr)
 {
+    static t_bool inited = FALSE;
     int32 i;
 
     /* compile-time sanity check first */
-    const_assert(sizeof(rr_regs)/sizeof(rr_regs[0]) == RP_IOLN/2 - RP_IOFF);
+    ASSURE(sizeof(rr_regs)/sizeof(rr_regs[0]) == RP_IOLN/2 - RP_IOFF);
+
+    if (!inited) {
+        inited = TRUE;
+        for (i = 0;  i < RP_NUMDR;  ++i) {
+            dptr->units[i].action = &rr_svc;
+            dptr->units[i].flags = UNIT_FIX | UNIT_ATTABLE | UNIT_DISABLE | UNIT_ROABLE;
+            sim_disk_set_drive_type_by_name (&dptr->units[i], "RP03");
+        }
+    }
 
     /* clear everything now */
     rpds = 0;
@@ -1228,7 +1178,7 @@ static t_stat rr_reset (DEVICE *dptr)
         uptr->HEAD = 0;
         uptr->CYL = 0;
     }
-    assert(dptr == &rr_dev);
+    ASSURE(dptr == &rr_dev);
     sim_debug(RRDEB_INT, dptr, "rr_reset(CLR_INT)\n");
     CLR_INT(RR);
     if (rpxb == NULL)
@@ -1242,12 +1192,10 @@ static t_stat rr_reset (DEVICE *dptr)
 
 static t_stat rr_attach (UNIT *uptr, CONST char *cptr)
 {
-    static const char* rr_types[] = { RP_RP03, RP_RP02, NULL };
-    int32 type = GET_DTYPE(uptr->flags);
-    t_stat err = sim_disk_attach_ex2(uptr, cptr,
-                                     RP_SIZE(sizeof(*rpxb)), sizeof(*rpxb),
-                                     TRUE, 0, drv_tab[type].name,
-                                     0, 0, rr_types, 0);
+    t_stat err = sim_disk_attach(uptr, cptr,
+                                 RP_SIZE(sizeof(*rpxb)), sizeof(*rpxb),
+                                 TRUE, 0, uptr->drvtyp->name,
+                                 0, 0);
     if (err == SCPE_OK  &&  !(uptr->STATUS & RPDS_DKER))
         uptr->STATUS &= ~RPDS_UNSAFE;
     return err;
@@ -1268,32 +1216,12 @@ static t_stat rr_detach (UNIT *uptr)
         }
     }
     uptr->STATUS |= RPDS_UNSAFE;                        /* must reset before use */
-    assert(!sim_is_active(uptr));
-    assert(!uptr->SEEKING);
+    ASSURE(!sim_is_active(uptr));
+    ASSURE(!uptr->SEEKING);
     uptr->action = rr_svc;
     uptr->HEAD = 0;
     uptr->CYL = 0;
     return sim_disk_detach(uptr);
-}
-
-/* Set / show drive type */
-
-static t_stat rr_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
-{
-    if ((val & ~UNIT_RP03)  ||  cptr)
-        return SCPE_ARG;
-    if (uptr->flags & UNIT_ATT)
-        return SCPE_ALATT;
-    uptr->capac  = RP_SIZE(drv_tab[GET_DTYPE(val)].size);
-    uptr->flags &= ~UNIT_RP03;
-    uptr->flags |= val;
-    return SCPE_OK;
-}
-
-static t_stat rr_show_type (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
-{
-    fputs(drv_tab[GET_DTYPE(uptr->flags)].name, st);
-    return SCPE_OK;
 }
 
 /* Set WLOA */
@@ -1379,7 +1307,7 @@ static const uint16 rr_boot_rom[] = {
 static t_stat rr_boot (int32 unitno, DEVICE *dptr)
 {
     size_t i;
-    assert(dptr == &rr_dev);
+    ASSURE(dptr == &rr_dev);
     for (i = 0;  i < BOOT_LEN;  ++i)
         WrMemW(BOOT_START + (2 * i), rr_boot_rom[i]);
     WrMemW(BOOT_UNIT, unitno & (RP_NUMDR - 1));
@@ -1411,15 +1339,17 @@ static t_stat rr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const cha
     "Disk drive parameters (all decimal):\n\n"
     "        Cylinders    Heads  Sects/Trk     Capacity    Average access\n"
     "      Total   Spare                   Nominal  Usable    time, ms\n", st);
-    for (i = 0;  i < sizeof(drv_tab)/sizeof(drv_tab[0]);  ++i) {
-        uint32 spare = GET_DA(drv_tab[i].spare, RP_NUMSF, RP_NUMSC);
-        uint32 total = drv_tab[i].size;
+    for (i = 0;  i < sizeof(drv_typ)/sizeof(drv_typ[0]);  ++i) {
+        uint32 spare = GET_DA(drv_typ[i].spare, RP_NUMSF, RP_NUMSC);
+        uint32 total = drv_typ[i].size;
+        if (drv_typ[i].name == NULL)
+            continue;
         fprintf(st, "%.6s: %5u   %5u  %5u  %5u"
-                "    %5.1fMB  %5.1fMB   %5u.%1u\n", drv_tab[i].name,
-                drv_tab[i].cyl, drv_tab[i].spare, RP_NUMSF, RP_NUMSC,
+                "    %5.1fMB  %5.1fMB   %5u.%1u\n", drv_typ[i].name,
+                drv_typ[i].cyl, drv_typ[i].spare, RP_NUMSF, RP_NUMSC,
                 RP_SIZE(total - spare) / .5e6, RP_SIZE(total) / .5e6,
-                (drv_tab[i].seek_ave + RP_ROT_12)/10,
-                (drv_tab[i].seek_ave + RP_ROT_12)%10);
+                (drv_typ[i].seek_ave + RP_ROT_12)/10,
+                (drv_typ[i].seek_ave + RP_ROT_12)%10);
     }
     fputs("\n"
     "The implementation does not include any maintenance registers or disk/sector\n"
