@@ -1,6 +1,6 @@
 /* sigma_coc.c: Sigma character-oriented communications subsystem simulator
 
-   Copyright (c) 2007-2022, Robert M Supnik
+   Copyright (c) 2007-2024, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,9 @@
 
    coc          7611 communications multiplexor
 
+   17-Feb-24    RMS     Zero delay from SIO to INIT state (Ken Rector)
+                        Detect and UEN on 0xFF order
+   15-Dec-22    RMS     Moved SIO int pending test to devices
    24-Aug-22    RMS     Transmit long space is 0x6, not 0xD (Ken Rector)
                         Added LNORDER modifier
 */
@@ -281,7 +284,7 @@ switch (op) {                                           /* case on op */
               *dvst |= (CC2 << DVT_V_CC);               /* SIO fails */
           else if ((*dvst & DVS_CST) == 0) {            /* ctrl idle? */
             muxc_cmd = MUXC_INIT;                       /* start dev thread */
-            sim_activate (&mux_unit[MUXC], chan_ctl_time);
+            sim_activate (&mux_unit[MUXC], 0);
             }
         break;
 
@@ -405,7 +408,11 @@ else {                                                  /* receive */
 return 0;
 }    
 
-/* Unit service - channel overhead */
+/* Unit service - channel overhead
+
+   The documentation says that the channel command is thrown away,
+   but the system exerciser requires a UEN on command 0xFF.
+*/
 
 t_stat muxc_svc (UNIT *uptr)
 {
@@ -417,6 +424,10 @@ if (muxc_cmd == MUXC_INIT) {                            /* init state? */
     if (CHS_IFERR (st))                                 /* channel error? */
        mux_chan_err (st);                               /* go idle */
     else muxc_cmd = MUXC_RCV;                           /* no, receive */
+    if (cmd == 0xFF) {                                  /* invalid cmd? */
+        chan_uen (mux_dib.dva);                         /* uend */
+        return SCPE_OK;
+        }
     }
 else if (muxc_cmd == MUXC_END) {                        /* end state? */
     st = chan_end (mux_dib.dva);                        /* set channel end */

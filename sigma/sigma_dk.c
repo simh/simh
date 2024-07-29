@@ -25,6 +25,7 @@
 
    dk           7250/7251-7252 cartridge disk
 
+   17-Feb-24    RMS     Zero delay from SIO to INIT state (Ken Rector)
    11-Feb-24    RMS     Report non-operational if not attached (Ken Rector)
    01-Feb-24    RMS     Fixed nx unit test (Ken Rector)
    15-Dec-22    RMS     Moved SIO interrupt test to devices
@@ -179,7 +180,7 @@ switch (op) {                                           /* case on op */
             *dvst |= (CC2 << DVT_V_CC);                 /* SIO fails */
         else if ((*dvst & (DVS_CST|DVS_DST)) == 0) {    /* ctrl + dev idle? */
             dk_cmd = DKS_INIT;                          /* start dev thread */
-            sim_activate (&dk_unit[un], chan_ctl_time);
+            sim_activate (&dk_unit[un], 0);
             }
         break;
 

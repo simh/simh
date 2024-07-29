@@ -25,6 +25,8 @@
 
    dp           moving head disk pack controller
 
+   05-Apr-24    RMS     Added case points for RDEES, CRIOF (Ken Rector)
+   17-Feb-24    RMS     Zero delay from SIO to INIT state (Ken Rector)
    11-Feb-24    RMS     Report non-operational if not attached (Ken Rector)
    01-Feb-24    RMS     Fixed nx unit test (Ken Rector)
    03-Jun-23    RMS     Fixed SENSE length error detection (Ken Rector)
@@ -623,7 +625,7 @@ switch (op) {                                           /* case on op */
             }
         if ((*dvst & (DVS_CST|DVS_DST)) == 0) {         /* ctrl + dev idle? */
             uptr->UCMD = DPS_INIT;                      /* start dev thread */
-            sim_activate (uptr, chan_ctl_time);
+            sim_activate (uptr, 0);
             }
         break;
 
@@ -883,6 +885,7 @@ switch (uptr->UCMD) {
             return SCPE_OK;                             /* err or cont */
         break;
 
+    case DPS_RDEES:                                     /* read */
     case DPS_READ:                                      /* read */
         if (dp_inv_ad (uptr, &da)) {                    /* invalid addr? */
             ctx->dp_flags |= DPF_PGE;
@@ -934,6 +937,7 @@ switch (uptr->UCMD) {
             return SCPE_OK;
         break;
 
+    case DPS_CRIOF:                                     /* cond rls intr */
     case DPS_RSRV:                                      /* reserve */
     case DPS_RLS:                                       /* release */
     case DPS_RLSA:                                      /* release */

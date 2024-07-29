@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   19-Mar-2024  RMS     Added chaining modifier flag (Ken Rector)
    11-Feb-2024  RMS     Fixed false dispatch bug (Ken Rector)
    04-May-2023  RMS     Fixed location 21 usage in even register case (Ken Rector)
    15-Dec-2022  RMS     Moved SIO interrupt test to devices

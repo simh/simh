@@ -25,6 +25,7 @@
 
    mt           7320 and 7322/7323 magnetic tape
 
+   17-Feb-24    RMS     Zero delay from SIO to INIT state (Ken Rector)
    11-Feb-24    RMS     Report non-operational if not attached (Ken Rector)
    01-Feb-24    RMS     Fixed nx unit test (Ken Rector)
    01-Nov-23    RMS     Fixed reset not to clear BOT
@@ -248,7 +249,7 @@ switch (op) {                                           /* case on op */
             *dvst |= (CC2 << DVT_V_CC);                 /* SIO fails */
         else if ((*dvst & (DVS_CST|DVS_DST)) == 0) {    /* ctrl + dev idle? */
             uptr->UCMD = MCM_INIT;                      /* start dev thread */
-            sim_activate (uptr, chan_ctl_time);
+            sim_activate (uptr, 0);
             }
         break;
 

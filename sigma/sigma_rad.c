@@ -1,6 +1,6 @@
 /* sigma_rad.c: Sigma 7211/7212 or 7231/7232 fixed head disk simulator
 
-   Copyright (c) 2007-2022, Robert M Supnik
+   Copyright (c) 2007-2024, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,9 @@
 
    rad          7211/7212 or 7231/7232 fixed head disk
 
+   17-Feb-24    RMS     Zero delay from SIO to INIT state (Ken Rector)
+   01-Feb-24    RMS     Fixed nx unit test (Ken Rector)
+   22-Apr-23    RMS     Fixed write protect test (Ken Rector)
    02-Jul-22    RMS     Fixed bugs in multi-unit operation
 
    The RAD is a head-per-track disk.  To minimize overhead, the entire RAD
@@ -206,8 +209,10 @@ int32 iu;
 UNIT *uptr;
 
 if ((un >= RAD_NUMDR) ||                                /* inv unit num? */
-    (rad_unit[un].flags & UNIT_DIS))                    /* disabled unit? */
-    return DVT_NODEV;
+    (rad_unit[un].flags & UNIT_DIS)) {                  /* disabled unit? */
+    *dvst = DVT_NODEV;
+    return 0;
+    }
 switch (op) {                                           /* case on op */
 
     case OP_SIO:                                        /* start I/O */
@@ -216,7 +221,7 @@ switch (op) {                                           /* case on op */
             *dvst |= (CC2 << DVT_V_CC);                 /* SIO fails */
         else if ((*dvst & (DVS_CST|DVS_DST)) == 0) {    /* ctrl + dev idle? */
             rad_cmd = RADS_INIT;                        /* start dev thread */
-            sim_activate (&rad_unit[un], chan_ctl_time);
+            sim_activate (&rad_unit[un], 0);
             }
         break;
 

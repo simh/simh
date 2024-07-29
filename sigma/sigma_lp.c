@@ -1,6 +1,6 @@
 /* sigma_lp.c: Sigma 7440/7450 line printer
 
-   Copyright (c) 2007-2021, Robert M. Supnik
+   Copyright (c) 2007-2024, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,9 @@
 
    lp           7440/7445 or 7450 line printer
 
+   18-Feb-2024  RMS     Zero delay from SIO to INIT state (Ken Rector)
+                        Added INIT test for illegal command (Ken Rector)
+   15-Dec-2022  RMS     Moved SIO interrupt test to devices
    10-Jun-2021  RMS     Removed use of ftell for pipe compatibility
    09-Mar-2017  RMS     Fixed unclosed file returns in CCT load (COVERITY)
 */
@@ -96,6 +99,24 @@ uint8 lp_to_ascii[64] = {
     'Y', 'Z', '^', ',', '%', '_', '>', '?',
     '0', '1', '2', '3', '4', '5', '6', '7',
     '8', '9', ':', '#', '@', '\'', '=', '"'
+    };
+static uint8 lp_valid_cmd[256] = {
+    0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,     /* 0x0n */
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,      /* 0x4n */
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
     };
 
 extern uint32 chan_ctl_time;
@@ -184,7 +205,7 @@ switch (op) {                                           /* case on op */
             *dvst |= (CC2 << DVT_V_CC);                 /* SIO fails */
         else if ((*dvst & DVS_DST) == 0) {              /* idle? */
             lp_cmd = LPS_INIT;                          /* start dev thread */
-            sim_activate (&lp_unit, chan_ctl_time);
+            sim_activate (&lp_unit, 0);
             }
         break;
 
@@ -232,6 +253,10 @@ switch (lp_cmd) {                                       /* case on state */
         st = chan_get_cmd (lp_dib.dva, &cmd);           /* get command */
         if (CHS_IFERR (st))                             /* channel error? */
             return lp_chan_err (st);
+        if (lp_valid_cmd[cmd] == 0) {                   /* bad command? */
+            chan_uen (lp_dib.dva);                      /* uend */
+            return SCPE_OK;
+            }
         lp_inh = 0;                                     /* clear inhibit, */
         lp_run = 0;                                     /* runaway */
         lp_cmd = lp_lastcmd = cmd;                      /* save command */

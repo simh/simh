@@ -114,36 +114,32 @@
 108. DP: TIO status routine always returns DVS_AUTO instead of proper status.
 109. DP: DP_SEEK definition is off by 1.
 110. DP: reset does not properly initialize controller, seek threads.
-111. DP: device address must include unit identifier everywhere, for interrupt generation.
-112. DK: device address must include unit identifier everywhere, for interrupt generation.
-113. MT: device address must include unit identifier everywhere, for interrupt generation.
-114: RAD: device address must include unit identifier everywhere, for interrupt generation.
-115. MT: error handling not consistent.
-116: IO: dangling else in write direct mode 1 code causes incorrect behavior.
-117: CPU: sim_interval is decremented before breakpoint test, which is incorrect.
-118. MT: revised error handling failed to set tape mark status on space file forward/reverse.
-119. IO: UEND flag in the wrong bit position in status word.
-120. DP: SEEK(I), RECAL(I) must be coded as fast operations.
-121. COC: Transmit long space is 0x6, and stop transmit is 0xE.
-122. COC: Received break generates a data-in channel transaction with a flag bit set
+111. DP, DK, MT, RAD: device address must include unit identifier everywhere, for interrupt generation.
+112. MT: error handling not consistent.
+113: IO: dangling else in write direct mode 1 code causes incorrect behavior.
+114: CPU: sim_interval is decremented before breakpoint test, which is incorrect.
+115. MT: revised error handling failed to set tape mark status on space file forward/reverse.
+116. IO: UEND flag in the wrong bit position in status word.
+117. DP: SEEK(I), RECAL(I) must be coded as fast operations.
+118. COC: Transmit long space is 0x6, and stop transmit is 0xE.
+119. COC: Received break generates a data-in channel transaction with a flag bit set
      in the line number.
-123. DP: dp_inv_adr error must set a TDV visible flag (i.e., PGE) before UEND.
-124. IO, all devices: moved SIO reject-on-interrupt test to devices.
-125. DP: SIO will knock down pending device interrupts and allow operation to proceed.
-126. MT: AIO must mask unit number before calling TDV status.
-127. IO: location 20/21 set incorrectly in the even, non-zero register case.
-128. CPU: WAIT must be implemented for correct operation of CP-V.
-129. DP: On 10 byte models, SENSE length errors can't happen. On 16 byte models,
+120. DP: dp_inv_adr error must set a TDV visible flag (i.e., PGE) before UEND.
+121. IO, all devices: moved SIO reject-on-interrupt test to devices.
+122. DP: SIO will knock down pending device interrupts and allow operation to proceed.
+123. MT: AIO must mask unit number before calling TDV status.
+124. IO: location 20/21 set incorrectly in the even, non-zero register case.
+125. CPU: WAIT must be implemented for correct operation of CP-V.
+126. DP: On 10 byte models, SENSE length errors can't happen. On 16 byte models,
      SENSE length errors only occur if length == 0 || length > 16.
-130. IO: DVT_NOTDEV macro incorrect.
-131. DP: Test for non-existent device returns wrong status.
-132. DK: Test for non-existent device returns wrong status.
-133. MT: Test for non-existent device returns wrong status.
-134. RAD: Test for non-existent device returns wrong status.
-135. DP: TIO status should return non-operational for unattached device.
-136. DK: TIO status should return non-operational for unattached device.
-137. NT: TIO status should return non-operational for unattached device.
-138. IO: Device mapping algorithm creates false dispatch points.
+127. IO: DVT_NOTDEV macro incorrect.
+128. DP, DK, MT, RAD: Test for non-existent device returns wrong status.
+129. DP, DK, MT: TIO status should return non-operational for unattached device.
+130. IO: Device mapping algorithm creates false dispatch points.
+131. All devices: dispatch time to INIT state must be 0.
+132. LPT: device must flag illegal commands in IDLE state.
+133. COC: must flag 0xFF as illegal command in IDLE state.
+134. IO: multiplexor channel implements a "chain modifier" capability, needed by punch.
 
 Diagnostic Notes
 ----------------

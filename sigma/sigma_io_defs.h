@@ -23,6 +23,9 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   19-Mar-24    RMS     Added chaining modifier flag (Ken Rector)
+   01-Feb-24    RMS     Fixed DVT_NODEV definition (Ken Rector)
+   15-Dec-22    RMS     Added chan_chk_dvi definition
    21-Jul-22    RMS     Channel UEND flag in wrong bit position (Ken Rector)
 */
 

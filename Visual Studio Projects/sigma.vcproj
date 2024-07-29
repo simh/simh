@@ -208,7 +208,15 @@
 				>
 			</File>
 			<File
+				RelativePath="..\sigma\sigma_cp.c"
+				>
+			</File>
+			<File
 				RelativePath="..\sigma\sigma_cpu.c"
+				>
+			</File>
+			<File
+				RelativePath="..\sigma\sigma_cr.c"
 				>
 			</File>
 			<File
