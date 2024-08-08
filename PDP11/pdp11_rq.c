@@ -153,6 +153,7 @@ extern int32 MMR2;
 #define RQ_NUMBY        512                             /* bytes per block */
 #define RQ_MAXFR        (1 << 16)                       /* max xfer */
 #define RQ_MAPXFER      (1u << 31)                      /* mapped xfer */
+#define RQ_MAXQBADDR    0x3FFFFF                        /* Max Qbus Address */
 #define RQ_M_PFN        0x1FFFFF                        /* map entry PFN */
 
 #define UNIT_V_ONL      (DKUF_V_UF + 0)                 /* online */
@@ -2214,7 +2215,7 @@ if (ba & RQ_MAPXFER) {                                  /* mapped xfer? */
     return 0;
     }
 #endif
-return Map_ReadB (ba, bc, buf);                         /* unmapped xfer */
+return Map_ReadB (ba & RQ_MAXQBADDR, bc, buf);           /* unmapped xfer */
 }
 
 /* Read word buffer from memory */
@@ -2240,7 +2241,7 @@ if (ba & RQ_MAPXFER) {                                  /* mapped xfer? */
     return 0;
     }
 #endif
-return Map_ReadW (ba, bc, buf);                         /* unmapped xfer */
+return Map_ReadW (ba & RQ_MAXQBADDR, bc, buf);          /* unmapped xfer */
 }
 
 /* Write word buffer to memory */
@@ -2266,7 +2267,7 @@ if (ba & RQ_MAPXFER) {                                  /* mapped xfer? */
     return 0;
     }
 #endif
-return Map_WriteW (ba, bc, buf);                        /* unmapped xfer */
+return Map_WriteW (ba & RQ_MAXQBADDR, bc, buf);         /* unmapped xfer */
 }
 
 /* Unit service for data transfer commands */
