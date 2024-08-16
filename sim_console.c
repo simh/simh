@@ -884,24 +884,31 @@ static void _sim_rem_log_out (TMLN *lp)
 {
 char cbuf[4*CBUFSIZE];
 REMOTE *rem = &sim_rem_consoles[(int)(lp - sim_rem_con_tmxr.ldsc)];
+size_t out_count = 0;
 
 if ((!sim_oline) && (sim_log)) {
     fflush (sim_log);
     (void)sim_fseeko (sim_log, sim_rem_cmd_log_start, SEEK_SET);
     cbuf[sizeof(cbuf)-1] = '\0';
-    while (fgets (cbuf, sizeof(cbuf)-1, sim_log))
+    while (fgets (cbuf, sizeof(cbuf)-1, sim_log)) {
+        out_count += strlen (cbuf);
         tmxr_linemsgf (lp, "%s", cbuf);
+        }
     }
 sim_oline = NULL;
-if ((rem->act == NULL) &&
-    (!tmxr_input_pending_ln (lp))) {
+if ((rem->act == NULL) && (out_count != 0)) {
+    int32 pending_input = tmxr_input_pending_ln (lp);
     int32 unwritten;
 
-    do {
-        unwritten = tmxr_send_buffered_data (lp);
-        if (unwritten == lp->txbsz)
-            sim_os_ms_sleep (100);
-        } while (unwritten == lp->txbsz);
+    if ((pending_input == 0) ||                                     /* No input pending OR */
+        ((pending_input == 1) && (lp->rxb[lp->rxbpr] == '\n'))) {   /* Microsoft Telnet bug (extra \n after \r) */
+        /* Time to flush pending output */
+        do {
+            unwritten = tmxr_send_buffered_data (lp);
+            if (unwritten == lp->txbsz)
+                sim_os_ms_sleep (100);
+            } while (unwritten == lp->txbsz);
+        }
     }
 
 }
