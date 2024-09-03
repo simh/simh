@@ -7511,9 +7511,16 @@ t_stat sim_load(FILE *fileref, CONST char *cptr, CONST char *fnam, int flag) {
    https://deramp.com/downloads/misc_software/hex-binary utilities for the PC/
 */
 static t_stat cpu_hex_load(FILE *fileref, CONST char *cptr, CONST char *fnam, int flag) {
+    char gbuf[CBUFSIZE];
     char linebuf[1024], datastr[1024], *bufptr;
     int32 bytecnt, rectype, databyte, chksum, line = 0, cnt = 0;
+    uint32 makeROM = FALSE;
     t_addr addr, org = 0;
+
+    get_glyph(cptr, gbuf, 0);
+    if (strcmp(gbuf, "ROM") == 0) {
+        makeROM = TRUE;
+    }
 
     while (!feof(fileref)) {
         if (fgets(linebuf, sizeof(linebuf), fileref) == NULL)
@@ -7552,7 +7559,13 @@ static t_stat cpu_hex_load(FILE *fileref, CONST char *cptr, CONST char *fnam, in
                 }
                 bufptr += 2;
 
-                PutBYTE(addr++, databyte);
+                if (makeROM) {
+                    mmu_table[addr >> LOG2PAGESIZE] = ROM_PAGE;
+                } else {
+                    mmu_table[addr >> LOG2PAGESIZE] = RAM_PAGE;
+                }
+
+                M[addr++] = databyte;
 
                 chksum += databyte;
                 cnt++;
@@ -7568,7 +7581,7 @@ static t_stat cpu_hex_load(FILE *fileref, CONST char *cptr, CONST char *fnam, in
         }
     }
 
-    return sim_messagef(SCPE_OK, "%d byte%s loaded at %x.\n", PLURAL(cnt), org);
+    return sim_messagef(SCPE_OK, "%d byte%s loaded at %x%s.\n", PLURAL(cnt), org, (makeROM) ? " [ROM]" : "");
 }
 
 void cpu_raise_interrupt(uint32 irq) {
