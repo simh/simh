@@ -209,6 +209,7 @@ uint32 getCommon(void);
 uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
                         int32 (*routine)(const int32, const int32, const int32), const char* name, uint8 unmap);
 
+static void PutBYTEasROMorRAM(register uint32 Addr, const register uint32 Value, const register uint32 makeROM);
 void PutBYTEExtended(register uint32 Addr, const register uint32 Value);
 uint32 GetBYTEExtended(register uint32 Addr);
 void cpu_raise_interrupt(uint32 irq);
@@ -1935,6 +1936,15 @@ static void PutBYTE(register uint32 Addr, const register uint32 Value) {
         else
             sim_printf("CPU: " ADDRESS_FORMAT " Attempt to write to ROM " ADDRESS_FORMAT ".\n", PCX, Addr);
     }
+}
+
+static void PutBYTEasROMorRAM(register uint32 Addr, const register uint32 Value, const register uint32 makeROM) {
+    Addr &= ADDRMASK;   /* registers are NOT guaranteed to be always 16-bit values */
+    if ((cpu_unit.flags & UNIT_CPU_BANKED) && (((common_low == 0) && (Addr < common)) || ((common_low == 1) && (Addr >= common))))
+        Addr |= bankSelect << MAXBANKSIZELOG2;
+
+    mmu_table[Addr >> LOG2PAGESIZE] = makeROM ? ROM_PAGE : RAM_PAGE;
+    M[Addr] = Value;
 }
 
 void PutBYTEExtended(register uint32 Addr, const register uint32 Value) {
@@ -7559,13 +7569,7 @@ static t_stat cpu_hex_load(FILE *fileref, CONST char *cptr, CONST char *fnam, in
                 }
                 bufptr += 2;
 
-                if (makeROM) {
-                    mmu_table[addr >> LOG2PAGESIZE] = ROM_PAGE;
-                } else {
-                    mmu_table[addr >> LOG2PAGESIZE] = RAM_PAGE;
-                }
-
-                M[addr++] = databyte;
+                PutBYTEasROMorRAM(addr++, databyte, makeROM);
 
                 chksum += databyte;
                 cnt++;
