@@ -1803,7 +1803,8 @@ static const char simh_help2[] =
       " %%SIM_MAJOR%%, %%SIM_MINOR%%, %%SIM_PATCH%%, %%SIM_DELTA%%,\n"
       " %%SIM_VM_RELEASE%%, %%SIM_VERSION_MODE%%, %%SIM_GIT_COMMIT_ID%%,\n"
       " %%SIM_GIT_COMMIT_TIME%%, %%SIM_ARCHIVE_GIT_COMMIT_ID%%,\n"
-      " %%SIM_ARCHIVE_GIT_COMMIT_TIME%%, %%SIM_RUNLIMIT%%, %%SIM_RUNLIMIT_UNITS%%\n\n"
+      " %%SIM_ARCHIVE_GIT_COMMIT_TIME%%, %%SIM_RUNLIMIT%%, %%SIM_RUNLIMIT_UNITS%%,\n"
+      " %%SIM_HOST_CORE_COUNT%%, %%SIM_HOST_MAX_THREADS%%\n\n"
       "+Token %%0 expands to the command file name.\n"
       "+Token %%n (n being a single digit) expands to the n'th argument\n"
       "+Token %%* expands to the whole set of arguments (%%1 ... %%9)\n\n"
@@ -1877,7 +1878,9 @@ static const char simh_help2[] =
       "++%%SIM_GIT_COMMIT_TIME%%  The git commit time of the current build\n"
       "++%%SIM_RUNLIMIT%%         The current execution limit defined\n"
       "++%%SIM_RUNLIMIT_UNITS%%   The units of the SIM_RUNLIMIT value\n"
-      "++++++++       (instructions, cycles or time)\n\n"
+      "++++++++       (instructions, cycles or time)\n"
+      "++%%SIM_HOST_CORE_COUNT%%  The number of CPU cores on the host\n"
+      "++%%SIM_HOST_MAX_THREADS%% The maximum number of possible host threads\n\n"
       "+Environment variable lookups are done first with the precise name\n"
       "+between the %% characters and if that fails, then the name between\n"
       "+the %% characters is upcased and a lookup of that value is attempted.\n\n"
@@ -7028,6 +7031,7 @@ char vmaj_s[12], vmin_s[12], vpat_s[12], vdelt_s[12];
 const char *cpp = "";
 const char *build = "";
 const char *arch = "";
+FILE *saved_st = st;
 
 if (cptr && (*cptr != 0))
     return SCPE_2MARG;
@@ -7059,7 +7063,9 @@ if (1) {
     setenv ("SIM_VERSION_MODE", mode, 1);
     }
 #endif
-if (flag) {
+if (flag == 0)
+    st = stdnul;
+if (1) {
     t_bool idle_capable;
     uint32 os_ms_sleep_1, os_tick_size;
     char os_type[128] = "Unknown";
@@ -7199,6 +7205,8 @@ if (flag) {
                 } while (!isdigit (cores[0]));
             _pclose (f);
             }
+        setenv ("SIM_HOST_CORE_COUNT", cores, 1);
+        setenv ("SIM_HOST_MAX_THREADS", procs, 1);
         fprintf (st, "\n        OS: %s", osversion);
         fprintf (st, "\n        Architecture: %s%s%s, %s%s%sLogical Processors: %s", arch, proc_arch3264 ? " on " : "", proc_arch3264 ? proc_arch3264  : "", (cores[0] == '\0') ? "" : "Cores: ", cores, (cores[0] == '\0') ? "" : ", ", procs);
         fprintf (st, "\n        Processor Id: %s, Level: %s, Revision: %s", proc_id ? proc_id : "", proc_level ? proc_level : "", proc_rev ? proc_rev : "");
@@ -7345,10 +7353,14 @@ if (flag) {
                 fprintf (st, "\n        ");
             if (arch[0] != '\0')
                 fprintf (st, "Architecture: %s", arch);
-            if (cores[0] != '\0')
+            if (cores[0] != '\0') {
                 fprintf (st, ", Cores: %s", cores);
-            if (procs[0] != '\0')
+                setenv ("SIM_HOST_CORE_COUNT", cores, 1);
+                }
+            if (procs[0] != '\0') {
                 fprintf (st, ", Logical Processors: %s", procs);
+                setenv ("SIM_HOST_MAX_THREADS", procs, 1);
+                }
             }
 #elif defined (__APPLE__)
         if ((f = popen ("sysctl machdep.cpu 2>/dev/null", "r"))) {
@@ -7379,10 +7391,14 @@ if (flag) {
                 fprintf (st, "\n        Processor Name: %s", proc_name);
             if ((procs[0] != '\0') || (cores[0] != '\0'))
                 fprintf (st, "\n        ");
-            if (cores[0] != '\0')
+            if (cores[0] != '\0') {
                 fprintf (st, "Cores: %s", cores);
-            if (procs[0] != '\0')
+                setenv ("SIM_HOST_CORE_COUNT", cores, 1);
+                }
+            if (procs[0] != '\0') {
                 fprintf (st, ", Logical Processors: %s", procs);
+                setenv ("SIM_HOST_MAX_THREADS", procs, 1);
+                }
             }
 #endif
         strlcpy (tarversion, _get_tool_version ("tar"), sizeof (tarversion));
@@ -7401,6 +7417,8 @@ if (flag) {
         strlcpy (os_type, getenv ("OSTYPE"), sizeof (os_type));
     setenv ("SIM_OSTYPE", os_type, 1);
     }
+if (flag == 0)
+    st = saved_st;
 #if defined(SIM_GIT_COMMIT_ID)
 if (1) {
     const char *extras = strchr (__STR(SIM_GIT_COMMIT_ID), '+');
