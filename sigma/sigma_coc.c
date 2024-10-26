@@ -403,7 +403,9 @@ else {                                                  /* receive */
         }
     if (mux_sta[ln] & MUXL_RBP)                         /* break pending? */
         CC = CC3|CC4;
-    else CC = mux_ldsc[ln].rcve? CC4: CC3;
+    else if (mux_ldsc[ln].conn)
+        CC = mux_ldsc[ln].rcve? CC4: CC3;
+    else  CC = 0;
     }
 return 0;
 }    
