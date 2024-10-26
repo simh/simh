@@ -38,7 +38,7 @@ set _ARG=
 rem Everything implicitly requires BUILD to also be set to have 
 rem any meaning, it always gets set.
 set _X_BUILD=BUILD
-set _X_REQUIRED_WINDOWS_BUILD=20241011
+set _X_REQUIRED_WINDOWS_BUILD=20241013
 call :FindVCVersion _VC_VER _MSVC_VER _MSVC_TOOLSET_VER  _MSVC_TOOLSET_DIR
 echo _VC_VER=%_VC_VER%
 echo _MSVC_VER=%_MSVC_VER%
