@@ -976,6 +976,10 @@ t_stat eth_filter (ETH_DEV* dev, int addr_count, ETH_MAC* const addresses,
 t_stat eth_filter_hash (ETH_DEV* dev, int addr_count, ETH_MAC* const addresses,
                    ETH_BOOL all_multicast, ETH_BOOL promiscuous, ETH_MULTIHASH* const hash)
   {return SCPE_NOFNC;}
+t_stat eth_filter_hash_ex (ETH_DEV* dev, int addr_count, ETH_MAC* const addresses,
+                   ETH_BOOL all_multicast, ETH_BOOL promiscuous, ETH_BOOL match_broadcast, 
+                   ETH_MULTIHASH* const hash)
+  {return SCPE_NOFNC;}
 const char *eth_version (void)
   {return NULL;}
 int eth_devices(int max, ETH_LIST* list, ETH_BOOL framers)
