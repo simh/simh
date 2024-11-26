@@ -308,13 +308,13 @@ static DPB dpb[] = {
         0xC0,   0x00,   0x0000, 0x0003, 0x02,   0x03,   0,      0,  NULL },             /* Osborne1 5.25" SS DD         */
 
     { "NSSS1",  179200,         40,     0x03,   0x07,   0x00,   0xA4,   0x003F,
-        0xC0,   0x00,   0x0010, 0x0002, 0x02,   0x03,   0,      0,  NULL },             /* Northstar SSDD Format 1      */
+        0xC0,   0x00,   0x0010, 0x0002, 0x02,   0x03,   0,      0,  NULL },             /* NorthStar SSDD Format 1      */
 
     { "NSSS2",  179200,         40,     0x04,   0x0F,   0x01,   0x51,   0x003F,
-        0x80,   0x00,   0x0010, 0x0002, 0x02,   0x03,   0,      0,  NULL },             /* Northstar SSDD Format 2      */
+        0x80,   0x00,   0x0010, 0x0002, 0x02,   0x03,   0,      0,  NULL },             /* NorthStar SSDD Format 2      */
 
     { "NSDS2",  358400,         40,     0x04,   0x0F,   0x01,   0xA9,   0x003F,
-        0x80,   0x00,   0x0010, 0x0002, 0x02,   0x03,   0,      0,  NULL },             /* Northstar DSDD Format 2      */
+        0x80,   0x00,   0x0010, 0x0002, 0x02,   0x03,   0,      0,  NULL },             /* NorthStar DSDD Format 2      */
 
     { "VGSS",   315392,         32,     0x04,   0x0F,   0x00,   149,    0x007F,
         0xC0,   0x00,   0x0020, 0x0002, 0x02,   0x03,   0,      0,  NULL },             /* Vector SS SD                 */
@@ -324,6 +324,9 @@ static DPB dpb[] = {
 
     { "DISK1A", 630784,         64,     0x04,   0x0F,   0x00,   299,    0x007F,
         0xC0,   0x00,   0x0020, 0x0002, 0x02,   0x03,   0,      0,  NULL },             /* CompuPro Disk1A 8" SS SD     */
+
+    { "HDCPM",  8519680,        0x0400, 0x06,   0x3F,   0x03,   0x03FF, 0x03FF,         /* Hard disk for Amstrad        */
+        0xF0,   0x00,   0x0000, 0x0001, 0x02,   0x03,   0,      0,  NULL },             /* CPC 6128 with ULIfAC board   */
 
     { "SSSD8",  256256,         SPT26,  0x03,   0x07,   0x00,   242,    0x003F,
         0xC0,   0x00,   0x0000, 0x0002, 0x00,   0x00,   0,      0,  NULL },             /* Standard 8" SS SD            */
