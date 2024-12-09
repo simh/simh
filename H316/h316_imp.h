@@ -176,9 +176,12 @@ struct _HIDB {
   uint16      rxdata[MAXDATA];  // UDP packet received.
   uint16      rxnext;           // Index to next word in UDP packet.
   uint16      rxsize;           // Size of UDP packet.
+  uint16      padding;          // Padding for long leaders.
+  t_bool      convert;          // Convert between 1822 short/long messages.
   // Transmitter (IMP -> HOST) data ...
   uint32      txdelay;          // RTC ticks until TX done interrupt
   uint32      txtotal;          // total host messages sent
+  t_bool      txfirst;          // First packet in a series
   // Other data ...
   t_bool      iloop;            // local loop back enabled
   t_bool      enabled;          // TRUE if the host is enabled
