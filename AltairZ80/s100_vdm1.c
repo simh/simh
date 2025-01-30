@@ -48,7 +48,6 @@
 /*
 ** PORT ASSIGNMENTS
 */
-#define VDM1_DSTAT       0xfe    /* VDM DISPLAY PARAMETER PORT  */
 #define VDM1_DSTAT_RMSK  0xf0    /* START ROW MASK */
 #define VDM1_DSTAT_CMSK  0x0f    /* START COL MASK */
 
@@ -391,7 +390,7 @@ static t_stat vdm1_boot(int32 unitno, DEVICE *dptr)
     exdep_cmd(EX_D, "-m 14 DCX H");
     exdep_cmd(EX_D, "-m 15 MOV A,H");
     exdep_cmd(EX_D, "-m 16 ORA A");
-    exdep_cmd(EX_D, "-m 17 JNZ 0012H");
+    exdep_cmd(EX_D, "-m 17 JNZ 0014H");
     exdep_cmd(EX_D, "-m 1A INR C");
     exdep_cmd(EX_D, "-m 1B MOV B,C");
     exdep_cmd(EX_D, "-m 1C JMP 0008H");
@@ -402,7 +401,7 @@ static t_stat vdm1_boot(int32 unitno, DEVICE *dptr)
 }
 
 static int32 vdm1_io(const int32 port, const int32 io, const int32 data) {
-    if ((io == 1) && (port == VDM1_DSTAT)) {
+    if (io == 1) {
         vdm1_dstat = data & 0xff;
     }
     return 0xff;
