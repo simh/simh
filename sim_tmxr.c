@@ -3443,6 +3443,7 @@ while (*tptr) {
                     tmxr_init_line (lp);                    /* init the line state */
                     if (speed[0] && (!datagram))
                         tmxr_set_line_speed (lp, speed);
+                    tmxr_add_to_open_list (mp);
                     return SCPE_OK;
                     }
                 else
