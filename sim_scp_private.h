@@ -370,6 +370,7 @@ extern int32 sim_asynch_inst_latency;
 /* Internal SCP declarations */
 extern DEVICE sim_scp_dev;
 #define SIM_DBG_INIT        0x00200000      /* initialization activities */
+#define SIM_DBG_SHUTDOWN    0x00100000      /* shutdown activities */
 
 /* Expect rule */
 

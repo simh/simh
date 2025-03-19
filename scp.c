@@ -336,6 +336,7 @@ static DEBTAB scp_debug[] = {
   {"SAVE",      SIM_DBG_SAVE,       "Save Activities"},
   {"RESTORE",   SIM_DBG_RESTORE,    "Restore Activities"},
   {"INIT",      SIM_DBG_INIT,       "Initialization Activities"},
+  {"SHUTDOWN",  SIM_DBG_SHUTDOWN,   "Shutdown Activities"},
   {0}
 };
 
@@ -3305,12 +3306,16 @@ if (SCPE_BARE_STATUS(stat) == SCPE_OPENERR)             /* didn't exist/can't op
     stat = SCPE_OK;
 
 if (SCPE_BARE_STATUS(stat) != SCPE_EXIT)
-    process_stdin_commands (SCPE_BARE_STATUS(stat), argv, FALSE);
+    stat = process_stdin_commands (SCPE_BARE_STATUS(stat), argv, FALSE);
 
 cleanup_and_exit:
 
+sim_debug (SIM_DBG_SHUTDOWN, &sim_scp_dev, "Shutting Down: Status = %d - %s\n", SCPE_BARE_STATUS (stat), sim_error_text (stat));
 detach_all (0, TRUE);                                   /* close files */
-sim_set_deboff (0, NULL);                               /* close debug */
+if (sim_deb) {                                          /* If debugging */
+    sim_switches |= SWMASK ('Q');                       /*   close debugging quietly */
+    sim_set_deboff (0, NULL);                           /*   and cleanly */
+    }
 sim_set_logoff (0, NULL);                               /* close log */
 sim_set_notelnet (0, NULL);                             /* close Telnet */
 vid_close_all ();                                       /* close video */
@@ -3464,10 +3469,6 @@ t_stat r = SCPE_EXIT;
 if (cptr && *cptr) {
     sim_exit_status = atoi (cptr);
     r |= SCPE_NOMESSAGE;            /* exit silently with the specified status */
-    }
-if (sim_deb) {                      /* If debugging, then close debugging cleanly */
-    sim_switches |= SWMASK ('Q');   /*   and quietly */
-    sim_set_deboff (0, NULL);
     }
 return r;
 }
@@ -8983,6 +8984,8 @@ for (i = start; (dptr = sim_devices[i]) != NULL; i++) { /* loop thru dev */
         if ((uptr->flags & UNIT_ATT) ||                 /* attached? */
             (shutdown && dptr->detach &&                /* shutdown, spec rtn, */
             !(uptr->flags & UNIT_ATTABLE))) {           /* !attachable? */
+            if (shutdown)
+                sim_debug (SIM_DBG_SHUTDOWN, &sim_scp_dev, "Detaching: %s\n", sim_uname(uptr));
             r = scp_detach_unit (dptr, uptr);           /* detach unit */
 
             if ((r != SCPE_OK) && !shutdown)            /* error and not shutting down? */
