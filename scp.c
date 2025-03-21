@@ -14536,12 +14536,13 @@ static void _sim_debug_write_flush (const char *buf, size_t len, t_bool flush)
 {
 char *eol;
 
+AIO_LOCK;
 if (sim_deb_switches & SWMASK ('F')) {              /* filtering disabled? */
     if (len > 0)
         _debug_fwrite (buf, len);                   /* output now. */
+    AIO_UNLOCK;
     return;                                         /* done */
     }
-AIO_LOCK;
 if (debug_line_offset + len + 1 > debug_line_bufsize) {
     debug_line_bufsize += MAX(1024, debug_line_offset + len + 1);
     debug_line_buf = (char *)realloc (debug_line_buf, debug_line_bufsize);
@@ -14627,6 +14628,7 @@ struct timespec saved_deb_basetime;
 if (sim_deb == NULL)                                    /* no debug? */
     return SCPE_OK;
 
+AIO_LOCK;
 saved_deb_basetime = *sim_rtcn_get_debug_basetime ();
 
 _sim_debug_write_flush ("", 0, TRUE);
@@ -14649,6 +14651,7 @@ if ((saved_deb_switches & SWMASK ('B')) != 0) {
     sim_switches = saved_sim_switches;
     sim_quiet = saved_quiet;
     }
+AIO_UNLOCK;
 return SCPE_OK;
 }
 
