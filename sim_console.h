@@ -94,6 +94,8 @@ t_stat sim_set_cons_expect (int32 flg, CONST char *cptr);
 t_stat sim_set_cons_noexpect (int32 flg, CONST char *cptr);
 t_stat sim_set_pchar (int32 flag, CONST char *cptr);
 t_stat sim_set_cons_speed (int32 flag, CONST char *cptr);
+t_stat sim_set_dbgsignal (int32 flag, CONST char *cptr);
+t_stat sim_reset_dbgsignal (int32 flag, CONST char *cptr);
 t_stat sim_show_console (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr);
 t_stat sim_show_remote_console (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr);
 t_stat sim_show_kmap (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr);
@@ -106,6 +108,7 @@ t_stat sim_show_cons_buff (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST
 t_stat sim_show_cons_log (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr);
 t_stat sim_show_cons_debug (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr);
 t_stat sim_show_cons_expect (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr);
+t_stat sim_show_dbgsignal (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr);
 t_stat sim_check_console (int32 sec);
 t_stat sim_open_logfile (const char *filename, t_bool binary, FILE **pf, FILEREF **pref);
 t_stat sim_close_logfile (FILEREF **pref);
