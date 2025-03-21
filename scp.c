@@ -1363,7 +1363,7 @@ static const char simh_help1[] =
       "+SET CONSOLE WRU=value       specify console drop to simh character\n"
       "+SET CONSOLE BRK=value       specify console Break character\n"
       "+SET CONSOLE DEL=value       specify console delete character\n"
-#if (defined(__GNUC__) && !defined(__OPTIMIZE__) && !defined(_WIN32))/* Debug build? */
+#if (defined(__GNUC__) && !defined(_WIN32))/* Debug build? */
       "+SET CONSOLE DBGINT=value    specify SIGINT character in debugger\n"
 #endif
       "+SET CONSOLE PCHAR=bitmask   bit mask of printable characters in\n"
@@ -1389,6 +1389,9 @@ static const char simh_help1[] =
       "++++++++                     specify console serial port and optionally\n"
       "++++++++                     the port config (i.e. ;9600-8n1)\n"
       "+SET CONSOLE NOSERIAL        disable console serial session\n"
+      "+SET CONSOLE DBSIGNAL        enable gdb debugger signals via the\n"
+      "++++++++                     specified DBGINT character\n"
+      "+SET CONSOLE NODBSIGNAL      disable gdb debugger signals\n"
        /***************** 80 character line width template *************************/
 #define HLP_SET_REMOTE "*Commands SET REMOTE"
       "3Remote\n"

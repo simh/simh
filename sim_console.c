@@ -148,9 +148,6 @@ int setenv(const char *envname, const char *envval, int overwrite);
 /* Forward Declarations of Platform specific routines */
 
 static t_stat sim_os_poll_kbd (void);
-#if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
-static t_bool sim_os_poll_kbd_ready (int ms_timeout);
-#endif
 static t_stat sim_os_putchar (int32 out);
 static t_stat sim_os_ttinit (void);
 static t_stat sim_os_ttrun (void);
@@ -2995,7 +2992,7 @@ if (cptr != NULL && *cptr != '\0') /* too many arguments? */
 
 fprintf(st, "%s interrupts to the debugger.\n", sim_dbg_signal ? "Delivering" : "Not delivering");
 #else
-fprintf(st, "Debugger interrupt not supported.\n");
+fprintf(st, "Debugger interrupt not supported on this platform.\n");
 #endif
 
 return SCPE_OK;
@@ -3430,29 +3427,6 @@ if (response = buffered_character) {
 return sim_os_poll_kbd_data ();
 }
 
-static t_bool sim_os_poll_kbd_ready (int ms_timeout)
-{
-unsigned int status, term[2];
-unsigned char buf[4];
-IOSB iosb;
-
-term[0] = 0; term[1] = 0;
-status = sys$qiow (EFN, tty_chan,
-    IO$_READLBLK | IO$M_NOECHO | IO$M_NOFILTR | IO$M_TIMED | IO$M_TRMNOECHO,
-    &iosb, 0, 0, buf, 1, (ms_timeout+999)/1000, term, 0, 0);
-if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL))
-    return FALSE;
-if (buf[0] == sim_int_char)
-    buffered_character = SCPE_STOP;
-else
-    if (sim_brk_char && (buf[0] == sim_brk_char))
-        buffered_character = SCPE_BREAK;
-    else
-        buffered_character = (buf[0] | SCPE_KFLAG);
-return TRUE;
-}
-
-
 static t_stat sim_os_putchar (int32 out)
 {
 unsigned int status;
@@ -3675,18 +3649,6 @@ if ((sim_brk_char && ((c & 0177) == sim_brk_char)) || (c & SCPE_BREAK))
 return c | SCPE_KFLAG;
 }
 
-static t_bool sim_os_poll_kbd_ready (int ms_timeout)
-{
-sim_debug (DBG_TRC, &sim_con_telnet, "sim_os_poll_kbd_ready()\n");
-if ((std_input == NULL) ||                              /* No keyboard for */
-    (std_input == INVALID_HANDLE_VALUE)) {              /* background processes */
-    Sleep (ms_timeout);
-    return FALSE;
-    }
-return (WAIT_OBJECT_0 == WaitForSingleObject (std_input, ms_timeout));
-}
-
-
 #define BELL_CHAR           7       /* Bell Character */
 #define BELL_INTERVAL_MS    500     /* No more than 2 Bell Characters Per Second */
 #define ESC_CHAR            033     /* Escape Character */
@@ -3843,8 +3805,8 @@ sim_debug (DBG_TRC, &sim_con_telnet, "sim_os_ttrun() - BSDTTY\n");
 
 if (sim_dbg_signal) {
     if (sim_dbg_int_char == 0)
-        sim_dbg_int_char = sim_int_char + 1;            /* Set a reasonable default */
-    runtchars.t_intrc = sim_dbg_int_char;               /* let debugger get SIGINT with next highest char */
+        sim_dbg_int_char = sim_int_char + 1;            /* Set a reasonable default for the DBGINT char */
+    runtchars.t_intrc = sim_dbg_int_char;               /* let debugger get SIGINT with the DBGINT char */
 
     if (!sigint_message_issued) {
         char sigint_name[8];
@@ -3916,22 +3878,6 @@ if (sim_brk_char && (buf[0] == sim_brk_char))
 if (sim_int_char && (buf[0] == sim_int_char))
     return SCPE_STOP;
 return (buf[0] | SCPE_KFLAG);
-}
-
-static t_bool sim_os_poll_kbd_ready (int ms_timeout)
-{
-fd_set readfds;
-struct timeval timeout;
-
-if (!isatty (0)) {                           /* skip if !tty */
-    sim_os_ms_sleep (ms_timeout);
-    return FALSE;
-    }
-FD_ZERO (&readfds);
-FD_SET (0, &readfds);
-timeout.tv_sec = (ms_timeout*1000)/1000000;
-timeout.tv_usec = (ms_timeout*1000)%1000000;
-return (1 == select (1, &readfds, NULL, NULL, &timeout));
 }
 
 static t_stat sim_os_putchar (int32 out)
@@ -4035,8 +3981,8 @@ runtty.c_cc[VINTR] = sim_int_char;                      /* in case changed */
 #endif
 if (sim_dbg_signal) {
     if (sim_dbg_int_char == 0)
-        sim_dbg_int_char = sim_int_char + 1;            /* Set a reasonable default */
-    runtty.c_cc[VINTR] = sim_dbg_int_char;              /* let debugger get SIGINT with next highest char */
+        sim_dbg_int_char = sim_int_char + 1;            /* Set a reasonable default for the DBGINT char */
+    runtty.c_cc[VINTR] = sim_dbg_int_char;              /* let debugger get SIGINT with the DBGINT char */
 
     if (!sigint_message_issued) {
         char sigint_name[8];
@@ -4099,22 +4045,6 @@ if (sim_brk_char && (buf[0] == sim_brk_char))
 if (sim_int_char && (buf[0] == sim_int_char))
     return SCPE_STOP;
 return (buf[0] | SCPE_KFLAG);
-}
-
-static t_bool sim_os_poll_kbd_ready (int ms_timeout)
-{
-fd_set readfds;
-struct timeval timeout;
-
-if (!sim_ttisatty()) {                      /* skip if !tty */
-    sim_os_ms_sleep (ms_timeout);
-    return FALSE;
-    }
-FD_ZERO (&readfds);
-FD_SET (0, &readfds);
-timeout.tv_sec = (ms_timeout*1000)/1000000;
-timeout.tv_usec = (ms_timeout*1000)%1000000;
-return (1 == select (1, &readfds, NULL, NULL, &timeout));
 }
 
 static t_stat sim_os_putchar (int32 out)
