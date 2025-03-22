@@ -359,7 +359,8 @@ static volatile t_uint64 sim_asynch_event_count = 0;
 static t_uint64 sim_processed_event_count = 0;
 /* Asynch I/O support */
 #if defined (SIM_ASYNCH_IO)
-pthread_mutex_t sim_asynch_lock = PTHREAD_MUTEX_INITIALIZER;
+/* sim_async_lock is initialized in AIO_INIT as a recursive lock */
+pthread_mutex_t sim_asynch_lock;
 pthread_cond_t sim_asynch_wake = PTHREAD_COND_INITIALIZER;
 
 pthread_mutex_t sim_timer_lock     = PTHREAD_MUTEX_INITIALIZER;
@@ -14635,6 +14636,7 @@ _sim_debug_write_flush ("", 0, TRUE);
 
 if (sim_deb == sim_log) {                               /* debug is log */
     fflush (sim_deb);                                   /* fflush is the best we can do */
+    AIO_UNLOCK;
     return SCPE_OK;
     }
 

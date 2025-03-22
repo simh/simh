@@ -209,6 +209,27 @@ extern int32 sim_asynch_inst_latency;
 /* It is primarily used only used in debugging messages */
 #define AIO_TLS
 #endif
+#define AIO_INIT                                                  \
+    do {                                                          \
+      pthread_mutexattr_t attr;                                   \
+                                                                  \
+      pthread_mutexattr_init (&attr);                             \
+      pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);  \
+      pthread_mutex_init (&sim_asynch_lock, &attr);               \
+      pthread_mutexattr_destroy (&attr);                          \
+      sim_asynch_main_threadid = pthread_self();                  \
+      /* Empty list/list end uses the point value (void *)1.      \
+         This allows NULL in an entry's a_next pointer to         \
+         indicate that the entry is not currently in any list */  \
+      sim_asynch_queue = QUEUE_LIST_END;                          \
+      } while (0)
+#define AIO_CLEANUP                                               \
+    do {                                                          \
+      pthread_mutex_destroy(&sim_asynch_lock);                    \
+      pthread_cond_destroy(&sim_asynch_wake);                     \
+      pthread_mutex_destroy(&sim_timer_lock);                     \
+      pthread_cond_destroy(&sim_timer_wake);                      \
+      } while (0)
 #define AIO_QUEUE_CHECK(que, lock)                              \
     do {                                                        \
         UNIT *_cptr;                                            \
@@ -248,21 +269,6 @@ extern int32 sim_asynch_inst_latency;
 /* sim_asynch_queue.  This implementation is a completely lock free design  */
 /* which avoids the potential ABA issues.                                   */
 #define AIO_QUEUE_MODE "Lock free asynchronous event queue"
-#define AIO_INIT                                                  \
-    do {                                                          \
-      sim_asynch_main_threadid = pthread_self();                  \
-      /* Empty list/list end uses the point value (void *)1.      \
-         This allows NULL in an entry's a_next pointer to         \
-         indicate that the entry is not currently in any list */  \
-      sim_asynch_queue = QUEUE_LIST_END;                          \
-      } while (0)
-#define AIO_CLEANUP                                               \
-    do {                                                          \
-      pthread_mutex_destroy(&sim_asynch_lock);                    \
-      pthread_cond_destroy(&sim_asynch_wake);                     \
-      pthread_mutex_destroy(&sim_timer_lock);                     \
-      pthread_cond_destroy(&sim_timer_wake);                      \
-      } while (0)
 #ifdef _WIN32
 #elif defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4) || defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_8)
 #define InterlockedCompareExchangePointerAcquire(Destination, Exchange, Comparand) __sync_val_compare_and_swap(Destination, Comparand, Exchange)
@@ -292,27 +298,6 @@ extern int32 sim_asynch_inst_latency;
 /* head sim_asynch_queue.  It will always work, but may be slower than the  */
 /* lock free approach when using USE_AIO_INTRINSICS                         */
 #define AIO_QUEUE_MODE "Lock based asynchronous event queue"
-#define AIO_INIT                                                  \
-    do {                                                          \
-      pthread_mutexattr_t attr;                                   \
-                                                                  \
-      pthread_mutexattr_init (&attr);                             \
-      pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);  \
-      pthread_mutex_init (&sim_asynch_lock, &attr);               \
-      pthread_mutexattr_destroy (&attr);                          \
-      sim_asynch_main_threadid = pthread_self();                  \
-      /* Empty list/list end uses the point value (void *)1.      \
-         This allows NULL in an entry's a_next pointer to         \
-         indicate that the entry is not currently in any list */  \
-      sim_asynch_queue = QUEUE_LIST_END;                          \
-      } while (0)
-#define AIO_CLEANUP                                               \
-    do {                                                          \
-      pthread_mutex_destroy(&sim_asynch_lock);                    \
-      pthread_cond_destroy(&sim_asynch_wake);                     \
-      pthread_mutex_destroy(&sim_timer_lock);                     \
-      pthread_cond_destroy(&sim_timer_wake);                      \
-      } while (0)
 #define AIO_ILOCK AIO_LOCK
 #define AIO_IUNLOCK AIO_UNLOCK
 #define AIO_QUEUE_VAL sim_asynch_queue
