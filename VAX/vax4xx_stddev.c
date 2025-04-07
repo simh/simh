@@ -128,8 +128,8 @@ DEVICE nvr_dev = {
    or_reg      OR register list
 */
 
-#define OR_ROM      up7         /* unit member holding the pointer to the ROM data */
-#define OR_DEVICE   up8         /* unit member holding the pointer to DEVICE the ROM operates */
+#define OR_ROM      up7         /* UNIT member holding the pointer to the ROM data */
+#define OR_DEVICE   up8         /* UNIT member holding the pointer to DEVICE the ROM operates */
 
 UNIT or_unit[] = {
     { UDATA (NULL, UNIT_FIX+UNIT_RO+UNIT_BINK, 0) },
@@ -482,7 +482,7 @@ UNIT *uptr = &or_unit[index];
 
 if (size > ORSIZE)
     return sim_messagef (SCPE_IERR, "%s: %s device ROM size of %u exceeds available address slot size %u\n", 
-                                    sim_uname(uptr), sim_dname (dptr), size, ORSIZE);
+                                    sim_uname(uptr), sim_dname (dptr), (uint32)size, (uint32)ORSIZE);
 uptr->OR_ROM = (void *)rom;
 uptr->OR_DEVICE = (void *)dptr;
 uptr->capac = size;
