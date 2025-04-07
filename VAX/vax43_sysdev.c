@@ -108,7 +108,7 @@ int32 con_halt (int32 code, int32 cc);
 int32 tmr_tir_rd (void);
 void tmr_sched ();
 
-extern t_stat or_map (uint32 index, uint8 *rom, t_addr size);
+extern t_stat or_map (DEVICE *dptr, uint32 index, uint8 *rom, t_addr size);
 extern t_stat or_unmap (uint32 index);
 extern void rom_wr_B (int32 pa, int32 val);
 extern int32 iccs_rd (void);
@@ -993,7 +993,7 @@ for (i = 0; (cdptr = sim_devices[i]) != NULL; i++) {    /* loop over all devices
         continue;
 
     if (cdibp->rom_array != NULL)                       /* device has an option ROM? */
-        or_map (cdibp->rom_index, cdibp->rom_array, cdibp->rom_size);
+        or_map (cdptr, cdibp->rom_index, cdibp->rom_array, cdibp->rom_size);
     }
 return SCPE_OK;
 }

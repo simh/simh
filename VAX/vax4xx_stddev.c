@@ -61,6 +61,7 @@ t_stat nvr_attach (UNIT *uptr, CONST char *cptr);
 t_stat nvr_detach (UNIT *uptr);
 const char *nvr_description (DEVICE *dptr);
 t_stat or_reset (DEVICE *dptr);
+t_stat or_show (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
 t_stat or_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 const char *or_description (DEVICE *dptr);
 t_stat clk_svc (UNIT *uptr);
@@ -127,19 +128,28 @@ DEVICE nvr_dev = {
    or_reg      OR register list
 */
 
+#define OR_ROM      up7         /* unit member holding the pointer to the ROM data */
+#define OR_DEVICE   up8         /* unit member holding the pointer to DEVICE the ROM operates */
+
 UNIT or_unit[] = {
-    { UDATA (NULL, UNIT_FIX+UNIT_RO+UNIT_BINK, ORSIZE) },
-    { UDATA (NULL, UNIT_FIX+UNIT_RO+UNIT_BINK, ORSIZE) },
-    { UDATA (NULL, UNIT_FIX+UNIT_RO+UNIT_BINK, ORSIZE) },
-    { UDATA (NULL, UNIT_FIX+UNIT_RO+UNIT_BINK, ORSIZE) }
+    { UDATA (NULL, UNIT_FIX+UNIT_RO+UNIT_BINK, 0) },
+    { UDATA (NULL, UNIT_FIX+UNIT_RO+UNIT_BINK, 0) },
+    { UDATA (NULL, UNIT_FIX+UNIT_RO+UNIT_BINK, 0) },
+    { UDATA (NULL, UNIT_FIX+UNIT_RO+UNIT_BINK, 0) }
     };
 
 REG or_reg[] = {
     { NULL }
     };
 
+MTAB or_mod[] = {
+    { MTAB_XTD|MTAB_VUN,          1, "DEVICE", NULL ,
+        NULL, &or_show, NULL, "Option ROM device" },
+    { 0 }
+    };
+
 DEVICE or_dev = {
-    "OR", or_unit, or_reg, NULL,
+    "OR", or_unit, or_reg, or_mod,
     OR_COUNT, 16, ORAWIDTH, 4, 16, 32,
     NULL, NULL, &or_reset,
     NULL, NULL, NULL,
@@ -412,11 +422,11 @@ int32 or_rd (int32 pa)
 uint32 off = (pa - ORBASE);                             /* offset from start of option roms */
 uint32 rn = ((off >> 18) & 0x3);                        /* rom number (0 - 3) */
 UNIT *uptr = &or_dev.units[rn];                         /* get unit */
-uint8 *opr = (uint8*) uptr->filebuf;
+uint8 *opr = (uint8*) uptr->OR_ROM;
 int32 data = 0;
 uint32 rg;
 
-if ((uptr->flags & UNIT_ATT) && (opr != NULL)) {
+if (opr != NULL) {
     switch (opr[0]) {                                    /* number of ROM chips */
         case 1:
             rg = (off >> 2) & (uptr->capac - 1);
@@ -447,6 +457,15 @@ t_stat or_reset (DEVICE *dptr)
 return SCPE_OK;
 }
 
+t_stat or_show (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
+{
+if (uptr->OR_ROM)
+    fprintf(st, "ROM for %s device", sim_dname((DEVICE *)uptr->OR_DEVICE));
+else
+    fprintf(st, "No Option Enabled");
+return SCPE_OK;
+}
+
 t_stat or_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "Option ROMs (OR)\n\n");
@@ -457,21 +476,25 @@ fprintf (st, "which option boards are present.\n");
 return SCPE_OK;
 }
 
-t_stat or_map (uint32 index, uint8 *rom, t_addr size)
+t_stat or_map (DEVICE *dptr, uint32 index, uint8 *rom, t_addr size)
 {
 UNIT *uptr = &or_unit[index];
-uptr->filebuf = (void *)rom;
+
+if (size > ORSIZE)
+    return sim_messagef (SCPE_IERR, "%s: %s device ROM size of %u exceeds available address slot size %u\n", 
+                                    sim_uname(uptr), sim_dname (dptr), size, ORSIZE);
+uptr->OR_ROM = (void *)rom;
+uptr->OR_DEVICE = (void *)dptr;
 uptr->capac = size;
-uptr->flags |= UNIT_ATT;
 return SCPE_OK;
 }
 
 t_stat or_unmap (uint32 index)
 {
 UNIT *uptr = &or_unit[index];
-uptr->filebuf = NULL;
+uptr->OR_ROM = NULL;
+uptr->OR_DEVICE = NULL;
 uptr->capac = 0;
-uptr->flags &= ~UNIT_ATT;
 return SCPE_OK;
 }
 
