@@ -27,9 +27,10 @@ Copyright (c) 2005-2012, William Beech
 #include <ctype.h>
 #include "sim_defs.h"                   // simulator defs
 
-/* Rename of global PC variable to avoid namespace conflicts on some platforms */
+/* Rename of global PC and SP variables to avoid namespace conflicts on some platforms */
 
 #define PC PC_Global
+#define SP SP_Global
 
 //#define DONT_USE_INTERNAL_ROM 1
 

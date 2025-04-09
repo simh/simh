@@ -180,10 +180,10 @@ typedef struct {
 /* storage for the rest of the registers */
 uint32 PSW = 0;                         /* program status word */
 uint32 A = 0;                           /* accumulator */
-uint32 BC = 0;                          /* BC register pair */
+static uint32 BC = 0;                   /* BC register pair */
 uint32 DE = 0;                          /* DE register pair */
 uint32 HL = 0;                          /* HL register pair */
-uint32 SP = 0;                          /* Stack pointer */
+static uint32 SP = 0;                   /* Stack pointer */
 uint32 saved_PC = 0;                    /* program counter */
 uint32 IM = 0;                          /* Interrupt Mask Register */
 uint8  xack = 0;                        /* XACK signal */
@@ -191,7 +191,7 @@ uint32 int_req = 0;                     /* Interrupt request */
 uint8 INTA = 0;                         // interrupt acknowledge
 uint16 PCX;                             /* External view of PC */
 uint16 PCY;                             /* Internal view of PC */
-uint16 PC;
+static uint16 PC;
 UNIT *uptr;
 uint16 port;                            //port used in any IN/OUT
 uint16 addr;                            //addr used for operand fetch

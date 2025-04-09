@@ -40,3 +40,6 @@
 #define STOP_IBKPT      3                                /* breakpoint */
 #define STOP_OPCODE     4
 
+/* Rename of global BC and SP variables to avoid namespace conflicts on some platforms */
+#define BC BC_Global
+#define SP SP_Global

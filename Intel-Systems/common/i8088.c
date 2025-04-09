@@ -71,7 +71,8 @@ uint32 temp1, temp2, temp3, temp4, temp5, temp32, tempaddr32, EA;
 int32    result;
 uint64 totalexec;
 
-int32 AX, BX, CX, DX, DI, SI, BP, SP, CS, DS, SS, ES, PSW, PCX, SGX, DISP, DATA8, DATA16;
+int32 AX, BX, CX, DX, DI, SI, BP, CS, DS, SS, ES, PSW, PCX, SGX, DISP, DATA8, DATA16;
+static int32 SP;
 
 //extern uint16    VGA_SC[0x100], VGA_CRTC[0x100], VGA_ATTR[0x100], VGA_GC[0x100];
 //extern uint8 updatedscreen;
