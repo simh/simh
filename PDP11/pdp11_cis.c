@@ -470,11 +470,11 @@ switch (op) {                                           /* case on opcode */
 
 /* MOVRC, MOVRCI
 
-   Operands (MOVC, MOVTC):
+   Operands (MOVRC):
         R0, R1          =       source string descriptor
         R2, R3          =       dest string descriptor
         R4<7:0>         =       fill character
-   Operands (MOVCI, MOVTCI):
+   Operands (MOVRCI):
         A1LNT, A1ADR    =       source string descriptor
         A2LNT, A2ADR    =       dest string descriptor
         A3LNT<7:0>      =       fill character
@@ -754,8 +754,8 @@ switch (op) {                                           /* case on opcode */
         R0, R1          =       source string descriptor
         R2, R3          =       substring descriptor
    Operands (MATCI):
-        A1LNT, A1ADR    =       source1 string descriptor
-        A2LNT, A2ADR    =       source2 string descriptor
+        A1LNT, A1ADR    =       source string descriptor
+        A2LNT, A2ADR    =       substring string descriptor
 
    Condition codes:
         NZ              =       set from R0
@@ -818,7 +818,11 @@ switch (op) {                                           /* case on opcode */
 
 /* ADDN, SUBN, ADDP, SUBP, ADDNI, SUBNI, ADDPI, SUBPI
 
-   Operands:
+   Operands (ADDN, SUBN, ADDP, SUBP):
+        R0, R1          =       source1 string descriptor
+        R2, R3          =       source2 string descriptor
+        R4, R5          =       destination string descriptor
+   Operands (ADDNI, SUBNI, ADDPI, SUBPI):
         A1LNT, A1ADR    =       source1 string descriptor
         A2LNT, A2ADR    =       source2 string descriptor
         A3LNT, A3ADR    =       destination string descriptor
@@ -860,7 +864,11 @@ switch (op) {                                           /* case on opcode */
 
 /* MULP, MULPI
 
-   Operands:
+   Operands (MULP):
+        R0, R1          =       source1 string descriptor
+        R2, R3          =       source2 string descriptor
+        R4, R5          =       destination string descriptor
+   Operands (MULPI):
         A1LNT, A1ADR    =       source1 string descriptor
         A2LNT, A2ADR    =       source2 string descriptor
         A3LNT, A3ADR    =       destination string descriptor
@@ -898,7 +906,11 @@ switch (op) {                                           /* case on opcode */
 
 /* DIVP, DIVPI
 
-   Operands:
+   Operands (DIVP):
+        R0, R1          =       divisor string descriptor
+        R2, R3          =       dividend string descriptor
+        R4, R5          =       destination string descriptor
+   Operands (DIVPI):
         A1LNT, A1ADR    =       divisor string descriptor
         A2LNT, A2ADR    =       dividend string descriptor
         A3LNT, A3ADR    =       destination string descriptor
@@ -948,7 +960,10 @@ switch (op) {                                           /* case on opcode */
 
 /* CMPN, CMPP, CMPNI, CMPPI
 
-   Operands:
+   Operands (CMPN, CMPP):
+        R0, R1          =       source1 string descriptor
+        R2, R3          =       source2 string descriptor
+   Operands (CMPNI, CMPPI):
         A1LNT, A1ADR    =       source1 string descriptor
         A2LNT, A2ADR    =       source2 string descriptor
 
@@ -979,7 +994,12 @@ switch (op) {                                           /* case on opcode */
 
 /* ASHN, ASHP, ASHNI, ASHPI
 
-   Operands:
+   Operands (ASHN, ASHP):
+        R0, R1          =       source string descriptor
+        R2, R3          =       destination string descriptor
+        R4<11:8>        =       rounding digit
+        R4<7:0>         =       shift count
+   Operands (ASHNI, ASHPI):
         A1LNT, A1ADR    =       source string descriptor
         A2LNT, A2ADR    =       destination string descriptor
         A3LNT<11:8>     =       rounding digit
@@ -1019,7 +1039,10 @@ switch (op) {                                           /* case on opcode */
 
 /* CVTPN, CVTPNI
 
-   Operands:
+   Operands (CVTPN):
+        R0, R1          =       source string descriptor
+        R2, R3          =       destination string descriptor
+   Operands (CVTPNI):
         A1LNT, A1ADR    =       source string descriptor
         A2LNT, A2ADR    =       destination string descriptor
 
@@ -1041,7 +1064,10 @@ switch (op) {                                           /* case on opcode */
 
 /* CVTNP, CVTNPI
 
-   Operands:
+   Operands (CVTNP):
+        R0, R1          =       source string descriptor
+        R2, R3          =       destination string descriptor
+   Operands (CVTNPI):
         A1LNT, A1ADR    =       source string descriptor
         A2LNT, A2ADR    =       destination string descriptor
 
@@ -1063,9 +1089,11 @@ switch (op) {                                           /* case on opcode */
 
 /* CVTNL, CVTPL, CVTNLI, CVTPLI
 
-   Operands:
+   Operands (CVTNL, CVTPL):
+        R0, R1          =       source string descriptor
+   Operands (CVTNLI, CVTPLI):
         A1LNT, A1ADR    =       source string descriptor
-        A2LNT           =       destination address (inline only)
+        A2LNT           =       destination address
 
    Condition codes:
         NZV             =       set from result
@@ -1109,10 +1137,12 @@ switch (op) {                                           /* case on opcode */
 
 /* CVTLN, CVTLP, CVTLNI, CVTLPI
 
-   Operands:
+   Operands (CVTLN, CVTLP):
+        R0, R1          =       destination string descriptor
+        R2:R3           =       source long - EIS format
+   Operands (CVTLNI, CVTLPI):
         A1LNT, A1ADR    =       destination string descriptor
-        A2LNT, A2ADR    =       source long (CVTLNI, CVTLPI) - VAX format
-        R2:R3           =       source long (CVTLN, CVTLP) - EIS format
+        A2LNT, A2ADR    =       source long - VAX format
 
    Condition codes:
         NZV             =       set from result
