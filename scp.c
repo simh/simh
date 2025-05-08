@@ -3368,7 +3368,7 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
         sim_cptr_is_action[sim_do_depth] = FALSE;
         }
     if (cptr == NULL) {                                 /* EOF? or SIGINT? */
-        if (sim_ttisatty()) {
+        if (sim_ttisatty() && (!sigterm_received)) {
             printf ("\n");
             continue;                                   /* ignore tty EOF */
             }
@@ -10238,7 +10238,11 @@ else
 void int_handler (int sig)
 {
 stop_cpu = TRUE;
-if (sig == SIGTERM)
+if ((sig == SIGTERM)
+#ifdef SIGHUP
+    || (sig == SIGHUP)
+#endif
+   )
     sigterm_received = TRUE;
 sim_interval = 0;               /* Minimize when stop_cpu gets noticed */
 }
