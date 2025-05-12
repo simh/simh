@@ -316,6 +316,8 @@ static int SDL_SavePNG_RW(SDL_Surface *surface, SDL_RWops *dst, int freedst)
     if (freedst) SDL_RWclose(dst);
     return (SUCCESS);
 }
+#else /* !defined(HAVE_LIBPNG) */
+#define SDL_SavePNG(surface, file) 0 /* Dummy Placeholder */
 #endif /* defined(HAVE_LIBPNG) */
 
 /*
@@ -2332,9 +2334,9 @@ if (1) {
             *p->entry_pointer = dlsym(hPNGLib, p->entry_name);
         }
     }
+sim_libpng_available = (*libpng_entries->entry_pointer != NULL);
 #endif /* defined(SIM_DLOPEN_EXTENSION) && defined(HAVE_LIBPNG) */
 
-sim_libpng_available = (*libpng_entries->entry_pointer != NULL);
 SDL_GetVersion(&running);
 
 SDL_VERSION(&compiled);
