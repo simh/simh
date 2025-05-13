@@ -261,7 +261,8 @@ find_exe = $(abspath $(strip $(firstword $(foreach dir,$(strip $(subst :, ,${PAT
 find_lib = $(firstword $(abspath $(strip $(firstword $(foreach dir,$(strip ${LIBPATH}),$(foreach ext,$(strip ${LIBEXT}),$(wildcard $(dir)/lib$(1).$(ext))))))))
 find_include = $(abspath $(strip $(firstword $(foreach dir,$(strip ${INCPATH}),$(wildcard $(dir)/$(1).h)))))
 ifeq (Darwin,$(OSTYPE))
-  ifeq (/usr/local/bin/brew,$(call find_exe,brew))
+  eq = $(if $(or $(1),$(2)),$(and $(findstring $(1),$(2)),$(findstring $(2),$(1))),1)
+  ifneq (,$(or $(call eq,/usr/local/bin/brew,$(call find_exe,brew)),$(call eq,/opt/homebrew/bin/brew,$(call find_exe,brew))))
     PKG_MGR = HOMEBREW
     PKG_CMD = brew install
   else
@@ -366,7 +367,8 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
   else
     export TEST = test
   endif
-  override AUTO_INSTALL_PACKAGES:=$(and $(AUTO_INSTALL_PACKAGES),$(or $(findstring HOMEBREW,$(PKG_MGR)),$(shell if $(TEST) -r /dev/mem; then echo running_as_root; fi)))
+  RUNNING_AS_ROOT:=$(if $(findstring Darwin,$(OSTYPE)),$(shell if [ `id -u` == '0' ]; then echo running_as_root; fi),$(shell if $(TEST) -r /dev/mem; then echo running_as_root; fi))
+  override AUTO_INSTALL_PACKAGES:=$(and $(AUTO_INSTALL_PACKAGES),$(or $(findstring HOMEBREW,$(PKG_MGR)),$(RUNNING_AS_ROOT)))
   ifeq (${GCC},)
     ifeq (,$(call find_exe,gcc))
       ifneq (clang,$(findstring clang,$(and $(call find_exe,cc),$(shell cc -v /dev/null 2>&1 | grep 'clang'))))
