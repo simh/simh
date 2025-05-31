@@ -286,6 +286,11 @@ ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,yum)))
   PKG_MGR = YUM
   PKG_CMD = yum install
 endif
+ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,apk)))
+  PKG_MGR = APK
+  PKG_CMD = apk add
+  PKG_NO_SUDO = YES
+endif
 ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,dnf)))
   PKG_MGR = DNF
   ifneq (,$(shell dnf repolist | grep crb))
@@ -325,18 +330,20 @@ DPKG_PNG       = 7
 DPKG_ZLIB      = 8
 DPKG_SDL_TTF   = 9
 DPKG_GMAKE     = 10
+DPKG_CURL      = 11
 ifneq (3,${SIM_MAJOR})
-  # Platform Pkg Names  COMPILER PCAP          VDE            PCRE         EDITLINE      SDL             PNG            ZLIB       SDL_TTF           GMAKE CURL
-  PKGS_SRC_HOMEBREW   = -        -             vde            pcre         libedit       sdl2          libpng         zlib       sdl2_ttf          make  -
-  PKGS_SRC_MACPORTS   = -        -             vde2           pcre         libedit       libsdl2       libpng         zlib       libsdl2_ttf       gmake -
-  PKGS_SRC_APT        = gcc      libpcap-dev   libvdeplug-dev libpcre3-dev libedit-dev   libsdl2-dev   libpng-dev     -          libsdl2-ttf-dev   -     curl
-  PKGS_SRC_YUM        = gcc      libpcap-devel -              pcre-devel   libedit-devel SDL2-devel    libpng-devel   zlib-devel SDL2_ttf-devel    -     -
-  PKGS_SRC_DNF        = gcc      libpcap-devel -              pcre-devel   libedit-devel SDL2-devel    libpng-devel   zlib-devel SDL2_ttf-devel    -     -
-  PKGS_SRC_ZYPPER     = gcc      libpcap-devel -              pcre-devel   libedit-devel libSDL2-devel libpng16-devel zlib-devel libSDL2_ttf-devel make  -
-  PKGS_SRC_PKGSRC     = -        -             -              pcre         editline      SDL2          png            zlib       SDL2_ttf          gmake -
-  PKGS_SRC_PKGBSD     = -        -             -              pcre         libedit       sdl2          png            -          sdl2_ttf          gmake -
-  PKGS_SRC_PKGADD     = -        -             -              pcre         -             sdl2          png            -          sdl2-ttf          gmake -
-  PKGS_SRC_TERMUX     = clang    libpcap       -              pcre         -             -             -              -          -                 -     curl
+  # Platform Pkg Names  COMPILER PCAP          VDE            PCRE         EDITLINE      SDL               PNG            ZLIB       SDL_TTF           GMAKE CURL
+  PKGS_SRC_HOMEBREW   = -        -             vde            pcre         libedit       sdl2              libpng         zlib       sdl2_ttf          make  -
+  PKGS_SRC_MACPORTS   = -        -             vde2           pcre         libedit       libsdl2           libpng         zlib       libsdl2_ttf       gmake -
+  PKGS_SRC_APT        = gcc      libpcap-dev   libvdeplug-dev libpcre3-dev libedit-dev   libsdl2-dev       libpng-dev     -          libsdl2-ttf-dev   -     curl
+  PKGS_SRC_YUM        = gcc      libpcap-devel -              pcre-devel   libedit-devel SDL2-devel        libpng-devel   zlib-devel SDL2_ttf-devel    -     -
+  PKGS_SRC_DNF        = gcc      libpcap-devel -              pcre-devel   libedit-devel SDL2-devel        libpng-devel   zlib-devel SDL2_ttf-devel    -     -
+  PKGS_SRC_ZYPPER     = gcc      libpcap-devel -              pcre-devel   libedit-devel libSDL2-devel     libpng16-devel zlib-devel libSDL2_ttf-devel make  -
+  PKGS_SRC_APK        = clang    libpcap-devel -              -            libedit-devel sdl2-compat-devel libpng-devel   -          sdl2_ttf-devel    gmake curl
+  PKGS_SRC_PKGSRC     = -        -             -              pcre         editline      SDL2              png            zlib       SDL2_ttf          gmake -
+  PKGS_SRC_PKGBSD     = -        -             -              pcre         libedit       sdl2              png            -          sdl2_ttf          gmake -
+  PKGS_SRC_PKGADD     = -        -             -              pcre         -             sdl2              png            -          sdl2-ttf          gmake -
+  PKGS_SRC_TERMUX     = clang    libpcap       -              pcre         -             -                 -              -          -                 -     curl
   ifneq (0,$(TESTS))
     ifneq (,${TEST_ARG})
       export TEST_ARG
@@ -374,9 +381,9 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
       ifneq (clang,$(findstring clang,$(and $(call find_exe,cc),$(shell cc -v /dev/null 2>&1 | grep 'clang'))))
         $(info *** Warning *** Using local cc since gcc isn't available locally.)
         $(info *** Warning *** You may need to install gcc to build working simulators.)
+        NEEDED_PKGS += DPKG_COMPILER
       endif
       GCC = cc
-      NEEDED_PKGS += DPKG_COMPILER
     else
       GCC = gcc
     endif
@@ -687,6 +694,9 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
         endif
       endif
     endif
+    ifeq (,$(and $(findstring -D_LARGEFILE64_SOURCE,$(OS_CCDEFS)),$(shell grep _LARGEFILE64_SOURCE $(call find_include,pthread))))
+      OS_CCDEFS += -D_LARGEFILE64_SOURCE
+    endif
     ifeq (,$(LIBSOEXT))
       LIBSOEXT = $(LIBEXT)
     endif
@@ -786,6 +796,14 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
   endif
   ifneq (,$(and $(findstring 3.,$(GNUMakeVERSION)),$(BUILD_SEPARATE)))
     NEEDED_PKGS += DPKG_GMAKE
+  endif
+  ifeq (,$(call find_exe,curl))
+    $(info *** Info ***)
+    $(info *** Info *** The SCP curl command needs the curl package installed.)
+    $(info *** Info *** Normal simulator execution doesn't require curl, but user)
+    $(info *** Info *** scripts may want it available.)
+    $(info *** Info ***)
+    OPTIONAL_PKGS += DPKG_CURL
   endif
   # Find available ncurses library.
   ifneq (,$(call find_include,ncurses))
@@ -1391,15 +1409,16 @@ ifeq (clean,$(strip ${MAKECMDGOALS}))
   NEEDED_PKGS =
 endif
 USEFUL_PACKAGES = $(filter-out -,$(foreach word,$(NEEDED_PKGS),$(word $($(word)),$(PKGS_SRC_$(strip $(PKG_MGR))))))
-USEFUL_PLURAL =  $(if $(word 2,$(USEFUL_PACKAGES)),s,)
-USEFUL_MULTIPLE_HIST = $(if $(word 2,$(USEFUL_PACKAGES)),were,was)
-USEFUL_MULTIPLE = $(if $(word 2,$(USEFUL_PACKAGES)),these,this)
+OPTIONAL_PACKAGES = $(filter-out -,$(foreach word,$(OPTIONAL_PKGS),$(word $($(word)),$(PKGS_SRC_$(strip $(PKG_MGR))))))
+USEFUL_PLURAL =  $(if $(word 2,$(USEFUL_PACKAGES) $(OPTIONAL_PACKAGES)),s,)
+USEFUL_MULTIPLE_HIST = $(if $(word 2,$(USEFUL_PACKAGES) $(OPTIONAL_PACKAGES)),were,was)
+USEFUL_MULTIPLE = $(if $(word 2,$(USEFUL_PACKAGES) $(OPTIONAL_PACKAGES)),these,this)
 ifneq (,$(USEFUL_PACKAGES))
   $(info )
   $(info *** Info ***)
   $(info *** Info *** The simulator$(BUILD_MULTIPLE) you are building could provide more)
   $(info *** Info *** functionality if the:)
-  $(info *** Info ***     $(USEFUL_PACKAGES))
+  $(info *** Info ***     $(USEFUL_PACKAGES) $(OPTIONAL_PACKAGES))
   $(info *** Info *** package$(USEFUL_PLURAL) $(USEFUL_MULTIPLE_HIST) available on your system.)
   $(info )
   ifeq (,$(AUTO_INSTALL_PACKAGES))
@@ -1422,7 +1441,7 @@ ifneq (,$(and $(AUTO_INSTALL_PACKAGES),$(PKG_CMD),$(USEFUL_PACKAGES)))
     $(info Do you want to install $(USEFUL_MULTIPLE) package$(USEFUL_PLURAL) before building $(MAKECMDGOALS_DESCRIPTION)?)
   endif
   ifeq (,$(if $(AUTO_INSTALL_PACKAGES),,$(shell $(SHELL) -c 'read -p "[Enter Y or N, Default is Y] " answer; echo $$answer' | grep -i n)))
-    INSTALLER_RESULT = $(shell $(PKG_CMD) $(USEFUL_PACKAGES) 1>&2)
+    INSTALLER_RESULT = $(shell $(PKG_CMD) $(USEFUL_PACKAGES) $(OPTIONAL_PACKAGES) 1>&2)
     $(info $(INSTALLER_RESULT))
     $(info *** rerunning this make to perform your desired build...)
     MAKE_RESULT = $(shell $(MAKE) $(MAKECMDGOALS) $(EXTRAS) 1>&2)
@@ -1446,7 +1465,7 @@ else
     endif
     ifeq (Y,$(ANSWER))
       ifeq (,$(PKG_NO_SUDO))
-        $(info Enter:    $$ sudo $(PKG_CMD) $(USEFUL_PACKAGES))
+        $(info Enter:    $$ sudo $(PKG_CMD) $(USEFUL_PACKAGES) $(OPTIONAL_PACKAGES))
         $(info when that completes)
         $(info re-enter: $$ $(MAKE) $(MAKECMDGOALS) $(EXTRAS))
         $(error )
@@ -1454,7 +1473,7 @@ else
         hash := \#
         $(info Enter:    $$ su)
         $(info Enter:    Password: <type-root-password>)
-        $(info Enter:    $(hash) $(PKG_CMD) $(USEFUL_PACKAGES))
+        $(info Enter:    $(hash) $(PKG_CMD) $(USEFUL_PACKAGES) $(OPTIONAL_PACKAGES))
         $(info when that completes)
         $(info Enter:    $(hash) exit)
         $(info re-enter: $$ $(MAKE) $(MAKECMDGOALS) $(EXTRAS))
