@@ -156,7 +156,7 @@ sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
   if (sim_switches & SWMASK ('T'))
     ;
   if (sim_switches & SWMASK ('S'))
-    ;
+    return load_stty (fileref);
   if (sim_switches & SWMASK ('M'))
     ;
   if (sim_switches & SWMASK ('P'))
