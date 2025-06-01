@@ -74,7 +74,7 @@ on_success:
   - git config --global user.email "mark@infocomm.com"
   - git config --global user.name "Mark Pizzolato"
   - git config --global core.autocrlf false
-# Linux & macOS use the shell to address this, Windows uses cmd. Poweshell on Windows doesn't like git output to stderr
+# Linux & macOS use the shell to address this, Windows uses cmd. Powershell on Windows doesn't like git output to stderr
   - sh: |
         if test -d ../Development-Binaries
         then
@@ -115,7 +115,7 @@ on_success:
         # repository if the current build for this platform is one week or more 
         # from the last saved build for this platform in the repository
         if (((Get-Date -UFormat %s) -gt $recent_saved_commit_time + $oneweek) -and 
-            ("$env:APPVEYOR_PULL_REQUEST_NUMBER" -eq "")) {
+            ("$env:APPVEYOR_PULL_REQUEST_NUMBER" -eq "") -and 0) {
           ("$platform Build") | Out-File -FilePath ../Save-Build-Results
         }
         Write-Output "Building repo '$env:APPVEYOR_REPO_NAME' branch: $env:APPVEYOR_REPO_BRANCH"
