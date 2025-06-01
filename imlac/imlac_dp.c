@@ -29,6 +29,9 @@
 /* Debug */
 #define DBG             0001
 
+/* Alpha display processor */
+#define DP_ALPHA        0001
+
 static t_addr DPC;
 static t_addr DT[8];
 static uint16 SP = 0;
@@ -77,13 +80,21 @@ static REG dp_reg[] = {
   { NULL }
 };
 
+static MTAB dp_mod[] = {
+  { DP_ALPHA, DP_ALPHA, "Alpha machine", "ALPHA",
+    NULL, NULL, NULL, "Enables Alpha display processor" },
+  { DP_ALPHA, 0,        "Graphics machine", "ALPHA",
+    NULL, NULL, NULL, "Disables Alpha display processor" },
+  { 0 }
+};
+
 static DEBTAB dp_deb[] = {
   { "DBG", DBG },
   { NULL, 0 }
 };
 
 DEVICE dp_dev = {
-  "DP", &dp_unit, dp_reg, NULL,
+  "DP", &dp_unit, dp_reg, dp_mod,
   1, 8, 16, 1, 8, 16,
   NULL, NULL, dp_reset,
   NULL, NULL, NULL, &dp_imdev, DEV_DEBUG, 0, dp_deb,
@@ -168,12 +179,18 @@ dp_iot (uint16 insn, uint16 AC)
 
 static uint16 deflect (uint16 msb, uint16 lsb)
 {
-  return (msb << 5) + lsb;
+  if (dp_unit.flags & DP_ALPHA)
+    return 18*msb + lsb;
+  else
+    return (msb << 5) + lsb;
 }
 
 static void increment (uint16 *msb, uint16 *lsb, uint16 x)
 {
   *lsb += SCALE * x;
+  if (dp_unit.flags & DP_ALPHA)
+    return;
+
   *msb += *lsb >> 5;
   *lsb &= 037;
 }
@@ -181,6 +198,9 @@ static void increment (uint16 *msb, uint16 *lsb, uint16 x)
 static void decrement (uint16 *msb, uint16 *lsb, uint16 x)
 {
   *lsb -= SCALE * x;
+  if (dp_unit.flags & DP_ALPHA)
+    return;
+
   *msb += ((int16)*lsb) >> 5;
   *lsb &= 037;
 }
