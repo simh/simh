@@ -150,6 +150,74 @@ load_stty (FILE *fileref)
   }
 }
 
+static t_stat
+get_word (FILE *fileref, uint16 *x)
+{
+  int c = Fgetc (fileref);
+  if (c == EOF)
+    return SCPE_IOERR;
+  *x = c << 8;
+  c = Fgetc (fileref);
+  if (c == EOF)
+    return SCPE_IOERR;
+  *x |= c;
+  return SCPE_OK;
+}
+
+static t_stat
+load_ptr (FILE *fileref)
+{
+  int verbose = sim_switches & SWMASK ('V');
+  uint16 x, addr;
+  uint32 csum;
+  int c, i, count;
+
+  /* Discard block loader. */
+  for (c = 0; c != 2;) {
+    c = Fgetc (fileref);
+    if (c == EOF)
+      return SCPE_IOERR;
+  }
+  for (i = 0; i < 123; i++) {
+    c = Fgetc (fileref);
+    if (c == EOF)
+      return SCPE_IOERR;
+  }
+
+  for (;;) {
+    c = Fgetc (fileref);
+    if (c == EOF)
+      return SCPE_IOERR;
+    if (c == 0)
+      continue;
+    count = c;
+
+    if (get_word (fileref, &addr) != SCPE_OK)
+      return SCPE_IOERR;
+
+    /* Address all ones means done. */
+    if (addr == 0177777)
+      return SCPE_OK;
+
+    csum = 0;
+    for (i = 0; i < count; i++) {
+      if (get_word (fileref, &x) != SCPE_OK)
+        return SCPE_IOERR;
+      M[(addr++) & memmask] = x;
+      csum += x;
+      if (csum & 0200000) {
+        csum++;
+        csum &= 0177777;
+      }
+    }
+
+    if (get_word (fileref, &x) != SCPE_OK)
+      return SCPE_IOERR;
+    if (x != csum)
+      return SCPE_CSUM;
+  }
+}
+
 t_stat
 sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
@@ -160,7 +228,7 @@ sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
   if (sim_switches & SWMASK ('M'))
     ;
   if (sim_switches & SWMASK ('P'))
-    ;
+    return load_ptr (fileref);
 
   return load_stty (fileref);
 }
