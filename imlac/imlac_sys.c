@@ -223,14 +223,15 @@ sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
   if (sim_switches & SWMASK ('T'))
     ;
-  if (sim_switches & SWMASK ('S'))
+  else if (sim_switches == 0 || (sim_switches & SWMASK ('S')) != 0)
     return load_stty (fileref);
-  if (sim_switches & SWMASK ('M'))
+  else if (sim_switches & SWMASK ('M'))
     ;
-  if (sim_switches & SWMASK ('P'))
+  else if (sim_switches & SWMASK ('P'))
     return load_ptr (fileref);
-
-  return load_stty (fileref);
+  else
+    return SCPE_ARG;
+  return SCPE_OK;
 }
 
 t_bool build_dev_tab (void)
