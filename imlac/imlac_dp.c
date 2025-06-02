@@ -72,8 +72,10 @@ static REG dp_reg[] = {
   { ORDATAD (MODE, MODE, 1, "Display mode") },
   { BRDATAD (DT, DT, 8, 16, 8, "Return address stack") },
   { ORDATAD (SP, SP, 3, "Stack pointer") },
-  { ORDATAD (XMSB, XMSB, 11, "X accumulator") },
-  { ORDATAD (YMSB, YMSB, 11, "Y accumulator") },
+  { ORDATAD (XMSB, XMSB, 7, "X accumulator MSB") },
+  { ORDATAD (XLSB, XLSB, 5, "X accumulator LSB") },
+  { ORDATAD (YMSB, YMSB, 7, "Y accumulator MSB") },
+  { ORDATAD (YLSB, YLSB, 5, "Y accumulator LSB") },
   { ORDATAD (SCALE, SCALE, 3, "Scale") },
   { ORDATAD (BLOCK, BLOCK, 3, "Block") },
   { ORDATAD (MIT8K, MIT8K, 1, "MIT 8K addressing") },
@@ -84,7 +86,7 @@ static REG dp_reg[] = {
 static MTAB dp_mod[] = {
   { DP_ALPHA, DP_ALPHA, "Alpha machine", "ALPHA",
     NULL, NULL, NULL, "Enables Alpha display processor" },
-  { DP_ALPHA, 0,        "Graphics machine", "ALPHA",
+  { DP_ALPHA, 0,        "Graphics machine", "GRAPHICS",
     NULL, NULL, NULL, "Disables Alpha display processor" },
   { 0 }
 };
@@ -189,6 +191,8 @@ static uint16 deflect (uint16 msb, uint16 lsb)
 
 static void increment (uint16 *msb, uint16 *lsb, uint16 x)
 {
+  /* On an Alpha machine, the LSB doesn't carry to the MSB. */
+
   *lsb += SCALE * x;
   if (dp_unit.flags & DP_ALPHA)
     return;
@@ -199,12 +203,35 @@ static void increment (uint16 *msb, uint16 *lsb, uint16 x)
 
 static void decrement (uint16 *msb, uint16 *lsb, uint16 x)
 {
+  /* On an Alpha machine, the LSB doesn't carry to the MSB. */
+
   *lsb -= SCALE * x;
   if (dp_unit.flags & DP_ALPHA)
     return;
 
   *msb += ((int16)*lsb) >> 5;
   *lsb &= 037;
+}
+
+static int scale_or_one (void)
+{
+  /* On an Alpha machine, the MSB is incremented per the scaling
+     factor.  On a Graphics machine, it's incremented by one
+     regardless of the scaling factor. */
+
+  if (dp_unit.flags & DP_ALPHA)
+    return SCALE >> 1;
+  else
+    return 1;
+}
+
+static void load_xy_accumulator (uint16 *msb, uint16 *lsb, uint16 insn)
+{
+  if (dp_unit.flags & DP_ALPHA)
+    *msb = (insn >> 5) & 0177;
+  else
+    *msb = (insn >> 4) & 0077;
+  *lsb = (insn << 1) & 0036;
 }
 
 static t_stat
@@ -255,19 +282,19 @@ dp_opr(uint16 insn)
   }
   if (insn & 00100) { /* DDYM */
     sim_debug (DBG, &dp_dev, "DDYM ");
-    YMSB--;
+    YMSB -= scale_or_one ();
   }
   if (insn & 00200) { /* DDXM */
     sim_debug (DBG, &dp_dev, "DDXM ");
-    XMSB--;
+    XMSB -= scale_or_one ();
   }
   if (insn & 00400) { /* DIYM */
     sim_debug (DBG, &dp_dev, "DIYM ");
-    YMSB++;
+    YMSB += scale_or_one ();
   }
   if (insn & 01000) { /* DIXM */
     sim_debug (DBG, &dp_dev, "DIXM ");
-    XMSB++;
+    XMSB += scale_or_one ();
   }
   if (insn & 02000) { /* DHVC */
     sim_debug (DBG, &dp_dev, "DHVC ");
@@ -386,13 +413,13 @@ dp_inc_escape (uint16 byte)
       sim_debug (DBG, &dp_dev, "stack underflow");
   }
   if (byte & 020)
-    XMSB++;
+    XMSB += scale_or_one ();
   if (byte & 010)
     XLSB = 0;
   if (byte & 4) /* Enter PPM mode. */
     ;
   if (byte & 2)
-    YMSB++;
+    YMSB += scale_or_one ();
   if (byte & 1)
     YLSB = 0;
 
@@ -454,13 +481,11 @@ dp_insn (uint16 insn)
     break;
   case 1: /* DLXA */
     sim_debug (DBG, &dp_dev, "DLXA %04o\n", insn & 01777);
-    XMSB = (insn >> 4) & 0077;
-    XLSB = (insn << 1) & 0036;
+    load_xy_accumulator (&XMSB, &XLSB, insn);
     break;
   case 2: /* DLYA */
     sim_debug (DBG, &dp_dev, "DLYA %04o\n", insn & 01777);
-    YMSB = (insn >> 4) & 0077;
-    YLSB = (insn << 1) & 0036;
+    load_xy_accumulator (&YMSB, &YLSB, insn);
     break;
   case 3: /* DEIM */
     sim_debug (DBG, &dp_dev, "DEIM ");
