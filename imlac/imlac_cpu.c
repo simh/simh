@@ -39,6 +39,9 @@
 #define ROM_STTY        2
 #define ROM_PTR         3
 
+#define UNIT_V_MSIZE    (UNIT_V_UF + 0)
+#define UNIT_MSIZE      (07 << UNIT_V_MSIZE)
+
 /* CPU state. */
 static uint16 PC;
 static uint16 AC;
@@ -77,6 +80,7 @@ static t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 static t_stat cpu_ex (t_value *vptr, t_addr ea, UNIT *uptr, int32 sw);
 static t_stat cpu_dep (t_value val, t_addr ea, UNIT *uptr, int32 sw);
 static t_stat cpu_reset (DEVICE *dptr);
+static t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 static uint16 irq_iot (uint16, uint16);
 static t_stat rom_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 static t_stat rom_show_type (FILE *st, UNIT *up, int32 v, CONST void *dp);
@@ -95,6 +99,9 @@ REG cpu_reg[] = {
 };
 
 static MTAB cpu_mod[] = {
+  { UNIT_MSIZE, 1,  "4K",  "4K", &cpu_set_size },
+  { UNIT_MSIZE, 2,  "8K",  "8K", &cpu_set_size },
+  { UNIT_MSIZE, 4, "16K", "16K", &cpu_set_size },
   { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE", &sim_set_idle, &sim_show_idle },
   { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL },
   { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "HISTORY", "HISTORY",
@@ -692,4 +699,11 @@ void
 cpu_set_switches (unsigned long p1, unsigned long p2)
 {
   DS = p1 & 0177777;
+}
+
+static t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+  cpu_unit.capac = (uint32)val * 4096;
+  memmask = cpu_unit.capac - 1;
+  return SCPE_OK;
 }
