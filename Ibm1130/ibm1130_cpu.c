@@ -653,7 +653,7 @@ t_stat sim_instr (void)
 
             eaddr = word2;                  /* assume standard addressing & compute effective address */
             if (TAG)                        /* if indexed */
-		eaddr = (eaddr + ReadIndex(TAG)) & 0xFFFF;	/* add index register value */
+                eaddr = (eaddr + ReadIndex(TAG)) & 0xFFFF; /* add index register value */
             if (INDIR)                      /* if indirect addressing */
                 eaddr = ReadW(eaddr);       /* pick up referenced address */
             
