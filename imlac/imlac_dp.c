@@ -318,7 +318,7 @@ dp_inc_vector (uint16 byte)
   uint16 dx, dy;
 
   if (byte == 0200) {
-    sim_debug (DBG, &dp_dev, "P");
+    sim_debug (DBG, &dp_dev, "P\n");
   } else {
     sim_debug (DBG, &dp_dev, "%s", byte & 0100 ? "B" : "D");
     if (byte & 00040)
@@ -326,7 +326,7 @@ dp_inc_vector (uint16 byte)
     sim_debug (DBG, &dp_dev, "%o", (byte >> 3) & 3);
     if (byte & 00004)
       sim_debug (DBG, &dp_dev, "M");
-    sim_debug (DBG, &dp_dev, "%o", byte & 3);
+    sim_debug (DBG, &dp_dev, "%o\n", byte & 3);
   }
 
   dx = (byte >> 3) & 3;
@@ -373,6 +373,8 @@ dp_inc_escape (uint16 byte)
     YMSB++;
   if (byte & 1)
     YLSB = 0;
+
+  sim_debug (DBG, &dp_dev, "\n");
 }
 
 static void
@@ -393,7 +395,6 @@ dp_deim (uint16 insn)
   MODE = 1;
   sim_debug (DBG, &dp_dev, "E,");
   dp_inc (insn & 0377);
-  sim_debug (DBG, &dp_dev, "\n");
 }
 
 static void
@@ -430,12 +431,12 @@ dp_insn (uint16 insn)
     dp_opr (insn);
     break;
   case 1: /* DLXA */
-    sim_debug (DBG, &dp_dev, "DLXA\n");
+    sim_debug (DBG, &dp_dev, "DLXA %04o\n", insn & 01777);
     XMSB = (insn >> 4) & 0077;
     XLSB = (insn << 1) & 0036;
     break;
   case 2: /* DLYA */
-    sim_debug (DBG, &dp_dev, "DLYA\n");
+    sim_debug (DBG, &dp_dev, "DLYA %04o\n", insn & 01777);
     YMSB = (insn >> 4) & 0077;
     YLSB = (insn << 1) & 0036;
     break;
