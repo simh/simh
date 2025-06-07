@@ -946,7 +946,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
         VIDEO_TTF_LDFLAGS += -lSDL2_ttf
         VIDEO_FEATURES += with TrueType font support
         # Retain support for explicitly supplying a preferred fontfile
-        ifneq (,$(and $(FONTFILE))
+        ifneq (,$(FONTFILE))
           VIDEO_TTF_OPT +=  -DFONTFILE=${FONTFILE}
         endif
       else
