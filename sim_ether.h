@@ -129,26 +129,34 @@ extern "C" {
 #undef USE_SHARED
 #endif
 
-/* USE_SHARED implies shared pcap, so force HAVE_PCAP_NETWORK */
-#if defined(USE_SHARED) && !defined(HAVE_PCAP_NETWORK)
-#define HAVE_PCAP_NETWORK 1
-#endif
-
 /*
   USE_BPF is defined to let this code leverage the libpcap/OS kernel provided
   BPF packet filtering.  This generally will enhance performance.  It may not
   be available in some environments and/or it may not work correctly, so
   undefining this will still provide working code here.
 */
-#if defined(HAVE_PCAP_NETWORK)
+#if defined(HAVE_PCAP_NETWORK) || defined(USE_SHARED)
 #define USE_BPF 1
 #if defined (_WIN32) && !defined (BPF_CONST_STRING)
+#if !defined(HAVE_PCAP_NETWORK)
+#define HAVE_PCAP_NETWORK 1
+#endif
 #define BPF_CONST_STRING 1
 #endif
 #else
 #define DONT_USE_PCAP_FINDALLDEVS 1
 #endif
 
+/* Generally avoid pcap APIs when running with vmnet.framework */
+#if defined(HAVE_VMNET_NETWORK)
+#define DONT_USE_PCAP_FINDALLDEVS 1
+#if defined(HAVE_TAP_NETWORK)
+#undef HAVE_TAP_NETWORK
+#endif
+#if defined(HAVE_VDE_NETWORK)
+#undef HAVE_VDE_NETWORK
+#endif
+#endif
 
 /* structure declarations */
 
@@ -157,6 +165,7 @@ extern "C" {
 #define ETH_FILTER_MAX        20                        /* maximum address filters */
 #define ETH_DEV_NAME_MAX     256                        /* maximum device name size */
 #define ETH_DEV_DESC_MAX     256                        /* maximum device description size */
+#define ETH_DEV_INFO_MAX     256                        /* maximum device info size */
 #define ETH_MIN_PACKET        60                        /* minimum ethernet packet size */
 #define ETH_MAX_PACKET      1514                        /* maximum ethernet packet size */
 #define ETH_MAX_JUMBO_FRAME 65536                       /* maximum ethernet jumbo frame size (or Offload Segment Size) */
@@ -234,6 +243,8 @@ typedef unsigned char ETH_MAC[6];
 struct eth_list {
   char    name[ETH_DEV_NAME_MAX];
   char    desc[ETH_DEV_DESC_MAX];
+  char    info[ETH_DEV_INFO_MAX];
+  char    connect[ETH_DEV_NAME_MAX];
   int     eth_api;
 };
 
@@ -256,12 +267,13 @@ struct eth_device {
   SOCKET        fd_handle;                              /* fd to kernel device (where needed) */
   char*         bpf_filter;                             /* bpf filter currently in effect */
   int           eth_api;                                /* Designator for which API is being used to move packets */
-#define ETH_API_NONE 0                                  /* No API in use yet */
-#define ETH_API_PCAP 1                                  /* Pcap API in use */
-#define ETH_API_TAP  2                                  /* tun/tap API in use */
-#define ETH_API_VDE  3                                  /* VDE API in use */
-#define ETH_API_UDP  4                                  /* UDP API in use */
-#define ETH_API_NAT  5                                  /* NAT (SLiRP) API in use */
+#define ETH_API_NONE  0                                 /* No API in use yet */
+#define ETH_API_PCAP  1                                 /* Pcap API in use */
+#define ETH_API_TAP   2                                 /* tun/tap API in use */
+#define ETH_API_VDE   3                                 /* VDE API in use */
+#define ETH_API_UDP   4                                 /* UDP API in use */
+#define ETH_API_NAT   5                                 /* NAT (SLiRP) API in use */
+#define ETH_API_VMNET 6                                 /* Apple vmnet.framework in use */
   ETH_PCALLBACK read_callback;                          /* read callback function */
   ETH_PCALLBACK write_callback;                         /* write callback function */
   ETH_PACK*     read_packet;                            /* read packet */
@@ -277,6 +289,7 @@ struct eth_device {
   ETH_MAC       physical_addr;                          /* physical address of interface */
   int32         have_host_nic_phy_addr;                 /* flag indicating that the host_nic_phy_hw_addr is valid */
   ETH_MAC       host_nic_phy_hw_addr;                   /* MAC address of the attached NIC */
+  ETH_BOOL      host_nic_is_wifi;                       /* Attached NIC is a WiFi device */
   uint32        jumbo_fragmented;                       /* Giant IPv4 Frames Fragmented */
   uint32        jumbo_dropped;                          /* Giant Frames Dropped */
   uint32        jumbo_truncated;                        /* Giant Frames too big for capture buffer - Dropped */

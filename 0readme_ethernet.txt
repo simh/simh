@@ -28,7 +28,7 @@ On Windows using the WinPcap interface, the simulated computer can "talk" to
 the host computer on the same interface.  On other platforms with libpcap
 (*nix), the simulated computer can not "talk" to the host computer via the
 selected interface, since simulator transmitted packets are not received
-by the host's network stack. The workaround for this is to use a second NIC
+by the host's network stack. One workaround for this is to use a second NIC
 in the host and connect them both into the same network; then the host and
 the simulator can communicate over the physical LAN.
 
@@ -46,6 +46,12 @@ traffic (on the platforms where it is available) by using the SIMH command:
 tested on include: Linux, FreeBSD, OpenBSD, NetBSD and OSX.  Each of these
 platforms has some way to create a tap pseudo device (and possibly then to
 bridge it with a physical network interface).
+
+Relatively recently, macOS (since version 10.15 sometime in 2019) has 
+functionality integrated into the OS that automatically provides bridging to 
+address this problem.  The capability is provided by the vmnet facility of 
+the OS.  The simh sim_ether layer now leverages this vmnet functionality 
+(when available), and building of simh on automatically includes it.
 
 The following steps were performed to get a working SIMH vax simulator
 sharing a physical NIC and allowing Host<->SIMH vax communications:
@@ -129,8 +135,9 @@ NetBSD (NetBSD 5.0.2)
     # Run simulator and "attach xq tap:tap0"
 
 OSX (Snow Leopard)
-    OSX Does NOT have native support for tun/tap interfaces.  It also does not have native
-    support for bridging.
+    On older versons of the macOS (OS/X) operating systems (prior to 10.15) 
+    OSX Does NOT have native support for tun/tap interfaces.  Those versions
+    also do not have native support for bridging.
 
     Mattias Nissler has created tun/tap functionality available at http://tuntaposx.sourceforge.net/
 
@@ -177,8 +184,9 @@ Linux (Ubuntu 11.10):
        sim> attach xq vde:/tmp/switch1  #simulator uses IP address 192.168.6.2
 
 OSX:
-    The macports package manager (http://www.macports.org) can be used to
-    install the net/vde2 package.
+    The homebrew package manager (https://brew.sh/) or macports package manager 
+    (http://www.macports.org) can be used to install the net/vde2 package. vde
+    is no longer needed given support for the vmnet functionality now available.
 
 -------------------------------------------------------------------------------
 Another alternative to direct pcap and tun/tap networking on all environments is
@@ -226,8 +234,8 @@ Windows notes:
 
  3. The first time the Npcap/WinPCAP driver is used, it will be dynamically
     loaded, and the user must be an Administrator on the machine to do so.
-    If you need to run as an unprivileged user, you must set the "npf" driver
-    to autostart.
+    If you need/want to run as an unprivileged user, you must set the "npf" 
+    driver to autostart.
     Current Npcap and WinPcap installers provide an option to configure this
     at installation time, so if that choice is made, then there is no need for
     administrator privileged to run simulators with network support.
@@ -331,13 +339,17 @@ Building on Linux, {Free|Net|Open}BSD, OS/X, Solaris, other *nix:
                 RedHat/Fedora Based distributions:
                        # yum install libpcap-devel
 
-      OS/X   : The libpcap components are installed as part of the Xcode
-               developer package.  Instructions to install Xcode on various
-               OSX versions are available at:
+      OS/X   : The libpcap and vmnet components are installed as part of 
+               the Xcode developer package.  The simplest way to install 
+               the Xcode developer components is merely to type "git" at a 
+               terminal shell prompt and answer yes to the dialog that pops 
+               up to install this feature.  Instructions to install Xcode 
+               on various OSX versions are available at:
                   https://guide.macports.org/chunked/installing.xcode.html
-               Be sure to install the command line tools which are installed
-               with the command "xcode-select --install" in more recent
-               versions of the Apple developer support.
+               On older macOS versions, be sure to install the command line 
+               tools which are installed with the command 
+               "xcode-select --install" for slightly older recent versions 
+               of the Apple developer support.
 
       HP-UX  : ftp://hpux.connect.org.uk/hpux/Networking/Admin/
 

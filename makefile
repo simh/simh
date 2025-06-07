@@ -547,7 +547,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
       OSNAME = OSX
       LIBEXT = dylib
       ifneq (include,$(findstring include,$(UNSUPPORTED_BUILD)))
-        INCPATH:=$(shell LANG=C; ${GCC} -x c -v -E /dev/null 2>&1 | grep -A 10 '> search starts here' | grep '^ ' | grep -v 'framework directory' | tr -d '\n')
+        INCPATH:=$(shell LANG=C; ${GCC} -x c -v -E /dev/null 2>&1 | grep -A 10 '> search starts here' | grep '^ ' | awk '{ print $$1 }' | tr '\n' ' ')
       endif
       ifeq (incopt,$(shell if ${TEST} -d /opt/local/include; then echo incopt; fi))
         INCPATH += /opt/local/include
@@ -946,7 +946,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
         VIDEO_TTF_LDFLAGS += -lSDL2_ttf
         VIDEO_FEATURES += with TrueType font support
         # Retain support for explicitly supplying a preferred fontfile
-        ifneq (,$(FONTFILE))
+        ifneq (,$(and $(FONTFILE))
           VIDEO_TTF_OPT +=  -DFONTFILE=${FONTFILE}
         endif
       else
@@ -959,81 +959,25 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
     endif
   endif
   ifneq (,$(NETWORK_USEFUL))
-    ifneq (,$(call find_include,pcap))
-      ifneq (,$(shell grep 'pcap/pcap.h' $(call find_include,pcap) | grep include))
-        PCAP_H_PATH = $(dir $(call find_include,pcap))pcap/pcap.h
+    ifeq (Darwin,$(OSTYPE)) # the macOS vmnet framework is only useful when the OS is 10.15 or later
+      macOSMajor = $(strip $(shell sw_vers 2>/dev/null | grep 'ProductVersion:' 2>/dev/null | awk '{ print $$2 }' | awk -F . '{ print $$1 }'))
+      macOSMinor = $(strip $(shell sw_vers 2>/dev/null | grep 'ProductVersion:' 2>/dev/null | awk '{ print $$2 }' | awk -F . '{ print $$2 }'))
+      ifeq (10,$(macOSMajor))
+        DONT_USE_VMNET = $(shell if ${TEST} $(macOSMinor) -lt 15; then echo DONT_USE_VMNET; fi)
       else
-        PCAP_H_PATH = $(call find_include,pcap)
+        DONT_USE_VMNET = $(shell if ${TEST} $(macOSMajor) -lt 10; then echo DONT_USE_VMNET; fi)
       endif
-      ifneq (,$(shell grep pcap_compile $(PCAP_H_PATH) | grep const))
-        BPF_CONST_STRING = -DBPF_CONST_STRING
-      endif
-      NETWORK_CCDEFS += -DHAVE_PCAP_NETWORK -I$(dir $(call find_include,pcap)) $(BPF_CONST_STRING)
-      NETWORK_LAN_FEATURES += PCAP
-      ifneq (,$(call find_lib,$(PCAPLIB)))
-        ifneq ($(USE_NETWORK),) # Network support specified on the GNU make command line
-          NETWORK_CCDEFS += -DUSE_NETWORK
-          ifeq (,$(findstring Linux,$(OSTYPE))$(findstring Darwin,$(OSTYPE)))
-            $(info *** Warning ***)
-            $(info *** Warning *** Directly linking against libpcap is provides no measurable)
-            $(info *** Warning *** benefits over dynamically linking libpcap.)
-            $(info *** Warning ***)
-            $(info *** Warning *** Support for linking this way is currently deprecated and may be removed)
-            $(info *** Warning *** in the future.)
-            $(info *** Warning ***)
-          else
-            $(info *** Error ***)
-            $(info *** Error *** Directly linking against libpcap is provides no measurable)
-            $(info *** Error *** benefits over dynamically linking libpcap.)
-            $(info *** Error ***)
-            $(info *** Error *** Support for linking directly has been removed on the $(OSTYPE))
-            $(info *** Error *** platform.)
-            $(info *** Error ***)
-            $(error Retry your build without specifying USE_NETWORK=1)
-          endif
-          ifeq (cygwin,$(OSTYPE))
-            # cygwin has no ldconfig so explicitly specify pcap object library
-            NETWORK_LDFLAGS = -L$(dir $(call find_lib,$(PCAPLIB))) -Wl,-R,$(dir $(call find_lib,$(PCAPLIB))) -l$(PCAPLIB)
-          else
-            NETWORK_LDFLAGS = -l$(PCAPLIB)
-          endif
-          $(info using libpcap: $(call find_lib,$(PCAPLIB)) $(call find_include,pcap))
-          NETWORK_FEATURES = - static networking support using $(OSNAME) provided libpcap components
-        else # default build uses dynamic libpcap
-          NETWORK_CCDEFS += -DUSE_SHARED
-          $(info using libpcap: $(call find_include,pcap))
-          NETWORK_FEATURES = - dynamic networking support using $(OSNAME) provided libpcap components
-        endif
-      else
-        LIBEXTSAVE := ${LIBEXT}
-        LIBEXT = a
-        ifneq (,$(call find_lib,$(PCAPLIB)))
-          NETWORK_CCDEFS += -DUSE_NETWORK
-          NETWORK_LDFLAGS := -L$(dir $(call find_lib,$(PCAPLIB))) -l$(PCAPLIB)
-          NETWORK_FEATURES = - static networking support using $(OSNAME) provided libpcap components
-          $(info using libpcap: $(call find_lib,$(PCAPLIB)) $(call find_include,pcap))
-        endif
-        LIBEXT = $(LIBEXTSAVE)
-        ifeq (Darwin,$(OSTYPE)$(findstring USE_,$(NETWORK_CCDEFS)))
-          NETWORK_CCDEFS += -DUSE_SHARED
-          NETWORK_FEATURES = - dynamic networking support using $(OSNAME) provided libpcap components
-          $(info using macOS dynamic libpcap: $(call find_include,pcap))
-        endif
-      endif
-    else # pcap desired but pcap.h not found
-      ifneq (,$(call find_lib,$(PCAPLIB)))
-        PCAP_LIB_VERSION = $(shell strings $(call find_lib,$(PCAPLIB)) | grep 'libpcap version' | awk '{ print $$3}')
-        PCAP_LIB_BASE_VERSION = $(firstword $(subst ., ,$(PCAP_LIB_VERSION)))
-      endif
-      NEEDED_PKGS += DPKG_PCAP
-      # On non-Linux platforms, we'll still try to provide deprecated support for libpcap in /usr/local
-      INCPATHSAVE := ${INCPATH}
-      ifeq (,$(findstring Linux,$(OSTYPE)))
-        # Look for package built from tcpdump.org sources with default install target (or cygwin winpcap)
-        INCPATH += /usr/local/include
-        PCAP_H_FOUND = $(call find_include,pcap)
-      endif
-      ifneq (,$(strip $(PCAP_H_FOUND)))
+    endif
+    ifneq (,$(if $(DONT_USE_VMNET),,$(call find_include,vmnet.framework/Headers/vmnet)))
+      # sim_ether reduces network features to the appropriate minimal set
+      NETWORK_LAN_FEATURES += VMNET
+      NETWORK_CCDEFS += -DUSE_SHARED -I slirp -I slirp_glue -I slirp_glue/qemu -DHAVE_VMNET_NETWORK
+      NETWORK_DEPS += slirp/*.c slirp_glue/*.c
+      NETWORK_LDFLAGS += -framework vmnet
+      $(info using vmnet: $(call find_include,vmnet.framework/Headers/vmnet))
+    else
+      # Consider other network connections
+      ifneq (,$(call find_include,pcap))
         ifneq (,$(shell grep 'pcap/pcap.h' $(call find_include,pcap) | grep include))
           PCAP_H_PATH = $(dir $(call find_include,pcap))pcap/pcap.h
         else
@@ -1042,107 +986,181 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
         ifneq (,$(shell grep pcap_compile $(PCAP_H_PATH) | grep const))
           BPF_CONST_STRING = -DBPF_CONST_STRING
         endif
-        LIBEXTSAVE := ${LIBEXT}
-        # first check if binary - shared objects are available/installed in the linker known search paths
+        NETWORK_CCDEFS += -DHAVE_PCAP_NETWORK -I$(dir $(call find_include,pcap)) $(BPF_CONST_STRING)
+        NETWORK_LAN_FEATURES += PCAP
         ifneq (,$(call find_lib,$(PCAPLIB)))
-          NETWORK_CCDEFS = -DUSE_SHARED -I$(dir $(call find_include,pcap)) $(BPF_CONST_STRING)
-          NETWORK_FEATURES = - dynamic networking support using libpcap components from www.tcpdump.org and locally installed libpcap.${LIBEXT}
-          $(info using libpcap: $(call find_include,pcap))
+          ifneq ($(USE_NETWORK),) # Network support specified on the GNU make command line
+            NETWORK_CCDEFS += -DUSE_NETWORK
+            ifeq (,$(findstring Linux,$(OSTYPE))$(findstring Darwin,$(OSTYPE)))
+              $(info *** Warning ***)
+              $(info *** Warning *** Directly linking against libpcap is provides no measurable)
+              $(info *** Warning *** benefits over dynamically linking libpcap.)
+              $(info *** Warning ***)
+              $(info *** Warning *** Support for linking this way is currently deprecated and may be removed)
+              $(info *** Warning *** in the future.)
+              $(info *** Warning ***)
+            else
+              $(info *** Error ***)
+              $(info *** Error *** Directly linking against libpcap is provides no measurable)
+              $(info *** Error *** benefits over dynamically linking libpcap.)
+              $(info *** Error ***)
+              $(info *** Error *** Support for linking directly has been removed on the $(OSTYPE))
+              $(info *** Error *** platform.)
+              $(info *** Error ***)
+              $(error Retry your build without specifying USE_NETWORK=1)
+            endif
+            ifeq (cygwin,$(OSTYPE))
+              # cygwin has no ldconfig so explicitly specify pcap object library
+              NETWORK_LDFLAGS = -L$(dir $(call find_lib,$(PCAPLIB))) -Wl,-R,$(dir $(call find_lib,$(PCAPLIB))) -l$(PCAPLIB)
+            else
+              NETWORK_LDFLAGS = -l$(PCAPLIB)
+            endif
+            $(info using libpcap: $(call find_lib,$(PCAPLIB)) $(call find_include,pcap))
+            NETWORK_FEATURES = - static networking support using $(OSNAME) provided libpcap components
+          else # default build uses dynamic libpcap
+            NETWORK_CCDEFS += -DUSE_SHARED
+            $(info using libpcap: $(call find_include,pcap))
+            NETWORK_FEATURES = - dynamic networking support using $(OSNAME) provided libpcap components
+          endif
         else
-          LIBPATH += /usr/local/lib
+          LIBEXTSAVE := ${LIBEXT}
           LIBEXT = a
           ifneq (,$(call find_lib,$(PCAPLIB)))
-            $(info using libpcap: $(call find_lib,$(PCAPLIB)) $(call find_include,pcap))
-            ifeq (cygwin,$(OSTYPE))
-              NETWORK_CCDEFS = -DUSE_NETWORK -DHAVE_PCAP_NETWORK -I$(dir $(call find_include,pcap)) $(BPF_CONST_STRING)
-              NETWORK_LDFLAGS = -L$(dir $(call find_lib,$(PCAPLIB))) -Wl,-R,$(dir $(call find_lib,$(PCAPLIB))) -l$(PCAPLIB)
-              NETWORK_FEATURES = - static networking support using libpcap components located in the cygwin directories
-            else
-              NETWORK_CCDEFS := -DUSE_NETWORK -DHAVE_PCAP_NETWORK -isystem -I$(dir $(call find_include,pcap)) $(BPF_CONST_STRING) $(call find_lib,$(PCAPLIB))
-              NETWORK_FEATURES = - networking support using libpcap components from www.tcpdump.org
-              $(info *** Warning ***)
-              $(info *** Warning *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) being built with networking support using)
-              $(info *** Warning *** libpcap components from www.tcpdump.org.)
-              $(info *** Warning *** Some users have had problems using the www.tcpdump.org libpcap)
-              $(info *** Warning *** components for simh networking.  For best results, with)
-              $(info *** Warning *** simh networking, it is recommended that you install the)
-              $(info *** Warning *** libpcap-dev (or libpcap-devel) package from your $(OSNAME) distribution)
-              $(info *** Warning ***)
-              $(info *** Warning *** Building with the components manually installed from www.tcpdump.org)
-              $(info *** Warning *** is officially deprecated.  Attempting to do so is unsupported.)
-              $(info *** Warning ***)
-            endif
-          else
-            $(error using libpcap: $(call find_include,pcap) missing $(PCAPLIB).${LIBEXT})
-          endif
-          NETWORK_LAN_FEATURES += PCAP
-        endif
-        LIBEXT = $(LIBEXTSAVE)
-      else
-        INCPATH = $(INCPATHSAVE)
-        ifeq (1,$(PCAP_LIB_BASE_VERSION))
-          $(info using libpcap $(PCAP_LIB_VERSION) without an available pcap.h)
-          NETWORK_CCDEFS = -DUSE_SHARED -DHAVE_PCAP_NETWORK -DPCAP_LIB_VERSION=$(PCAP_LIB_VERSION)
-          NETWORK_FEATURES = - dynamic networking support using libpcap components from www.tcpdump.org and locally installed libpcap.${LIBEXT}
-          NETWORK_LAN_FEATURES += PCAP
-          NEEDED_PKGS := $(filter-out DPKG_PCAP,$(NEEDED_PKGS))
-        else
-          $(info *** Warning ***)
-          $(info *** Warning *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) $(BUILD_MULTIPLE_VERB) being built WITHOUT)
-          $(info *** Warning *** libpcap networking support)
-          $(info *** Warning ***)
-          $(info *** Warning *** To build simulator(s) with libpcap networking support you)
-          $(info *** Warning *** should install the libpcap development components for)
-          $(info *** Warning *** for your $(OSNAME) system.)
-          ifeq (,$(or $(findstring Linux,$(OSTYPE)),$(findstring OSX,$(OSNAME))))
-            $(info *** Warning *** You should read 0readme_ethernet.txt and follow the instructions)
-            $(info *** Warning *** regarding the needed libpcap development components for your)
-            $(info *** Warning *** $(OSNAME) platform.)
-          endif
-          $(info *** Warning ***)
-        endif
-      endif
-    endif
-    # Consider other network connections
-    ifneq (,$(call find_lib,vdeplug))
-      # libvdeplug requires the use of the OS provided libpcap
-      ifeq (,$(findstring usr/local,$(NETWORK_CCDEFS)))
-        ifneq (,$(call find_include,libvdeplug))
-          # Provide support for vde networking
-          NETWORK_CCDEFS += -DHAVE_VDE_NETWORK
-          NETWORK_LAN_FEATURES += VDE
-          ifeq (,$(findstring USE_NETWORK,$(NETWORK_CCDEFS))$(findstring USE_SHARED,$(NETWORK_CCDEFS)))
             NETWORK_CCDEFS += -DUSE_NETWORK
+            NETWORK_LDFLAGS := -L$(dir $(call find_lib,$(PCAPLIB))) -l$(PCAPLIB)
+            NETWORK_FEATURES = - static networking support using $(OSNAME) provided libpcap components
+            $(info using libpcap: $(call find_lib,$(PCAPLIB)) $(call find_include,pcap))
           endif
-          ifeq (Darwin,$(OSTYPE))
-            NETWORK_LDFLAGS += -lvdeplug -L$(dir $(call find_lib,vdeplug))
+          LIBEXT = $(LIBEXTSAVE)
+          ifeq (Darwin,$(OSTYPE)$(findstring USE_,$(NETWORK_CCDEFS)))
+            NETWORK_CCDEFS += 
+            NETWORK_FEATURES = - dynamic networking support using $(OSNAME) provided libpcap components
+            $(info using macOS dynamic libpcap: $(call find_include,pcap))
+          endif
+        endif
+      else # pcap desired but pcap.h not found
+        ifneq (,$(call find_lib,$(PCAPLIB)))
+          PCAP_LIB_VERSION = $(shell strings $(call find_lib,$(PCAPLIB)) | grep 'libpcap version' | awk '{ print $$3}')
+          PCAP_LIB_BASE_VERSION = $(firstword $(subst ., ,$(PCAP_LIB_VERSION)))
+        endif
+        NEEDED_PKGS += DPKG_PCAP
+        # On non-Linux platforms, we'll still try to provide deprecated support for libpcap in /usr/local
+        INCPATHSAVE := ${INCPATH}
+        ifeq (,$(findstring Linux,$(OSTYPE)))
+          # Look for package built from tcpdump.org sources with default install target (or cygwin winpcap)
+          INCPATH += /usr/local/include
+          PCAP_H_FOUND = $(call find_include,pcap)
+        endif
+        ifneq (,$(strip $(PCAP_H_FOUND)))
+          ifneq (,$(shell grep 'pcap/pcap.h' $(call find_include,pcap) | grep include))
+            PCAP_H_PATH = $(dir $(call find_include,pcap))pcap/pcap.h
           else
-            NETWORK_LDFLAGS += -lvdeplug -Wl,-R,$(dir $(call find_lib,vdeplug)) -L$(dir $(call find_lib,vdeplug))
+            PCAP_H_PATH = $(call find_include,pcap)
           endif
-          $(info using libvdeplug: $(call find_lib,vdeplug) $(call find_include,libvdeplug))
+          ifneq (,$(shell grep pcap_compile $(PCAP_H_PATH) | grep const))
+            BPF_CONST_STRING = -DBPF_CONST_STRING
+          endif
+          LIBEXTSAVE := ${LIBEXT}
+          # first check if binary - shared objects are available/installed in the linker known search paths
+          ifneq (,$(call find_lib,$(PCAPLIB)))
+            NETWORK_CCDEFS = -DUSE_SHARED -I$(dir $(call find_include,pcap)) $(BPF_CONST_STRING)
+            NETWORK_FEATURES = - dynamic networking support using libpcap components from www.tcpdump.org and locally installed libpcap.${LIBEXT}
+            $(info using libpcap: $(call find_include,pcap))
+          else
+            LIBPATH += /usr/local/lib
+            LIBEXT = a
+            ifneq (,$(call find_lib,$(PCAPLIB)))
+              $(info using libpcap: $(call find_lib,$(PCAPLIB)) $(call find_include,pcap))
+              ifeq (cygwin,$(OSTYPE))
+                NETWORK_CCDEFS = -DUSE_NETWORK -DHAVE_PCAP_NETWORK -I$(dir $(call find_include,pcap)) $(BPF_CONST_STRING)
+                NETWORK_LDFLAGS = -L$(dir $(call find_lib,$(PCAPLIB))) -Wl,-R,$(dir $(call find_lib,$(PCAPLIB))) -l$(PCAPLIB)
+                NETWORK_FEATURES = - static networking support using libpcap components located in the cygwin directories
+              else
+                NETWORK_CCDEFS := -DUSE_NETWORK -DHAVE_PCAP_NETWORK -isystem -I$(dir $(call find_include,pcap)) $(BPF_CONST_STRING) $(call find_lib,$(PCAPLIB))
+                NETWORK_FEATURES = - networking support using libpcap components from www.tcpdump.org
+                $(info *** Warning ***)
+                $(info *** Warning *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) being built with networking support using)
+                $(info *** Warning *** libpcap components from www.tcpdump.org.)
+                $(info *** Warning *** Some users have had problems using the www.tcpdump.org libpcap)
+                $(info *** Warning *** components for simh networking.  For best results, with)
+                $(info *** Warning *** simh networking, it is recommended that you install the)
+                $(info *** Warning *** libpcap-dev (or libpcap-devel) package from your $(OSNAME) distribution)
+                $(info *** Warning ***)
+                $(info *** Warning *** Building with the components manually installed from www.tcpdump.org)
+                $(info *** Warning *** is officially deprecated.  Attempting to do so is unsupported.)
+                $(info *** Warning ***)
+              endif
+            else
+              $(error using libpcap: $(call find_include,pcap) missing $(PCAPLIB).${LIBEXT})
+            endif
+            NETWORK_LAN_FEATURES += PCAP
+          endif
+          LIBEXT = $(LIBEXTSAVE)
+        else
+          INCPATH = $(INCPATHSAVE)
+          ifeq (1,$(PCAP_LIB_BASE_VERSION))
+            $(info using libpcap $(PCAP_LIB_VERSION) without an available pcap.h)
+            NETWORK_CCDEFS = -DUSE_SHARED -DHAVE_PCAP_NETWORK -DPCAP_LIB_VERSION=$(PCAP_LIB_VERSION)
+            NETWORK_FEATURES = - dynamic networking support using libpcap components from www.tcpdump.org and locally installed libpcap.${LIBEXT}
+            NETWORK_LAN_FEATURES += PCAP
+            NEEDED_PKGS := $(filter-out DPKG_PCAP,$(NEEDED_PKGS))
+          else
+            $(info *** Warning ***)
+            $(info *** Warning *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) $(BUILD_MULTIPLE_VERB) being built WITHOUT)
+            $(info *** Warning *** libpcap networking support)
+            $(info *** Warning ***)
+            $(info *** Warning *** To build simulator(s) with libpcap networking support you)
+            $(info *** Warning *** should install the libpcap development components for)
+            $(info *** Warning *** for your $(OSNAME) system.)
+            ifeq (,$(or $(findstring Linux,$(OSTYPE)),$(findstring OSX,$(OSNAME))))
+              $(info *** Warning *** You should read 0readme_ethernet.txt and follow the instructions)
+              $(info *** Warning *** regarding the needed libpcap development components for your)
+              $(info *** Warning *** $(OSNAME) platform.)
+            endif
+            $(info *** Warning ***)
+          endif
+        endif
+      endif
+      ifneq (,$(call find_lib,vdeplug))
+        # libvdeplug requires the use of the OS provided libpcap
+        ifeq (,$(findstring usr/local,$(NETWORK_CCDEFS)))
+          ifneq (,$(call find_include,libvdeplug))
+            # Provide support for vde networking
+            NETWORK_CCDEFS += -DHAVE_VDE_NETWORK
+            NETWORK_LAN_FEATURES += VDE
+            ifeq (,$(findstring USE_NETWORK,$(NETWORK_CCDEFS))$(findstring USE_SHARED,$(NETWORK_CCDEFS)))
+              NETWORK_CCDEFS += -DUSE_SHARED
+            endif
+            ifeq (Darwin,$(OSTYPE))
+              NETWORK_LDFLAGS += -lvdeplug -L$(dir $(call find_lib,vdeplug))
+            else
+              NETWORK_LDFLAGS += -lvdeplug -Wl,-R,$(dir $(call find_lib,vdeplug)) -L$(dir $(call find_lib,vdeplug))
+            endif
+            $(info using libvdeplug: $(call find_lib,vdeplug) $(call find_include,libvdeplug))
+          endif
+        else
+          ifeq (,$(findstring PKG_PCAP, $(NEEDED_PKGS)))
+            NEEDED_PKGS += DPKG_PCAP
+          endif
         endif
       else
-        ifeq (,$(findstring PKG_PCAP, $(NEEDED_PKGS)))
-          NEEDED_PKGS += DPKG_PCAP
+        NEEDED_PKGS += DPKG_VDE
+      endif
+      ifneq (,$(call find_include,linux/if_tun))
+        # Provide support for Tap networking on Linux
+        NETWORK_CCDEFS += -DHAVE_TAP_NETWORK
+        NETWORK_LAN_FEATURES += TAP
+        ifeq (,$(findstring USE_NETWORK,$(NETWORK_CCDEFS))$(findstring USE_SHARED,$(NETWORK_CCDEFS)))
+          NETWORK_CCDEFS += -DUSE_NETWORK
         endif
       endif
-    else
-      NEEDED_PKGS += DPKG_VDE
-    endif
-    ifneq (,$(call find_include,linux/if_tun))
-      # Provide support for Tap networking on Linux
-      NETWORK_CCDEFS += -DHAVE_TAP_NETWORK
-      NETWORK_LAN_FEATURES += TAP
-      ifeq (,$(findstring USE_NETWORK,$(NETWORK_CCDEFS))$(findstring USE_SHARED,$(NETWORK_CCDEFS)))
-        NETWORK_CCDEFS += -DUSE_NETWORK
-      endif
-    endif
-    ifeq (bsdtuntap,$(shell if ${TEST} -e /usr/include/net/if_tun.h -o -e /Library/Extensions/tap.kext -o -e /Applications/Tunnelblick.app/Contents/Resources/tap-notarized.kext; then echo bsdtuntap; fi))
-      # Provide support for Tap networking on BSD platforms (including OS X)
-      NETWORK_CCDEFS += -DHAVE_TAP_NETWORK -DHAVE_BSDTUNTAP
-      NETWORK_LAN_FEATURES += TAP
-      ifeq (,$(findstring USE_NETWORK,$(NETWORK_CCDEFS))$(findstring USE_SHARED,$(NETWORK_CCDEFS)))
-        NETWORK_CCDEFS += -DUSE_NETWORK
+      ifeq (bsdtuntap,$(shell if ${TEST} -e /usr/include/net/if_tun.h -o -e /Library/Extensions/tap.kext -o -e /Applications/Tunnelblick.app/Contents/Resources/tap-notarized.kext; then echo bsdtuntap; fi))
+        # Provide support for Tap networking on BSD platforms (including OS X)
+        NETWORK_CCDEFS += -DHAVE_TAP_NETWORK -DHAVE_BSDTUNTAP
+        NETWORK_LAN_FEATURES += TAP
+        ifeq (,$(findstring USE_NETWORK,$(NETWORK_CCDEFS))$(findstring USE_SHARED,$(NETWORK_CCDEFS)))
+          NETWORK_CCDEFS += -DUSE_NETWORK
+        endif
       endif
     endif
     ifeq (slirp,$(shell if ${TEST} -e slirp_glue/sim_slirp.c; then echo slirp; fi))

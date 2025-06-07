@@ -42,6 +42,11 @@
 #include "sim_slirp.h"
 #include "sim_sock.h"
 #include "libslirp.h"
+#include "sim_ether.h"
+
+#ifdef HAVE_VMNET_NETWORK
+#include <vmnet/vmnet.h>
+#endif
 
 #if !defined (USE_READER_THREAD)
 #define pthread_mutex_init(mtx, val)
@@ -56,14 +61,6 @@
 static const char *tcpudp[] = {
     "TCP",
     "UDP"
-    };
-
-struct redir_tcp_udp {
-    struct in_addr inaddr;
-    int is_udp;
-    int port;
-    int lport;
-    struct redir_tcp_udp *next;
     };
 
 static int
@@ -115,7 +112,8 @@ else {
     }
 }
 
-static int _do_redirects (Slirp *slirp, struct redir_tcp_udp *head)
+static int 
+_do_redirects (Slirp *slirp, struct redir_tcp_udp *head)
 {
 struct in_addr host_addr;
 int ret = 0;
@@ -140,19 +138,7 @@ struct slirp_write_request {
 
 struct sim_slirp {
     Slirp *slirp;
-    char *args;
-    struct in_addr vnetwork;
-    struct in_addr vnetmask;
-    int maskbits;
-    struct in_addr vgateway;
-    int dhcpmgmt;
-    struct in_addr vdhcp_start;
-    struct in_addr vnameserver;
-    char *boot_file;
-    char *tftp_path;
-    char *dns_search;
-    char **dns_search_domains;
-    struct redir_tcp_udp *rtcp;
+    struct sim_net_attributes nat;
     GArray *gpollfds;
     SOCKET db_chime;            /* write packet doorbell */
     struct slirp_write_request *write_requests;
@@ -164,6 +150,7 @@ struct sim_slirp {
     uint32 dbit;
     };
 
+
 #if defined(__cplusplus)
 extern "C" {
 #endif
@@ -173,164 +160,34 @@ uint32 slirp_dbit;
 }
 #endif
 
+static int 
+sim_slirp_parse_args (SLIRP *slirp, const char *args, char *errbuf, size_t errbuf_size)
+{
+return sim_nat_parse_args (&slirp->nat, args, ETH_API_NAT, errbuf, errbuf_size);
+}
+
 SLIRP *sim_slirp_open (const char *args, void *opaque, packet_callback callback, DEVICE *dptr, uint32 dbit, char *errbuf, size_t errbuf_size)
 {
 SLIRP *slirp = (SLIRP *)g_malloc0(sizeof(*slirp));
-char *targs = g_strdup (args);
-const char *tptr = targs;
-const char *cptr;
-char tbuf[CBUFSIZE], gbuf[CBUFSIZE], abuf[CBUFSIZE];
-int err;
 
 slirp_dptr = dptr;
 slirp_dbit = dbit;
-slirp->args = (char *)g_malloc0(1 + strlen(args));
-strcpy (slirp->args, args);
 slirp->opaque = opaque;
 slirp->callback = callback;
-slirp->maskbits = 24;
-slirp->dhcpmgmt = 1;
 slirp->db_chime = INVALID_SOCKET;
-inet_aton(DEFAULT_IP_ADDR,&slirp->vgateway);
 pthread_mutex_init (&slirp->write_buffer_lock, NULL);
 
-err = 0;
-while (*tptr && !err) {
-    tptr = get_glyph_nc (tptr, tbuf, ',');
-    if (!tbuf[0])
-        break;
-    cptr = tbuf;
-    cptr = get_glyph (cptr, gbuf, '=');
-    if (0 == MATCH_CMD (gbuf, "DHCP")) {
-        slirp->dhcpmgmt = 1;
-        if (cptr && *cptr)
-            inet_aton (cptr, &slirp->vdhcp_start);
-        continue;
-        }
-    if (0 == MATCH_CMD (gbuf, "TFTP")) {
-        if (cptr && *cptr)
-            slirp->tftp_path = g_strdup (cptr);
-        else {
-            strlcpy (errbuf, "Missing TFTP Path", errbuf_size);
-            err = 1;
-            }
-        continue;
-        }
-    if (0 == MATCH_CMD (gbuf, "BOOTFILE")) {
-        if (cptr && *cptr)
-            slirp->boot_file = g_strdup (cptr);
-        else {
-            strlcpy (errbuf, "Missing DHCP Boot file name", errbuf_size);
-            err = 1;
-            }
-        continue;
-        }
-    if ((0 == MATCH_CMD (gbuf, "NAMESERVER")) ||
-        (0 == MATCH_CMD (gbuf, "DNS"))) {
-        if (cptr && *cptr)
-            inet_aton (cptr, &slirp->vnameserver);
-        else {
-            strlcpy (errbuf, "Missing nameserver", errbuf_size);
-            err = 1;
-            }
-        continue;
-        }
-    if (0 == MATCH_CMD (gbuf, "DNSSEARCH")) {
-        if (cptr && *cptr) {
-            int count = 0;
-            char *name;
-           
-            slirp->dns_search = g_strdup (cptr);
-            name = slirp->dns_search;
-            do {
-                ++count;
-                slirp->dns_search_domains = (char **)realloc (slirp->dns_search_domains, (count + 1)*sizeof(char *));
-                slirp->dns_search_domains[count] = NULL;
-                slirp->dns_search_domains[count-1] = name;
-                name = strchr (name, ':');
-                if (name) {
-                    *name = '\0';
-                    ++name;
-                    }
-                } while (name && *name);
-            }
-        else {
-            strlcpy (errbuf, "Missing DNS search list", errbuf_size);
-            err = 1;
-            }
-        continue;
-        }
-    if (0 == MATCH_CMD (gbuf, "GATEWAY")) {
-        if (cptr && *cptr) {
-            cptr = get_glyph (cptr, abuf, '/');
-            if (cptr && *cptr)
-                slirp->maskbits = atoi (cptr);
-            inet_aton (abuf, &slirp->vgateway);
-            }
-        else {
-            strlcpy (errbuf, "Missing host", errbuf_size);
-            err = 1;
-            }
-        continue;
-        }
-    if (0 == MATCH_CMD (gbuf, "NETWORK")) {
-        if (cptr && *cptr) {
-            cptr = get_glyph (cptr, abuf, '/');
-            if (cptr && *cptr)
-                slirp->maskbits = atoi (cptr);
-            inet_aton (abuf, &slirp->vnetwork);
-            }
-        else {
-            strlcpy (errbuf, "Missing network", errbuf_size);
-            err = 1;
-            }
-        continue;
-        }
-    if (0 == MATCH_CMD (gbuf, "NODHCP")) {
-        slirp->dhcpmgmt = 0;
-        continue;
-        }
-    if (0 == MATCH_CMD (gbuf, "UDP")) {
-        if (cptr && *cptr)
-            err = _parse_redirect_port (&slirp->rtcp, cptr, IS_UDP);
-        else {
-            strlcpy (errbuf, "Missing UDP port mapping", errbuf_size);
-            err = 1;
-            }
-        continue;
-        }
-    if (0 == MATCH_CMD (gbuf, "TCP")) {
-        if (cptr && *cptr)
-            err = _parse_redirect_port (&slirp->rtcp, cptr, IS_TCP);
-        else {
-            strlcpy (errbuf, "Missing TCP port mapping", errbuf_size);
-            err = 1;
-            }
-        continue;
-        }
-    snprintf (errbuf, errbuf_size - 1, "Unexpected NAT argument: %s", gbuf);
-    err = 1;
-    }
-if (err) {
+if (sim_slirp_parse_args(slirp, args, errbuf, errbuf_size)) {
     sim_slirp_close (slirp);
-    g_free (targs);
     return NULL;
     }
 
-slirp->vnetmask.s_addr = slirp->maskbits ? htonl(~((1 << (32-slirp->maskbits)) - 1)) : 0xFFFFFFFF;
-slirp->vnetwork.s_addr = slirp->vgateway.s_addr & slirp->vnetmask.s_addr;
-if ((slirp->vgateway.s_addr & ~slirp->vnetmask.s_addr) == 0)
-    slirp->vgateway.s_addr = htonl(ntohl(slirp->vnetwork.s_addr) | 2);
-if ((slirp->vdhcp_start.s_addr == 0) && slirp->dhcpmgmt)
-    slirp->vdhcp_start.s_addr = htonl(ntohl(slirp->vnetwork.s_addr) | 15);
-if (slirp->vnameserver.s_addr == 0)
-    slirp->vnameserver.s_addr = htonl(ntohl(slirp->vnetwork.s_addr) | 3);
-slirp->slirp = slirp_init (0, slirp->vnetwork, slirp->vnetmask, slirp->vgateway, 
-                           NULL, slirp->tftp_path, slirp->boot_file, 
-                           slirp->vdhcp_start, slirp->vnameserver, 
-                           (const char **)(slirp->dns_search_domains), (void *)slirp);
+slirp->slirp = slirp_init (0, slirp->nat.vnetwork, slirp->nat.vnetmask, slirp->nat.vgateway, 
+                           NULL, slirp->nat.tftp_path, slirp->nat.boot_file, 
+                           slirp->nat.vdhcp_start, slirp->nat.vnameserver, 
+                           (const char **)(slirp->nat.dns_search_domains), (void *)slirp);
 
-if (_do_redirects (slirp->slirp, slirp->rtcp)) {
+if (_do_redirects (slirp->slirp, slirp->nat.rtcp)) {
     sim_slirp_close (slirp);
     slirp = NULL;
     }
@@ -360,7 +217,6 @@ else {
     if (sim_deb && (sim_deb != stdout) && (sim_deb != sim_log))
         sim_slirp_show(slirp, sim_deb);
     }
-g_free (targs);
 return slirp;
 }
 
@@ -369,14 +225,14 @@ void sim_slirp_close (SLIRP *slirp)
 struct redir_tcp_udp *rtmp;
 
 if (slirp) {
-    g_free (slirp->args);
-    g_free (slirp->tftp_path);
-    g_free (slirp->boot_file);
-    g_free (slirp->dns_search);
-    g_free (slirp->dns_search_domains);
-    while ((rtmp = slirp->rtcp)) {
+    g_free (slirp->nat.args);
+    g_free (slirp->nat.tftp_path);
+    g_free (slirp->nat.boot_file);
+    g_free (slirp->nat.dns_search);
+    g_free (slirp->nat.dns_search_domains);
+    while ((rtmp = slirp->nat.rtcp)) {
         slirp_remove_hostfwd(slirp->slirp, rtmp->is_udp, rtmp->inaddr, rtmp->lport);
-        slirp->rtcp = rtmp->next;
+        slirp->nat.rtcp = rtmp->next;
         g_free (rtmp);
         }
     g_array_free(slirp->gpollfds, true);
@@ -399,57 +255,6 @@ if (slirp) {
         slirp_cleanup(slirp->slirp);
     }
 g_free (slirp);
-}
-
-t_stat sim_slirp_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
-{
-fprintf (st, "%s", 
-"NAT options:\n"
-"    DHCP{=dhcp_start_address}           Enables DHCP server and specifies\n"
-"                                        guest LAN DHCP start IP address\n"
-"    BOOTFILE=bootfilename               specifies DHCP returned Boot Filename\n"
-"    TFTP=tftp-base-path                 Enables TFTP server and specifies\n"
-"                                        base file path\n"
-"    NAMESERVER=nameserver_ipaddres      specifies DHCP nameserver IP address\n"
-"    DNS=nameserver_ipaddres             specifies DHCP nameserver IP address\n"
-"    DNSSEARCH=domain{:domain{:domain}}  specifies DNS Domains search suffixes\n"
-"    GATEWAY=host_ipaddress{/masklen}    specifies LAN gateway IP address\n"
-"    NETWORK=network_ipaddress{/masklen} specifies LAN network address\n"
-"    UDP=port:address:address's-port     maps host UDP port to guest port\n"
-"    TCP=port:address:address's-port     maps host TCP port to guest port\n"
-"    NODHCP                              disables DHCP server\n\n"
-"Default NAT Options: GATEWAY=10.0.2.2, masklen=24(netmask is 255.255.255.0)\n"
-"                     DHCP=10.0.2.15, NAMESERVER=10.0.2.3\n"
-"    Nameserver defaults to proxy traffic to host system's active nameserver\n\n"
-"The 'address' field in the UDP and TCP port mappings are the simulated\n"
-"(guest) system's IP address which, if DHCP allocated would default to\n"
-"10.0.2.15 or could be statically configured to any address including\n"
-"10.0.2.4 thru 10.0.2.14.\n\n"
-"NAT limitations\n\n"
-"There are four limitations of NAT mode which users should be aware of:\n\n"
-" 1) ICMP protocol limitations:\n"
-"    Some frequently used network debugging tools (e.g. ping or tracerouting)\n"
-"    rely on the ICMP protocol for sending/receiving messages. While some\n"
-"    ICMP support is available on some hosts (ping may or may not work),\n"
-"    some other tools may not work reliably.\n\n"
-" 2) Receiving of UDP broadcasts is not reliable:\n"
-"    The guest does not reliably receive broadcasts, since, in order to save\n"
-"    resources, it only listens for a certain amount of time after the guest\n"
-"    has sent UDP data on a particular port.\n\n"
-" 3) Protocols such as GRE, DECnet, LAT and Clustering are unsupported:\n"
-"    Protocols other than TCP and UDP are not supported.\n\n"
-" 4) Forwarding host ports < 1024 impossible:\n"
-"    On Unix-based hosts (e.g. Linux, Solaris, Mac OS X) it is not possible\n"
-"    to bind to ports below 1024 from applications that are not run by root.\n"
-"    As a result, if you try to configure such a port forwarding, the attach\n"
-"    will fail.\n\n"
-"These limitations normally don't affect standard network use. But the\n"
-"presence of NAT has also subtle effects that may interfere with protocols\n"
-"that are normally working. One example is NFS, where the server is often\n"
-"configured to refuse connections from non-privileged ports (i.e. ports not\n"
-" below 1024).\n"
-);
-return SCPE_OK;
 }
 
 int sim_slirp_send (SLIRP *slirp, const char *msg, size_t len, int flags)
@@ -501,41 +306,6 @@ void slirp_output (void *opaque, const uint8_t *pkt, int pkt_len)
 SLIRP *slirp = (SLIRP *)opaque;
 
 slirp->callback (slirp->opaque, pkt, pkt_len);
-}
-
-void sim_slirp_show (SLIRP *slirp, FILE *st)
-{
-struct redir_tcp_udp *rtmp;
-
-if ((slirp == NULL) || (slirp->slirp == NULL))
-    return;
-fprintf (st, "NAT args: %s\n", slirp->args);
-fprintf (st, "NAT network setup:\n");
-fprintf (st, "        gateway       =%s/%d", inet_ntoa(slirp->vgateway), slirp->maskbits);
-fprintf (st, "(%s)\n", inet_ntoa(slirp->vnetmask));
-fprintf (st, "        DNS           =%s\n", inet_ntoa(slirp->vnameserver));
-if (slirp->vdhcp_start.s_addr != 0)
-    fprintf (st, "        dhcp_start    =%s\n", inet_ntoa(slirp->vdhcp_start));
-if (slirp->boot_file)
-    fprintf (st, "        dhcp bootfile =%s\n", slirp->boot_file);
-if (slirp->dns_search_domains) {
-    char **domains = slirp->dns_search_domains;
-    
-    fprintf (st, "        DNS domains   =");
-    while (*domains) {
-        fprintf (st, "%s%s", (domains != slirp->dns_search_domains) ? ", " : "", *domains);
-        ++domains;
-        }
-    fprintf (st, "\n");
-    }
-if (slirp->tftp_path)
-    fprintf (st, "        tftp prefix   =%s\n", slirp->tftp_path);
-rtmp = slirp->rtcp;
-while (rtmp) {
-    fprintf (st, "        redir %3s     =%d:%s:%d\n", tcpudp[rtmp->is_udp], rtmp->lport, inet_ntoa(rtmp->inaddr), rtmp->port);
-    rtmp = rtmp->next;
-    }
-slirp_connection_info (slirp->slirp, (Monitor *)st);
 }
 
 #if !defined(MAX)
@@ -662,5 +432,284 @@ pthread_mutex_unlock (&slirp->write_buffer_lock);
 
 slirp_pollfds_poll(slirp->gpollfds, 0);
 
+}
+
+#if defined(HAVE_VMNET_NETWORK)
+#define UNUSED_SETTING(arg) if (nat_type == ETH_API_VMNET) sim_messagef(SCPE_OK, "Ignoring unused %s setting which unavailable in vmnet\n", arg)
+#else
+#define UNUSED_SETTING(arg)
+#endif
+
+int 
+sim_nat_parse_args (NAT *nat, const char *args, int nat_type, char *errbuf, size_t errbuf_size)
+{
+char *targs = g_strdup (args);
+const char *tptr = targs;
+const char *cptr;
+char tbuf[CBUFSIZE], gbuf[CBUFSIZE], abuf[CBUFSIZE];
+int err;
+
+nat->nat_type = nat_type;
+nat->maskbits = 24;
+nat->dhcpmgmt = 1;
+if (nat->vgateway.s_addr == INADDR_ANY)
+    inet_aton(DEFAULT_IP_ADDR, &nat->vgateway);
+if (nat->args == NULL) {
+    nat->args = (char *)g_malloc0(1 + strlen(args));
+    strcpy (nat->args, args);
+    }
+else {
+    nat->args = (char *)g_realloc(nat->args, strlen(nat->args) + 2 + strlen(args));
+    strcat(nat->args, ",");
+    strcat(nat->args, args);
+    }
+memset(errbuf, 0, errbuf_size);
+err = 0;
+while (*tptr && !err) {
+    tptr = get_glyph_nc (tptr, tbuf, ',');
+    if (!tbuf[0])
+        break;
+    cptr = tbuf;
+    cptr = get_glyph (cptr, gbuf, '=');
+    if (0 == MATCH_CMD (gbuf, "DHCP")) {
+        nat->dhcpmgmt = 1;
+        if (cptr && *cptr)
+            inet_aton (cptr, &nat->vdhcp_start);
+        continue;
+        }
+    if (0 == MATCH_CMD (gbuf, "STARTIP")) {
+        if (cptr && *cptr)
+            inet_aton (cptr, &nat->vdhcp_start);
+        else {
+            strlcpy (errbuf, "STARTIP Missing start ip address", errbuf_size);
+            err = 1;
+            }
+        continue;
+        }
+    if (0 == MATCH_CMD (gbuf, "ENDIP")) {
+        if (cptr && *cptr)
+            inet_aton (cptr, &nat->vdhcp_end);
+        else {
+            strlcpy (errbuf, "ENDIP Missing end ip address", errbuf_size);
+            err = 1;
+            }
+        continue;
+        }
+    if (0 == MATCH_CMD (gbuf, "TFTP")) {
+        if (cptr && *cptr)
+            nat->tftp_path = g_strdup (cptr);
+        else {
+            strlcpy (errbuf, "TFTP Missing TFTP Path", errbuf_size);
+            err = 1;
+            }
+        UNUSED_SETTING("TFTP");
+        continue;
+        }
+    if (0 == MATCH_CMD (gbuf, "BOOTFILE")) {
+        if (cptr && *cptr)
+            nat->boot_file = g_strdup (cptr);
+        else {
+            strlcpy (errbuf, "BOOTFILE Missing DHCP Boot file name", errbuf_size);
+            err = 1;
+            }
+        UNUSED_SETTING("BOOTFILE");
+        continue;
+        }
+    if ((0 == MATCH_CMD (gbuf, "NAMESERVER")) ||
+        (0 == MATCH_CMD (gbuf, "DNS"))) {
+        if (cptr && *cptr)
+            inet_aton (cptr, &nat->vnameserver);
+        else {
+            strlcpy (errbuf, "Missing nameserver", errbuf_size);
+            err = 1;
+            }
+        UNUSED_SETTING("NAMESERVER");
+        continue;
+        }
+    if (0 == MATCH_CMD (gbuf, "DNSSEARCH")) {
+        if (cptr && *cptr) {
+            int count = 0;
+            char *name;
+           
+            nat->dns_search = g_strdup (cptr);
+            name = nat->dns_search;
+            do {
+                ++count;
+                nat->dns_search_domains = (char **)realloc (nat->dns_search_domains, (count + 1)*sizeof(char *));
+                nat->dns_search_domains[count] = NULL;
+                nat->dns_search_domains[count-1] = name;
+                name = strchr (name, ':');
+                if (name) {
+                    *name = '\0';
+                    ++name;
+                    }
+                } while (name && *name);
+            }
+        else {
+            strlcpy (errbuf, "DNSSEARCH Missing DNS search list", errbuf_size);
+            err = 1;
+            }
+        UNUSED_SETTING("DNSSEARCH");
+        continue;
+        }
+    if ((0 == MATCH_CMD (gbuf, "GATEWAY")) ||
+        (0 == MATCH_CMD (gbuf, "HOSTIP"))) {
+        if (cptr && *cptr) {
+            cptr = get_glyph (cptr, abuf, '/');
+            if (cptr && *cptr)
+                nat->maskbits = atoi (cptr);
+            inet_aton (abuf, &nat->vgateway);
+            }
+        else {
+            strlcpy (errbuf, "GATEWAY Missing host ip address", errbuf_size);
+            err = 1;
+            }
+        continue;
+        }
+    if (0 == MATCH_CMD (gbuf, "NETWORK")) {
+        if (cptr && *cptr) {
+            cptr = get_glyph (cptr, abuf, '/');
+            if (cptr && *cptr)
+                nat->maskbits = atoi (cptr);
+            inet_aton (abuf, &nat->vnetwork);
+            }
+        else {
+            strlcpy (errbuf, "NETWORK Missing network", errbuf_size);
+            err = 1;
+            }
+        continue;
+        }
+    if (0 == MATCH_CMD (gbuf, "NODHCP")) {
+        nat->dhcpmgmt = 0;
+        continue;
+        }
+    if (0 == MATCH_CMD (gbuf, "UDP")) {
+        if (cptr && *cptr)
+            err = _parse_redirect_port (&nat->rtcp, cptr, IS_UDP);
+        else {
+            strlcpy (errbuf, "UDP Missing UDP port mapping", errbuf_size);
+            err = 1;
+            }
+        continue;
+        }
+    if (0 == MATCH_CMD (gbuf, "TCP")) {
+        if (cptr && *cptr)
+            err = _parse_redirect_port (&nat->rtcp, cptr, IS_TCP);
+        else {
+            strlcpy (errbuf, "TCP Missing TCP port mapping", errbuf_size);
+            err = 1;
+            }
+        continue;
+        }
+    snprintf (errbuf, errbuf_size, "Unexpected NAT argument: %s", gbuf);
+    err = 1;
+    }
+g_free (targs);
+if (err)
+    return err;
+nat->vnetmask.s_addr = nat->maskbits ? htonl(~((1 << (32-nat->maskbits)) - 1)) : 0xFFFFFFFF;
+nat->vnetwork.s_addr = nat->vgateway.s_addr & nat->vnetmask.s_addr;
+if ((nat->vgateway.s_addr & ~nat->vnetmask.s_addr) == 0)
+    nat->vgateway.s_addr = htonl(ntohl(nat->vnetwork.s_addr) | 2);
+if ((nat->vdhcp_start.s_addr == 0) && nat->dhcpmgmt)
+    nat->vdhcp_start.s_addr = htonl(ntohl(nat->vnetwork.s_addr) | 15);
+if ((nat->vdhcp_end.s_addr == 0) && nat->dhcpmgmt)
+    nat->vdhcp_end.s_addr = htonl(ntohl(nat->vnetwork.s_addr) | ((0xffffffff >> nat->maskbits) - 1));
+if (nat->vnameserver.s_addr == 0)
+    nat->vnameserver.s_addr = htonl(ntohl(nat->vnetwork.s_addr) | 3);
+return err;
+}
+
+void sim_slirp_show (SLIRP *slirp, FILE *st)
+{
+sim_nat_show (&slirp->nat, st);
+slirp_connection_info (slirp->slirp, (Monitor *)st);
+}
+
+void sim_nat_show (NAT *nat, FILE *st)
+{
+struct redir_tcp_udp *rtmp;
+
+if (nat == NULL)
+    return;
+fprintf (st, "NAT args: %s\n", nat->args);
+fprintf (st, "NAT network setup:\n");
+fprintf (st, "        gateway       =%s/%d", inet_ntoa(nat->vgateway), nat->maskbits);
+fprintf (st, "(%s)\n", inet_ntoa(nat->vnetmask));
+fprintf (st, "        DNS           =%s\n", inet_ntoa(nat->vnameserver));
+if (nat->vdhcp_start.s_addr != 0)
+    fprintf (st, "        dhcp_start    =%s\n", inet_ntoa(nat->vdhcp_start));
+if (nat->vdhcp_end.s_addr != 0)
+    fprintf (st, "        dhcp_end      =%s\n", inet_ntoa(nat->vdhcp_end));
+if (nat->boot_file)
+    fprintf (st, "        dhcp bootfile =%s\n", nat->boot_file);
+if (nat->dns_search_domains) {
+    char **domains = nat->dns_search_domains;
+    
+    fprintf (st, "        DNS domains   =");
+    while (*domains) {
+        fprintf (st, "%s%s", (domains != nat->dns_search_domains) ? ", " : "", *domains);
+        ++domains;
+        }
+    fprintf (st, "\n");
+    }
+if (nat->tftp_path)
+    fprintf (st, "        tftp prefix   =%s\n", nat->tftp_path);
+rtmp = nat->rtcp;
+while (rtmp) {
+    fprintf (st, "        redir %3s     =%d:%s:%d\n", tcpudp[rtmp->is_udp], rtmp->lport, inet_ntoa(rtmp->inaddr), rtmp->port);
+    rtmp = rtmp->next;
+    }
+}
+
+t_stat sim_nat_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+{
+fprintf (st, "%s", 
+"NAT options:\n"
+"    DHCP{=dhcp_start_address}           Enables DHCP server and specifies\n"
+"                                        guest LAN DHCP start IP address\n"
+"    BOOTFILE=bootfilename               specifies DHCP returned Boot Filename\n"
+"    TFTP=tftp-base-path                 Enables TFTP server and specifies\n"
+"                                        base file path\n"
+"    NAMESERVER=nameserver_ipaddres      specifies DHCP nameserver IP address\n"
+"    DNS=nameserver_ipaddres             specifies DHCP nameserver IP address\n"
+"    DNSSEARCH=domain{:domain{:domain}}  specifies DNS Domains search suffixes\n"
+"    GATEWAY=host_ipaddress{/masklen}    specifies LAN gateway IP address\n"
+"    NETWORK=network_ipaddress{/masklen} specifies LAN network address\n"
+"    UDP=port:address:address's-port     maps host UDP port to guest port\n"
+"    TCP=port:address:address's-port     maps host TCP port to guest port\n"
+"    NODHCP                              disables DHCP server\n\n"
+"Default NAT Options: GATEWAY=10.0.2.2, masklen=24(netmask is 255.255.255.0)\n"
+"                     DHCP=10.0.2.15, NAMESERVER=10.0.2.3\n"
+"    Nameserver defaults to proxy traffic to host system's active nameserver\n\n"
+"The 'address' field in the UDP and TCP port mappings are the simulated\n"
+"(guest) system's IP address which, if DHCP allocated would default to\n"
+"10.0.2.15 or could be statically configured to any address including\n"
+"10.0.2.4 thru 10.0.2.14.\n\n"
+"NAT limitations\n\n"
+"There are four limitations of NAT mode which users should be aware of:\n\n"
+" 1) ICMP protocol limitations:\n"
+"    Some frequently used network debugging tools (e.g. ping or tracerouting)\n"
+"    rely on the ICMP protocol for sending/receiving messages. While some\n"
+"    ICMP support is available on some hosts (ping may or may not work),\n"
+"    some other tools may not work reliably.\n\n"
+" 2) Receiving of UDP broadcasts is not reliable:\n"
+"    The guest does not reliably receive broadcasts, since, in order to save\n"
+"    resources, it only listens for a certain amount of time after the guest\n"
+"    has sent UDP data on a particular port.\n\n"
+" 3) Protocols such as GRE, DECnet, LAT and Clustering are unsupported:\n"
+"    Protocols other than TCP and UDP are not supported.\n\n"
+" 4) Forwarding host ports < 1024 impossible:\n"
+"    On Unix-based hosts (e.g. Linux, Solaris, Mac OS X) it is not possible\n"
+"    to bind to ports below 1024 from applications that are not run by root.\n"
+"    As a result, if you try to configure such a port forwarding, the attach\n"
+"    will fail.\n\n"
+"These limitations normally don't affect standard network use. But the\n"
+"presence of NAT has also subtle effects that may interfere with protocols\n"
+"that are normally working. One example is NFS, where the server is often\n"
+"configured to refuse connections from non-privileged ports (i.e. ports not\n"
+"below 1024).\n"
+);
+return SCPE_OK;
 }
 

@@ -105,7 +105,7 @@ Simulator binaries for x86 Linus, x86 macOS, and Windows for all recent changes 
 - More complete host system information displayed in SHOW VERSION output.
 - Simulator THROTTLING can only be enabled once per simulator run.  This avoids potential errant behaviors when arbitrarily switching throttling settings.
 - EXAMINE memory commands will now produce minimal output that summarizes multiple successive locations with the same contents and may be aborted by SIGINT (Control-C).
-- 
+- Ethernet enhancements on all platforms and and much simplified platform support on macOS.
 
 #### All simulators build cleanly under OpenVMS on ia64 systems.
 

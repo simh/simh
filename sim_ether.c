@@ -157,6 +157,15 @@
   HAVE_SLIRP_NETWORK- Specifies that support for SLiRP networking should be
                       included.  This can be leveraged to provide User Mode
                       IP NAT connectivity for simulators.
+  HAVE_VMNET_NETWORK- Specifies that the vmnet APIs are available.  Initially 
+                      on macOS, and possibly other platforms in the future.
+                      These APIs provide OS/host based functionality that
+                      can solve the TUN, VDE and NAT based network setups.
+                      Wherever functionality provided by vmnet's APIs 
+                      eclipses PCAP, TUN, VDE or NAT and is of equivalent 
+                      or better functionality to the prior method, the
+                      vmnet functions will be used with the prior 
+                      configuration syntax retained.
 
   NEED_PCAP_SENDPACKET
                     - Specifies that you are using an older version of libpcap
@@ -390,7 +399,7 @@
 
 /* Internal routine - forward declaration */
 static int _eth_get_system_id (char *buf, size_t buf_size);
-static void eth_get_nic_hw_addr(ETH_DEV* dev, const char *devname, int set_on);
+static void eth_get_nic_hw_addr(ETH_DEV* dev, const char *devname, int set_on, char Info[ETH_DEV_INFO_MAX]);
 
 static const unsigned char framer_oui[3] = { 0xaa, 0x00, 0x03 };
 
@@ -789,30 +798,97 @@ t_stat eth_show_devices (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, CONST ch
 return eth_show (st, uptr, val, NULL);
 }
 
+/* Pseudo uuid that meets the local consistent values with no external global use. */
+/* This pseudo uuid is used with vmnet host connections which can be isolated or   */
+/* shared with multiple simulated host on the local host machine. Separate simulators */
+/* on the same host will get the same pseudo uuid for the same tap: connection */
+static void _eth_tap_uuid (const char *tap, unsigned char uuid_buf[16])
+{
+char sysid[64];
+PACKED_BEGIN
+struct {
+  uint32 pseudo_hash;
+  uint8  data[12];
+    } PACKED_END fields = {0x00000000u, 0xadu, 0x9du, 0xd1u, 0x11u, 0x80u, 0xb4u, 0x00u, 0xc0u, 0x4fu, 0xd4u, 0x30u, 0xc8u};
+
+_eth_get_system_id (sysid, sizeof(sysid));
+fields.pseudo_hash = eth_crc32 (eth_crc32 (0x6ba7b815, sysid, sizeof(sysid)), tap, strlen (tap));
+memcpy (uuid_buf, (void *)&fields, 16);
+}
+
+static ETH_BOOL _eth_running_as_root (void)
+{
+FILE *f = fopen("/dev/mem", "r");
+char response[64] = "";
+
+if (f != NULL) {
+  fclose(f);
+  return TRUE;
+  }
+#if !defined(_WIN32)
+f = popen("id -u", "r");
+if (f == NULL)
+  return FALSE;
+if (fgets(response, sizeof(response), f))
+ sim_trim_endspc (response);
+fclose(f);
+#endif
+return (0 == strcmp(response, "0"));
+}
+
 #if defined (USE_NETWORK) || defined (USE_SHARED)
 
-static const char* _eth_getname(int number, char* name, char *desc)
+#ifdef HAVE_VMNET_NETWORK
+#include <vmnet/vmnet.h>
+
+/* The string form of status code returned by vmnet operations. */
+static const char* _vmnet_status_string(vmnet_return_t status)
+  {
+  static const char *vmnet_status[] = {
+        /* VMNET_SUCCESS              */ "Successfully completed.",
+        /* VMNET_FAILURE              */ "General failure.",
+        /* VMNET_MEM_FAILURE          */ "Memory allocation failure.",
+        /* VMNET_INVALID_ARGUMENT     */ "Invalid argument specified.",
+        /* VMNET_SETUP_INCOMPLETE     */ "Interface setup is not complete.",
+        /* VMNET_INVALID_ACCESS       */ "Permission denied.",
+        /* VMNET_PACKET_TOO_BIG       */ "Packet size larger than MTU.",
+        /* VMNET_BUFFER_EXHAUSTED     */ "Buffers exhausted in kernel.",
+        /* VMNET_TOO_MANY_PACKETS     */ "Packet count exceeds limit.",
+        /* VMNET_SHARING_SERVICE_BUSY */ "Vmnet Interface cannot be started as conflicting sharing service is in use."
+      };
+  static char unknown_status[128];
+
+  if ((status >= VMNET_SUCCESS) && (status <= VMNET_SHARING_SERVICE_BUSY))
+    return vmnet_status[status - VMNET_SUCCESS];
+  snprintf(unknown_status, sizeof(unknown_status), "Unknown vmnet status value: %d", (int)status);
+  return unknown_status;
+}
+#endif
+
+
+static const char* _eth_getname(int number, char* name, char *desc, char *info)
 {
   ETH_LIST  list[ETH_MAX_DEVICE];
   int count = eth_devices(ETH_MAX_DEVICE, list, FALSE);
 
   if ((number < 0) || (count <= number))
       return NULL;
-  if (list[number].eth_api != ETH_API_PCAP) {
+  if (list[number].name[0] == '\0') {
 #if defined(_WIN32)
     sim_printf ("Eth: Pcap capable device not found.  Install Npcap or WinPcap 4.1.3 to use pcap networking\n");
 #else
-    sim_printf ("Eth: Pcap capable device not found.  You may need to run as root\n");
+    sim_printf ("Eth: Network capable device not found.  You may need to run as root\n");
 #endif
     return NULL;
     }
 
   strcpy(name, list[number].name);
   strcpy(desc, list[number].desc);
+  strcpy(info, list[number].info);
   return name;
 }
 
-const char* eth_getname_bydesc(const char* desc, char* name, char *ndesc)
+static const char* _eth_getname_bydesc(const char* desc, char* name, char *ndesc, char *info)
 {
   ETH_LIST  list[ETH_MAX_DEVICE];
   int count = eth_devices(ETH_MAX_DEVICE, list, FALSE);
@@ -832,13 +908,14 @@ const char* eth_getname_bydesc(const char* desc, char* name, char *ndesc)
     /* found a case-insensitive description match */
     strcpy(name, list[i].name);
     strcpy(ndesc, list[i].desc);
+    strcpy(info, list[i].info);
     return name;
   }
   /* not found */
   return NULL;
 }
 
-char* eth_getname_byname(const char* name, char* temp, char *desc)
+static char* _eth_getname_byname(const char* name, char* temp, char *desc, char *info)
 {
   ETH_LIST  list[ETH_MAX_DEVICE];
   int count = eth_devices(ETH_MAX_DEVICE, list, FALSE);
@@ -853,12 +930,13 @@ char* eth_getname_byname(const char* name, char* temp, char *desc)
       found = 1;
       strcpy(temp, list[i].name); /* only case might be different */
       strcpy(desc, list[i].desc);
+      strcpy(info, list[i].info);
     }
   }
   return (found ? temp : NULL);
 }
 
-char* eth_getdesc_byname(char* name, char* temp)
+static char* _eth_getdesc_byname(char* name, char* temp, char* info)
 {
   ETH_LIST  list[ETH_MAX_DEVICE];
   int count = eth_devices(ETH_MAX_DEVICE, list, FALSE);
@@ -872,6 +950,7 @@ char* eth_getdesc_byname(char* name, char* temp)
         (strncasecmp(name, list[i].name, n) == 0)) {
       found = 1;
       strcpy(temp, list[i].desc);
+      strcpy(info, list[i].info);
     }
   }
   return (found ? temp : NULL);
@@ -911,24 +990,76 @@ t_stat eth_show (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
   fprintf(st, "ETH devices:\n");
   if (number == -1)
     fprintf(st, "  network support not available in simulator\n");
-  else
+  else {
     if (number == 0)
       fprintf(st, "  no network devices are available\n");
     else {
       size_t min, len;
       int i;
+
       for (i=0, min=0; i<number; i++)
-        if ((len = strlen(list[i].name)) > min) min = len;
-      for (i=0; i<number; i++)
-        fprintf(st," eth%d\t%-*s (%s)\n", i, (int)min, list[i].name, list[i].desc);
+        if ((len = strlen(list[i].name)) > min)
+            min = len;
+      for (i=0; i<number; i++) {
+        char *start, *end;
+        fprintf(st," eth%d\t%-*s (", i, (int)min, list[i].name);
+        start = list[i].desc;
+        do {
+          end = strchr(start, '\n');
+          if (end == NULL) {
+            if (*start == '\0')
+              break;
+            if (list[i].info[0] == '\0')
+              fprintf(st,"%s)\n", start);
+            else
+              fprintf(st,"%s\n     \t%-*s  ", start, (int)min, "");
+            }
+          else {
+            fprintf(st,"%*.*s\n     \t%-*s  ", (int)(end-start), (int)(end-start), start, (int)min, "");
+            start = end + 1;
+            }
+          } while (end != NULL);
+        start = list[i].info;
+        do {
+          end = strchr(start, '\n');
+          if (end == NULL) {
+            if (*start != '\0')
+              fprintf(st,"%s)\n", start);
+            else
+              break;
+            }
+          else {
+            fprintf(st,"%*.*s\n     \t%-*s  ", (int)(end-start), (int)(end-start), start, (int)min, "");
+            start = end + 1;
+            }
+          } while (end != NULL);
+        }
+      if ((NULL != strstr(list[0].name, "tap:")) && (!_eth_running_as_root()))
+        fprintf(st, "You probably need to run as root\n");
+      }
+    }
+  if (1) {
+    int i;
+    t_bool found = FALSE;
+    DEVICE *dptr;
+
+    for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
+      if (DEV_TYPE(dptr) == DEV_ETHER) {
+        if (!found)
+            fprintf(st, "Ethernet Device in %s simulator:\n", sim_name);
+        found = TRUE;
+        fprintf(st, "  %s %s %s\n", dptr->name, (dptr->description) ? "-" : "", (dptr->description) ? dptr->description (dptr) : "");
+        }
+      }
     }
   if (eth_open_device_count) {
     int i;
     char desc[ETH_DEV_DESC_MAX], *d;
+    char info[ETH_DEV_INFO_MAX];
 
     fprintf(st,"Open ETH Devices:\n");
     for (i=0; i<eth_open_device_count; i++) {
-      d = eth_getdesc_byname(eth_open_devices[i]->name, desc);
+      d = _eth_getdesc_byname(eth_open_devices[i]->name, desc, info);
       if (d)
         fprintf(st, " %-7s%s (%s)\n", eth_open_devices[i]->dptr->name, eth_open_devices[i]->dptr->units[0].filename, d);
       else
@@ -939,7 +1070,8 @@ t_stat eth_show (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
   return SCPE_OK;
 }
 
-#endif
+#endif /* defined (USE_NETWORK) || defined (USE_SHARED) */
+
 /*============================================================================*/
 /*                        Non-implemented versions                            */
 /*============================================================================*/
@@ -998,6 +1130,7 @@ t_stat sim_ether_test (DEVICE *dptr, const char *cptr)
   {return SCPE_OK;}
 #else    /* endif unimplemented */
 
+
 #if (defined (xBSD) || defined (__APPLE__)) && (defined (HAVE_TAP_NETWORK) || defined (HAVE_PCAP_NETWORK))
 #include <sys/ioctl.h>
 #include <net/bpf.h>
@@ -1010,7 +1143,7 @@ t_stat sim_ether_test (DEVICE *dptr, const char *cptr)
 /*============================================================================*/
 
 #include <pcap.h>
-#else
+#else /* !defined(HAVE_PCAP_NETWORK) || defined(PCAP_LIB_VERSION) */
 struct pcap_pkthdr {
     uint32 caplen;  /* length of portion present */
     uint32 len;     /* length this packet (off wire) */
@@ -1018,7 +1151,7 @@ struct pcap_pkthdr {
 #define PCAP_ERRBUF_SIZE 256
 typedef void * pcap_t;          /* Pseudo Type to avoid compiler errors */
 #define DLT_EN10MB 1            /* Dummy Value to avoid compiler errors */
-#if defined (PCAP_LIB_VERSION) && defined (USE_SHARED)
+#if defined (USE_SHARED) && !defined (HAVE_PCAP_NETWORK)
 typedef uint32 bpf_u_int32;     /* Pseudo Type to avoid compiler errors */
 typedef struct pcap_if {
         struct pcap_if *next;
@@ -1055,8 +1188,8 @@ int     pcap_fileno (pcap_t *);
 int     pcap_sendpacket (pcap_t* handle, const u_char* msg, int len);
 int     pcap_setfilter (pcap_t *, struct bpf_program *);
 int     pcap_setnonblock(pcap_t* a, int nonblock, char *errbuf);
-#endif
-#endif /* HAVE_PCAP_NETWORK */
+#endif /* defined (PCAP_LIB_VERSION) && defined (USE_SHARED) */
+#endif /* defined (HAVE_PCAP_NETWORK) && !defined (PCAP_LIB_VERSION) */
 
 /*
      The libpcap provided API pcap_findalldevs() on most platforms, will
@@ -1140,6 +1273,72 @@ for (i=0; i<used; i++) {
     sprintf (list[i].desc, "%s", regval);
     }
   } /* for */
+if (1) {
+  char command[64] = "ipconfig";
+  char tool[CBUFSIZE];
+  FILE *f;
+  ETH_LIST *dev = NULL;
+
+  get_glyph_nc (command, tool, 0);
+  if (sim_get_tool_path (tool)[0]) {
+    if (NULL != (f = _popen(command, "r"))) {
+      char line[128];
+
+      memset(line, 0, sizeof(line));
+      while (fgets(line, sizeof(line), f)) {
+        sim_trim_endspc (line);
+        if (line[0] == '\0')
+          continue;
+        if (sim_isspace(line[0])) {
+            char *c = strchr(line, ':');
+
+            if (strstr(line, "IPv4 Address") || strstr(line, "IP Address")) {
+              char *c = strchr(line, ':');
+              strlcat(dev->info, "Host IPv4 Address", sizeof(dev->info));
+              strlcat(dev->info, c, sizeof(dev->info));
+              }
+            if (strstr(line, "Subnet Mask")) {
+              unsigned int byt1, byt2, byt3, byt4;
+              int netmask;
+              char cidr[20];
+
+              sscanf(c, ": %u.%u.%u.%u", &byt1, &byt2, &byt3, &byt4);
+              netmask = (byt1 << 24) | (byt2 << 16) | (byt3 << 8) | byt4;
+              for (i = 0; i < 32; i++) {
+                if (0 == (netmask & (1 << (31 - i))))
+                  break;
+                }
+              snprintf(cidr, sizeof(cidr), "/%d", i);
+              strlcat(dev->info, cidr, sizeof(dev->info));
+              }
+            if (strstr(line, "Media State")) {
+              if (dev->info[0] != '\0')
+                strlcat(dev->info, "\n", sizeof(dev->info));
+              strlcat(dev->info, "MediaState: disconnected", sizeof(dev->info));
+              }
+            continue;
+          }
+        else {
+          if (NULL == strstr(line, "adapter"))
+            continue;
+          dev = NULL;
+          for (i=0; i<used; i++) {
+            if (strstr(line, list[i].desc)) {
+              dev = &list[i];
+              if ((strcmp(dev->desc, "Wi-Fi") == 0) && (strstr(dev->info, "LinkType") == NULL)) {
+                if (dev->info[0] != '\0')
+                  strlcat(dev->info, "\n", sizeof(dev->info));
+                strlcat(dev->info, "LinkType: WiFi", sizeof(dev->info));
+                }
+              break;
+              }
+            }
+          }
+        }
+      _pclose(f);
+      }
+    }
+  }
 #endif
 
 return used;
@@ -1177,7 +1376,7 @@ static t_bool eth_vde_network_available = FALSE;
 #endif
 #endif /* HAVE_VDE_NETWORK */
 
-#ifdef HAVE_SLIRP_NETWORK
+#if defined(HAVE_SLIRP_NETWORK) || defined(HAVE_VMNET_NETWORK)
 #include "sim_slirp.h"
 #endif /* HAVE_SLIRP_NETWORK */
 
@@ -1198,6 +1397,12 @@ const char *eth_capabilities(void)
  strlcat (capabilities, "Polled ", sizeof (capabilities));
 #endif
  strlcat (capabilities, "Ethernet Packet transports", sizeof (capabilities));
+#if defined (HAVE_VMNET_NETWORK)
+ strlcat (capabilities, ":PCAP(vmnet):TAP(vmnet)", sizeof (capabilities));
+#if defined(USE_VMNET_SHARED_AS_NAT)
+ strlcat (capabilities, ":NAT(vmnet)", sizeof (capabilities));
+#endif
+#endif
 #if defined (HAVE_PCAP_NETWORK)
  strlcat (capabilities, ":PCAP", sizeof (capabilities));
 #endif
@@ -1209,7 +1414,7 @@ const char *eth_capabilities(void)
  if (eth_vde_network_available)
    strlcat (capabilities, ":VDE", sizeof (capabilities));
 #endif
-#if defined (HAVE_SLIRP_NETWORK)
+#if defined (HAVE_SLIRP_NETWORK) && !defined(USE_VMNET_SHARED_AS_NAT)
  strlcat (capabilities, ":NAT", sizeof (capabilities));
 #endif
  strlcat (capabilities, ":UDP", sizeof (capabilities));
@@ -1220,7 +1425,7 @@ int eth_devices(int max, ETH_LIST* list, ETH_BOOL framers)
 {
 int used = 0;
 char errbuf[PCAP_ERRBUF_SIZE] = "";
-#ifndef DONT_USE_PCAP_FINDALLDEVS
+#if !defined(DONT_USE_PCAP_FINDALLDEVS)
 pcap_if_t* alldevs;
 pcap_if_t* dev;
 ETH_DEV edev;
@@ -1235,8 +1440,10 @@ if (pcap_findalldevs(&alldevs, errbuf) == -1) {
 else {
   /* copy device list into the passed structure */
   for (used=0, dev=alldevs; dev && (used < max); dev=dev->next) {
+    char Info[ETH_DEV_INFO_MAX];
+
     edev.eth_api = ETH_API_PCAP;
-    eth_get_nic_hw_addr (&edev, dev->name, 0);
+    eth_get_nic_hw_addr (&edev, dev->name, 0, Info);
     if ((memcmp (edev.host_nic_phy_hw_addr, framer_oui, 3) == 0) != framers)
       continue;
     if ((dev->flags & PCAP_IF_LOOPBACK) || (!strcmp("any", dev->name)))
@@ -1244,27 +1451,69 @@ else {
     strlcpy(list[used].name, dev->name, sizeof(list[used].name));
     if (dev->description)
       strlcpy(list[used].desc, dev->description, sizeof(list[used].desc));
-    else
+    else {
       strlcpy(list[used].desc, "No description available", sizeof(list[used].desc));
+      if (Info[0] != '\0')
+        snprintf(list[used].info, sizeof(list[used].info), "%s", Info);
+      }
     ++used;
     }
 
   /* free device list */
   pcap_freealldevs(alldevs);
   }
-#endif
+#endif /* !defined(DONT_USE_PCAP_FINDALLDEVS) */
 
 /* Add any host specific devices and/or validate those already found */
 used = eth_host_pcap_devices(used, max, list);
 
 /* If no devices were found and an error message was left in the buffer, display it */
-if ((used == 0) && (errbuf[0])) {
-    sim_printf ("Eth: pcap_findalldevs warning: %s\n", errbuf);
-    }
+if ((used == 0) && (errbuf[0]))
+  sim_printf ("Eth: pcap_findalldevs warning: %s\n", errbuf);
 
 if (framers)
     return used;    /* don't add pseudo-ethernet devices */
 
+#ifdef HAVE_VMNET_NETWORK
+if (1) {
+  ETH_DEV edev;
+  xpc_object_t interface_list = vmnet_copy_shared_interface_list();
+  int i, interface_count = xpc_array_get_count(interface_list);
+
+  for (i=0; i<interface_count; i++) {
+    xpc_object_t element = xpc_array_get_value(interface_list, i);
+
+    if (used < max) {
+      char Info[ETH_DEV_INFO_MAX] = "";
+
+      snprintf(list[used].name, sizeof(list[used].name), "%s", xpc_string_get_string_ptr(element));
+      snprintf(list[used].desc, sizeof(list[used].desc), "%s", "Integrated bridged network (vmnet) support");
+      edev.eth_api = ETH_API_VMNET;          /* Fool eth_get_nic_hw_addr to actually examine the interface */
+      eth_get_nic_hw_addr(&edev, list[used].name, 0, Info);
+      if (Info[0] != '\0')
+        snprintf(list[used].info, sizeof(list[used].info), "%s", Info);
+      list[used].eth_api = ETH_API_VMNET;
+      ++used;
+      }
+    }
+  xpc_release(interface_list);
+
+  if (used < max) {
+    sprintf(list[used].name, "%s", "tap:{optional-tap-parameters}");
+    sprintf(list[used].desc, "%s", "Integrated host-only network (vmnet) support");
+    list[used].eth_api = ETH_API_VMNET;
+    ++used;
+    }
+#if defined(USE_VMNET_SHARED_AS_NAT)
+  if (used < max) {
+    sprintf(list[used].name, "%s", "nat:{optional-nat-parameters}");
+    sprintf(list[used].desc, "%s", "Integrated NAT (vmnet) support");
+    list[used].eth_api = ETH_API_VMNET;
+    ++used;
+    }
+#endif /* defined(USE_VMNET_SHARED_AS_NAT) */
+  }
+#endif /* defined(HAVE_VMNET_NETWORK) */
 #ifdef HAVE_TAP_NETWORK
 if (used < max) {
 #if defined(__OpenBSD__)
@@ -1285,7 +1534,7 @@ if (eth_vde_network_available && (used < max)) {
   ++used;
   }
 #endif
-#ifdef HAVE_SLIRP_NETWORK
+#if defined(HAVE_SLIRP_NETWORK) && !defined(USE_VMNET_SHARED_AS_NAT)
 if (used < max) {
   sprintf(list[used].name, "%s", "nat:{optional-nat-parameters}");
   sprintf(list[used].desc, "%s", "Integrated NAT (SLiRP) support");
@@ -1840,11 +2089,13 @@ return tool;
 }
 #endif
 
-static void eth_get_nic_hw_addr(ETH_DEV* dev, const char *devname, int set_on)
+static void eth_get_nic_hw_addr(ETH_DEV* dev, const char *devname, int set_on, char Info[ETH_DEV_INFO_MAX])
 {
   memset(&dev->host_nic_phy_hw_addr, 0, sizeof(dev->host_nic_phy_hw_addr));
   dev->have_host_nic_phy_addr = 0;
-  if (dev->eth_api != ETH_API_PCAP)
+  if  (Info)
+      *Info = '\0';
+  if ((dev->eth_api != ETH_API_PCAP) && (dev->eth_api != ETH_API_VMNET))
     return;
 #if defined(_WIN32) || defined(__CYGWIN__)
   if (!pcap_mac_if_win32(devname, dev->host_nic_phy_hw_addr))
@@ -1855,6 +2106,7 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, const char *devname, int set_on)
 #elif !defined(__CYGWIN__) && !defined(__VMS)
   if (1) {
     char command[1024];
+    char result[1024];
     FILE *f;
     int i;
     char tool[CBUFSIZE];
@@ -1862,7 +2114,7 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, const char *devname, int set_on)
         "ip link set dev %.*s up 2>/dev/null",
         "ifconfig %.*s up 2>/dev/null",
         NULL};
-    const char *patterns[] = {
+    const char *MACpatterns[] = {
         "ip link show %.*s 2>/dev/null | grep [0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F] 2>/dev/null",
         "ip link show %.*s 2>/dev/null | grep -E [0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F] 2>/dev/null",
         "ip link show %.*s 2>/dev/null | egrep [0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F] 2>/dev/null",
@@ -1870,8 +2122,26 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, const char *devname, int set_on)
         "ifconfig %.*s 2>/dev/null | grep -E [0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F] 2>/dev/null",
         "ifconfig %.*s 2>/dev/null | egrep [0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F] 2>/dev/null",
         NULL};
+    const char *IPv4patterns[] = {
+        "ip -4 address show %.*s 2>/dev/null | grep 'inet '    2>/dev/null",
+        "ip -4 address show %.*s 2>/dev/null | grep -E 'inet ' 2>/dev/null",
+        "ip -4 address show %.*s 2>/dev/null | egrep 'inet '   2>/dev/null",
+        "ifconfig %.*s 2>/dev/null | grep 'inet '              2>/dev/null",
+        "ifconfig %.*s 2>/dev/null | grep -E 'inet '           2>/dev/null",
+        "ifconfig %.*s 2>/dev/null | egrep 'inet '             2>/dev/null",
+        NULL};
+    const char *LinkTypepatterns[] = {
+        "ipconfig getsummary %.*s 2>/dev/null | grep 'InterfaceType'    2>/dev/null | awk '{ print $3 }'",
+        "nmcli device 2>/dev/null | grep %.*s 2>/dev/null | grep 'Wired connection'      2>/dev/null | awk '{ print $2 }'",
+        "nmcli device 2>/dev/null | grep %.*s 2>/dev/null | grep -e 'wifi' -e 'ethernet' 2>/dev/null | awk '{ print $2 }'",
+        NULL};
+    const char *LinkStatuspatterns[] = {
+        "ipconfig getsummary %.*s 2>/dev/null | grep 'LinkStatusActive' 2>/dev/null | awk '{ print $3 }'",
+        NULL};
+    const char *LinkStatusDownpatterns[] = {
+        "ip -4 link show %.*s 2>/dev/null     | grep 'NO-CARRIER'       2>/dev/null | grep 'state DOWN' 2>/dev/null",
+        NULL};
 
-    memset(command, 0, sizeof(command));
     if (set_on) {
       /* try to force an otherwise unused interface to be turned on */
       for (i=0; turnon[i]; ++i) {
@@ -1883,16 +2153,16 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, const char *devname, int set_on)
           }
         }
       }
-    for (i=0; patterns[i] && (0 == dev->have_host_nic_phy_addr); ++i) {
-      snprintf(command, sizeof(command), patterns[i], (int)(sizeof(command) - (2 + strlen(patterns[i]))), devname);
+    for (i=0; MACpatterns[i] && (0 == dev->have_host_nic_phy_addr); ++i) {
+      snprintf(command, sizeof(command), MACpatterns[i], (int)(sizeof(command) - (2 + strlen(MACpatterns[i]))), devname);
       get_glyph_nc (command, tool, 0);
       if (sim_get_tool_path (tool)[0]) {
         if (NULL != (f = popen(command, "r"))) {
           while (0 == dev->have_host_nic_phy_addr) {
-            if (fgets(command, sizeof(command)-1, f)) {
+            if (fgets(result, sizeof(result), f)) {
               char *p1, *p2;
 
-              p1 = strchr(command, ':');
+              p1 = strchr(result, ':');
               while (p1) {
                 p2 = strchr(p1+1, ':');
                 if (p2 <= p1+3) {
@@ -1918,7 +2188,152 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, const char *devname, int set_on)
           }
         }
       }
+    for (i=0; IPv4patterns[i] && (Info != NULL) && (Info[0] == '\0'); ++i) {
+      snprintf(command, sizeof(command), IPv4patterns[i], (int)(sizeof(command) - (2 + strlen(IPv4patterns[i]))), devname);
+      get_glyph_nc (command, tool, 0);
+      if (sim_get_tool_path (tool)[0]) {
+        if (NULL != (f = popen(command, "r"))) {
+          while (Info[0] == '\0') {
+            if (fgets(result, sizeof(result), f)) {
+              char *p1;
+
+              p1 = strstr(result, "inet ");
+              if (p1) {
+                p1 += 5;    /* skip "inet " */
+                if (strchr(p1, '/')) { /* CIDR netmask present? */
+                  char IPv4addrcidr[19];
+
+                  strlcpy(Info, "Host IPv4 Address: ", ETH_DEV_INFO_MAX);
+                  sscanf(p1, "%18s", IPv4addrcidr);
+                  strlcat(Info, IPv4addrcidr, ETH_DEV_INFO_MAX);
+                  }
+                else {
+                  unsigned int byt1, byt2, byt3, byt4;
+                  int j;
+                  char *p2 = strstr(p1, "netmask");
+                  int netmask = 0xFFFFFFFF;
+                  char cidr[4];
+
+                  if (NULL != p2) {
+                    if (4 == sscanf(p2, "netmask %u.%u.%u.%u", &byt1, &byt2, &byt3, &byt4))
+                      netmask = (byt1 << 24) | (byt2 << 16) | (byt3 << 8) | byt4;
+                    else
+                      sscanf(p2, "netmask 0x%x", &netmask);
+                    if (netmask != 0xFFFFFFFF) {
+                      for (j = 0; j < 32; j++)
+                        if (0 == (netmask & (1 << (31 - j)))) {
+                          snprintf(cidr, sizeof(cidr), "/%d", j);
+                          break;
+                          }
+                      strlcpy(Info, "Host IPv4 Address: ", ETH_DEV_INFO_MAX);
+                      sscanf(p1, "%15s", &Info[strlen(Info)]);
+                      strlcat(Info, cidr, ETH_DEV_INFO_MAX);
+                      }
+                    }
+                  }
+                break;
+                }
+              }
+            else
+              break;
+            }
+          pclose(f);
+          }
+        }
+      }
+    for (i=0; LinkTypepatterns[i] && (Info != NULL) && (NULL == strstr(Info, "LinkType")); ++i) {
+      snprintf(command, sizeof(command), LinkTypepatterns[i], (int)(sizeof(command) - (2 + strlen(LinkTypepatterns[i]))), devname);
+      get_glyph_nc (command, tool, 0);
+      if (sim_get_tool_path (tool)[0]) {
+        if (NULL != (f = popen(command, "r"))) {
+          while (NULL == strstr(Info, "LinkType")) {
+            if (fgets(result, sizeof(result), f)) {
+              sim_trim_endspc(result);
+              if (Info[0] != '\0')
+                strlcat(Info, "\n", ETH_DEV_INFO_MAX);
+              strlcat(Info, "LinkType: ", ETH_DEV_INFO_MAX);
+              if ((strcmp(result, "wifi") == 0) ||
+                  (strcmp(result, "Wi-Fi") == 0))
+                strlcat(Info, "WiFi", ETH_DEV_INFO_MAX);
+              else
+                if (strcasecmp(result, "Ethernet") == 0)
+                  strlcat(Info, "Ethernet", ETH_DEV_INFO_MAX);
+                else
+                  strlcat(Info, result, ETH_DEV_INFO_MAX);
+              break;
+              }
+            else
+              break;
+            }
+          pclose(f);
+          }
+        }
+      }
+    /* If the link type is still undetermined, then assume that device */
+    /* names starting with "wl" are WiFi otherwise they are Ethernet */
+    if ((Info != NULL) && (NULL == strstr(Info, "LinkType"))) {
+      if (Info[0] != '\0')
+        strlcat(Info, "\n", ETH_DEV_INFO_MAX);
+      strlcat(Info, "LinkType: ", ETH_DEV_INFO_MAX);
+      if (memcmp(devname, "wl", 2) == 0)
+        strlcat(Info, "WiFi", ETH_DEV_INFO_MAX);
+      else
+        strlcat(Info, "Ethernet", ETH_DEV_INFO_MAX);
+      }
+    for (i=0; LinkStatuspatterns[i] && (Info != NULL) && (NULL == strstr(Info, "LinkStatus")); ++i) {
+      snprintf(command, sizeof(command), LinkStatuspatterns[i], (int)(sizeof(command) - (2 + strlen(LinkStatuspatterns[i]))), devname);
+      get_glyph_nc (command, tool, 0);
+      if (sim_get_tool_path (tool)[0]) {
+        if (NULL != (f = popen(command, "r"))) {
+          while (NULL == strstr(Info, "MediaState")) {
+            if (fgets(result, sizeof(result), f)) {
+              sim_trim_endspc(result);
+              if (Info[0] != '\0')
+                strlcat(Info, "\n", ETH_DEV_INFO_MAX);
+              strlcat(Info, "MediaState: ", ETH_DEV_INFO_MAX);
+              if (0 == strcasecmp(result, "TRUE"))
+                strlcat(Info, "connected",  ETH_DEV_INFO_MAX);
+              else
+                strlcat(Info, "disconnected",  ETH_DEV_INFO_MAX);
+              break;
+              }
+            else {
+              if (Info[0] != '\0')
+                strlcat(Info, "\n", ETH_DEV_INFO_MAX);
+              strlcat(Info, "MediaState: disconnected", ETH_DEV_INFO_MAX);
+              break;
+              }
+            }
+          pclose(f);
+          }
+        }
+      }
+    for (i=0; LinkStatusDownpatterns[i] && (Info != NULL) && (NULL == strstr(Info, "LinkStatus")); ++i) {
+      snprintf(command, sizeof(command), LinkStatusDownpatterns[i], (int)(sizeof(command) - (2 + strlen(LinkStatusDownpatterns[i]))), devname);
+      get_glyph_nc (command, tool, 0);
+      if (sim_get_tool_path (tool)[0]) {
+        if (NULL != (f = popen(command, "r"))) {
+          while (NULL == strstr(Info, "MediaState")) {
+            if (fgets(result, sizeof(result), f)) {
+              sim_trim_endspc(result);
+              if (Info[0] != '\0')
+                strlcat(Info, "\n", ETH_DEV_INFO_MAX);
+              strlcat(Info, "MediaState: disconnected", ETH_DEV_INFO_MAX);
+              break;
+              }
+            else {
+              if (Info[0] != '\0')
+                strlcat(Info, "\n", ETH_DEV_INFO_MAX);
+              strlcat(Info, "MediaState: connected", ETH_DEV_INFO_MAX);
+              break;
+              }
+            }
+          pclose(f);
+          }
+        }
+      }
     }
+
 #endif
 }
 
@@ -2143,6 +2558,37 @@ while (dev->handle) {
           }
         break;
 #endif /* HAVE_VDE_NETWORK */
+#ifdef HAVE_VMNET_NETWORK
+    case ETH_API_VMNET:
+      {
+        vmnet_return_t ret;
+        int count = 1;
+        struct pcap_pkthdr header;
+        struct vmpktdesc pkt_desc;
+        struct iovec iov;
+
+        // XXX: Should be MTU returned from vmnet startup?
+        u_char buf[ETH_MAX_JUMBO_FRAME];
+
+        iov.iov_base = buf;
+        iov.iov_len = ETH_MAX_JUMBO_FRAME;
+
+        pkt_desc.vm_pkt_size = ETH_MAX_JUMBO_FRAME;
+        pkt_desc.vm_pkt_iov = &iov;
+        pkt_desc.vm_pkt_iovcnt = 1;
+        pkt_desc.vm_flags = 0;
+
+        ret = vmnet_read((interface_ref)dev->handle, &pkt_desc, &count);
+        if ((ret == VMNET_SUCCESS) && (count > 0)) {
+          status = 1;
+          header.caplen = header.len = pkt_desc.vm_pkt_size;
+          _eth_callback((u_char *)dev, &header, buf);
+        } else {
+          status = (ret == VMNET_SUCCESS) ? 0 : -1;
+        }
+      }
+      break;
+#endif
 #ifdef HAVE_SLIRP_NETWORK
       case ETH_API_NAT:
         sim_slirp_dispatch ((SLIRP*)dev->handle);
@@ -2222,10 +2668,10 @@ pthread_mutex_lock (&dev->writer_lock);
 while (dev->handle) {
   pthread_cond_wait (&dev->writer_cond, &dev->writer_lock);
   while (NULL != (request = dev->write_requests)) {
-    if (dev->handle == NULL)      /* Shutting down? */
-      break;
     /* Pull buffer off request list */
     dev->write_requests = request->next;
+    if (dev->handle == NULL)      /* Shutting down? */
+      break;
     pthread_mutex_unlock (&dev->writer_lock);
 
     if (dev->throttle_delay != ETH_THROT_DISABLED_DELAY) {
@@ -2314,7 +2760,13 @@ dev->throttle_mask = (1 << dev->throttle_burst) - 1;
 return SCPE_OK;
 }
 
-static t_stat _eth_open_port(char *savname, int *eth_api, void **handle, SOCKET *fd_handle, char errbuf[PCAP_ERRBUF_SIZE], char *bpf_filter, void *opaque, DEVICE *dptr, uint32 dbit)
+#if defined(HAVE_VMNET_NETWORK)
+// Because vmnet operates via callbacks, set up a semaphore to block on
+static dispatch_semaphore_t _vmnet_cb_finished = NULL;
+static vmnet_return_t _vmnet_status;
+#endif
+
+static t_stat _eth_open_port(char *savname, int *eth_api, void **handle, SOCKET *fd_handle, char *errbuf, size_t errbuf_size, char *bpf_filter, void *opaque, DEVICE *dptr, uint32 dbit)
 {
 int bufsz = (BUFSIZ < ETH_MAX_PACKET) ? ETH_MAX_PACKET : BUFSIZ;
 
@@ -2326,7 +2778,199 @@ if (bufsz < ETH_MAX_JUMBO_FRAME)
 *fd_handle = 0;
 
 /* attempt to connect device */
-memset(errbuf, 0, PCAP_ERRBUF_SIZE);
+memset(errbuf, 0, errbuf_size);
+
+if (0 == strncmp("udp:", savname, 4)) {
+  char localport[CBUFSIZE], host[CBUFSIZE], port[CBUFSIZE];
+  char hostport[2*CBUFSIZE];
+  const char *devname = savname + 4;
+
+  if (!strcmp(savname, "udp:sourceport:remotehost:remoteport")) {
+    snprintf (errbuf, errbuf_size, "Must specify actual udp host and ports(i.e. udp:1224:somehost.com:2234)");
+    return SCPE_OPENERR;
+    }
+
+  while (isspace(*devname))
+    ++devname;
+    if (SCPE_OK != sim_parse_addr_ex (devname, host, sizeof(host), "localhost", port, sizeof(port), localport, sizeof(localport), NULL)) {
+      return SCPE_OPENERR;
+      }
+
+  if (localport[0] == '\0')
+    strcpy (localport, port);
+  sprintf (hostport, "%s:%s", host, port);
+  if ((SCPE_OK == sim_parse_addr (hostport, NULL, 0, NULL, NULL, 0, NULL, "localhost")) &&
+      (0 == strcmp (localport, port))) {
+    snprintf (errbuf, errbuf_size, "Must specify different udp localhost ports\n");
+    return SCPE_OPENERR;
+    }
+  *fd_handle = sim_connect_sock_ex (localport, hostport, NULL, NULL, SIM_SOCK_OPT_DATAGRAM);
+  if (INVALID_SOCKET == *fd_handle) {
+    snprintf (errbuf, errbuf_size, "Can not open socket %s to %s", localport, hostport);
+    return SCPE_OPENERR;
+    }
+  *eth_api = ETH_API_UDP;
+  *handle = (void *)1;  /* Flag used to indicated open */
+  return SCPE_OK;
+  }
+#if !defined(USE_VMNET_SHARED_AS_NAT)
+if (0 == strncmp("nat:", savname, 4)) {
+#if defined(HAVE_SLIRP_NETWORK)
+  const char *devname = savname + 4;
+
+  while (isspace(*devname))
+    ++devname;
+  if (!(*handle = (void*) sim_slirp_open(devname, opaque, &_slirp_callback, dptr, dbit, errbuf, PCAP_ERRBUF_SIZE))) {
+    snprintf (errbuf, errbuf_size, "Error opening NAT: %s", strerror(errno));
+    return SCPE_OPENERR;
+    }
+  else {
+    *eth_api = ETH_API_NAT;
+    *fd_handle = 0;
+    return SCPE_OK;
+    }
+#else
+  snprintf (errbuf, errbuf_size, "No support for nat: network devices");
+  return SCPE_OPENERR;
+#endif /* defined(HAVE_SLIRP_NETWORK) */
+  }
+#endif /* !defined(USE_VMNET_SHARED_AS_NAT) */
+/* Setting parameters on a vmnet SHARED interface doesn't actually   */
+/* work as described in the documentation.  If, in the future, it    */
+/* does, and the network block can actually be specified along with  */
+/* configuring inbound UDP and TCP port mapping, this can be enabled */
+/* along with implementing any currently missing pieces.             */
+#if defined(HAVE_VMNET_NETWORK)
+xpc_object_t if_desc;
+dispatch_queue_t vmn_queue;
+interface_ref vmn_interface;
+char gbuf[CBUFSIZE];
+char *hostaddr = NULL;
+char *endaddr = NULL;
+char *netmask = NULL;
+
+if_desc = xpc_dictionary_create(NULL, NULL, 0);
+#if defined(USE_VMNET_SHARED_AS_NAT)
+if (0 == strncasecmp(savname, "nat:", 4)) {
+  NAT nat;
+  int err = 0;
+  
+  memset(&nat, 0, sizeof(NAT));
+  xpc_dictionary_set_uint64(if_desc, vmnet_operation_mode_key, VMNET_SHARED_MODE);
+  /* First, start with the original NAT default */
+  sim_nat_parse_args (&nat, "GATEWAY=10.0.2.2,MASKLEN=24,DHCP=10.0.2.15", ETH_API_VMNET, (char *)errbuf, sizeof(errbuf));
+  err = sim_nat_parse_args (&nat, &savname[4], ETH_API_VMNET, (char *)errbuf, sizeof(errbuf));
+  if (err == 0) {
+    if (nat.vdhcp_start.s_addr != INADDR_ANY)
+      hostaddr = strdup (inet_ntoa (nat.vdhcp_start));
+    if (nat.vdhcp_end.s_addr != INADDR_ANY)
+      endaddr = strdup (inet_ntoa (nat.vdhcp_end));
+    if (nat.vnetmask.s_addr != INADDR_ANY)
+      netmask = strdup (inet_ntoa (nat.vnetmask));
+    if (hostaddr)
+      xpc_dictionary_set_string(if_desc, vmnet_start_address_key, hostaddr);
+    if (endaddr)
+      xpc_dictionary_set_string(if_desc, vmnet_end_address_key, endaddr);
+    if (netmask)
+      xpc_dictionary_set_string(if_desc, vmnet_host_subnet_mask_key, netmask);
+    xpc_dictionary_set_bool(if_desc, vmnet_enable_isolation_key, TRUE);
+    }
+  // Need NAT parameter parsing, TCP and UDP port allowances and setup
+  }
+else {
+#else /* !defined(USE_VMNET_SHARED_AS_NAT) */
+if (1) {
+#endif /* !defined(USE_VMNET_SHARED_AS_NAT) */
+  if (0 == strncasecmp(savname, "tap:", 4)) {
+    const char *tptr = savname + 4;
+    unsigned char net_uuid[16];
+    NAT nat;
+    int err = 0;
+
+    memset(&nat, 0, sizeof(nat));
+    xpc_dictionary_set_uint64(if_desc, vmnet_operation_mode_key, VMNET_HOST_MODE);
+    tptr = get_glyph_nc (tptr, gbuf, ',');
+    _eth_tap_uuid (gbuf, net_uuid);
+    xpc_dictionary_set_uuid(if_desc, vmnet_network_identifier_key, net_uuid);
+    if ((tptr != NULL) && (*tptr != '\0')) {
+      err = sim_nat_parse_args (&nat, tptr, ETH_API_VMNET, (char *)errbuf, sizeof(errbuf));
+      if (err != 0) {
+        xpc_release(if_desc);
+        snprintf (errbuf, errbuf_size, "Error parsing vmnet tap: device parameters");
+        return SCPE_OPENERR;
+        }
+      if (nat.vgateway.s_addr != INADDR_ANY)
+        hostaddr = strdup (inet_ntoa (nat.vgateway));
+      if (nat.vnetmask.s_addr != INADDR_NONE)
+        netmask = strdup (inet_ntoa (nat.vnetmask));
+      if (((hostaddr != NULL) && (netmask == NULL)) ||
+          ((hostaddr == NULL) && (netmask != NULL))){
+        free(hostaddr);
+        free(endaddr);
+        free(netmask);
+        xpc_release(if_desc);
+        snprintf (errbuf, errbuf_size, "Both the HOSTIP and MASKLEN must be specified together vmnet host (tap:) device");
+        return SCPE_OPENERR;
+        }
+      if (hostaddr)
+        xpc_dictionary_set_string(if_desc, vmnet_host_ip_address_key, hostaddr);
+      if (netmask)
+        xpc_dictionary_set_string(if_desc, vmnet_host_subnet_mask_key, netmask);
+      }
+    }
+  else { // Bridged, so check if we've got a reasonable device name
+    xpc_object_t interface_list = vmnet_copy_shared_interface_list();
+    int i, interface_count = xpc_array_get_count(interface_list);
+
+    for (i=0; i<interface_count; i++) {
+      xpc_object_t element = xpc_array_get_value(interface_list, i);
+
+      if (0 == strcmp(savname, xpc_string_get_string_ptr(element)))
+        break;
+      }
+    if (i == interface_count) { /* Not found? */
+      free(hostaddr);
+      free(endaddr);
+      free(netmask);
+      xpc_release(if_desc);
+      snprintf (errbuf, errbuf_size, "You must specify either an appropriate vmnet bridged interface or a tap:");
+      return SCPE_OPENERR;
+      }
+    xpc_dictionary_set_uint64(if_desc, vmnet_operation_mode_key, VMNET_BRIDGED_MODE);
+    xpc_dictionary_set_string(if_desc, vmnet_shared_interface_name_key, savname);
+    }
+  }
+
+vmn_queue = dispatch_get_global_queue(QOS_CLASS_UTILITY, 0);
+
+_vmnet_cb_finished = dispatch_semaphore_create(0);
+
+vmn_interface = vmnet_start_interface(if_desc, vmn_queue, ^(vmnet_return_t status, xpc_object_t params)
+  {
+  _vmnet_status = status;
+  dispatch_semaphore_signal(_vmnet_cb_finished);
+  });
+
+dispatch_semaphore_wait(_vmnet_cb_finished, DISPATCH_TIME_FOREVER);
+dispatch_release(_vmnet_cb_finished);
+_vmnet_cb_finished = NULL;
+free(hostaddr);
+free(endaddr);
+free(netmask);
+xpc_release(if_desc);
+
+if (_vmnet_status != VMNET_SUCCESS) {
+  if (!_eth_running_as_root())
+    snprintf (errbuf, errbuf_size, "Failed to create vmnet connection for %s - %s.  You may need to run as root", savname, _vmnet_status_string(_vmnet_status));
+  else
+    snprintf (errbuf, errbuf_size, "Failed to create vmnet connection for %s - %s.", savname, _vmnet_status_string(_vmnet_status));
+  return SCPE_OPENERR;
+  }
+
+*eth_api = ETH_API_VMNET;
+*handle = (void *)vmn_interface;  /* Flag used to indicated open */
+return SCPE_OK;
+#else /* !defined(HAVE_VMNET_NETWORK) */
 if (0 == strncmp("tap:", savname, 4)) {
   int  tun = -1;    /* TUN/TAP Socket */
   int  on = 1;
@@ -2335,8 +2979,10 @@ if (0 == strncmp("tap:", savname, 4)) {
   while (isspace(*devname))
       ++devname;
 #if defined(HAVE_TAP_NETWORK)
-  if (!strcmp(savname, "tap:tapN"))
-    return sim_messagef (SCPE_OPENERR, "Eth: Must specify actual tap device name (i.e. tap:tap0)\n");
+  if (!strcmp(savname, "tap:tapN")) {
+    snprintf (errbuf, errbuf_size, "Must specify actual tap device name (i.e. tap:tap0)\n");
+    return SCPE_OPENERR;
+    }
 #endif
 #if (defined(__linux) || defined(__linux__)) && defined(HAVE_TAP_NETWORK)
   if ((tun = open("/dev/net/tun", O_RDWR)) >= 0) {
@@ -2350,7 +2996,7 @@ if (0 == strncmp("tap:", savname, 4)) {
     /* Send interface requests to TUN/TAP driver. */
     if (ioctl(tun, TUNSETIFF, &ifr) >= 0) {
       if (ioctl(tun, FIONBIO, &on)) {
-        strlcpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE);
+        strlcpy(errbuf, strerror(errno), errbuf_size);
         close(tun);
         tun = -1;
         }
@@ -2360,10 +3006,10 @@ if (0 == strncmp("tap:", savname, 4)) {
         }
       }
     else
-      strlcpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE);
+      strlcpy(errbuf, strerror(errno), errbuf_size);
     }
   else
-    strlcpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE);
+    strlcpy(errbuf, strerror(errno), errbuf_size);
   if ((tun >= 0) && (errbuf[0] != 0)) {
     close(tun);
     tun = -1;
@@ -2377,7 +3023,7 @@ if (0 == strncmp("tap:", savname, 4)) {
 
     if ((tun = open(dev_name, O_RDWR)) >= 0) {
       if (ioctl(tun, FIONBIO, &on)) {
-        strlcpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE);
+        strlcpy(errbuf, strerror(errno), errbuf_size);
         close(tun);
         tun = -1;
         }
@@ -2398,7 +3044,7 @@ if (0 == strncmp("tap:", savname, 4)) {
           if (ioctl(s, SIOCGIFFLAGS, (caddr_t)&ifr) >= 0) {
             ifr.ifr_flags |= IFF_UP;
             if (ioctl(s, SIOCSIFFLAGS, (caddr_t)&ifr)) {
-              strlcpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE);
+              strlcpy(errbuf, strerror(errno), errbuf_size);
               close(tun);
               tun = -1;
               }
@@ -2409,164 +3055,121 @@ if (0 == strncmp("tap:", savname, 4)) {
 #endif
       }
     else
-      strlcpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE);
+      strlcpy(errbuf, strerror(errno), errbuf_size);
     if ((tun >= 0) && (errbuf[0] != 0)) {
       close(tun);
       tun = -1;
       }
     }
 #else
-  strlcpy(errbuf, "No support for tap: devices", PCAP_ERRBUF_SIZE);
+  strlcpy(errbuf, "No support for tap: devices", errbuf_size);
 #endif /* !defined(__linux) && !defined(HAVE_BSDTUNTAP) */
   if (0 == errbuf[0]) {
     *eth_api = ETH_API_TAP;
     *handle = (void *)1;  /* Flag used to indicated open */
+    return SCPE_OK;
+    }
+  return SCPE_OPENERR;
+  }
+if (0 == strncmp("vde:", savname, 4)) {
+#if defined(HAVE_VDE_NETWORK)
+  if (eth_vde_network_available) {
+    char vdeswitch_s[CBUFSIZE]; /* VDE switch name */
+    char vdeport_s[CBUFSIZE];   /* VDE switch port (optional), numeric */
+
+    struct vde_open_args voa;
+    const char *devname = savname + 4;
+
+    memset(&voa, 0, sizeof(voa));
+    if (!strcmp(savname, "vde:vdedevice")) {
+      snprintf (errbuf, errbuf_size, "Must specify actual vde device name (i.e. vde:/tmp/switch)\n");
+      return SCPE_OPENERR;
+      }
+    while (isspace(*devname))
+      ++devname;
+    devname = get_glyph_nc (devname, vdeswitch_s, ':'); /* Extract switch name          */
+    devname = get_glyph_nc (devname, vdeport_s, 0);     /* Extract optional port number */
+
+    if (vdeport_s[0]) {                                 /* port provided? */
+      t_stat r;
+
+      voa.port = (int)get_uint (vdeport_s, 10, 255, &r);
+      if (r != SCPE_OK) {
+        snprintf (errbuf, errbuf_size, "Invalid vde port number: %s in %s\n", vdeport_s, savname);
+        return SCPE_OPENERR;
+        }
+      }
+
+    if (!(*handle = (void*) p_vde_open_real((char *)vdeswitch_s, (char *)"simh", LIBVDEPLUG_INTERFACE_VERSION, &voa)))
+      strlcpy(errbuf, strerror(errno), errbuf_size);
+    else {
+      *eth_api = ETH_API_VDE;
+      *fd_handle = (SOCKET)p_vde_datafd((VDECONN*)(*handle));
+      return SCPE_OK;
+      }
+    }
+  else
+    strlcpy(errbuf, "No support for vde: network devices", errbuf_size);
+#else
+  strlcpy(errbuf, "No support for vde: network devices", errbuf_size);
+#endif /* defined(HAVE_VDE_NETWORK) */
+  }
+#if defined(HAVE_PCAP_NETWORK)
+*handle = (void*) pcap_open_live(savname, bufsz, ETH_PROMISC, PCAP_READ_TIMEOUT, errbuf);
+#if !defined(__CYGWIN__) && !defined(__VMS) && !defined(_WIN32)
+if (!*handle) { /* can't open device */
+  if (strstr (errbuf, "That device is not up")) {
+    char command[1024];
+
+    /* try to force an otherwise unused interface to be turned on */
+    snprintf(command, sizeof(command), (sim_get_tool_path ("ifconfig")[0] != '\0') ? "ifconfig %s up" : "ip link set dev %s up", savname);
+    if (system(command)) {};
+    errbuf[0] = '\0';
+    *handle = (void*) pcap_open_live(savname, bufsz, ETH_PROMISC, PCAP_READ_TIMEOUT, errbuf);
     }
   }
-else { /* !tap: */
-  if (0 == strncmp("vde:", savname, 4)) {
-#if defined(HAVE_VDE_NETWORK)
-    if (eth_vde_network_available) {
-      char vdeswitch_s[CBUFSIZE]; /* VDE switch name */
-      char vdeport_s[CBUFSIZE];   /* VDE switch port (optional), numeric */
-
-      struct vde_open_args voa;
-      const char *devname = savname + 4;
-
-      memset(&voa, 0, sizeof(voa));
-      if (!strcmp(savname, "vde:vdedevice"))
-        return sim_messagef (SCPE_OPENERR, "Eth: Must specify actual vde device name (i.e. vde:/tmp/switch)\n");
-      while (isspace(*devname))
-        ++devname;
-      devname = get_glyph_nc (devname, vdeswitch_s, ':'); /* Extract switch name          */
-      devname = get_glyph_nc (devname, vdeport_s, 0);     /* Extract optional port number */
-
-      if (vdeport_s[0]) {                                 /* port provided? */
-        t_stat r;
-
-        voa.port = (int)get_uint (vdeport_s, 10, 255, &r);
-        if (r != SCPE_OK)
-            return sim_messagef (SCPE_OPENERR, "Eth: Invalid vde port number: %s in %s\n", vdeport_s, savname);
-        }
-
-      if (!(*handle = (void*) p_vde_open_real((char *)vdeswitch_s, (char *)"simh", LIBVDEPLUG_INTERFACE_VERSION, &voa)))
-        strlcpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE);
-      else {
-        *eth_api = ETH_API_VDE;
-        *fd_handle = (SOCKET)p_vde_datafd((VDECONN*)(*handle));
-        }
-      }
-    else
-      strlcpy(errbuf, "No support for vde: network devices", PCAP_ERRBUF_SIZE);
-#else
-    strlcpy(errbuf, "No support for vde: network devices", PCAP_ERRBUF_SIZE);
-#endif /* defined(HAVE_VDE_NETWORK) */
-    }
-  else { /* !vde: */
-    if (0 == strncmp("nat:", savname, 4)) {
-#if defined(HAVE_SLIRP_NETWORK)
-      const char *devname = savname + 4;
-
-      while (isspace(*devname))
-        ++devname;
-      if (!(*handle = (void*) sim_slirp_open(devname, opaque, &_slirp_callback, dptr, dbit, errbuf, PCAP_ERRBUF_SIZE)))
-        strlcpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE);
-      else {
-        *eth_api = ETH_API_NAT;
-        *fd_handle = 0;
-        }
-#else
-      strlcpy(errbuf, "No support for nat: network devices", PCAP_ERRBUF_SIZE);
-#endif /* defined(HAVE_SLIRP_NETWORK) */
-      }
-    else { /* not nat: */
-      if (0 == strncmp("udp:", savname, 4)) {
-        char localport[CBUFSIZE], host[CBUFSIZE], port[CBUFSIZE];
-        char hostport[2*CBUFSIZE];
-        const char *devname = savname + 4;
-
-        if (!strcmp(savname, "udp:sourceport:remotehost:remoteport"))
-          return sim_messagef (SCPE_OPENERR, "Eth: Must specify actual udp host and ports(i.e. udp:1224:somehost.com:2234)\n");
-
-        while (isspace(*devname))
-          ++devname;
-        if (SCPE_OK != sim_parse_addr_ex (devname, host, sizeof(host), "localhost", port, sizeof(port), localport, sizeof(localport), NULL))
-          return SCPE_OPENERR;
-
-        if (localport[0] == '\0')
-          strcpy (localport, port);
-        sprintf (hostport, "%s:%s", host, port);
-        if ((SCPE_OK == sim_parse_addr (hostport, NULL, 0, NULL, NULL, 0, NULL, "localhost")) &&
-            (0 == strcmp (localport, port)))
-          return sim_messagef (SCPE_OPENERR, "Eth: Must specify different udp localhost ports\n");
-        *fd_handle = sim_connect_sock_ex (localport, hostport, NULL, NULL, SIM_SOCK_OPT_DATAGRAM);
-        if (INVALID_SOCKET == *fd_handle)
-          return SCPE_OPENERR;
-        *eth_api = ETH_API_UDP;
-        *handle = (void *)1;  /* Flag used to indicated open */
-        }
-      else { /* not udp:, so attempt to open the parameter as if it were an explicit device name */
-#if defined(HAVE_PCAP_NETWORK)
-        *handle = (void*) pcap_open_live(savname, bufsz, ETH_PROMISC, PCAP_READ_TIMEOUT, errbuf);
-#if !defined(__CYGWIN__) && !defined(__VMS) && !defined(_WIN32)
-        if (!*handle) { /* can't open device */
-          if (strstr (errbuf, "That device is not up")) {
-            char command[1024];
-
-            /* try to force an otherwise unused interface to be turned on */
-            snprintf(command, sizeof(command), (sim_get_tool_path ("ifconfig")[0] != '\0') ? "ifconfig %s up" : "ip link set dev %s up", savname);
-            if (system(command)) {};
-            errbuf[0] = '\0';
-            *handle = (void*) pcap_open_live(savname, bufsz, ETH_PROMISC, PCAP_READ_TIMEOUT, errbuf);
-            }
-          }
 #endif
-        if (!*handle)  /* can't open device */
-          return sim_messagef (SCPE_OPENERR, "Eth: pcap_open_live error - %s\n", errbuf);
-        *eth_api = ETH_API_PCAP;
+if (!*handle)  /* can't open device */
+  return SCPE_OPENERR;
+*eth_api = ETH_API_PCAP;
 #if !defined(HAS_PCAP_SENDPACKET) && defined (xBSD) && !defined (__APPLE__)
-        /* Tell the kernel that the header is fully-formed when it gets it.
-           This is required in order to fake the src address. */
-        if (1) {
-          int one = 1;
-          ioctl(pcap_fileno(*handle), BIOCSHDRCMPLT, &one);
-          }
+/* Tell the kernel that the header is fully-formed when it gets it.
+   This is required in order to fake the src address. */
+if (1) {
+  int one = 1;
+  ioctl(pcap_fileno(*handle), BIOCSHDRCMPLT, &one);
+  }
 #endif /* xBSD */
 #if defined(_WIN32)
-        if ((pcap_setmintocopy ((pcap_t*)(*handle), 0) == -1) ||
-            (pcap_getevent ((pcap_t*)(*handle)) == NULL)) {
-          pcap_close ((pcap_t*)(*handle));
-          errbuf[PCAP_ERRBUF_SIZE-1] = '\0';
-          snprintf (errbuf, PCAP_ERRBUF_SIZE-1, "pcap can't initialize API for interface: %s", savname);
-          return SCPE_OPENERR;
-          }
+if ((pcap_setmintocopy ((pcap_t*)(*handle), 0) == -1) ||
+    (pcap_getevent ((pcap_t*)(*handle)) == NULL)) {
+  pcap_close ((pcap_t*)(*handle));
+  snprintf (errbuf, errbuf_size, "pcap can't initialize API for interface: %s", savname);
+  return SCPE_OPENERR;
+  }
 #endif
 #if !defined (USE_READER_THREAD)
 #ifdef USE_SETNONBLOCK
-        /* set ethernet device non-blocking so pcap_dispatch() doesn't hang */
-        if (pcap_setnonblock (*handle, 1, errbuf) == -1) {
-          sim_printf ("Eth: Failed to set non-blocking: %s\n", errbuf);
-          }
+/* set ethernet device non-blocking so pcap_dispatch() doesn't hang */
+if (pcap_setnonblock (*handle, 1, errbuf) == -1) {
+  sim_printf ("Eth: Failed to set non-blocking: %s\n", errbuf);
+  }
 #endif
 #if defined (__APPLE__)
-        if (1) {
-          /* Deliver packets immediately, needed for OS X 10.6.2 and later
-           * (Snow-Leopard).
-           * See this thread on libpcap and Mac Os X 10.6 Snow Leopard on
-           * the tcpdump mailinglist: http://seclists.org/tcpdump/2010/q1/110
-           */
-          int v = 1;
-          ioctl(pcap_fileno(*handle), BIOCIMMEDIATE, &v);
-          }
+if (1) {
+  /* Deliver packets immediately, needed for OS X 10.6.2 and later
+   * (Snow-Leopard).
+   * See this thread on libpcap and Mac Os X 10.6 Snow Leopard on
+   * the tcpdump mailinglist: http://seclists.org/tcpdump/2010/q1/110
+   */
+  int v = 1;
+  ioctl(pcap_fileno(*handle), BIOCIMMEDIATE, &v);
+  }
 #endif /* defined (__APPLE__) */
 #endif /* !defined (USE_READER_THREAD) */
 #else
-        strlcpy (errbuf, "Unknown or unsupported network device", PCAP_ERRBUF_SIZE);
+strlcpy (errbuf, "Unknown or unsupported network device", errbuf_size);
 #endif /* defined(HAVE_PCAP_NETWORK) */
-        } /* not udp:, so attempt to open the parameter as if it were an explicit device name */
-      } /* !nat: */
-    } /* !vde: */
-  } /* !tap: */
 if (errbuf[0])
   return SCPE_OPENERR;
 
@@ -2601,8 +3204,11 @@ if (bpf_filter && (*eth_api == ETH_API_PCAP)) {
     }
   }
 #endif /* USE_BPF */
+#endif /* defined(HAVE_VMNET_NETWORK) */
 return SCPE_OK;
 }
+
+static t_stat _eth_close_port(int eth_api, pcap_t *pcap, SOCKET pcap_fd);
 
 t_stat eth_open(ETH_DEV* dev, const char* name, DEVICE* dptr, uint32 dbit)
 {
@@ -2610,6 +3216,7 @@ t_stat r;
 int bufsz = (BUFSIZ < ETH_MAX_PACKET) ? ETH_MAX_PACKET : BUFSIZ;
 char errbuf[PCAP_ERRBUF_SIZE];
 char temp[1024], desc[1024] = "";
+char info[ETH_DEV_INFO_MAX] = "";
 const char* savname = name;
 char namebuf[4*CBUFSIZE];
 int   num;
@@ -2629,19 +3236,20 @@ if ((strlen(name) == 4 || strlen(name) == 5)
     && (strlen(name) == 4 || isdigit(name[4]))
    ) {
   num = atoi(&name[3]);
-  savname = _eth_getname(num, temp, desc);
+  savname = _eth_getname(num, temp, desc, info);
   if (savname == NULL) /* didn't translate */
     return SCPE_OPENERR;
   }
 else {
   /* are they trying to use device description? */
-  savname = eth_getname_bydesc(name, temp, desc);
+  savname = _eth_getname_bydesc(name, temp, desc, info);
   if (savname == NULL) { /* didn't translate */
     /* probably is not ethX and has no description */
-    savname = eth_getname_byname(name, temp, desc);
+    savname = _eth_getname_byname(name, temp, desc, info);
     if (savname == NULL) {/* didn't translate */
       savname = name;
       desc[0] = '\0';   /* no description */
+      info[0] = '\0';   /* or info */
       }
     }
   }
@@ -2654,19 +3262,34 @@ if (strchr (namebuf, ':')) {
             namebuf[num] = tolower (namebuf[num]);
     }
 savname = namebuf;
-r = _eth_open_port(namebuf, &dev->eth_api, &dev->handle, &dev->fd_handle, errbuf, NULL, (void *)dev, dptr, dbit);
+r = _eth_open_port(namebuf, &dev->eth_api, &dev->handle, &dev->fd_handle, errbuf, sizeof(errbuf), NULL, (void *)dev, dptr, dbit);
 
 if (errbuf[0])
   return sim_messagef (SCPE_OPENERR, "Eth: open error - %s\n", errbuf);
 if (r != SCPE_OK)
   return r;
 
+if (NULL != strstr(info, "MediaState: disconnected")) {
+  if (!(sim_switches & SWMASK('F'))) {
+   _eth_close_port (dev->eth_api, (pcap_t *)dev->handle, dev->fd_handle);
+    dev->eth_api = 0;
+    dev->handle = NULL;
+    dev->fd_handle = 0;
+    return sim_messagef (SCPE_OPENERR, "Eth: OS device %s is disconnected\n", savname);
+    }
+  else {
+    sim_messagef (SCPE_OK, "Eth: OS device %s is disconnected\n", savname);
+    }
+  }
+
 if (!strcmp (desc, "No description available"))
     strcpy (desc, "");
 sim_messagef (SCPE_OK, "Eth: opened OS device %s%s%s\n", savname, desc[0] ? " - " : "", desc);
 
 /* get the NIC's hardware MAC address */
-eth_get_nic_hw_addr(dev, savname, 1);
+eth_get_nic_hw_addr(dev, savname, 1, NULL);
+if (dev->have_host_nic_phy_addr)
+  dev->host_nic_is_wifi = (NULL != strstr(info, "LinkType: WiFi"));
 
 /* save name of device */
 dev->name = (char *)malloc(strlen(savname)+1);
@@ -2734,6 +3357,15 @@ switch (eth_api) {
     sim_slirp_close((SLIRP*)pcap);
     break;
 #endif
+#ifdef HAVE_VMNET_NETWORK
+  case ETH_API_VMNET:
+    {
+      dispatch_queue_t stop_queue;
+      stop_queue = dispatch_get_global_queue(QOS_CLASS_UTILITY, 0);
+      vmnet_stop_interface((interface_ref)pcap, stop_queue, ^(vmnet_return_t status){});
+    }
+    break;
+#endif
   case ETH_API_UDP:
     sim_close_sock(pcap_fd);
     break;
@@ -2795,6 +3427,14 @@ static char version[300] = "";
 
 if (version[0] != '\0')
   return version;
+#if defined(HAVE_VMNET_NETWORK)
+ strlcat (version, "PCAP(vmnet - bridged), TAP(vmnet - host)", sizeof (version));
+#if defined(USE_VMNET_SHARED_AS_NAT)
+ strlcat (version, ", NAT(vmnet - shared), UDP", sizeof (version));
+#else /* !defined(USE_VMNET_SHARED_AS_NAT) */
+ strlcat (version, ", NAT(SLiRP), UDP", sizeof (version));
+#endif /* !defined(USE_VMNET_SHARED_AS_NAT) */
+#else /* !defined(HAVE_VMNET_NETWORK) */
 #if defined(HAVE_SLIRP_NETWORK)
 if (version[0] != '\0')
   strlcat (version, ", ", sizeof (version));
@@ -2831,6 +3471,7 @@ if (strstr (pcap_lib_version(), "Npcap") != NULL) {
   }
 strlcat (version, pcap_lib_version(), sizeof (version));
 #endif
+#endif /* !HAVE_VMNET_VERSION */
 return version;
 }
 
@@ -2838,8 +3479,25 @@ t_stat eth_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const cha
 {
 fprintf (st, "%s attach help\n\n", dptr->name);
 fprintf (st, "   sim> SHOW ETHERNET\n");
-fprintf (st, "   Ethernet Packet Info: NAT, TAP, VDE, UDP, PCAP: libpcap version 1.10.1 (with TPACKET_V3)\n");
+fprintf (st, "   Ethernet Packet Info: %s\n", eth_version());
 fprintf (st, "   ETH devices:\n");
+#if defined(HAVE_VMNET_NETWORK)
+fprintf (st, "    eth0   en0                                  (Integrated bridged network (vmnet) support\n");
+fprintf (st, "                                                 Host IPv4 Address: 192.168.86.114/24\n");
+fprintf (st, "                                                 LinkType: Ethernet\n");
+fprintf (st, "                                                 MediaState: connected)\n");
+fprintf (st, "    eth1   en1                                  (Integrated bridged network (vmnet) support\n");
+fprintf (st, "                                                 LinkType: WiFi\n");
+fprintf (st, "                                                 MediaState: disconnected)\n");
+fprintf (st, "    eth2   tap:tapN{,HOSTIP=address/masklen}    (Integrated host-only (vmnet) support)\n");
+#if defined(USE_VMNET_SHARED_AS_NAT)
+fprintf (st, "    eth3   nat:{optional-nat-parameters}        (Integrated NAT (vmnet) support)\n");
+#else
+#if defined(HAVE_SLIRP_NETWORK)
+fprintf (st, "    eth3   nat:{optional-nat-parameters}        (Integrated NAT (SLiRP) support)\n");
+#endif
+#endif
+#else /* !defined(HAVE_VMNET_NETWORK) */
 fprintf (st, "    eth0   en0                                  (No description available)\n");
 #if defined(HAVE_TAP_NETWORK)
 fprintf (st, "    eth1   tap:tapN                             (Integrated Tun/Tap support)\n");
@@ -2851,12 +3509,20 @@ if (eth_vde_network_available)
 #if defined(HAVE_SLIRP_NETWORK)
 fprintf (st, "    eth3   nat:{optional-nat-parameters}        (Integrated NAT (SLiRP) support)\n");
 #endif
+#endif /* !defined(HAVE_VMNET_NETWORK) */
 fprintf (st, "    eth4   udp:sourceport:remotehost:remoteport (Integrated UDP bridge support)\n");
 fprintf (st, "   sim> ATTACH %s eth0\n\n", dptr->name);
 fprintf (st, "or equivalently:\n\n");
 fprintf (st, "   sim> ATTACH %s en0\n\n", dptr->name);
-#if defined(HAVE_SLIRP_NETWORK)
-sim_slirp_attach_help (st, dptr, uptr, flag, cptr);
+fprintf (st, "Additionally:\n\n");
+fprintf (st, "   sim> ATTACH %s en1\n", dptr->name);
+fprintf (st, "   %%SIM-ERROR: Eth: OS device en1 is disconnected\n");
+fprintf (st, "To force a connection to a currently disconnected device:\n\n");
+fprintf (st, "   sim> ATTACH -F %s en1\n", dptr->name);
+fprintf (st, "   %%SIM-INFO: Eth: OS device en1 is disconnected\n");
+fprintf (st, "   %%SIM-INFO: Eth: opened OS device en1 - Integrated bridged network (vmnet) support\n\n");
+#if defined(HAVE_SLIRP_NETWORK) || defined(HAVE_VMNET_NETWORK)
+sim_nat_attach_help (st, dptr, uptr, flag, cptr);
 #endif
 return SCPE_OK;
 }
@@ -3069,12 +3735,21 @@ switch (dev->eth_api) {
   case ETH_API_NAT:
       netname = "nat";
       break;
+  case ETH_API_VMNET:
+      netname = "vmnet";
+      break;
   }
 sprintf(msg, "%s(%s): ", where, netname);
 switch (dev->eth_api) {
 #if defined(HAVE_PCAP_NETWORK)
   case ETH_API_PCAP:
       sim_printf ("%s%s\n", msg, pcap_geterr ((pcap_t*)dev->handle));
+      break;
+#endif
+#if defined(HAVE_VMNET_NETWORK)
+  case ETH_API_VMNET:
+      /* XXX: vmnet errors aren't global */
+      sim_printf ("%s\n", msg);
       break;
 #endif
   default:
@@ -3114,7 +3789,7 @@ if (dev->error_needs_reset) {
   _eth_close_port(dev->eth_api, (pcap_t *)dev->handle, dev->fd_handle);
   sim_os_sleep (ETH_ERROR_REOPEN_PAUSE);
 
-  r = _eth_open_port(dev->name, &dev->eth_api, &dev->handle, &dev->fd_handle, errbuf, dev->bpf_filter, (void *)dev, dev->dptr, dev->dbit);
+  r = _eth_open_port(dev->name, &dev->eth_api, &dev->handle, &dev->fd_handle, errbuf, sizeof(errbuf), dev->bpf_filter, (void *)dev, dev->dptr, dev->dbit);
   dev->error_needs_reset = FALSE;
   if (r == SCPE_OK)
     sim_printf ("%s ReOpened: %s \n", msg, dev->name);
@@ -3196,6 +3871,27 @@ if ((packet->len >= ETH_MIN_PACKET) && (packet->len <= ETH_MAX_PACKET)) {
         status = 0;
       else
         status = 1;
+      break;
+#endif
+#ifdef HAVE_VMNET_NETWORK
+    case ETH_API_VMNET:
+      {
+        vmnet_return_t ret;
+        int count = 1;
+        struct vmpktdesc pkt_desc;
+        struct iovec iov;
+
+        iov.iov_base = packet->msg;
+        iov.iov_len = packet->len;
+
+        pkt_desc.vm_pkt_size = packet->len;
+        pkt_desc.vm_pkt_iov = &iov;
+        pkt_desc.vm_pkt_iovcnt = 1;
+        pkt_desc.vm_flags = 0;
+
+        ret = vmnet_write((interface_ref)dev->handle, &pkt_desc, &count);
+        status = ((ret == VMNET_SUCCESS) && (count > 0)) ? 0 : 1;
+      }
       break;
 #endif
     case ETH_API_UDP:
@@ -3821,6 +4517,7 @@ switch (dev->eth_api) {
   case ETH_API_VDE:
   case ETH_API_UDP:
   case ETH_API_NAT:
+  case ETH_API_VMNET:
     bpf_used = 0;
     to_me = 0;
     eth_packet_trace (dev, data, header->len, "received");
@@ -4017,6 +4714,37 @@ do {
         }
       break;
 #endif /* HAVE_VDE_NETWORK */
+#ifdef HAVE_VMNET_NETWORK
+    case ETH_API_VMNET:
+      {
+        vmnet_return_t ret;
+        int count = 1;
+        struct pcap_pkthdr header;
+        struct vmpktdesc pkt_desc;
+        struct iovec iov;
+
+        // XXX: Should be MTU returned from vmnet startup?
+        u_char buf[ETH_MAX_JUMBO_FRAME];
+
+        iov.iov_base = buf;
+        iov.iov_len = ETH_MAX_JUMBO_FRAME;
+
+        pkt_desc.vm_pkt_size = ETH_MAX_JUMBO_FRAME;
+        pkt_desc.vm_pkt_iov = &iov;
+        pkt_desc.vm_pkt_iovcnt = 1;
+        pkt_desc.vm_flags = 0;
+
+        ret = vmnet_read((interface_ref)dev->handle, &pkt_desc, &count);
+        if ((ret == VMNET_SUCCESS) && (count > 0)) {
+          status = 1;
+          header.caplen = header.len = pkt_desc.vm_pkt_size;
+          _eth_callback((u_char *)dev, &header, buf);
+        } else {
+          status = (ret == VMNET_SUCCESS) ? 0 : -1;
+        }
+      }
+      break;
+#endif
     case ETH_API_UDP:
       if (1) {
         struct pcap_pkthdr header;
@@ -4349,6 +5077,8 @@ if (dev->have_host_nic_phy_addr) {
 
   eth_mac_fmt(&dev->host_nic_phy_hw_addr, hw_mac);
   fprintf(st, "  Host NIC Address:        %s\n", hw_mac);
+  if (dev->host_nic_is_wifi)
+      fprintf(st, "  Host NIC is WiFi:        Yes\n");
   }
 if (dev->jumbo_dropped)
   fprintf(st, "  Jumbo Dropped:           %d\n", dev->jumbo_dropped);
