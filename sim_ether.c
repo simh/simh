@@ -2810,7 +2810,7 @@ if (0 == strncmp("udp:", savname, 4)) {
     }
   *fd_handle = sim_connect_sock_ex (localport, hostport, NULL, NULL, SIM_SOCK_OPT_DATAGRAM);
   if (INVALID_SOCKET == *fd_handle) {
-    snprintf (errbuf, errbuf_size, "Can not open socket %s to %s", localport, hostport);
+    snprintf (errbuf, errbuf_size, "Can not open socket %1.64s to %1.64s", localport, hostport);
     return SCPE_OPENERR;
     }
   *eth_api = ETH_API_UDP;
