@@ -31,7 +31,7 @@ before_build:
           sudo apt-get install -ym gcc libpcap-dev libvdeplug-dev libpcre3-dev libedit-dev libsdl2-dev libpng-dev libsdl2-ttf-dev
         } else {
           if ($platform -eq 'Darwin') {
-            $env:HOMEBREW_NO_AUTO_UPDATE=1; brew install vde pcre libedit sdl2 libpng zlib sdl2_ttf make git-lfs
+            $env:HOMEBREW_NO_AUTO_UPDATE=1; brew install pcre libedit sdl2 libpng zlib sdl2_ttf make git-lfs
           }
         }
         git lfs install
@@ -75,75 +75,75 @@ on_success:
   - git config --global user.name "Mark Pizzolato"
   - git config --global core.autocrlf false
 # Linux & macOS use the shell to address this, Windows uses cmd. Powershell on Windows doesn't like git output to stderr
-  - sh: |
-        if test -d ../Development-Binaries
-        then
-          pushd ../Development-Binaries
-          git pull origin master
-          popd
-        else
-          pushd ..
-          git clone -q "https://github.com/simh/Development-Binaries" Development-Binaries
-          popd
-        fi
-  - cmd: |
-         if NOT EXIST ..\Development-Binaries pushd .. & git clone -q "https://github.com/simh/Development-Binaries" Development-Binaries & popd
-         pushd ..\Development-Binaries & git pull origin master & popd
-  - ps: |
-        cd ../Development-Binaries
-        $pkg_filename = "simh-$datetime-$platform-$arch-$version_major.$version_minor-$version_mode-$id"
-        if ($isWindows) {
-          $pkg_filename = $pkg_filename + '.zip'
-          Compress-Archive -Path $env:APPVEYOR_BUILD_FOLDER\BIN\NT\Win32-Release\*.exe -DestinationPath "$pkg_filename"
-        } else {
-          $pkg_filename = $pkg_filename + '.tgz'
-          pushd $env:APPVEYOR_BUILD_FOLDER/BIN
-          tar -cvzf ../../Development-Binaries/$pkg_filename --exclude=buildtools --exclude=NT '--exclude=*-build'  *
-          popd
-        }
-        "$platform Build results for simh Commit: https://github.com/simh/simh/commit/$id" | Out-File -FilePath ../pkg_commit_message -Encoding Ascii
-        (Get-Content README.md) -replace ('(\['+$platform+' is here\]\(https\:\/\/github\.com\/simh\/Development-Binaries\/blob\/master\/)([a-zA-Z0-9._-]+)(.+\.)'),('$1'+$pkg_filename+'$3') | Out-File -FilePath README.md -Encoding Ascii
-        $recent_saved_commit = git log -1  --grep="$platform Build" --pretty=format:%H
-        $recent_saved_commit_time = git log -1 --pretty="%at" $recent_saved_commit
-        $oneweek=$((60 * 60 * 24 * 7))
-        # Only update the https://github.com/simh/DevelopmentBinaries repository 
-        # during CI/CD processing of direct commits pushed to the 
-        # https://github.com/simh/simh repository (i.e. don't update the
-        # DevelopmentBinaries when CI/CD actions are being done on external
-        # pull requests.
-        # Additionally, only update the https://github.com/simh/DevelopmentBinaries 
-        # repository if the current build for this platform is one week or more 
-        # from the last saved build for this platform in the repository
-        if (((Get-Date -UFormat %s) -gt $recent_saved_commit_time + $oneweek) -and 
-            ("$env:APPVEYOR_PULL_REQUEST_NUMBER" -eq "") -and 0) {
-          ("$platform Build") | Out-File -FilePath ../Save-Build-Results
-        }
-        Write-Output "Building repo '$env:APPVEYOR_REPO_NAME' branch: $env:APPVEYOR_REPO_BRANCH"
-        if ("$env:APPVEYOR_PULL_REQUEST_NUMBER" -ne "") {
-          Write-Output "Skipping Saving binaries for pull request $env:APPVEYOR_PULL_REQUEST_NUMBER CI build"
-        } else {
-          if ((Get-Date -UFormat %s) -lt $recent_saved_commit_time + $oneweek) {
-            Write-Output "Skipping Saving binaries since the last one was saved " + (([System.DateTimeOffset]::FromUnixTimeSeconds($recent_saved_commit_time)).DateTime).ToString()
-          }
-        }
-  # Linux & macOS use the shell to perform git activities.
-  # Windows uses cmd. Poweshell on Windows doesn't like git output to stderr
-  - sh: |
-        if [ -f ../Save-Build-Results ]
-        then
-          git add *
-          git commit -F ../pkg_commit_message
-          git push -u origin master
-        else
-          # clean up the un-committed pieces so the cache is maintained correctly
-          git reset --hard
-        fi
-  - cmd: |
-         if EXIST ..\Save-Build-Results        git add *
-         if EXIST ..\Save-Build-Results        git commit -F ../pkg_commit_message
-         if EXIST ..\Save-Build-Results        git push -u origin master
-         rem clean up the un-committed pieces so the cache is maintained correctly
-         if NOT EXIST ..\Save-Build-Results    git reset --hard
+#  - sh: |
+#        if test -d ../Development-Binaries
+#        then
+#          pushd ../Development-Binaries
+#          git pull origin master
+#          popd
+#        else
+#          pushd ..
+#          git clone -q "https://github.com/simh/Development-Binaries" Development-Binaries
+#          popd
+#        fi
+#  - cmd: |
+#         if NOT EXIST ..\Development-Binaries pushd .. & git clone -q "https://github.com/simh/Development-Binaries" Development-Binaries & popd
+#         pushd ..\Development-Binaries & git pull origin master & popd
+#  - ps: |
+#        cd ../Development-Binaries
+#        $pkg_filename = "simh-$datetime-$platform-$arch-$version_major.$version_minor-$version_mode-$id"
+#        if ($isWindows) {
+#          $pkg_filename = $pkg_filename + '.zip'
+#          Compress-Archive -Path $env:APPVEYOR_BUILD_FOLDER\BIN\NT\Win32-Release\*.exe -DestinationPath "$pkg_filename"
+#        } else {
+#          $pkg_filename = $pkg_filename + '.tgz'
+#          pushd $env:APPVEYOR_BUILD_FOLDER/BIN
+#          tar -cvzf ../../Development-Binaries/$pkg_filename --exclude=buildtools --exclude=NT '--exclude=*-build'  *
+#          popd
+#        }
+#        "$platform Build results for simh Commit: https://github.com/simh/simh/commit/$id" | Out-File -FilePath ../pkg_commit_message -Encoding Ascii
+#        (Get-Content README.md) -replace ('(\['+$platform+' is here\]\(https\:\/\/github\.com\/simh\/Development-Binaries\/blob\/master\/)([a-zA-Z0-9._-]+)(.+\.)'),('$1'+$pkg_filename+'$3') | Out-File -FilePath README.md -Encoding Ascii
+#        $recent_saved_commit = git log -1  --grep="$platform Build" --pretty=format:%H
+#        $recent_saved_commit_time = git log -1 --pretty="%at" $recent_saved_commit
+#        $oneweek=$((60 * 60 * 24 * 7))
+#        # Only update the https://github.com/simh/DevelopmentBinaries repository 
+#        # during CI/CD processing of direct commits pushed to the 
+#        # https://github.com/simh/simh repository (i.e. don't update the
+#        # DevelopmentBinaries when CI/CD actions are being done on external
+#        # pull requests.
+#        # Additionally, only update the https://github.com/simh/DevelopmentBinaries 
+#        # repository if the current build for this platform is one week or more 
+#        # from the last saved build for this platform in the repository
+#        if (((Get-Date -UFormat %s) -gt $recent_saved_commit_time + $oneweek) -and 
+#            ("$env:APPVEYOR_PULL_REQUEST_NUMBER" -eq "") -and 0) {
+#          ("$platform Build") | Out-File -FilePath ../Save-Build-Results
+#        }
+#        Write-Output "Building repo '$env:APPVEYOR_REPO_NAME' branch: $env:APPVEYOR_REPO_BRANCH"
+#        if ("$env:APPVEYOR_PULL_REQUEST_NUMBER" -ne "") {
+#          Write-Output "Skipping Saving binaries for pull request $env:APPVEYOR_PULL_REQUEST_NUMBER CI build"
+#        } else {
+#          if ((Get-Date -UFormat %s) -lt $recent_saved_commit_time + $oneweek) {
+#            Write-Output "Skipping Saving binaries since the last one was saved " + (([System.DateTimeOffset]::FromUnixTimeSeconds($recent_saved_commit_time)).DateTime).ToString()
+#          }
+#        }
+#  # Linux & macOS use the shell to perform git activities.
+#  # Windows uses cmd. Poweshell on Windows doesn't like git output to stderr
+#  - sh: |
+#        if [ -f ../Save-Build-Results ]
+#        then
+#          git add *
+#          git commit -F ../pkg_commit_message
+#          git push -u origin master
+#        else
+#          # clean up the un-committed pieces so the cache is maintained correctly
+#          git reset --hard
+#        fi
+#  - cmd: |
+#         if EXIST ..\Save-Build-Results        git add *
+#         if EXIST ..\Save-Build-Results        git commit -F ../pkg_commit_message
+#         if EXIST ..\Save-Build-Results        git push -u origin master
+#         rem clean up the un-committed pieces so the cache is maintained correctly
+#         if NOT EXIST ..\Save-Build-Results    git reset --hard
 
 notifications:
   - provider: Email
