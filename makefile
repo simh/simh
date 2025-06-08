@@ -960,12 +960,17 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
   endif
   ifneq (,$(NETWORK_USEFUL))
     ifeq (Darwin,$(OSTYPE)) # the macOS vmnet framework is only useful when the OS is 10.15 or later
-      macOSMajor = $(strip $(shell sw_vers 2>/dev/null | grep 'ProductVersion:' 2>/dev/null | awk '{ print $$2 }' | awk -F . '{ print $$1 }'))
-      macOSMinor = $(strip $(shell sw_vers 2>/dev/null | grep 'ProductVersion:' 2>/dev/null | awk '{ print $$2 }' | awk -F . '{ print $$2 }'))
-      ifeq (10,$(macOSMajor))
-        DONT_USE_VMNET = $(shell if ${TEST} $(macOSMinor) -lt 15; then echo DONT_USE_VMNET; fi)
-      else
-        DONT_USE_VMNET = $(shell if ${TEST} $(macOSMajor) -lt 10; then echo DONT_USE_VMNET; fi)
+      ifeq (,$(findstring clang,$(COMPILER_NAME))) #only clang can use vmnet APIs
+        DONT_USE_VMNET = DONT_USE_VMNET
+      endif
+      ifeq (,$(DONT_USE_VMNET))
+        macOSMajor = $(strip $(shell sw_vers 2>/dev/null | grep 'ProductVersion:' 2>/dev/null | awk '{ print $$2 }' | awk -F . '{ print $$1 }'))
+        macOSMinor = $(strip $(shell sw_vers 2>/dev/null | grep 'ProductVersion:' 2>/dev/null | awk '{ print $$2 }' | awk -F . '{ print $$2 }'))
+        ifeq (10,$(macOSMajor))
+          DONT_USE_VMNET = $(shell if ${TEST} $(macOSMinor) -lt 15; then echo DONT_USE_VMNET; fi)
+        else
+          DONT_USE_VMNET = $(shell if ${TEST} $(macOSMajor) -lt 10; then echo DONT_USE_VMNET; fi)
+        endif
       endif
     endif
     ifneq (,$(if $(DONT_USE_VMNET),,$(call find_include,vmnet.framework/Headers/vmnet)))

@@ -2761,9 +2761,13 @@ return SCPE_OK;
 }
 
 #if defined(HAVE_VMNET_NETWORK)
-// Because vmnet operates via callbacks, set up a semaphore to block on
-static dispatch_semaphore_t _vmnet_cb_finished = NULL;
-static vmnet_return_t _vmnet_status;
+/* Because vmnet operates via callbacks, set up a semaphore to block on.  */
+/* These variables are referenced by the single command input thread      */
+/* which only is operating when other potential competing thread activity */
+/* has not yet been started or is otherwise suspended.                    */
+static dispatch_semaphore_t _open_port_vmnet_cb_finished = NULL;
+static vmnet_return_t _open_port_vmnet_status;
+static void *_open_port_opaque;
 #endif
 
 static t_stat _eth_open_port(char *savname, int *eth_api, void **handle, SOCKET *fd_handle, char *errbuf, size_t errbuf_size, char *bpf_filter, void *opaque, DEVICE *dptr, uint32 dbit)
@@ -2943,27 +2947,34 @@ if (1) {
 
 vmn_queue = dispatch_get_global_queue(QOS_CLASS_UTILITY, 0);
 
-_vmnet_cb_finished = dispatch_semaphore_create(0);
+_open_port_vmnet_cb_finished = dispatch_semaphore_create(0);
+_open_port_opaque = opaque;
 
 vmn_interface = vmnet_start_interface(if_desc, vmn_queue, ^(vmnet_return_t status, xpc_object_t params)
   {
-  _vmnet_status = status;
-  dispatch_semaphore_signal(_vmnet_cb_finished);
+  _open_port_vmnet_status = status;
+  if (status == VMNET_SUCCESS) {
+      /* The logical device (bridge or otherwise) vmnet provides has its own MAC address which */
+      /* becomes the host system's address from the simulator's point of view */
+    if (SCPE_OK == eth_mac_scan (&((ETH_DEV*)_open_port_opaque)->host_nic_phy_hw_addr, xpc_dictionary_get_string(params, vmnet_mac_address_key)))
+      ((ETH_DEV*)_open_port_opaque)->have_host_nic_phy_addr = 1;
+    }
+  dispatch_semaphore_signal(_open_port_vmnet_cb_finished);
   });
 
-dispatch_semaphore_wait(_vmnet_cb_finished, DISPATCH_TIME_FOREVER);
-dispatch_release(_vmnet_cb_finished);
-_vmnet_cb_finished = NULL;
+dispatch_semaphore_wait(_open_port_vmnet_cb_finished, DISPATCH_TIME_FOREVER);
+dispatch_release(_open_port_vmnet_cb_finished);
+_open_port_vmnet_cb_finished = NULL;
 free(hostaddr);
 free(endaddr);
 free(netmask);
 xpc_release(if_desc);
 
-if (_vmnet_status != VMNET_SUCCESS) {
+if (_open_port_vmnet_status != VMNET_SUCCESS) {
   if (!_eth_running_as_root())
-    snprintf (errbuf, errbuf_size, "Failed to create vmnet connection for %s - %s.  You may need to run as root", savname, _vmnet_status_string(_vmnet_status));
+    snprintf (errbuf, errbuf_size, "Failed to create vmnet connection for %s - %s.  You may need to run as root", savname, _vmnet_status_string(_open_port_vmnet_status));
   else
-    snprintf (errbuf, errbuf_size, "Failed to create vmnet connection for %s - %s.", savname, _vmnet_status_string(_vmnet_status));
+    snprintf (errbuf, errbuf_size, "Failed to create vmnet connection for %s - %s.", savname, _vmnet_status_string(_open_port_vmnet_status));
   return SCPE_OPENERR;
   }
 
@@ -3286,8 +3297,9 @@ if (!strcmp (desc, "No description available"))
     strcpy (desc, "");
 sim_messagef (SCPE_OK, "Eth: opened OS device %s%s%s\n", savname, desc[0] ? " - " : "", desc);
 
-/* get the NIC's hardware MAC address */
-eth_get_nic_hw_addr(dev, savname, 1, NULL);
+/* If necessary, get the NIC's hardware MAC address */
+if (dev->have_host_nic_phy_addr == 0)
+  eth_get_nic_hw_addr(dev, savname, 1, NULL);
 if (dev->have_host_nic_phy_addr)
   dev->host_nic_is_wifi = (NULL != strstr(info, "LinkType: WiFi"));
 
