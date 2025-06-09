@@ -3029,8 +3029,7 @@ if (0 == strncmp("tap:", savname, 4)) {
   if (1) {
     char dev_name[64] = "";
 
-    snprintf(dev_name, sizeof(dev_name)-1, "/dev/%s", devname);
-    dev_name[sizeof(dev_name)-1] = '\0';
+    snprintf(dev_name, sizeof(dev_name), "/dev/%s", devname);
 
     if ((tun = open(dev_name, O_RDWR)) >= 0) {
       if (ioctl(tun, FIONBIO, &on)) {
@@ -3106,7 +3105,7 @@ if (0 == strncmp("vde:", savname, 4)) {
 
       voa.port = (int)get_uint (vdeport_s, 10, 255, &r);
       if (r != SCPE_OK) {
-        snprintf (errbuf, errbuf_size, "Invalid vde port number: %s in %s\n", vdeport_s, savname);
+        snprintf (errbuf, errbuf_size, "Invalid vde port number: %1.64s in %1.100s\n", vdeport_s, savname);
         return SCPE_OPENERR;
         }
       }
@@ -3155,7 +3154,7 @@ if (1) {
 if ((pcap_setmintocopy ((pcap_t*)(*handle), 0) == -1) ||
     (pcap_getevent ((pcap_t*)(*handle)) == NULL)) {
   pcap_close ((pcap_t*)(*handle));
-  snprintf (errbuf, errbuf_size, "pcap can't initialize API for interface: %s", savname);
+  snprintf (errbuf, errbuf_size, "pcap can't initialize API for interface: %1.100s", savname);
   return SCPE_OPENERR;
   }
 #endif
@@ -5266,8 +5265,7 @@ for (eth_num=0; eth_num<eth_device_count; eth_num++) {
       (0 == memcmp (eth_list[eth_num].name, "vde:", 4)) ||
       (0 == memcmp (eth_list[eth_num].name, "udp:", 4)))
       continue;
-  eth_name[sizeof (eth_name)-1] = '\0';
-  snprintf (eth_name, sizeof (eth_name)-1, "eth%d", eth_num);
+  snprintf (eth_name, sizeof (eth_name), "eth%d", eth_num);
   r = eth_open(&dev, eth_name, &eth_tst, 1);
   if (r != SCPE_OK) {
     sim_printf ("%s: Eth: Error opening eth%d: %s\n", dptr->name, eth_num, sim_error_text (r));
