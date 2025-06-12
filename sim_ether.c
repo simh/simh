@@ -1283,6 +1283,8 @@ if (1) {
   if (sim_get_tool_path (tool)[0]) {
     if (NULL != (f = _popen(command, "r"))) {
       char line[128];
+      char *which, *c;
+      t_bool wireless = FALSE;
 
       memset(line, 0, sizeof(line));
       while (fgets(line, sizeof(line), f)) {
@@ -1290,8 +1292,7 @@ if (1) {
         if (line[0] == '\0')
           continue;
         if (sim_isspace(line[0])) {
-            char *c = strchr(line, ':');
-
+            c = strchr(line, ':');
             if (strstr(line, "IPv4 Address") || strstr(line, "IP Address")) {
               char *c = strchr(line, ':');
               strlcat(dev->info, "Host IPv4 Address", sizeof(dev->info));
@@ -1319,17 +1320,28 @@ if (1) {
             continue;
           }
         else {
-          if (NULL == strstr(line, "adapter"))
+          if ((NULL == (which = strstr(line, "Ethernet adapter "))) &&
+              (NULL == (which = strstr(line, "Wireless LAN adapter "))))
             continue;
+          if (0 == strncmp(which, "Ethernet adapter ", strlen("Ethernet adapter ")))
+            which += strlen ("Ethernet adapter ");
+          else
+            which += strlen ("Wireless LAN adapter ");
+          c = strchr (which, ':');
+          if (c != NULL)
+            *c = '\0';
+          if (dev != NULL) {
+            if (wireless && (strstr(dev->info, "LinkType") == NULL)) {
+              if (dev->info[0] != '\0')
+                strlcat(dev->info, "\n", sizeof(dev->info));
+              strlcat(dev->info, "LinkType: WiFi", sizeof(dev->info));
+              }
+            }
+          wireless = (0 == memcmp (line, "Wireless LAN adapter ", strlen ("Wireless LAN adapter ")));
           dev = NULL;
           for (i=0; i<used; i++) {
-            if (strstr(line, list[i].desc)) {
+            if (0 == strcmp(which, list[i].desc)) {
               dev = &list[i];
-              if ((strcmp(dev->desc, "Wi-Fi") == 0) && (strstr(dev->info, "LinkType") == NULL)) {
-                if (dev->info[0] != '\0')
-                  strlcat(dev->info, "\n", sizeof(dev->info));
-                strlcat(dev->info, "LinkType: WiFi", sizeof(dev->info));
-                }
               break;
               }
             }
