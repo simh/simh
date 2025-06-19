@@ -38,7 +38,7 @@ set _ARG=
 rem Everything implicitly requires BUILD to also be set to have 
 rem any meaning, it always gets set.
 set _X_BUILD=BUILD
-set _X_REQUIRED_WINDOWS_BUILD=20250601
+set _X_REQUIRED_WINDOWS_BUILD=20250613
 call :FindVCVersion _VC_VER _MSVC_VER _MSVC_TOOLSET_VER  _MSVC_TOOLSET_DIR
 echo _VC_VER=%_VC_VER%
 echo _MSVC_VER=%_MSVC_VER%
@@ -474,7 +474,7 @@ for /f "tokens=3-10 delims=\" %%a in ("%_VC_CL_%") do call :VCCheck _VC_VER_NUM_
 for /f "delims=." %%a in ("%_VC_VER_NUM_%") do set %1=%%a
 set _VC_CL_STDERR_=%TEMP%\cl_stderr%_TARGET%.tmp
 set VS_UNICODE_OUTPUT=
-"%_VC_CL_%" /? 2>"%_VC_CL_STDERR_%" 1>NUL 
+"%_VC_CL_%" /? 2>"%_VC_CL_STDERR_%" 1>NUL <NUL
 for /f "usebackq tokens=4-9" %%a in (`findstr Version "%_VC_CL_STDERR_%"`) do call :MSVCCheck _MSVC_VER_NUM_ "%%a" "%%b" "%%c" "%%d" "%%e"
 if "%4" NEQ "" set %4=%_MSVC_TOOLSET_%
 if "%_MSVC_TOOLSET_%" NEQ "" set _MSVC_TOOLSET_=v%_MSVC_TOOLSET_:~0,2%%_MSVC_TOOLSET_:~3,1%
