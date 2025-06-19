@@ -338,7 +338,7 @@ ifneq (3,${SIM_MAJOR})
   PKGS_SRC_APT        = gcc      libpcap-dev   libvdeplug-dev libpcre3-dev libedit-dev   libsdl2-dev       libpng-dev     -          libsdl2-ttf-dev   -     curl
   PKGS_SRC_YUM        = gcc      libpcap-devel -              pcre-devel   libedit-devel SDL2-devel        libpng-devel   zlib-devel SDL2_ttf-devel    -     -
   PKGS_SRC_DNF        = gcc      libpcap-devel -              pcre-devel   libedit-devel SDL2-devel        libpng-devel   zlib-devel SDL2_ttf-devel    -     -
-  PKGS_SRC_ZYPPER     = gcc      libpcap-devel -              pcre-devel   libedit-devel libSDL2-devel     libpng16-devel zlib-devel libSDL2_ttf-devel make  -
+  PKGS_SRC_ZYPPER     = gcc      libpcap-devel -              -            libedit-devel sdl2-compat-devel libpng16-devel zlib-devel SDL2_ttf-devel    make  -
   PKGS_SRC_APK        = clang    libpcap-devel -              -            libedit-devel sdl2-compat-devel libpng-devel   -          sdl2_ttf-devel    gmake curl
   PKGS_SRC_PKGSRC     = -        -             -              pcre         editline      SDL2              png            zlib       SDL2_ttf          gmake -
   PKGS_SRC_PKGBSD     = -        -             -              pcre         libedit       sdl2              png            -          sdl2_ttf          gmake -
