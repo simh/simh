@@ -45,6 +45,7 @@ static uint16 BLOCK = 0;
 static uint16 MIT8K;
 static uint16 SGR;
 static uint16 SYNC = 1;
+static uint16 HZ = 40;
 
 /* Function declaration. */
 static uint16 dp_iot (uint16, uint16);
@@ -107,6 +108,7 @@ static UNIT sync_unit = {
 
 static REG sync_reg[] = {
   { ORDATAD (SYNC, SYNC, 1, "Flag") },
+  { ORDATAD (HZ,   HZ,   1, "Frequency") },
   { NULL }
 };
 
@@ -527,7 +529,7 @@ dp_reset(DEVICE * uptr)
 static t_stat
 sync_svc (UNIT *uptr)
 {
-  sim_debug (DBG, &sync_dev, "40 Hz sync\n");
+  sim_debug (DBG, &sync_dev, "Display sync (%d Hz)\n", HZ);
   SYNC = 1;
   if (SYNC && HALT)
     flag_on (FLAG_SYNC);
@@ -542,7 +544,7 @@ sync_iot (uint16 insn, uint16 AC)
     sim_debug (DBG, &sync_dev, "Clear flag\n");
     SYNC = 0;
     flag_off (FLAG_SYNC);
-    sim_activate_after (&sync_unit, 25000);
+    sim_activate_after (&sync_unit, 1000000 / HZ);
   }
   if ((insn & 0772) == 0072) { /* IOS */
   }
