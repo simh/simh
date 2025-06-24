@@ -404,6 +404,11 @@ struct SEND {
     int32               extoff;                         /* extra offset */
     };
 
+/* Private SCP only APIs */
+
+t_stat _sim_os_putchar (int32 out);
+
+
 #endif /* defined(SIM_SCP_PRIVATE_DONT_REPEAT) */
 
 #ifdef  __cplusplus

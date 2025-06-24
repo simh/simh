@@ -113,7 +113,7 @@
    sim_ttclose                  called once before the simulator exits
    sim_ttisatty                 called to determine if running interactively
    sim_os_poll_kbd              poll for keyboard input
-   sim_os_putchar               output character to console
+   _sim_os_putchar              output character to console
    sim_set_noconsole_port       Enable automatic WRU console polling
    sim_set_stable_registers_state Declare that all registers are always stable
 
@@ -148,7 +148,6 @@ int setenv(const char *envname, const char *envval, int overwrite);
 /* Forward Declarations of Platform specific routines */
 
 static t_stat sim_os_poll_kbd (void);
-static t_stat sim_os_putchar (int32 out);
 static t_stat sim_os_ttinit (void);
 static t_stat sim_os_ttrun (void);
 static t_stat sim_os_ttcmd (void);
@@ -2259,10 +2258,13 @@ return SCPE_OK;
 
 t_stat sim_set_cons_speed (int32 flag, CONST char *cptr)
 {
-t_stat r = tmxr_set_line_speed (&sim_con_ldsc, cptr);
+t_stat r;
 
-if ((r == SCPE_OK) && (sim_con_ldsc.uptr != NULL))
-    sim_con_ldsc.uptr->wait = sim_con_ldsc.rxdeltausecs;
+if (sim_con_ldsc.o_uptr == NULL)
+    return sim_messagef (SCPE_TTOERR, "Can't set port speed. Console Output unit missing.\n");
+r = tmxr_set_line_speed (&sim_con_ldsc, cptr);
+if (r == SCPE_OK)
+    sim_con_ldsc.o_uptr->wait = 0;
 return r;
 }
 
@@ -2549,8 +2551,10 @@ while (*cptr != 0) {                                    /* do all mods */
     else {
         if (cvptr)                                      /* if we removed a = sign */
             *(--cvptr) = '=';                           /* restore it */
-        if (sim_con_tmxr.master)                        /* already open? */
-            sim_set_notelnet (0, NULL);                 /* close first */
+        if ((sim_con_tmxr.master) ||                    /* already open? */
+            (sim_con_ldsc.serport) || 
+            (sim_con_ldsc.console))
+            tmxr_close_master (&sim_con_tmxr);          /* close first */
         r = tmxr_attach (&sim_con_tmxr, &sim_con_unit, gbuf);/* open master socket */
         if (r == SCPE_OK)
             sim_activate_after(&sim_con_unit, 1000000); /* check for connection in 1 second */
@@ -2567,9 +2571,8 @@ t_stat sim_set_notelnet (int32 flag, CONST char *cptr)
 {
 if (cptr && (*cptr != 0))                               /* too many arguments? */
     return SCPE_2MARG;
-if (sim_con_tmxr.master == 0)                           /* ignore if already closed */
-    return SCPE_OK;
-return tmxr_close_master (&sim_con_tmxr);               /* close master socket */
+tmxr_close_master (&sim_con_tmxr);                      /* close master socket, if open */
+return tmxr_attach (&sim_con_tmxr, &sim_con_unit, "CONSOLE");
 }
 
 /* Show console Telnet status */
@@ -3049,21 +3052,18 @@ return SCPE_OK;
 
 t_stat sim_putchar (int32 c)
 {
-sim_exp_check (&sim_con_expect, c);
-if ((sim_con_tmxr.master == 0) &&                       /* not Telnet? */
-    (sim_con_ldsc.serport == 0)) {                      /* and not serial port */
-    ++sim_con_pos;                                      /* bookkeeping */
-    if (sim_log)                                        /* log file? */
-        fputc (c, sim_log);
-    sim_debug (DBG_XMT, &sim_con_telnet, "sim_putchar('%c' (0x%02X)\n", sim_isprint (c) ? c : '.', c);
-    return sim_os_putchar (c);                          /* in-window version */
-    }
-if (!sim_con_ldsc.conn) {                               /* no Telnet or serial connection? */
-    if (!sim_con_ldsc.txbfd)                            /* unbuffered? */
-        return SCPE_LOST;                               /* connection lost */
+if (!sim_con_ldsc.console      &&                       /* Non Console */
+    !sim_con_ldsc.serport      &&                       /* no serial connection */
+    ((sim_con_tmxr.master != 0) &&                      /* Telnet but not connected */
+     !sim_con_ldsc.conn)) {
+    if (!sim_con_ldsc.txbfd)                            /* non-buffered Telnet connection? */
+        return SCPE_LOST;                               /* lost */
     if (tmxr_poll_conn (&sim_con_tmxr) >= 0)            /* poll connect */
         sim_con_ldsc.rcve = 1;                          /* rcv enabled */
     }
+if (sim_log)                                            /* log file? */
+    fputc (c, sim_log);
+sim_debug (DBG_XMT, &sim_con_telnet, "sim_putchar('%c' (0x%02X)\n", sim_isprint (c) ? c : '.', c);
 tmxr_putc_ln (&sim_con_ldsc, c);                        /* output char */
 ++sim_con_pos;                                          /* bookkeeping */
 tmxr_poll_tx (&sim_con_tmxr);                           /* poll xmt */
@@ -3074,25 +3074,34 @@ t_stat sim_putchar_s (int32 c)
 {
 t_stat r;
 
-sim_exp_check (&sim_con_expect, c);
-if ((sim_con_tmxr.master == 0) &&                       /* not Telnet? */
-    (sim_con_ldsc.serport == 0)) {                      /* and not serial port */
-    ++sim_con_pos;                                      /* bookkeeping */
-    if (sim_log)                                        /* log file? */
-        fputc (c, sim_log);
-    sim_debug (DBG_XMT, &sim_con_telnet, "sim_putchar('%c' (0x%02X)\n", sim_isprint (c) ? c : '.', c);
-    return sim_os_putchar (c);                          /* in-window version */
-    }
-if (!sim_con_ldsc.conn) {                               /* no Telnet or serial connection? */
+if (!sim_con_ldsc.console      &&                       /* Non Console */
+    !sim_con_ldsc.serport      &&                       /* no serial connection */
+    ((sim_con_tmxr.master != 0) &&                      /* Telnet but not connected */
+     !sim_con_ldsc.conn)) {
     if (!sim_con_ldsc.txbfd)                            /* non-buffered Telnet connection? */
         return SCPE_LOST;                               /* lost */
     if (tmxr_poll_conn (&sim_con_tmxr) >= 0)            /* poll connect */
         sim_con_ldsc.rcve = 1;                          /* rcv enabled */
     }
-r = tmxr_putc_ln (&sim_con_ldsc, c);                    /* Telnet output */
+if (tmxr_txdone_ln (&sim_con_ldsc) == 0) {
+    if (sim_con_ldsc.txbps)                             /* rate limiting? */
+        sim_con_ldsc.o_uptr->wait =                     /* Long poll to allow proper scheduling*/
+            (int32)((2 * TMLN_SPD_50_BPS * sim_timer_inst_per_sec ()) / USECS_PER_SECOND);
+    else
+        sim_con_ldsc.o_uptr->wait = SERIAL_OUT_WAIT;    /* "standard" output wait */
+    return SCPE_STALL;
+    }
+if (sim_log)                                            /* log file? */
+    fputc (c, sim_log);
+sim_debug (DBG_XMT, &sim_con_telnet, "sim_putchar_s('%c' (0x%02X)\n", sim_isprint (c) ? c : '.', c);
+r = tmxr_putc_ln (&sim_con_ldsc, c);                    /* Telnet & Console output */
 if (r == SCPE_OK)
     ++sim_con_pos;                                      /* bookkeeping */
 tmxr_poll_tx (&sim_con_tmxr);                           /* poll xmt */
+if (sim_con_ldsc.txbps)                                 /* rate limiting? */
+    sim_con_ldsc.o_uptr->wait = 0;                      /* next one 0 wait */
+else
+    sim_con_ldsc.o_uptr->wait = SERIAL_OUT_WAIT;        /* "standard" output wait */
 return r;                                               /* return status */
 }
 
@@ -3247,8 +3256,10 @@ return SCPE_OK;
 t_stat sim_ttinit (void)
 {
 sim_con_tmxr.ldsc->mp = &sim_con_tmxr;
+sim_con_tmxr.ldsc->expect = &sim_con_expect;
 sim_register_internal_device (&sim_con_telnet);
 tmxr_startup ();
+sim_set_notelnet (0, NULL);
 return sim_os_ttinit ();
 }
 
@@ -3427,7 +3438,7 @@ if (response = buffered_character) {
 return sim_os_poll_kbd_data ();
 }
 
-static t_stat sim_os_putchar (int32 out)
+t_stat _sim_os_putchar (int32 out)
 {
 unsigned int status;
 char c;
@@ -3680,7 +3691,7 @@ return SCPE_OK;
 
 #define out_hold_unit sim_con_units[1]
 
-static t_stat sim_os_putchar (int32 c)
+t_stat _sim_os_putchar (int32 c)
 {
 uint32 now;
 static uint32 last_bell_time;
@@ -3880,7 +3891,7 @@ if (sim_int_char && (buf[0] == sim_int_char))
 return (buf[0] | SCPE_KFLAG);
 }
 
-static t_stat sim_os_putchar (int32 out)
+t_stat _sim_os_putchar (int32 out)
 {
 char c;
 
@@ -4047,7 +4058,7 @@ if (sim_int_char && (buf[0] == sim_int_char))
 return (buf[0] | SCPE_KFLAG);
 }
 
-static t_stat sim_os_putchar (int32 out)
+t_stat _sim_os_putchar (int32 out)
 {
 char c;
 

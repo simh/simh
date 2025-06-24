@@ -771,11 +771,15 @@ else {
                 }
             }
         else {
-            if ((lp->conn == TMXR_LINE_DISABLED) ||
-                ((lp->conn == 0) && lp->txbfd)){
-                written = length;                           /* Count here output timing is correct */
-                if (lp->conn == TMXR_LINE_DISABLED)
-                    lp->txdrp += length;                    /* Record as having been dropped on the floor */
+            if (lp->console)
+                written = (SCPE_OK == _sim_os_putchar (lp->txb[i])) ? 1 : 0; /* write to the sim> session */
+            else {
+                if ((lp->conn == TMXR_LINE_DISABLED) ||
+                    ((lp->conn == 0) && lp->txbfd)){
+                    written = length;                           /* Count here output timing is correct */
+                    if (lp->conn == TMXR_LINE_DISABLED)
+                        lp->txdrp += length;                    /* Record as having been dropped on the floor */
+                    }
                 }
             }
         }
@@ -987,9 +991,11 @@ tptr = (char *) calloc (1, 1);
 if (tptr == NULL)                                       /* no more mem? */
     return tptr;
 
-if (lp->destination || lp->port || lp->txlogname || (lp->conn == TMXR_LINE_DISABLED)) {
+if (lp->destination || lp->port || lp->txlogname || (lp->conn == TMXR_LINE_DISABLED) || lp->console) {
     if ((lp->mp->lines > 1) || (lp->port))
         sprintf (growstring(&tptr, 32), "Line=%d", (int)(lp-lp->mp->ldsc));
+    if (lp->console)
+        sprintf (growstring(&tptr, 32), "CONSOLE");
     if (lp->conn == TMXR_LINE_DISABLED)
         sprintf (growstring(&tptr, 32), ",Disabled");
     if (lp->modem_control != lp->mp->modem_control)
@@ -2919,7 +2925,7 @@ ETH_DEV *eth;
 SOCKET sock;
 SERHANDLE serport;
 CONST char *tptr = cptr;
-t_bool nolog, notelnet, listennotelnet, nomessage, listennomessage, modem_control, loopback, datagram, packet, disabled;
+t_bool nolog, notelnet, listennotelnet, nomessage, listennomessage, modem_control, loopback, datagram, packet, disabled, console;
 int32 listenbacklog;
 TMLN *lp;
 t_stat r = SCPE_OK;
@@ -2934,6 +2940,7 @@ for (i = 0; i < mp->lines; i++) {               /* initialize lines */
     if (lp->bpsfactor == 0.0)
         lp->bpsfactor = 1.0;
     }
+console = FALSE;
 notelnet = listennotelnet = mp->notelnet;
 nomessage = listennomessage = mp->nomessage;
 listenbacklog = mp->backlog;
@@ -3077,6 +3084,10 @@ while (*tptr) {
                 strlcpy (speed, cptr, sizeof(speed));
                 continue;
                 }
+            if (0 == MATCH_CMD (gbuf, "CONSOLE")) {
+                console = TRUE;
+                continue;
+                }
             cptr = get_glyph (gbuf, port, ';');
             if (sim_parse_addr (port, NULL, 0, NULL, NULL, 0, NULL, NULL))
                 return sim_messagef (SCPE_ARG, "Invalid Port Specifier: %s\n", port);
@@ -3176,6 +3187,10 @@ while (*tptr) {
     if (disabled) {
         if (destination[0] || listen[0] || loopback || framer[0])
             return sim_messagef (SCPE_ARG, "Can't disable line with%s%s%s%s%s%s%s\n", destination[0] ? " CONNECT=" : "", destination, listen[0] ? " " : "", listen, loopback ? " LOOPBACK" : "", framer[0] ? " SYNC=" : "", framer);
+        }
+    if (console) {
+        if (destination[0] || listen[0] || loopback || framer[0] || disabled)
+            return sim_messagef (SCPE_ARG, "Can't have console line with%s%s%s%s%s%s%s%s\n", destination[0] ? " CONNECT=" : "", destination, listen[0] ? " " : "", listen, loopback ? " LOOPBACK" : "", framer[0] ? " SYNC=" : "", framer, disabled ? " DISABLED" : "");
         }
     if (destination[0]) {
         /* Validate destination */
@@ -3386,6 +3401,10 @@ while (*tptr) {
                 if (speed[0])
                     tmxr_set_line_speed (lp, speed);
                 }
+            }
+        if (console) {
+            lp->console = TRUE;
+            lp->conn = 1;
             }
         if (destination[0]) {
             if (mp->lines > 1)
@@ -3736,6 +3755,8 @@ t_stat tmxr_set_console_units (UNIT *rxuptr, UNIT *txuptr)
 {
 extern TMXR sim_con_tmxr;
 
+rxuptr->tmxr = &sim_con_tmxr;
+txuptr->tmxr = &sim_con_tmxr;
 tmxr_set_line_unit (&sim_con_tmxr, 0, rxuptr);
 tmxr_set_line_output_unit (&sim_con_tmxr, 0, txuptr);
 return SCPE_OK;
@@ -4105,7 +4126,7 @@ return SCPE_OK;
 
    The listening socket associated with multiplexer descriptor "mp" is closed
    and deallocated.  In addition, all current Telnet sessions are disconnected.
-   Serial and outgoing sessions are also disconnected.
+   Serial, outgoing sessions and console connections are also disconnected.
 */
 
 t_stat tmxr_close_master (TMXR *mp)
@@ -4129,6 +4150,7 @@ for (i = 0; i < mp->lines; i++) {  /* loop thru conn */
             sim_control_serial (lp->serport, 0, TMXR_MDM_DTR|TMXR_MDM_RTS, NULL);/* drop DTR and RTS */
             tmxr_close_ln (lp);
             }
+        lp->console = FALSE;
         free (lp->destination);
         lp->destination = NULL;
         free (lp->acl);
@@ -5215,7 +5237,7 @@ int32 i, t;
 if (mp == NULL)
     return SCPE_IERR;
 for (i = t = 0; i < mp->lines; i++)
-    if ((mp->ldsc[i].sock != 0) || (mp->ldsc[i].serport != 0))
+    if ((mp->ldsc[i].sock != 0) || (mp->ldsc[i].serport != 0) || (mp->ldsc[i].console != 0))
         t = t + 1;
 if (mp->lines > 1)
     fprintf (st, "%d current connection%s", t, (t != 1) ? "s" : "");

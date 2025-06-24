@@ -192,6 +192,7 @@ struct tmln {
     t_bool              ser_connect_pending;            /* serial connection notice pending */
     SOCKET              connecting;                     /* Outgoing socket while connecting */
     char                *destination;                   /* Outgoing destination address:port */
+    t_bool              console;                        /* simulator I/O to console session */
     t_bool              loopback;                       /* Line in loopback mode */
     t_bool              halfduplex;                     /* Line in half-duplex mode */
     t_bool              datagram;                       /* Line is datagram packet oriented */
