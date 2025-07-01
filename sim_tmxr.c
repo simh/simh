@@ -4178,18 +4178,18 @@ for (i = 0; i < mp->lines; i++) {  /* loop thru conn */
     lp->modembits = 0;
     }
 
-if (mp->master)
+if (mp->master) {
     sim_close_sock (mp->master);                        /* close master socket */
+    if (mp->ring_sock != INVALID_SOCKET)
+        sim_close_sock (mp->ring_sock);                 /* close any pending incoming connection */
+    }
 mp->master = 0;
 free (mp->port);
 mp->port = NULL;
-if (mp->ring_sock != INVALID_SOCKET) {
-    sim_close_sock (mp->ring_sock);
-    mp->ring_sock = INVALID_SOCKET;
-    free (mp->ring_ipad);
-    mp->ring_ipad = NULL;
-    mp->ring_start_time = 0;
-    }
+mp->ring_sock = INVALID_SOCKET;
+free (mp->ring_ipad);
+mp->ring_ipad = NULL;
+mp->ring_start_time = 0;
 _tmxr_remove_from_open_list (mp);
 return SCPE_OK;
 }
