@@ -831,7 +831,7 @@ if (f == NULL)
   return FALSE;
 if (fgets(response, sizeof(response), f))
  sim_trim_endspc (response);
-fclose(f);
+pclose(f);
 #endif
 return (0 == strcmp(response, "0"));
 }
