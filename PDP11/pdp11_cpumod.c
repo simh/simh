@@ -285,7 +285,7 @@ REG sys_reg[] = {
                            "11/84, 11/93, 11/94)") },
     { ORDATAD (DR, DR, 16, "display register or board LEDs ("
                            "11/04, 11/05, 11/20, "
-                           "1123+, 11/24, 11/34, "
+                           "11/23+, 11/24, 11/34, "
                            "11/70, 11/73B, 11/83, "
                            "11/84, 11/93, 11/94)") },
     { ORDATAD (MEMERR, MEMERR, 16, "memory error register ("
