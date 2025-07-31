@@ -882,7 +882,8 @@ mb = dptr - mba_dev;
 if (mb >= MBA_NUM)
     return SCPE_NOFNC;
 massbus[mb].cs1 = CS1_DONE;
-massbus[mb].wc = 0;
+if ((sim_switches & SWMASK ('P')) !=0)
+    massbus[mb].wc = 0;                             /* powerup only */
 massbus[mb].ba = 0;
 massbus[mb].cs2 = 0;
 massbus[mb].db = 0;
