@@ -854,11 +854,13 @@ static const char* _vmnet_status_string(vmnet_return_t status)
         /* VMNET_PACKET_TOO_BIG       */ "Packet size larger than MTU.",
         /* VMNET_BUFFER_EXHAUSTED     */ "Buffers exhausted in kernel.",
         /* VMNET_TOO_MANY_PACKETS     */ "Packet count exceeds limit.",
-        /* VMNET_SHARING_SERVICE_BUSY */ "Vmnet Interface cannot be started as conflicting sharing service is in use."
+        /* VMNET_SHARING_SERVICE_BUSY */ "Vmnet Interface cannot be started as conflicting sharing service is in use.",
+        /* VMNET_NOT_AUTHORIZED       */ "The operation could not be completed due to missing authorization."
       };
   static char unknown_status[128];
 
-  if ((status >= VMNET_SUCCESS) && (status <= VMNET_SHARING_SERVICE_BUSY))
+  if ((status >= VMNET_SUCCESS) && 
+      ((sizeof (vmnet_status) / sizeof (vmnet_status[0])) > (status - VMNET_SUCCESS)))
     return vmnet_status[status - VMNET_SUCCESS];
   snprintf(unknown_status, sizeof(unknown_status), "Unknown vmnet status value: %d", (int)status);
   return unknown_status;
