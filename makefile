@@ -375,6 +375,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
     export TEST = test
   endif
   RUNNING_AS_ROOT:=$(if $(findstring Darwin,$(OSTYPE)),$(shell if [ `id -u` == '0' ]; then echo running_as_root; fi),$(shell if $(TEST) -r /dev/mem; then echo running_as_root; fi))
+  CAN_AUTO_INSTALL_PACKAGES:=$(findstring HOMEBREW,$(PKG_MGR)),$(RUNNING_AS_ROOT)
   override AUTO_INSTALL_PACKAGES:=$(and $(AUTO_INSTALL_PACKAGES),$(or $(findstring HOMEBREW,$(PKG_MGR)),$(RUNNING_AS_ROOT)))
   ifeq (${GCC},)
     ifeq (,$(call find_exe,gcc))
@@ -1488,6 +1489,13 @@ else
       endif
     endif
     ifeq (Y,$(ANSWER))
+      ifneq (,$(CAN_AUTO_INSTALL_PACKAGES))
+        INSTALLER_RESULT = $(shell $(PKG_CMD) $(USEFUL_PACKAGES) $(OPTIONAL_PACKAGES) 1>&2)
+        $(info $(INSTALLER_RESULT))
+        $(info *** rerunning this make to perform your desired build...)
+        MAKE_RESULT = $(shell $(MAKE) $(MAKECMDGOALS) $(EXTRAS) 1>&2)
+        $(error Done: $(MAKE_RESULT))
+      endif
       ifeq (,$(PKG_NO_SUDO))
         $(info Enter:    $$ sudo $(PKG_CMD) $(USEFUL_PACKAGES) $(OPTIONAL_PACKAGES))
         $(info when that completes)
@@ -1615,7 +1623,11 @@ export CC := ${GCC} ${CC_STD} -U__STRICT_ANSI__ ${CFLAGS_G} ${CFLAGS_O} ${CFLAGS
 ifneq (,${SIM_VERSION_MODE})
   CC += -DSIM_VERSION_MODE="${SIM_VERSION_MODE}"
 endif
-export LDFLAGS := ${OS_LDFLAGS} ${NETWORK_LDFLAGS} ${VIDEO_LDFLAGS} ${VIDEO_TTF_LDFLAGS} ${LDFLAGS_O}
+ifneq (,$(and $(findstring -lpthread,$(NETWORK_LDFLAGS)),$(findstring -lpthread,$(VIDEO_LDFLAGS))))
+  export LDFLAGS := ${OS_LDFLAGS} $(NETWORK_LDFLAGS:-lpthread=) ${VIDEO_LDFLAGS} ${VIDEO_TTF_LDFLAGS} ${LDFLAGS_O}
+else
+  export LDFLAGS := ${OS_LDFLAGS} ${NETWORK_LDFLAGS} ${VIDEO_LDFLAGS} ${VIDEO_TTF_LDFLAGS} ${LDFLAGS_O}
+endif
 
 #
 # Common Libraries
