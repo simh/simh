@@ -734,7 +734,7 @@ if (wc && (err == 0)) {                                 /* seek ok? */
                 rkxb[i] = comp;
             }
         else {                                          /* normal fetch */
-            if ((t = MAP_RDW (ma, wc << 1, rkxb))) {  /* get buf */
+            if ((t = MAP_RDW (ma, wc << 1, rkxb))) {    /* get buf */
                 rker = rker | RKER_NXM;                 /* NXM? set flg */
                 wc = wc - (t >> 1);                     /* adj wd cnt */
                 }

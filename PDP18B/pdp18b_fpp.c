@@ -379,7 +379,7 @@ return SCPE_OK;
 
 t_stat fp15_opnd (int32 ir, int32 addr, UFP *fpn)
 {
-int32 i, numwd, wd[3];
+int32 i, numwd, wd[3] = { 0,0,0 };
 
 fguard = 0;                                             /* clear guard */
 if (ir & FI_NOLOAD)                                     /* no load? */
@@ -426,7 +426,7 @@ return FP_OK;
 
 t_stat fp15_store (int32 ir, int32 addr, UFP *a)
 {
-int32 i, numwd, wd[3];
+int32 i, numwd, wd[3] = { 0,0,0 };
 t_stat sta;
 
 fguard = 0;                                             /* clear guard */

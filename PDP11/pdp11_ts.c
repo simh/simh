@@ -544,7 +544,7 @@ do {
         msgrfc = fc;
     if ((st = sim_tape_sprecf (uptr, &tbc)))            /* space rec fwd, err? */
         return ts_map_status (st);                      /* map status */
-        ts_set_mot (0);                                 /* tape has moved, !BOT */
+    ts_set_mot (0);                                     /* tape has moved, !BOT */
     } while (fc != 0);
 return 0;
 }

@@ -695,8 +695,8 @@ return SCPE_NXM;                                        /* unimplemented */
 t_stat CPU70_wr (int32 data, int32 pa, int32 access)
 {
 switch ((pa >> 1) & 017) {                              /* decode pa<4:1> */
-    case 000:
-    case 001:
+    case 000:                                           /* low error */
+    case 001:                                           /* high error */
         return SCPE_OK;                                 /* error addr */
 
     case 002:                                           /* MEMERR */

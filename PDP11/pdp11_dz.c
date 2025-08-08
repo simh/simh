@@ -1,6 +1,6 @@
 /* pdp11_dz.c: DZ11 terminal multiplexor simulator
 
-   Copyright (c) 2001-2008, Robert M Supnik
+   Copyright (c) 2001-2023, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    dz           DZ11 terminal multiplexor
 
+   23-Feb-23    RMS     Fixed line number calculation in connect (Walter Mueller)
    29-Dec-08    RMS     Added MTAB_NC to SET LOG command (Walter Mueller)
    19-Nov-08    RMS     Revised for common TMXR show routines
    18-Jun-07    RMS     Added UNIT_IDLE flag
