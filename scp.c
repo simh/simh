@@ -3281,6 +3281,28 @@ if (docmdp) {
         stat = SCPE_OPENERR;
     if (SCPE_BARE_STATUS(stat) == SCPE_OPENERR)
         stat = docmdp->action (-1, "simh.ini");             /* simh.ini proc cmd file */
+    if ((SCPE_BARE_STATUS(stat) == SCPE_OPENERR) &&
+        (*argv[0])) {                                       /* sim name arg? */
+        char *np;                                           /* "path.ini" */
+        nbuf[0] = '"';                                      /* starting " */
+        strlcpy (nbuf + 1, argv[0], PATH_MAX + 2);          /* copy sim path-name */
+        if (((np = strrchr (nbuf, '/')) != NULL) ||
+            ((np = strrchr (nbuf, '\\')) != NULL)) {
+            *(np + 1) = '\0';
+            strlcat (nbuf, "simh.ini\"", sizeof (nbuf));
+            stat = docmdp->action (-1, nbuf);               /* simh.ini proc cmd file */
+            }
+        else                /* No / or \, then we're looking at for simh.ini in the */
+            stat = stat;    /* current working directory which we've already checked */
+        }
+    if (SCPE_BARE_STATUS(stat) == SCPE_OPENERR) {
+        snprintf(nbuf, sizeof (nbuf), "\"%s%s%sLibrary%sPreferences%ssimh.ini\"", cptr2 ? cptr2 : "", cptr, strchr (cptr, '/') ? "/" : "\\", strchr (cptr, '/') ? "/" : "\\", strchr (cptr, '/') ? "/" : "\\");
+        stat = docmdp->action (-1, nbuf);                   /* simh.ini proc cmd file */
+        }
+    if (SCPE_BARE_STATUS(stat) == SCPE_OPENERR)
+        stat = docmdp->action (-1, "/Library/Preferences/simh.ini");/* simh.ini proc cmd file */
+    if (SCPE_BARE_STATUS(stat) == SCPE_OPENERR)
+        stat = docmdp->action (-1, "/etc/simh.ini");        /* simh.ini proc cmd file */
     if (*cbuf)                                              /* cmd file arg? */
         stat = docmdp->action (0, cbuf);                    /* proc cmd file */
     else {

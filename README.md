@@ -107,6 +107,7 @@ Simulator binaries for x86 Linus, x86 macOS, and Windows for all recent changes 
 - EXAMINE memory commands will now produce minimal output that summarizes multiple successive locations with the same contents and may be aborted by SIGINT (Control-C).
 - Ethernet enhancements on all platforms and and much simplified platform support on macOS.
 - Almost all existing simulators have useful SET CONSOLE SPEED=nnn behaviors in both the bare console session as well as TELNET console sessions.
+- Simh global/startup configuration commands can be contained in the first of simh.ini found in: 1) The current working directory, 2) The User login directory, 3) The directory containing the simulator executable, 4) The ~/Library/Preferences directory, 5) The /Library/Preferences directory, or 6) The /etc directory.
 
 #### All simulators build cleanly under OpenVMS on ia64 systems.
 
@@ -196,7 +197,7 @@ Simulator binaries for x86 Linus, x86 macOS, and Windows for all recent changes 
 
 #### CDC 1700 simulator from John Forecast
 
-#### Hans-Åke Lund has implemented an SCELBI (SCientic-ELectronics-BIology) simulator.
+#### Hans-ï¿½ke Lund has implemented an SCELBI (SCientic-ELectronics-BIology) simulator.
 
 #### IBM 650 simulator from Roberto Sancho Villa
 
