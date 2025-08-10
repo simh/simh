@@ -161,6 +161,8 @@ static t_stat sim_set_rem_connections (int32 flag, CONST char *cptr);
 static t_stat sim_set_rem_timeout (int32 flag, CONST char *cptr);
 static t_stat sim_set_rem_master (int32 flag, CONST char *cptr);
 
+static void sim_check_running_under_debugger (void);
+
 /* Deprecated CONSOLE HALT, CONSOLE RESPONSE and CONSOLE DELAY support */
 static t_stat sim_set_halt (int32 flag, CONST char *cptr);
 static t_stat sim_set_response (int32 flag, CONST char *cptr);
@@ -176,7 +178,11 @@ static t_stat sim_set_delay (int32 flag, CONST char *cptr);
 
 int32 sim_int_char = 005;                               /* interrupt character */
 int32 sim_dbg_int_char = 0;                             /* SIGINT char under debugger */
-int32 sim_dbg_signal = 0;                               /* Enable SIGINT to debugger */
+t_bool sim_dbg_signal = FALSE;                          /* Enable SIGINT to debugger */
+static t_bool sim_running_under_debugger = FALSE;
+static char *sim_controlling_debugger = NULL;           /* gdb or lldb when sim_running_under_debugger is TRUE */
+#define RUNNING_UNDER_GDB (sim_running_under_debugger && (strcmp (sim_controlling_debugger, "gdb") == 0))
+#define RUNNING_UNDER_LLDB (sim_running_under_debugger && (strcmp (sim_controlling_debugger, "lldb") == 0))
 static t_bool sigint_message_issued = FALSE;
 int32 sim_brk_char = 000;                               /* break character */
 int32 sim_tt_pchar = 0x00002780;
@@ -211,9 +217,11 @@ UNIT sim_con_units[2] = {{ UDATA (&sim_con_poll_svc, UNIT_ATTABLE, 0)}}; /* cons
 #define DBG_CON  TMXR_DBG_CON                           /* display connection activity */
 #define DBG_EXP  0x00000001                             /* Expect match activity */
 #define DBG_SND  0x00000002                             /* Send (Inject) data activity */
+#define DBG_SET  0x00000004                             /* settings call values */
 
 static DEBTAB sim_con_debug[] = {
   {"TRC",    DBG_TRC, "routine calls"},
+  {"SET",    DBG_SET, "settings call values"},
   {"XMT",    DBG_XMT, "Transmitted Data"},
   {"RCV",    DBG_RCV, "Received Data"},
   {"RET",    DBG_RET, "Returned Received Data"},
@@ -333,9 +341,7 @@ static CTAB set_con_tab[] = {
     { "RESPONSE", &sim_set_response, 1 | CMD_WANTSTR },
     { "NORESPONSE", &sim_set_response, 0 },
     { "DBGINT",  &sim_set_kmap, KMAP_DBGINT | KMAP_NZ },
-    { "DBGSIG", &sim_set_dbgsignal, 0 },
     { "DBGSIGNAL", &sim_set_dbgsignal, 0 },
-    { "NODBGSIG", &sim_reset_dbgsignal, 0 },
     { "NODBGSIGNAL", &sim_reset_dbgsignal, 0 },
     { NULL, NULL, 0 }
     };
@@ -355,9 +361,7 @@ static SHTAB show_con_tab[] = {
     { "WRU", &sim_show_kmap, KMAP_WRU },
     { "BRK", &sim_show_kmap, KMAP_BRK },
     { "DEL", &sim_show_kmap, KMAP_DEL },
-#if !defined(_WIN32) && !defined(_WIN64) && !defined(VMS)
     { "DBGINT", &sim_show_kmap, KMAP_DBGINT },
-#endif
     { "PCHAR", &sim_show_pchar, 0 },
     { "SPEED", &sim_show_cons_speed, 0 },
     { "LOG", &sim_show_cons_log, 0 },
@@ -2168,6 +2172,8 @@ DEVICE *dptr = sim_devices[0];
 int32 val, rdx;
 t_stat r;
 
+if (((flag  & (~KMAP_NZ)) == KMAP_DBGINT) && RUNNING_UNDER_LLDB)
+    return sim_messagef(SCPE_OK, "Debugger interrupt not supported with lldb debugger.\n");
 if ((cptr == NULL) || (*cptr == 0))
     return SCPE_2FARG;
 if (dptr->dradix == 16)
@@ -2189,6 +2195,8 @@ t_stat sim_show_kmap (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char
 {
 int32 kmap_char = *(cons_kmap[flag & KMAP_MASK]);
 
+if (((flag  & (~KMAP_NZ)) == KMAP_DBGINT) && !RUNNING_UNDER_GDB)
+    return SCPE_OK;
 if (sim_devices[0]->dradix == 16)
     fprintf (st, "%s = 0x%X", show_con_tab[flag].name, kmap_char);
 else
@@ -2966,6 +2974,10 @@ t_stat sim_set_dbgsignal (int32 flag, CONST char *cptr)
 if (cptr != NULL && *cptr != '\0')
     return SCPE_2FARG;
 
+if (!sim_running_under_debugger)
+    return sim_messagef(SCPE_OK, "Debugger interrupt not supported unless running under a debugger.\n");
+if (!RUNNING_UNDER_GDB)
+    return sim_messagef(SCPE_OK, "Debugger interrupt only supported with gdb debugger.\n");
 sim_dbg_signal = TRUE;             /* Enable SIGINT to debugger */
 return sim_messagef(SCPE_OK, "SIGINT to debugger enabled.\n");
 #else
@@ -3260,7 +3272,14 @@ sim_con_tmxr.ldsc->expect = &sim_con_expect;
 sim_register_internal_device (&sim_con_telnet);
 tmxr_startup ();
 sim_set_notelnet (0, NULL);
-return sim_os_ttinit ();
+sim_con_telnet.dctrl = 0xffffffff;
+sim_os_ttinit ();
+sim_con_telnet.dctrl = 0;
+#if (defined(__GNUC__) && !defined(__OPTIMIZE__))       /* Debug build? */
+if (RUNNING_UNDER_GDB)                                  /* and Running under gdb */
+    sim_dbg_signal = TRUE;                              /* Enable SIGINT to debugger on by default */
+#endif
+return SCPE_OK;
 }
 
 t_stat sim_ttrun (void)
@@ -3807,6 +3826,7 @@ runltchars.t_rprntc = 0xFF;
 runltchars.t_flushc = 0xFF;
 runltchars.t_werasc = 0xFF;
 runltchars.t_lnextc = 0xFF;
+sim_check_running_under_debugger ();
 return SCPE_OK;                                         /* return success */
 }
 
@@ -3921,8 +3941,187 @@ return SCPE_NOFNC;
 struct termios cmdtty, runtty;
 int cmdfl,runfl;                                        /* TTY flags */
 
+/* These BITFIELDs and character array tmio_cc reflect the definitions in */
+/* macOS.  Different bit ordering and tmio_cc array indexes are likely on */
+/* other platforms.                                                       */
+BITFIELD tmio_inp_bits[] = {
+  BIT(IGNBRK),                              /* 0x00000001 ignore BREAK condition */
+  BIT(BRKINT),                              /* 0x00000002 map BREAK to SIGINTR */
+  BIT(IGNPAR),                              /* 0x00000004 ignore (discard) parity errors */
+  BIT(PARMRK),                              /* 0x00000008 mark parity and framing errors */
+  BIT(INPCK),                               /* 0x00000010 enable checking of parity errors */
+  BIT(ISTRIP),                              /* 0x00000020 strip 8th bit off chars */
+  BIT(INLCR),                               /* 0x00000040 map NL into CR */
+  BIT(IGNCR),                               /* 0x00000080 ignore CR */
+  BIT(ICRNL),                               /* 0x00000100 map CR to NL (ala CRMOD) */
+  BIT(IXON),                                /* 0x00000200 enable output flow control */
+  BIT(IXOFF),                               /* 0x00000400 enable input flow control */
+  BIT(IXANY),                               /* 0x00000800 any char will restart after stop */
+  BITNC,                                    /* 0x00001000 Unused bit */
+#if !defined(_POSIX_C_SOURCE) || defined(_DARWIN_C_SOURCE)
+  BIT(IMAXBEL),                             /* 0x00002000 ring bell on input queue full */
+  BIT(IUTF8),                               /* 0x00004000 maintain state for UTF-8 VERASE */
+#endif
+  ENDBITS
+};
+BITFIELD tmio_out_bits[] = {
+  BIT(OPOST),                               /* 0x00000001 enable following output processing */
+  BIT(ONLCR),                               /* 0x00000002 map NL to CR-NL (ala CRMOD) */
+#if !defined(_POSIX_C_SOURCE) || defined(_DARWIN_C_SOURCE)
+  BIT(OXTABS),                              /* 0x00000004 expand tabs to spaces */
+  BIT(ONOEOT),                              /* 0x00000008 discard EOT's (^D) on output) */
+#else
+  BITNCF(2),                                /* 0x00000004-0x00000008 Unused bits */
+#endif
+  BIT(OCRNL),                               /* 0x00000010 map CR to NL on output */
+  BIT(ONOCR),                               /* 0x00000020 no CR output at column 0 */
+  BIT(ONLRET),                              /* 0x00000040 NL performs CR function */
+  BIT(OFILL),                               /* 0x00000080 use fill characters for delay */
+  BITF(CHRDLY,9),                           /* 0x0001FF00 various different delays */
+//BIT(NLDLY),                               /* 0x00000300 \n delay */
+//BIT(TABDLY),                              /* 0x00000c04 horizontal tab delay */
+//BIT(CRDLY),                               /* 0x00003000 \r delay */
+//BIT(FFDLY),                               /* 0x00004000 form feed delay */
+//BIT(BSDLY),                               /* 0x00008000 \b delay */
+//BIT(VTDLY),                               /* 0x00010000 vertical tab delay */
+  BIT(OFDEL),                               /* 0x00020000 fill is DEL, else NUL */
+  ENDBITS
+};
+BITFIELD tmio_ctl_bits[] = {
+#if !defined(_POSIX_C_SOURCE) || defined(_DARWIN_C_SOURCE)
+  BIT(CIGNORE),                             /* 0x00000001 ignore control flags */
+#else
+  BITNC,                                    /* 0x00000001 Unused bit */
+#endif
+  BITF(CSIZE,2),                            /* 0x00000300 character size mask */
+  BIT(CSTOPB),                              /* 0x00000400 send 2 stop bits */
+  BIT(CREAD),                               /* 0x00000800 enable receiver */
+  BIT(PARENB),                              /* 0x00001000 parity enable */
+  BIT(PARODD),                              /* 0x00002000 odd parity, else even */
+  BIT(HUPCL),                               /* 0x00002000 hang up on last close */
+  BIT(CLOCAL),                              /* 0x00004000 ignore modem status lines */
+  BIT(CIGNORE),                             /* 0x00008000 ignore control flags */
+#if !defined(_POSIX_C_SOURCE) || defined(_DARWIN_C_SOURCE)
+  BIT(CCTS_OFLOW),                          /* 0x00010000 CTS flow control of output */
+  BIT(CRTS_IFLOW),                          /* 0x00020000 RTS flow control of input */
+  BIT(CDTR_IFLOW),                          /* 0x00040000 DTR flow control of input */
+  BIT(CDSR_OFLOW),                          /* 0x00080000 DSR flow control of output */
+  BIT(CCAR_OFLOW),                          /* 0x00100000 DCD flow control of output */
+#endif
+  ENDBITS
+};
+BITFIELD tmio_lcl_bits[] = {
+#if !defined(_POSIX_C_SOURCE) || defined(_DARWIN_C_SOURCE)
+  BIT(ECHOKE),                              /* 0x00000001 visual erase for line kill */
+#else
+  BITNC,                                    /* 0x00000001 Unused bit */
+#endif
+  BIT(ECHOE),                               /* 0x00000002 visually erase chars */
+  BIT(ECHOK),                               /* 0x00000004 echo NL after line kill */
+  BIT(ECHO),                                /* 0x00000005 enable echoing */
+  BIT(ECHONL),                              /* 0x00000010 echo NL even if ECHO is off */
+#if !defined(_POSIX_C_SOURCE) || defined(_DARWIN_C_SOURCE)
+  BIT(ECHOPRT),                             /* 0x00000020 visual erase mode for hardcopy */
+  BIT(ECHOCTL),                             /* 0x00000040 echo control chars as ^(Char) */
+#else
+  BITNCF(2),                                /* 0x00000020-0x00000040 Unused bits */
+#endif  /*(_POSIX_C_SOURCE && !_DARWIN_C_SOURCE) */
+  BIT(ISIG),                                /* 0x00000080 enable signals INTR, QUIT, [D]SUSP */
+  BIT(ICANON),                              /* 0x00000100 canonicalize input lines */
+#if !defined(_POSIX_C_SOURCE) || defined(_DARWIN_C_SOURCE)
+  BIT(ALTWERASE),                           /* 0x00000200 use alternate WERASE algorithm */
+#else
+  BITNC,                                    /* 0x00000200 Unused bit */
+#endif  /*(_POSIX_C_SOURCE && !_DARWIN_C_SOURCE) */
+  BIT(IEXTEN),                              /* 0x00000400 enable DISCARD and LNEXT */
+#if !defined(_POSIX_C_SOURCE) || defined(_DARWIN_C_SOURCE)
+  BIT(EXTPROC),                             /* 0x00000800 external processing */
+#else
+  BITNC,                                    /* 0x00000800 Unused bit */
+#endif  /*(_POSIX_C_SOURCE && !_DARWIN_C_SOURCE) */
+  BIT(TOSTOP),                              /* 0x00400000 stop background jobs from output */
+#if !defined(_POSIX_C_SOURCE) || defined(_DARWIN_C_SOURCE)
+  BIT(FLUSHO),                              /* 0x00800000 output being flushed (state) */
+  BITNC,                                    /* 0x01000000 Unused bit */
+  BIT(NOKERNINFO),                          /* 0x02000000 no kernel output from VSTATUS */
+  BITNCF(3),                                /* 0x04000000-0x10000000 Unused bits */
+  BIT(PENDIN),                              /* 0x20000000 XXX retype pending input (state) */
+  BITNC,                                    /* 0x40000000 Unused bit */
+#else
+  BITNCF(8),                                /* 0x00800000-0x40000000 Unused bits */
+#endif  /*(_POSIX_C_SOURCE && !_DARWIN_C_SOURCE) */
+  BIT(NOFLSH),                              /* 0x80000000 don't flush after interrupt */
+  ENDBITS
+};
+
+static char *tmio_cc[NCCS] = {
+    "VEOF",
+    "VEOL",
+#if defined(_POSIX_C_SOURCE) && !defined(_DARWIN_C_SOURCE)
+    "undefined-"
+#endif
+    "VEOL2",
+    "VERASE",
+#if defined(_POSIX_C_SOURCE) && !defined(_DARWIN_C_SOURCE)
+    "undefined-"
+#endif
+    "VWERASE",
+    "VKILL",
+#if defined(_POSIX_C_SOURCE) && !defined(_DARWIN_C_SOURCE)
+    "undefined-"
+#endif
+    "VREPRINT",
+    "spare 1",
+    "VINTR",
+    "VQUIT",
+    "VSUSP",
+#if defined(_POSIX_C_SOURCE) && !defined(_DARWIN_C_SOURCE)
+    "undefined-"
+#endif
+    "VDSUSP",
+    "VSTART",
+    "VSTOP",
+#if defined(_POSIX_C_SOURCE) && !defined(_DARWIN_C_SOURCE)
+    "undefined-"
+#endif
+    "VLNEXT",
+    "VDISCARD",
+    "VMIN",
+    "VTIME",
+#if defined(_POSIX_C_SOURCE) && !defined(_DARWIN_C_SOURCE)
+    "undefined-"
+#endif
+    "VSTATUS",
+    "spare 2"
+};
+
+static void _tmio_debug (const char *name, struct termios *ttyset)
+{
+int i;
+
+sim_debug (DBG_SET, &sim_con_telnet, "%s.c_iflag = 0x%08X ", name, (uint32)(ttyset->c_iflag));
+sim_debug_bits(DBG_SET, &sim_con_telnet, tmio_inp_bits, (uint32)(ttyset->c_iflag), (uint32)(ttyset->c_iflag), TRUE);
+sim_debug (DBG_SET, &sim_con_telnet, "%s.c_oflag = 0x%08X ", name, (uint32)(ttyset->c_oflag));
+sim_debug_bits(DBG_SET, &sim_con_telnet, tmio_out_bits, (uint32)(ttyset->c_oflag), (uint32)(ttyset->c_oflag), TRUE);
+sim_debug (DBG_SET, &sim_con_telnet, "%s.c_cflag = 0x%08X ", name, (uint32)(ttyset->c_cflag));
+sim_debug_bits(DBG_SET, &sim_con_telnet, tmio_ctl_bits, (uint32)(ttyset->c_cflag), (uint32)(ttyset->c_cflag), TRUE);
+sim_debug (DBG_SET, &sim_con_telnet, "%s.c_lflag = 0x%08X ", name, (uint32)(ttyset->c_lflag));
+sim_debug_bits(DBG_SET, &sim_con_telnet, tmio_lcl_bits, (uint32)(ttyset->c_lflag), (uint32)(ttyset->c_lflag), TRUE);
+for (i = 0; i < NCCS; i++) {
+    if (ttyset->c_cc[i]) {
+        sim_debug (DBG_SET, &sim_con_telnet, "%s.c_cc[%s] = 0x%X ", name, tmio_cc[i], ttyset->c_cc[i]);
+        if (ttyset->c_cc[i] <= 32)
+            sim_debug (DBG_SET, &sim_con_telnet, "'^%c'\n", '@' + (ttyset->c_cc[i]&0xFF));
+        else
+            sim_debug (DBG_SET, &sim_con_telnet, "'\\%03o'\n", ttyset->c_cc[i]&0xFF);
+        }
+    }
+}
+
 static t_stat sim_os_ttinit (void)
 {
+int i;
+
 sim_debug (DBG_TRC, &sim_con_telnet, "sim_os_ttinit()\n");
 
 cmdfl = fcntl (fileno (stdin), F_GETFL, 0);             /* get old flags  and status */
@@ -3942,10 +4141,18 @@ runtty = cmdtty;
 runtty.c_lflag = runtty.c_lflag & ~(ECHO | ICANON);     /* no echo or edit */
 runtty.c_oflag = runtty.c_oflag & ~OPOST;               /* no output edit */
 runtty.c_iflag = runtty.c_iflag & ~ICRNL;               /* no cr conversion */
+runtty.c_iflag = runtty.c_iflag & ~IGNCR;               /* don't ignore cr */
+runtty.c_iflag = runtty.c_iflag & ~IXANY;               /* don't restart after stop */
+runtty.c_iflag = runtty.c_iflag & ~IMAXBEL;             /* don't ring bell on input queue full */
+runtty.c_lflag = runtty.c_lflag & ~PENDIN;              /* don't retype pending input (state) */
+runtty.c_lflag = runtty.c_lflag | ECHOK;                /* echo NL after line kill */
 #if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
 runtty.c_cc[VINTR] = 0;                                 /* OS X doesn't deliver SIGINT to main thread when enabled */
 #else
-runtty.c_cc[VINTR] = sim_int_char;                      /* interrupt */
+if (RUNNING_UNDER_LLDB)
+    runtty.c_cc[VINTR] = 0;                             /* lldb doesn't deliver SIGINT to running process */
+else
+    runtty.c_cc[VINTR] = sim_int_char;                  /* interrupt */
 #endif
 runtty.c_cc[VQUIT] = 0;                                 /* no quit */
 runtty.c_cc[VERASE] = 0;
@@ -3975,6 +4182,9 @@ runtty.c_cc[VDSUSP] = 0;
 #if defined (VSTATUS)
 runtty.c_cc[VSTATUS] = 0;
 #endif
+_tmio_debug ("cmdtty", &cmdtty);
+_tmio_debug ("runtty", &runtty);
+sim_check_running_under_debugger ();
 return SCPE_OK;
 }
 
@@ -3988,7 +4198,10 @@ if (!isatty (fileno (stdin)))                           /* skip if !tty */
 #if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
 runtty.c_cc[VINTR] = 0;                                 /* OS X doesn't deliver SIGINT to main thread when enabled */
 #else
-runtty.c_cc[VINTR] = sim_int_char;                      /* in case changed */
+if (RUNNING_UNDER_LLDB)
+    runtty.c_cc[VINTR] = 0;                             /* lldb doesn't deliver SIGINT to running process */
+else
+    runtty.c_cc[VINTR] = sim_int_char;                  /* in case changed */
 #endif
 if (sim_dbg_signal) {
     if (sim_dbg_int_char == 0)
@@ -4012,6 +4225,7 @@ if (sim_dbg_signal) {
         sigint_message_issued = TRUE;
         }
     }
+_tmio_debug ("runtty", &runtty);
 if (tcsetattr (fileno(stdin), TCSETATTR_ACTION, &runtty) < 0)
     return SCPE_TTIERR;
 sim_os_set_thread_priority (PRIORITY_BELOW_NORMAL);     /* try to lower pri */
@@ -4025,7 +4239,8 @@ sim_debug (DBG_TRC, &sim_con_telnet, "sim_os_ttcmd() - BSDTTY\n");
 if (!isatty (fileno (stdin)))                           /* skip if !tty */
     return SCPE_OK;
 sim_os_set_thread_priority (PRIORITY_NORMAL);           /* try to raise pri */
-(void)fcntl (0, F_SETFL, cmdfl);                        /* block mode */
+(void)fcntl (fileno (stdin), F_SETFL, cmdfl);           /* block mode */
+_tmio_debug ("cmdtty", &cmdtty);
 if (tcsetattr (fileno(stdin), TCSETATTR_ACTION, &cmdtty) < 0)
     return SCPE_TTIERR;
 return SCPE_OK;
@@ -4099,6 +4314,30 @@ if (program[0] != '\0') {
 return sim_messagef (SCPE_NOFNC, "Can't find a telnet program to connect to the console in a window\n");
 }
 
+#endif
+
+#if !defined(_WIN32) && !defined(VMS)
+#include <stdio.h>
+#include <unistd.h>
+
+/* Determine if current process is running under a debugger */
+void sim_check_running_under_debugger (void)
+{
+char command[128];
+char response[256] = "";
+FILE *f;
+
+snprintf (command, sizeof (command), "ps -p %d | grep -E 'gdb|lldb|LLDB'", (int)getppid());
+f = popen (command, "r");
+if (f != NULL) {
+    if (fgets(response, sizeof(response), f))
+       sim_trim_endspc (response);
+    pclose (f);
+    }
+sim_running_under_debugger = (strlen (response) > 0);
+if (sim_running_under_debugger)
+    sim_controlling_debugger = (strstr (response, "gdb") != NULL) ? "gdb" : "lldb";
+}
 #endif
 
 /* Decode a string.
