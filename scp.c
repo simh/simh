@@ -7438,6 +7438,9 @@ if (1) {
             fprintf (st, "\n        curl tool: %s", curlversion);
             setenv ("SIM_CURL_CMD_AVAILABLE", "TRUE", 1);
             }
+#if !defined(_WIN32)
+        fprintf (st, "\n        %s as root", _sim_running_as_root () ? "Running" : "Not running");
+#endif
         }
 #endif
     if ((!strcmp (os_type, "Unknown")) && (getenv ("OSTYPE")))
@@ -16902,6 +16905,26 @@ sim_rand_seed = a * lo - r * hi;
 if (sim_rand_seed < 0)
     sim_rand_seed += RAND_MAX + 1;
 return (sim_rand_seed - 1);
+}
+
+t_bool _sim_running_as_root (void)
+{
+FILE *f = fopen("/dev/mem", "r");
+char response[64] = "";
+
+if (f != NULL) {
+  fclose(f);
+  return TRUE;
+  }
+#if !defined(_WIN32)
+f = popen("id -u", "r");
+if (f == NULL)
+  return FALSE;
+if (fgets(response, sizeof(response), f))
+ sim_trim_endspc (response);
+pclose(f);
+#endif
+return (0 == strcmp(response, "0"));
 }
 
 

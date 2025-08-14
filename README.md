@@ -108,6 +108,7 @@ Simulator binaries for x86 Linus, x86 macOS, and Windows for all recent changes 
 - Ethernet enhancements on all platforms and and much simplified platform support on macOS.
 - Almost all existing simulators have useful SET CONSOLE SPEED=nnn behaviors in both the bare console session as well as TELNET console sessions.
 - Simh global/startup configuration commands can be contained in the first of simh.ini found in: 1) The current working directory, 2) The User login directory, 3) The directory containing the simulator executable, 4) The ~/Library/Preferences directory, 5) The /Library/Preferences directory, or 6) The /etc directory.
+- Enhanced Ethernet functionality on macOS which leverages the OS provided vmnet capabilities.  This is available on all intel and Apple Silicon macOS systems starting with Catalina (10.15) which was released in 2019.
 
 #### All simulators build cleanly under OpenVMS on ia64 systems.
 
@@ -138,7 +139,7 @@ Simulator binaries for x86 Linus, x86 macOS, and Windows for all recent changes 
 - VAX Instruction history can be recorded to disk both for all instructions executed as well as every n instructions.
 - VAX Unibus simulators (780, 750, 730, 8600, 8200) run DEC supplied diagnostics at the speed of the original systems and also run the privileged instruction diagnostic that was supported on the original systems.
 
-### All relevant changes in the simh v3.12-4 release have been merged into this repo
+### All relevant changes in Bob Supnik's simh v3.12-4 release have been merged into this repo
 
 ### Bill Beech has made significant enhancements and bug fixes to the SWTP simulators along with a new disk controller from Roberto Sancho Villa
 

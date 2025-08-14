@@ -407,6 +407,7 @@ struct SEND {
 /* Private SCP only APIs */
 
 t_stat _sim_os_putchar (int32 out);
+t_bool _sim_running_as_root (void);
 
 
 #endif /* defined(SIM_SCP_PRIVATE_DONT_REPEAT) */

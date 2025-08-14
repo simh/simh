@@ -150,8 +150,11 @@ extern "C" {
 /* Generally avoid pcap APIs when running with vmnet.framework */
 #if defined(HAVE_VMNET_NETWORK)
 #define DONT_USE_PCAP_FINDALLDEVS 1
+#if !defined(DONT_USE_VMNET_HOST)
+#define USE_VMNET_HOST_AS_TAP 1
 #if defined(HAVE_TAP_NETWORK)
 #undef HAVE_TAP_NETWORK
+#endif
 #endif
 #if defined(HAVE_VDE_NETWORK)
 #undef HAVE_VDE_NETWORK
