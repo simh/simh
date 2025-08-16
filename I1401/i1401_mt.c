@@ -25,6 +25,7 @@
 
    mt           7-track magtape
 
+   15-Aug-25    VRS     Reverted tape mark behaviour as revision was wrong (Van Snyder)
    26-Mar-22    RMS     Added extra case points for new MTSE definitions
    20-Oct-16    RMS     Must call sim_tape_attach to use library (Mark Pizzolato)
    03-Sep-13    RMS     Read TMK does not write GM+WM to memory
@@ -346,8 +347,6 @@ switch (mod) {
                 return STOP_WRAP;
                 }
             }
-        if (st == MTSE_TMK)                             /* if TMK, no GM+WM */
-            break;
         if (M[BS] != (BCD_GRPMRK + WM)) {               /* not GM+WM at end? */
             if (flag & MD_WM)                           /* LCA: clear WM */
                 M[BS] = BCD_GRPMRK;
