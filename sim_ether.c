@@ -2348,6 +2348,8 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, const char *devname, int set_on, c
                 break;
                 }
               }
+            else
+                break;
             }
           pclose(f);
           }
