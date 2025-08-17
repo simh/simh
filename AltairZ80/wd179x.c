@@ -93,11 +93,12 @@ typedef union {
 typedef struct {
     UNIT *uptr;
     DISK_INFO *imd;
-    uint8 ntracks;   /* number of tracks */
-    uint8 nheads;    /* number of heads */
-    uint32 sectsize; /* sector size, not including pre/postamble */
-    uint8 track;     /* Current Track */
-    uint8 ready;     /* Is drive ready? */
+    uint8 ntracks;      /* number of tracks */
+    uint8 nheads;       /* number of heads */
+    uint32 sectsize;    /* sector size, not including pre/postamble */
+    uint8 track;        /* Current Track */
+    uint8 ready;        /* Is drive ready? */
+    int rpm;            /* Drive RPM */
 } WD179X_DRIVE_INFO;
 
 typedef struct {
@@ -336,6 +337,14 @@ static t_stat wd179x_reset(DEVICE *dptr)
     wd179x_info->cmdtype = 0;
 
     return SCPE_OK;
+}
+
+void wd179x_set_rpm(int rpm)
+{
+    if (wd179x_info->sel_drive > WD179X_MAX_DRIVES) {
+        return;
+    }
+    wd179x_info->drive[wd179x_info->sel_drive & 3].rpm = rpm;
 }
 
 void wd179x_connect_external_fifo(uint16 fifo_len, uint8* storage)
@@ -1210,11 +1219,24 @@ static uint8 Do1793Command(uint8 cCommand)
                 if (cCommand & 0x04) {
                     wd179x_info->index_pulse_wait = TRUE;
                     if (wd179x_info->sel_drive < WD179X_MAX_DRIVES) {
-                        if (pDrive->uptr->u3 == IMAGE_TYPE_IMD) {
-                            sim_activate (wd179x_unit, ((wd179x_info->drive[wd179x_info->sel_drive].imd->ntracks % 77) == 0) ? CROMFDC_8IN_ROT : CROMFDC_5IN_ROT); /* Generate INDEX pulse */
-                        } else {
-                            sim_activate(wd179x_unit, CROMFDC_8IN_ROT); /* Generate INDEX pulse */
+                        int rot = 0;
+
+                        switch (pDrive->rpm) {
+                        case 300:
+                            rot = CROMFDC_5IN_ROT;
+                            break;
+                        case 360:
+                            rot = CROMFDC_8IN_ROT;
+                            break;
+                        default: /* RPM not set, infer from the disk image, if possible. */
+                            if (pDrive->uptr->u3 == IMAGE_TYPE_IMD) {
+                                rot = ((wd179x_info->drive[wd179x_info->sel_drive].imd->ntracks % 77) == 0) ? CROMFDC_8IN_ROT : CROMFDC_5IN_ROT;
+                            }
+                            else {
+                                rot = CROMFDC_8IN_ROT;
+                            }
                         }
+                        sim_activate(wd179x_unit, rot); /* Generate INDEX pulse */
                     }
                 } else {
                     wd179x_info->intrq = 1;

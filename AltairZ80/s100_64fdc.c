@@ -82,6 +82,7 @@ extern t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
                                int32 (*routine)(const int32, const int32, const int32), const char* name, uint8 unmap);
+void wd179x_set_rpm(int rpm);
 
 static t_stat cromfdc_svc (UNIT *uptr);
 
@@ -1586,8 +1587,10 @@ static int32 cromfdc_control(const int32 port, const int32 io, const int32 data)
         }
         if(data & CROMFDC_CTRL_MAXI) {
             wd179x_infop->drivetype = 8;
+            wd179x_set_rpm(360);
         } else {
             wd179x_infop->drivetype = 5;
+            wd179x_set_rpm(300);
         }
 
         if(data & CROMFDC_CTRL_MTRON) {
@@ -1611,6 +1614,7 @@ static int32 cromfdc_control(const int32 port, const int32 io, const int32 data)
         }
 
         sim_debug(DRIVE_MSG, &cromfdc_dev, "CROMFDC: " ADDRESS_FORMAT " WR CTRL: sel_drive=%d, drivetype=%d, motor=%d, dens=%d, aw=%d\n", PCX, wd179x_infop->sel_drive, wd179x_infop->drivetype, cromfdc_info->motor_on, wd179x_infop->ddens, cromfdc_info->autowait);
+
     } else { /* I/O Read */
         result = (crofdc_boot) ? 0 : CROMFDC_FLAG_BOOT;
         result |= (wd179x_infop->intrq) ? CROMFDC_FLAG_EOJ : 0;
