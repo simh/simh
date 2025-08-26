@@ -572,6 +572,8 @@ static MTAB cpu_mod[] = {
         NULL, NULL, "Sets the RAM type to Cromemco RAM for 8080 / Z80 / 8086"   },
     { MTAB_XTD | MTAB_VDV,  4,                  NULL,           "B810",         &cpu_set_ramtype,
         NULL, NULL, "Sets the RAM type AB Digital Design B810 8080 / Z80 / 8086"},
+    { MTAB_XTD | MTAB_VDV,  5,                  NULL,           "ERAM",         &cpu_set_ramtype,
+        NULL, NULL, "Sets the RAM type to SD Systems ExpandoRAM for 8080 / Z80 / 8086"},
     { MTAB_VDV,             4,                  NULL,           "4KB",          &cpu_set_size,
         NULL, NULL, "Sets the RAM size to 4KB for 8080 / Z80 / 8086"        },
     { MTAB_VDV,             8,                  NULL,           "8KB",          &cpu_set_size,
@@ -734,7 +736,8 @@ const char* handlerNameForPort(const int32 port) {
 #define RAM_TYPE_VRAM   2       /* Vector Graphic RAM card */
 #define RAM_TYPE_CRAM   3       /* Cromemco RAM card */
 #define RAM_TYPE_B810   4       /* AB Digital Design B810 RAM card */
-#define MAX_RAM_TYPE    RAM_TYPE_B810
+#define RAM_TYPE_ERAM   5       /* SD Systems ExpandoRAM */
+#define MAX_RAM_TYPE    RAM_TYPE_ERAM
 
 static int32 ramtype = RAM_TYPE_AZ80;
 
@@ -2394,7 +2397,7 @@ static t_stat sim_instr_mmu (void) {
 
             IFF_S = 0; /* disable interrupts */
 
-            vectorInterrupt &= ~(1 << intVector);
+            vectorInterrupt &= ~(1 << intVector); /* Clear interrupt */
 
             op = dataBus[intVector];
 
@@ -6760,7 +6763,7 @@ const static CPUFLAG *cpuflags[NUM_CHIP_TYPE] = { cpuflags8080, cpuflagsZ80,
     cpuflags8086, cpuflagsM68K, };
 
 /* needs to be set for each ramtype <= MAX_RAM_TYPE */
-static const char *ramTypeToString[] = { "AZ80", "HRAM", "VRAM", "CRAM", "B810" };
+static const char *ramTypeToString[] = { "AZ80", "HRAM", "VRAM", "CRAM", "B810", "ERAM" };
 
 static const char* m68kVariantToString[] = {
     "INVALID",
@@ -7000,6 +7003,13 @@ static int32 bankseldev(const int32 port, const int32 io, const int32 data) {
                     sim_printf("Invalid bank select 0x%02x for B810\n", data);
                 }
                 break;
+            case RAM_TYPE_ERAM:
+                if (data < 8) {
+                    setBankSelect(data);
+                } else {
+                    sim_printf("Invalid bank select 0x%02x for ERAM\n", data);
+                }
+                break;
             case RAM_TYPE_AZ80:
             default:
                 break;
@@ -7143,6 +7153,11 @@ static t_stat cpu_set_ramtype(UNIT *uptr, int32 value, CONST char *cptr, void *d
                 sim_printf("Unmapping AB Digital Design B810 RAM\n");
             sim_map_resource(0x40, 1, RESOURCE_TYPE_IO, &bankseldev, "bankseldev", TRUE);
             break;
+        case RAM_TYPE_ERAM:
+            if (cpu_unit.flags & UNIT_CPU_VERBOSE)
+                sim_printf("Unmapping SD Systems ExpandoRAM\n");
+            sim_map_resource(0xff, 1, RESOURCE_TYPE_IO, &bankseldev, "bankseldev", TRUE);
+            break;
         case 0:
         default:
             if (cpu_unit.flags & UNIT_CPU_VERBOSE)
@@ -7170,6 +7185,11 @@ static t_stat cpu_set_ramtype(UNIT *uptr, int32 value, CONST char *cptr, void *d
             if (cpu_unit.flags & UNIT_CPU_VERBOSE)
                 sim_printf("AB Digital Design B810 RAM Selected\n");
             sim_map_resource(0x40, 1, RESOURCE_TYPE_IO, &bankseldev, "bankseldev", FALSE);
+            break;
+        case RAM_TYPE_ERAM:
+            if (cpu_unit.flags & UNIT_CPU_VERBOSE)
+                sim_printf("SD Systems ExpandoRAM Selected\n");
+            sim_map_resource(0xff, 1, RESOURCE_TYPE_IO, &bankseldev, "bankseldev", FALSE);
             break;
         case 0:
         default:
@@ -7525,11 +7545,21 @@ static t_stat cpu_hex_load(FILE *fileref, CONST char *cptr, CONST char *fnam, in
     char linebuf[1024], datastr[1024], *bufptr;
     int32 bytecnt, rectype, databyte, chksum, line = 0, cnt = 0;
     uint32 makeROM = FALSE;
-    t_addr addr, org = 0;
+    t_addr addr, start = 0, offset = 0, org = -1;
+    CONST char *result;
 
     get_glyph(cptr, gbuf, 0);
     if (strcmp(gbuf, "ROM") == 0) {
         makeROM = TRUE;
+    } else {
+        start = strtotv(cptr, &result, 16) & ADDRMASKEXTENDED;
+        if (cptr != result)
+            org = start;
+        while (isspace(*result))
+            result++;
+        get_glyph(result, gbuf, 0);
+        if (strcmp(gbuf, "ROM") == 0)
+            makeROM = TRUE;
     }
 
     while (!feof(fileref)) {
@@ -7560,8 +7590,12 @@ static t_stat cpu_hex_load(FILE *fileref, CONST char *cptr, CONST char *fnam, in
         datastr[sizeof(datastr) - 1] = '\0';
 
         if ((rectype == 0) && (bytecnt > 0) && (addr+bytecnt <= MAXMEMORY)) {
-            if (cnt == 0)
-                org = addr;
+            if (cnt == 0) {
+                if (org == -1)
+                    org = addr;
+                else
+                    offset = org - addr;
+            }
 
             do {
                 if (sscanf(bufptr, "%2x", &databyte) != 1) {
@@ -7569,7 +7603,7 @@ static t_stat cpu_hex_load(FILE *fileref, CONST char *cptr, CONST char *fnam, in
                 }
                 bufptr += 2;
 
-                PutBYTEasROMorRAM(addr++, databyte, makeROM);
+                PutBYTEasROMorRAM(offset+addr++, databyte, makeROM);
 
                 chksum += databyte;
                 cnt++;
