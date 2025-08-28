@@ -145,13 +145,6 @@ static BITFIELD tmr_iccs_bits [] = {
     ENDBITS
     };
 
-/* TU58 definitions */
-
-#define TD_NUMBLK       512                             /* blocks/tape */
-#define TD_NUMBY        512                             /* bytes/block */
-#define TD_SIZE         (TD_NUMBLK * TD_NUMBY)          /* bytes/tape */
-
-
 
 int32 tti_csr = 0;                                      /* control/status */
 uint32 tti_buftime;                                     /* time input character arrived */
@@ -389,7 +382,7 @@ DEVICE td_dev = {
     "TD", &td_unit, td_reg, td_mod,
     1, DEV_RDX, 20, 1, DEV_RDX, 8,
     NULL, NULL, &td_reset,
-    NULL, NULL, NULL,
+    NULL, &td_attach, NULL,
     NULL, DEV_DEBUG | DEV_DISK, 0, td_deb, NULL, NULL, NULL, NULL, NULL, 
     &td_description, NULL, &drv_tab
     };

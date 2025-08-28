@@ -138,6 +138,7 @@ Simulator binaries for x86 Linus, x86 macOS, and Windows for all recent changes 
 - MSCP Media-Id information and drive geometry information is available for all attached disk containers.
 - VAX Instruction history can be recorded to disk both for all instructions executed as well as every n instructions.
 - VAX Unibus simulators (780, 750, 730, 8600, 8200) run DEC supplied diagnostics at the speed of the original systems and also run the privileged instruction diagnostic that was supported on the original systems.
+- Reliable emulation of TU58 devices in PDP11 and Unibus VAX systems and consistent console TU58 on the VAX730 and VAX750.
 
 ### All relevant changes in Bob Supnik's simh v3.12-4 release have been merged into this repo
 

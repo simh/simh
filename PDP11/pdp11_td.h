@@ -87,6 +87,13 @@ static DEBTAB td_deb[] = {
     { NULL, 0 }
     };
 
+
+/* TU58 definitions */
+
+#define TD_NUMBLK       512                             /* blocks/tape */
+#define TD_NUMBY        512                             /* bytes/block */
+#define TD_SIZE         (TD_NUMBLK * TD_NUMBY)          /* bytes/tape */
+
 #define TD_DRV(d)           \
     { 128, 4, 1,  512, #d, 512 }
 
@@ -94,5 +101,12 @@ static DRVTYP drv_tab[] = {
     TD_DRV (TU58),
     { 0 }
     };
+
+static t_stat td_attach (UNIT *uptr, CONST char *cptr)
+{
+return sim_disk_attach (uptr, cptr, TD_NUMBY, 
+                        sizeof (uint16), TRUE, 0, 
+                        "TU58", 0, 0);
+}
 
 #endif /* _PDP11_TD_H */
