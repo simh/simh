@@ -107,6 +107,7 @@ typedef struct {
 #define DEV_PTP         002                             /* paper tape punch */
 #define DEV_TTI         003                             /* console input */
 #define DEV_TTO         004                             /* console output */
+#define DEV_DPY         005                             /* Type 34 display */
 #define DEV_CLK         013                             /* clock */
 #define DEV_TSC         036
 #define DEV_KJ8         040                             /* extra terminals */

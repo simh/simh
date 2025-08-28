@@ -67,6 +67,9 @@ extern DEVICE df_dev, rf_dev;
 extern DEVICE dt_dev, td_dev;
 extern DEVICE mt_dev, ct_dev;
 extern DEVICE ttix_dev, ttox_dev;
+#ifdef USE_DISPLAY
+extern DEVICE dpy_dev;
+#endif
 extern REG cpu_reg[];
 extern uint16 M[];
 
@@ -114,6 +117,10 @@ DEVICE *sim_devices[] = {
     &td_dev,
     &mt_dev,
     &ct_dev,
+    &ct_dev,
+#ifdef USE_DISPLAY
+    &dpy_dev,
+#endif
     NULL
     };
 
@@ -332,6 +339,8 @@ static const char *opcode[] = {
  "PCE", "PSF", "PCF", "PPC", "PLS",
  "KCF", "KSF", "KCC", "KRS", "KIE", "KRB",              /* console */
  "TLF", "TSF", "TCF", "TPC", "SPI", "TLS",
+ "DCX", "DXL", "DIX", "DXS",
+ "DCY", "DYL", "DIY", "DYS",
  "SBE", "SPL", "CAL",                                   /* power fail */
  "CLEI", "CLDI", "CLSC", "CLLE", "CLCL", "CLSK",        /* clock */
  "CINT", "RDF", "RIF", "RIB",                           /* mem mmgt */
@@ -400,6 +409,8 @@ static const int32 opc_val[] = {
  06020+I_NPN, 06021+I_NPN, 06022+I_NPN, 06024+I_NPN, 06026+I_NPN,
  06030+I_NPN, 06031+I_NPN, 06032+I_NPN, 06034+I_NPN, 06035+I_NPN, 06036+I_NPN,
  06040+I_NPN, 06041+I_NPN, 06042+I_NPN, 06044+I_NPN, 06045+I_NPN, 06046+I_NPN,
+ 06051+I_NPN, 06053+I_NPN, 06054+I_NPN, 06057+I_NPN, 
+ 06061+I_NPN, 06063+I_NPN, 06064+I_NPN, 06067+I_NPN, 
  06101+I_NPN, 06102+I_NPN, 06103+I_NPN,
  06131+I_NPN, 06132+I_NPN, 06133+I_NPN, 06135+I_NPN, 06136+I_NPN, 06137+I_NPN,
  06204+I_NPN, 06214+I_NPN, 06224+I_NPN, 06234+I_NPN,

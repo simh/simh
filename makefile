@@ -221,6 +221,10 @@ endif
 ifneq (,$(findstring pdp7,${MAKECMDGOALS}))
   VIDEO_USEFUL = true
 endif
+# building the PDP-8 could use video support
+ifneq (,$(findstring pdp8,${MAKECMDGOALS}))
+  VIDEO_USEFUL = true
+endif
 # building the pdp11, any pdp10, any 3b2, or any vax simulator could use networking support
 ifneq (,$(findstring pdp11,${MAKECMDGOALS})$(findstring pdp10,${MAKECMDGOALS})$(findstring vax,${MAKECMDGOALS})$(findstring frontpaneltest,${MAKECMDGOALS})$(findstring infoserver,${MAKECMDGOALS})$(findstring 3b2,${MAKECMDGOALS})$(findstring all,${MAKECMDGOALS}))
   NETWORK_USEFUL = true
@@ -1978,8 +1982,9 @@ PDP8 = ${PDP8D}/pdp8_cpu.c ${PDP8D}/pdp8_clk.c ${PDP8D}/pdp8_df.c \
 	${PDP8D}/pdp8_pt.c ${PDP8D}/pdp8_rf.c ${PDP8D}/pdp8_rk.c \
 	${PDP8D}/pdp8_rx.c ${PDP8D}/pdp8_sys.c ${PDP8D}/pdp8_tt.c \
 	${PDP8D}/pdp8_ttx.c ${PDP8D}/pdp8_rl.c ${PDP8D}/pdp8_tsc.c \
-	${PDP8D}/pdp8_td.c ${PDP8D}/pdp8_ct.c ${PDP8D}/pdp8_fpp.c
-PDP8_OPT = -I ${PDP8D}
+	${PDP8D}/pdp8_td.c ${PDP8D}/pdp8_ct.c ${PDP8D}/pdp8_fpp.c \
+	${PDP8D}/pdp8_dpy.c ${DISPLAYL}
+PDP8_OPT = -I ${PDP8D} ${DISPLAY_OPT}
 
 
 H316D = ${SIMHD}/H316
