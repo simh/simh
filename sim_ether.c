@@ -1393,6 +1393,7 @@ static t_bool eth_vde_network_available = FALSE;
 const char *eth_capabilities(void)
  {
  static char capabilities[CBUFSIZE] = "";
+ char cap_env[CBUFSIZE];
 
  if (capabilities[0] != '\0')
      return capabilities;
@@ -1426,6 +1427,8 @@ const char *eth_capabilities(void)
  strlcat (capabilities, ":NAT", sizeof (capabilities));
 #endif
  strlcat (capabilities, ":UDP", sizeof (capabilities));
+ snprintf (cap_env, sizeof(cap_env), "SIM_ETHER_CAPABILITIES=%s", capabilities);
+ sim_set_environment (0, cap_env);
  return capabilities;
  }
 

@@ -2433,7 +2433,7 @@ static const char simh_help2[] =
       " command which returns the AFAIL condition, it will exit the running\n"
       " command file with the AFAIL status to the calling command file.  This\n"
       " behavior can be changed with the ON command as well as switches to the\n"
-      " invoking DO command.\n\n"
+      " invoking DO command.\n"
       "5Examples:\n"
       " A command file might be used to bootstrap an operating system that\n"
       " halts after the initial load from disk.  The ASSERT command is then\n"
@@ -2456,7 +2456,7 @@ static const char simh_help2[] =
       " In the example, if the A register is not 0, the \"ASSERT A=0\" command will\n"
       " be echoed, the command file will be aborted with an \"Assertion failed\"\n"
       " message.  Otherwise, the command file will continue to bring up the\n"
-      " operating system.\n"
+      " operating system.\n\n"
       "4IF-ELSE\n"
       " The IF command tests a simulator state condition and executes additional\n"
       " commands if the condition is true:\n\n"
@@ -2483,7 +2483,7 @@ static const char simh_help2[] =
       " Failure Code:\" command will be displayed, the contents of the A register\n"
       " will be displayed and the command file will be aborted with an \"Assertion\n"
       " failed\" message.  Otherwise, the command file will continue to bring up\n"
-      " the operating system.\n"
+      " the operating system.\n\n"
       "4Conditional Expressions\n"
       " The IF and ASSERT commands evaluate five different forms of conditional\n"
       " expressions.:\n\n"
@@ -2587,6 +2587,15 @@ static const char simh_help2[] =
       "++{NOT} DEVICE <device-name>\n\n"
       " Specifies a true (false {NOT}) condition if the device exists and is\n"
       " enabled.\n\n"
+      "5Regular Expressions Tests\n"
+      " Comparision using Regular Expressions are available when IF commands use\n"
+      " this form of a condition:\n\n"
+      "++{NOT} \"<string>\" =~ Regular-Expression\n\n"
+      " Specifies a true (false {NOT}) condition if the regular expression matches\n"
+      " the string.\n\n"
+      " When a regular expression match happens, the environment variable\n"
+      " _IF_RE_MATCH_GROUP_0 is set to the part of the string that matches the\n"
+      " specified regular expression.\n\n"
       "5Debugging Expression Evaluation\n"
       " Debug output can be produced which will walk through the details\n"
       " involved during expression evaluation.  This output can, for example,\n"
@@ -5405,10 +5414,73 @@ if (sim_switches & SWMASK ('F')) {      /* File Compare? */
         }
     return c1 - c2;
     }
+if (sim_switches & SWMASK ('R')) {      /* Regular Expression Compare? */
+    if (sim_pcre_regex_available) {
+        pcre *re;
+        int rc;
+        char *re_buf = NULL;
+        const char *errmsg;
+        int erroffset, re_nsub;
+        int *ovector = NULL;
+        static size_t sim_if_re_match_sub_count = 0;
+
+        re_buf = calloc (strlen (s2) + 1, 1);
+        if ((s2[0] == s2[strlen(s2)- 1]) && ((s2[0] == '\"') || (s2[0] == '\'')))
+            memcpy (re_buf, s2 + 1, strlen(s2)-2);       /* extract string without surrounding quotes */
+        else
+            strcpy (re_buf, s2);
+        re = pcre_compile ((char *)re_buf, (sim_switches & SWMASK ('I')) ? PCRE_CASELESS : 0, &errmsg, &erroffset, NULL);
+        (void)pcre_fullinfo (re, NULL, PCRE_INFO_CAPTURECOUNT, &re_nsub);
+        if (re == NULL) {
+            sim_messagef (SCPE_ARG, "Regular Expression Error: %s\n", errmsg);
+            free (re_buf);
+            return SCPE_ARG|SCPE_NOMESSAGE;
+            }
+        ovector = (int *)malloc (3 * (re_nsub + 1) * sizeof (*ovector));
+        if (sim_deb && (sim_scp_dev.dctrl & SIM_DBG_BRK_ACTION)) {
+            sim_debug (SIM_DBG_BRK_ACTION, &sim_scp_dev, "Checking String: %s\n", s1);
+            sim_debug (SIM_DBG_BRK_ACTION, &sim_scp_dev, "Against RegEx Match Rule: %s\n", re_buf);
+            }
+        rc = pcre_exec (re, NULL, s1, strlen (s1), 0, PCRE_NOTBOL, ovector, 3 * (re_nsub + 1));
+        free (re_buf);
+        pcre_free (re);
+        if (rc >= 0) {
+            size_t j;
+            char *buf = (char *)malloc (1 + strlen (s1));  /* largest buf needed is current string + NUL */
+
+            for (j=0; j < (size_t)rc; j++) {
+                char env_name[32];
+                int end_offs = ovector[2 * j + 1], start_offs = ovector[2 * j];
+
+                sprintf (env_name, "_IF_RE_MATCH_GROUP_%d", (int)j);
+                memcpy (buf, &s1[start_offs], end_offs - start_offs);
+                buf[end_offs - start_offs] = '\0';
+                setenv (env_name, buf, 1);      /* Make the match and substrings available as environment variables */
+                sim_debug (SIM_DBG_BRK_ACTION, &sim_scp_dev, "%s=%s\n", env_name, buf);
+                }
+            for (; j<sim_if_re_match_sub_count; j++) {
+                char env_name[32];
+
+                sprintf (env_name, "_IF_RE_MATCH_GROUP_%d", (int)j);
+                unsetenv (env_name);            /* Remove previous extra environment variables */
+                }
+            sim_if_re_match_sub_count = re_nsub;
+            free (buf);
+            }
+        free (ovector);
+        if (rc == PCRE_ERROR_NOMATCH)
+            return -1;
+        return 0;
+        }
+    else {
+        sim_printf ("RegEx support not available\n");
+        return -1;
+        }
+    }
 v1 = strtol(s1+1, &ep1, 0);
 v2 = strtol(s2+1, &ep2, 0);
-if ((ep1 != s1 + strlen (s1) - 1) ||
-    (ep2 != s2 + strlen (s2) - 1))
+if ((ep1 != s1 + strlen (s1) - 1) ||        /* s1 is numeric? */
+    (ep2 != s2 + strlen (s2) - 1))          
     return (strlen (s1) == strlen (s2)) ? strncmp (s1 + 1, s2 + 1, strlen (s1) - 2)
                                         : strcmp (s1, s2);
 if (v1 == v2)
@@ -5526,20 +5598,22 @@ if (Exist || (*gbuf == '"') || (*gbuf == '\'')) {       /* quoted string compari
         int aval;
         int bval;
         t_bool invert;
+        int32 plus_switches;
         } *optr, compare_ops[] =
         {
-            {"==",   0,  0, FALSE},
-            {"EQU",  0,  0, FALSE},
-            {"!=",   0,  0, TRUE},
-            {"NEQ",  0,  0, TRUE},
-            {"<",   -1, -1, FALSE},
-            {"LSS", -1, -1, FALSE},
-            {"<=",   0, -1, FALSE},
-            {"LEQ",  0, -1, FALSE},
-            {">",    1,  1, FALSE},
-            {"GTR",  1,  1, FALSE},
-            {">=",   0,  1, FALSE},
-            {"GEQ",  0,  1, FALSE},
+            {"==",   0,  0, FALSE,  0},
+            {"EQU",  0,  0, FALSE,  0},
+            {"!=",   0,  0, TRUE,   0},
+            {"NEQ",  0,  0, TRUE,   0},
+            {"<",   -1, -1, FALSE,  0},
+            {"LSS", -1, -1, FALSE,  0},
+            {"<=",   0, -1, FALSE,  0},
+            {"LEQ",  0, -1, FALSE,  0},
+            {">",    1,  1, FALSE,  0},
+            {"GTR",  1,  1, FALSE,  0},
+            {">=",   0,  1, FALSE,  0},
+            {"GEQ",  0,  1, FALSE,  0},
+            {"=~",   0,  1, FALSE,  SWMASK('R')},
             {NULL}};
 
     if (!*tptr)
@@ -5548,6 +5622,8 @@ if (Exist || (*gbuf == '"') || (*gbuf == '\'')) {       /* quoted string compari
     while (sim_isspace (*cptr))                         /* skip spaces */
         ++cptr;
     if (!Exist) {
+        int32 saved_switches;
+
         get_glyph (cptr, op, quote);
         for (optr = compare_ops; optr->op; optr++)
             if (0 == strncmp (op, optr->op, strlen (optr->op)))
@@ -5559,7 +5635,12 @@ if (Exist || (*gbuf == '"') || (*gbuf == '\'')) {       /* quoted string compari
             return sim_messagef (SCPE_ARG, "Invalid operator: %s\n", op);
         while (sim_isspace (*cptr))                     /* skip spaces */
             ++cptr;
+        sim_switches |= optr->plus_switches;
+        saved_switches = sim_switches;
+        if (sim_switches & SWMASK ('R'))                /* Regex operation? */
+            sim_switches &= ~SWMASK ('I');              /* Make sure to gather the regex literally */
         cptr = _get_string (cptr, gbuf2, 0);            /* get second string */
+        sim_switches = saved_switches;
         if (*cptr) {                                    /* more? */
             if (flag == 1)                              /* ASSERT has no more args */
                 return SCPE_2MARG;
@@ -7101,6 +7182,7 @@ if (1) {
     fprintf (st, "\n        %s", sim_si64);
     fprintf (st, "\n        %s", sim_sa64);
     fprintf (st, "\n        %s", eth_capabilities());
+    setenv ("SIM_ETHERNET_CAPABILITIES", eth_capabilities(), 1);
     idle_capable = sim_timer_idle_capable (&os_ms_sleep_1, &os_tick_size);
     fprintf (st, "\n        Idle/Throttling support is %savailable", idle_capable ? "" : "NOT ");
     if (sim_disk_vhd_support())
@@ -7173,9 +7255,9 @@ if (1) {
     fprintf (st, "\n        %s", sim_toffset_64 ? "Large File (>2GB) support" : "No Large File support");
     fprintf (st, "\n        SDL Video support: %s", vid_version());
     if (sim_pcre_regex_available)
-        fprintf (st, "\n        PCRE RegEx (Version %s) support for EXPECT commands", pcre_version());
+        fprintf (st, "\n        PCRE RegEx (Version %s) support for EXPECT and IF commands", pcre_version());
     else
-        fprintf (st, "\n        No RegEx support for EXPECT commands");
+        fprintf (st, "\n        No RegEx support for EXPECT or IF commands");
     fprintf (st, "\n        OS clock resolution: %dms", os_tick_size);
     fprintf (st, "\n        Time taken by msleep(1): %dms", os_ms_sleep_1);
     if (sim_editline_version != 0) {

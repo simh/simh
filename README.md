@@ -109,6 +109,7 @@ Simulator binaries for x86 Linus, x86 macOS, and Windows for all recent changes 
 - Almost all existing simulators have useful SET CONSOLE SPEED=nnn behaviors in both the bare console session as well as TELNET console sessions.
 - Simh global/startup configuration commands can be contained in the first of simh.ini found in: 1) The current working directory, 2) The User login directory, 3) The directory containing the simulator executable, 4) The ~/Library/Preferences directory, 5) The /Library/Preferences directory, or 6) The /etc directory.
 - Enhanced Ethernet functionality on macOS which leverages the OS provided vmnet capabilities.  This is available on all intel and Apple Silicon macOS systems starting with Catalina (10.15) which was released in 2019.
+- SCP IF command supports RegEx comparisons.
 
 #### All simulators build cleanly under OpenVMS on ia64 systems.
 
