@@ -2785,7 +2785,7 @@ if (*tptr != 0)                                         /* now eol? */
     return SCPE_2MARG;
 sim_close_logfile (pref);
 *pf = NULL;
-if (strcmp (gbuf, "LOG") == 0) {                        /* output to log? */
+if (sim_strcasecmp (gbuf, "LOG") == 0) {                        /* output to log? */
     if (sim_log == NULL)                                /* any log? */
         return SCPE_ARG;
     *pf = sim_log;
@@ -2793,7 +2793,7 @@ if (strcmp (gbuf, "LOG") == 0) {                        /* output to log? */
     if (*pref)
         ++(*pref)->refcount;
     }
-else if (strcmp (gbuf, "DEBUG") == 0) {                 /* output to debug? */
+else if (sim_strcasecmp (gbuf, "DEBUG") == 0) {                 /* output to debug? */
     if (sim_deb == NULL)                                /* any debug? */
         return SCPE_ARG;
     *pf = sim_deb;
@@ -2801,11 +2801,11 @@ else if (strcmp (gbuf, "DEBUG") == 0) {                 /* output to debug? */
     if (*pref)
         ++(*pref)->refcount;
     }
-else if (strcmp (gbuf, "STDOUT") == 0) {                /* output to stdout? */
+else if (sim_strcasecmp (gbuf, "STDOUT") == 0) {                /* output to stdout? */
     *pf = stdout;
     *pref = NULL;
     }
-else if (strcmp (gbuf, "STDERR") == 0) {                /* output to stderr? */
+else if (sim_strcasecmp (gbuf, "STDERR") == 0) {                /* output to stderr? */
     *pf = stderr;
     *pref = NULL;
     }
@@ -4054,7 +4054,7 @@ BITFIELD tmio_lcl_bits[] = {
   ENDBITS
 };
 
-static char *tmio_cc[NCCS] = {
+static const char *tmio_cc[] = {
     "VEOF",
     "VEOL",
 #if defined(_POSIX_C_SOURCE) && !defined(_DARWIN_C_SOURCE)
@@ -4097,6 +4097,12 @@ static char *tmio_cc[NCCS] = {
 
 static void _tmio_debug (const char *name, struct termios *ttyset)
 {
+/* The tmio_cc and various flag bits were specifically relevant  */
+/* while troubleshooting under macOS and bits and tmio_cc        */
+/* indexes are derived from the macOS termios.h and potentially  */
+/* confusing elsewhere, so this routine does nothing except when */
+/* running there.                                                */
+#if defined(__APPLE__)
 int i;
 
 sim_debug (DBG_SET, &sim_con_telnet, "%s.c_iflag = 0x%08X ", name, (uint32)(ttyset->c_iflag));
@@ -4116,6 +4122,7 @@ for (i = 0; i < NCCS; i++) {
             sim_debug (DBG_SET, &sim_con_telnet, "'\\%03o'\n", ttyset->c_cc[i]&0xFF);
         }
     }
+#endif
 }
 
 static t_stat sim_os_ttinit (void)
