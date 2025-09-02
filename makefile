@@ -379,7 +379,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
     export TEST = test
   endif
   RUNNING_AS_ROOT:=$(if $(findstring Darwin,$(OSTYPE)),$(shell if [ `id -u` == '0' ]; then echo running_as_root; fi),$(shell if $(TEST) -r /dev/mem; then echo running_as_root; fi))
-  CAN_AUTO_INSTALL_PACKAGES:=$(findstring HOMEBREW,$(PKG_MGR)),$(RUNNING_AS_ROOT)
+  CAN_AUTO_INSTALL_PACKAGES:=$(findstring HOMEBREW,$(PKG_MGR))$(RUNNING_AS_ROOT)
   override AUTO_INSTALL_PACKAGES:=$(and $(AUTO_INSTALL_PACKAGES),$(or $(findstring HOMEBREW,$(PKG_MGR)),$(RUNNING_AS_ROOT)))
   ifeq (${GCC},)
     ifeq (,$(call find_exe,gcc))
