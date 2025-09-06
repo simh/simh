@@ -1393,7 +1393,7 @@ static t_bool eth_vde_network_available = FALSE;
 const char *eth_capabilities(void)
  {
  static char capabilities[CBUFSIZE] = "";
- char cap_env[CBUFSIZE];
+ char cap_env[2*CBUFSIZE];
 
  if (capabilities[0] != '\0')
      return capabilities;
