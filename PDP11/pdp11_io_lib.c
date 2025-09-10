@@ -121,7 +121,7 @@ if (dibp == NULL)
 newba = (uint32) get_uint (cptr, DEV_RDX, IOPAGEBASE+IOPAGEMASK, &r); /* get new */
 if (r != SCPE_OK)
     return r;
-if ((newba <= IOPAGEBASE) ||                            /* > IO page base? */
+if ((newba < IOPAGEBASE) ||                             /* > IO page base? */
     (newba % ((uint32) val)))                           /* check modulus */
     return sim_messagef (SCPE_ARG, "Invalid bus address value: %s\n", cptr);
 if (dibp->ba != newba) {                                /* changed? */
@@ -145,7 +145,7 @@ dptr = find_dev_from_unit (uptr);
 if (dptr == NULL)
     return SCPE_IERR;
 dibp = (DIB *) dptr->ctxt;
-if ((dibp == NULL) || (dibp->ba <= IOPAGEBASE))
+if ((dibp == NULL) || (dibp->ba < IOPAGEBASE))
     return SCPE_IERR;
 if ((sim_switches & SWMASK('H')) || (sim_switch_number == 16))
     radix = 16;

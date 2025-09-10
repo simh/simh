@@ -929,6 +929,7 @@ while (reason == 0)  {
             }
         src = ReadCW (trapea | calc_ds (MD_KER));       /* new PC */
         src2 = ReadCW ((trapea + 2) | calc_ds (MD_KER));/* new PSW */
+        src2 = src2 & cpu_tab[cpu_model].psw;           /* mask off invalid bits */
         t = (src2 >> PSW_V_CM) & 03;                    /* new cm */
         trapea = ~t;                                    /* flag pushes */
         WriteCW (PSW, ((STACKFILE[t] - 2) & 0177777) | calc_ds (t));
