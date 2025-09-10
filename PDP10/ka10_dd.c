@@ -103,7 +103,7 @@ uint32 vds_analog[VDS_OUTPUTS];           /* Analog channel. */
 
 static t_stat dd_set_windows (UNIT *uptr, int32 val, CONST char *cptr, void *desc) ;
 static t_stat dd_show_windows (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
-static void dd_chargen (char c, int column);
+static void dd_chargen (uint16 c, int column);
 static void dd_graphics (uint8 data, int column);
 static t_stat dd_devio(uint32 dev, uint64 *data);
 static t_stat vds_devio(uint32 dev, uint64 *data);
@@ -149,11 +149,6 @@ DEVICE vds_dev = {
     NULL, NULL, NULL, &vds_dib, DEV_DEBUG | DEV_DISABLE | DEV_DIS | DEV_DISPLAY, 0, dev_debug,
     NULL, NULL, &vds_help, NULL, NULL, &vds_description
     };
-
-static void unimplemented (const char *text)
-{
-    fprintf (stderr, "\r\n[UNIMPLEMENTED: %s]\r\n", text);
-}
 
 static void
 dd_hang (const char *msg)
@@ -271,7 +266,7 @@ dd_pixel (int x, int y, uint8 pixel)
 }
 
 static void
-dd_chargen (char c, int column)
+dd_chargen (uint16 c, int column)
 {
     int i, j;
     uint8 pixels;
@@ -541,7 +536,7 @@ dd_decode (uint64 insn)
 static t_stat
 dd_svc (UNIT *uptr)
 {
-    if (uptr->MA >= (int32)MEMSIZE) {
+    if ((t_addr)uptr->MA >= MEMSIZE) {
         uptr->STATUS |= DD_NXM;
         dd_halt ("NXM");
      } else {
