@@ -131,6 +131,10 @@ struct color color_p31 = { p31, ELEMENTS(p31), 100000 };
 static struct phosphor p39[] = {{0.2, 1.0, 0.0, 0.5, 0.01}};
 struct color color_p39 = { p39, ELEMENTS(p39), 20000 };
 
+/* orange phosphor for LINC */
+static struct phosphor p19[] = {{1.0, 0.7, 0.0, 0.1, 0.22}};
+struct color color_p19 = { p19, ELEMENTS(p19), 20000 };
+
 static struct phosphor p40[] = {
     /* P40 blue-white spot with yellow-green decay (.045s to 10%?) */
     {0.4, 0.2, 0.924, 0.5, 0.0135},
@@ -252,6 +256,15 @@ static struct display displays[] = {
      * on PDP-10
      */
     { DIS_III, "III Display", &color_p39, NULL, 1024, 1024 },
+
+    /*
+     * LINC display
+     * 512x511 addressable points.
+     * The horizontal position is a 9-bit unsigned value, but the
+     * vertical is a one's complement signed 9-bit value with
+     * both +0 and -0 referring to the same position.
+     */
+    { DIS_LINC, "LINC Display", &color_p19, NULL, 512, 511 },
 
     /*
      * Imlac display

@@ -197,6 +197,10 @@ ifneq (3,${SIM_MAJOR})
   ifneq (,$(findstring imlac,${MAKECMDGOALS}))
     VIDEO_USEFUL = true
   endif
+  # building the LINC needs video support
+  ifneq (,$(findstring linc,${MAKECMDGOALS}))
+    VIDEO_USEFUL = true
+  endif
   # building the TT2500 needs video support
   ifneq (,$(findstring tt2500,${MAKECMDGOALS}))
     VIDEO_USEFUL = true
@@ -2013,7 +2017,15 @@ IMLAC = ${IMLACD}/imlac_sys.c ${IMLACD}/imlac_cpu.c \
 	${IMLACD}/imlac_dp.c ${IMLACD}/imlac_crt.c ${IMLACD}/imlac_kbd.c \
 	${IMLACD}/imlac_tty.c ${IMLACD}/imlac_pt.c ${IMLACD}/imlac_bel.c \
 	${DISPLAYL}
-IMLAC_OPT = -I ${IMLACD} ${DISPLAY_OPT}
+IMLAC_OPT = -I ${IMLACD} ${DISPLAY_OPT} ${AIO_CCDEFS}
+
+
+LINCD = ${SIMHD}/linc
+LINC = ${LINCD}/linc_sys.c ${LINCD}/linc_cpu.c \
+	${LINCD}/linc_crt.c ${LINCD}/linc_dpy.c ${LINCD}/linc_kbd.c \
+	${LINCD}/linc_tape.c ${LINCD}/linc_tty.c \
+	${DISPLAYL}
+LINC_OPT = -I ${LINCD} ${DISPLAY_OPT} ${AIO_CCDEFS}
 
 
 TT2500D = ${SIMHD}/tt2500
@@ -2021,7 +2033,7 @@ TT2500 = ${TT2500D}/tt2500_sys.c ${TT2500D}/tt2500_cpu.c \
 	${TT2500D}/tt2500_dpy.c ${TT2500D}/tt2500_crt.c ${TT2500D}/tt2500_tv.c \
 	${TT2500D}/tt2500_key.c ${TT2500D}/tt2500_uart.c ${TT2500D}/tt2500_rom.c \
 	${DISPLAYL}
-TT2500_OPT = -I ${TT2500D} ${DISPLAY_OPT}
+TT2500_OPT = -I ${TT2500D} ${DISPLAY_OPT} ${AIO_CCDEFS}
 
 
 PDP8D = ${SIMHD}/PDP8
@@ -2514,7 +2526,7 @@ ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	swtp6800mp-a swtp6800mp-a2 tx-0 ssem b5500 intel-mds \
 	scelbi 3b2 3b2-700 i701 i704 i7010 i7070 i7080 i7090 \
 	sigma uc15 pdp10-ka pdp10-ki pdp10-kl pdp10-ks pdp6 i650 \
-	imlac tt2500 sel32
+	imlac linc tt2500 sel32
 
 all : ${ALL}
 
@@ -2590,6 +2602,12 @@ imlac : $(BIN)imlac$(EXE)
 
 $(BIN)imlac$(EXE) : ${IMLAC} ${SIM}
 	$(MAKEIT) OPTS="$(IMLAC_OPT)"
+
+
+linc : $(BIN)linc$(EXE)
+
+$(BIN)linc$(EXE) : ${LINC} ${SIM}
+	$(MAKEIT) OPTS="$(LINC_OPT)"
 
 
 tt2500 : $(BIN)tt2500$(EXE)

@@ -47,6 +47,7 @@ enum display_type {
     DIS_VR17 = 17,
     DIS_VR20 = 20,
     DIS_TYPE30 = 30,
+    DIS_LINC = 40,
     DIS_VR48 = 48,
     DIS_III = 111,
     DIS_TYPE340 = 340,
