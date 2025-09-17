@@ -36,6 +36,18 @@
 #define STOP_RBKPT      3
 #define STOP_WBKPT      3
 
+#define WMASK  07777  /* Full word. */
+#define HMASK  04000  /* H bit; half word select. */
+#define AMASK  03777  /* Full memory address. */
+#define XMASK  01777  /* X part; low memory address. */
+#define DMASK  00777  /* Display coordinate. */
+#define TMASK  00777  /* Tape block. */
+#define LMASK  07700  /* Left half word. */
+#define RMASK  00077  /* Right half word; character. */
+#define IMASK  00020  /* Index bit. */
+#define UMASK  00010  /* Tape unit bit. */
+#define BMASK  00017  /* Beta; index register. */
+
 #define MEMSIZE  2048
 
 extern REG cpu_reg[];
@@ -49,10 +61,13 @@ extern DEVICE tape_dev;
 extern DEVICE tty_dev;
 
 extern t_bool build_dev_tab(void);
+extern t_stat cpu_do(void);
 extern void dpy_dis(uint16 h, uint16 x, uint16 y);
 extern void crt_point (uint16 x, uint16 y);
+extern void crt_toggle_fullscreen(void);
 extern uint16 kbd_key(uint16 wait);
 extern int kbd_struck(void);
 extern void tape_op(void);
+extern t_stat tape_metadata(FILE *, uint16 *, int16 *, int16 *);
 
 #endif /* LINC_DEFS_H_ */

@@ -104,28 +104,35 @@ sim_load(FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
   t_stat (*get_word)(FILE *fileref, uint16 *x) = get_binary_word;
   t_addr addr, length = MEMSIZE, start = 0, end;
+  int16 forward_offset = 0, reverse_offset;
+  uint16 block_size;
   long offset = 0;
   t_stat stat;
+
+  if (sim_switches & SWMASK('E')) {
+    stat = tape_metadata(fileref, &block_size, &forward_offset, &reverse_offset);
+    if (stat != SCPE_OK)
+      return stat;
+    if (block_size != 256)
+      return SCPE_FMT;
+  }
 
   if (sim_switches & SWMASK('O'))
     get_word = get_octal_word;
 
-  while (cptr != NULL && *cptr != 0) {
-    if (strncasecmp(cptr, "start=", 6) == 0)
-      start = (t_addr)get_uint(cptr + 6, 8, ~0, &stat);
-    else if (strncasecmp(cptr, "offset=", 7) == 0)
-      offset = 2 * (long)get_uint(cptr + 7, 8, ~0, &stat);
-    else if (strncasecmp(cptr, "block=", 6) == 0)
-      offset = 512 * (long)get_uint(cptr + 6, 8, ~0, &stat);
-    else if (strncasecmp(cptr, "length=", 7) == 0)
-      length = (t_addr)get_uint(cptr + 7, 8, ~0, &stat);
+  while (*cptr !=0) {
+    char gbuf[100];
+    cptr = get_glyph(cptr, gbuf, 0);
+    if (strncmp(gbuf, "START=", 6) == 0)
+      start = (t_addr)get_uint(gbuf + 6, 8, ~0, &stat);
+    else if (strncmp(gbuf, "OFFSET=", 7) == 0)
+      offset = 2 * (long)get_uint(gbuf + 7, 8, ~0, &stat);
+    else if (strncmp(gbuf, "BLOCK=", 6) == 0)
+      offset = 512 * ((long)get_uint(gbuf + 6, 8, ~0, &stat) - forward_offset);
+    else if (strncmp(gbuf, "LENGTH=", 7) == 0)
+      length = (t_addr)get_uint(gbuf + 7, 8, ~0, &stat);
     else
       return SCPE_ARG;
-    cptr = strchr(cptr, ' ');
-    if (cptr == NULL)
-      break;
-    while (*cptr == ' ')
-      cptr++;
   }
 
   end = start + length;
@@ -162,7 +169,7 @@ t_bool build_dev_tab(void)
 static t_stat fprint_next(FILE *of, uint16 addr)
 {
   fprintf(of, "\n");
-  fprint_val(of, ++addr & 01777, 8, 10, PV_LEFT);
+  fprint_val(of, ++addr & XMASK, 8, 10, PV_LEFT);
   fprintf(of, ":\t%04o", M[addr]);
   return -1;
 }
@@ -182,8 +189,8 @@ static void fprint_misc(FILE *of, uint16 insn)
   case 00011:
     fprintf(of, "CLR");
     break;
-  case 00013:
-    fprintf(of, "%04o", insn);
+  case 00012:
+    fprintf(of, "DIN");
     break;
   case 00014:
     fprintf(of, "ATR");
@@ -198,17 +205,17 @@ static void fprint_misc(FILE *of, uint16 insn)
     fprintf(of, "COM");
     break;
   default:
-    fprintf(of, "%04o", insn);
+    fprintf(of, "MSC %o", insn);
     break;
   }
 }
 
 static t_stat fprint_index(FILE *of, uint16 insn, uint16 addr)
 {
-  if (insn & 020)
+  if (insn & IMASK)
     fprintf(of, " i");
-  if (insn & 017)
-    fprintf(of, " %o", insn & 017);
+  if (insn & BMASK)
+    fprintf(of, " %o", insn & BMASK);
   else
     return fprint_next(of, addr);
   return SCPE_OK;
@@ -223,7 +230,7 @@ static void fprint_set(FILE *of, uint16 insn, uint16 addr)
 
 static void fprint_sam(FILE *of, uint16 insn)
 {
-  fprintf(of, "SAM ");
+  fprintf(of, "SAM%s %o", insn & IMASK ? " i" : "", insn & BMASK);
 }
 
 static t_stat fprint_dis(FILE *of, uint16 insn, uint16 addr)
@@ -263,7 +270,7 @@ static void fprint_skip(FILE *of, uint16 insn)
   case 000: case 001: case 002: case 003: case 004: case 005: case 006: case 007:
   case 010: case 011: case 012: case 013:
     fprintf(of, "SXL");
-    snprintf(beta, sizeof beta, "%o", insn & 017);
+    snprintf(beta, sizeof beta, "%o", insn & BMASK);
     break;
   case 015:
     fprintf(of, "KST");
@@ -297,7 +304,7 @@ static void fprint_skip(FILE *of, uint16 insn)
     fprintf(of, "%04o", insn);
     return;
   }
-  if (insn & 020)
+  if (insn & IMASK)
     fprintf(of, " i" );
   fprintf(of, " %s", beta);
 }
@@ -322,7 +329,7 @@ static void fprint_opr(FILE *of, uint16 insn)
     fprintf(of, "%04o", insn);
     break;
   }
-  if (insn & 020)
+  if (insn & IMASK)
     fprintf(of, "i" );
 }
 
@@ -364,9 +371,9 @@ static void fprint_tape(FILE *of, uint16 insn, uint16 addr)
     fprintf(of, "CHK");
     break;
   }
-  if (insn & 020)
+  if (insn & IMASK)
     fprintf(of, " i");
-  if (insn & 010)
+  if (insn & UMASK)
     fprintf(of, " u");
   fprint_next(of, addr);
 }
@@ -463,17 +470,17 @@ static t_stat fprint_dsc(FILE *of, uint16 insn, uint16 addr)
 
 static void fprint_add(FILE *of, uint16 insn)
 {
-  fprintf(of, "ADD %04o", insn & 01777);
+  fprintf(of, "ADD %04o", insn & XMASK);
 }
 
 static void fprint_stc(FILE *of, uint16 insn)
 {
-  fprintf(of, "STC %04o", insn & 01777);
+  fprintf(of, "STC %04o", insn & XMASK);
 }
 
 static void fprint_jmp(FILE *of, uint16 insn)
 {
-  fprintf(of, "JMP %04o", insn & 01777);
+  fprintf(of, "JMP %04o", insn & XMASK);
 }
 
 t_stat fprint_sym(FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw)
@@ -582,12 +589,108 @@ t_stat fprint_sym(FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw)
   return SCPE_OK;
 }
 
+struct symbol {
+  const char *name;
+  uint16 value;
+};
+
+static const struct symbol symbols[] = {
+  { "U",   00010 },
+  { "I",   00020 },
+  { "HLT", 00000 },
+  { "ZTA", 00005 },
+  { "CLR", 00011 },
+  { "DIN", 00012 },
+  { "ATR", 00014 },
+  { "RTA", 00015 },
+  { "NOP", 00016 },
+  { "COM", 00017 },
+  { "SET", 00040 },
+  { "SAM", 00100 },
+  { "DIS", 00140 },
+  { "XSK", 00200 },
+  { "ROL", 00240 },
+  { "ROR", 00300 },
+  { "SCR", 00340 },
+  { "SXL", 00400 },
+  { "KST", 00415 },
+  { "SNS", 00440 },
+  { "AZE", 00450 },
+  { "APO", 00451 },
+  { "LZE", 00452 },
+  { "IBZ", 00453 },
+  { "OVF", 00454 },
+  { "ZZZ", 00455 },
+  { "OPR", 00500 },
+  { "KBD", 00515 },
+  { "RSW", 00516 },
+  { "LSW", 00517 },
+  { "LMB", 00600 },
+  { "UMB", 00640 },
+  { "RDC", 00700 },
+  { "RCG", 00701 },
+  { "RDE", 00702 },
+  { "MTB", 00703 },
+  { "WRC", 00704 },
+  { "WCG", 00705 },
+  { "WRI", 00706 },
+  { "CHK", 00707 },
+  { "LDA", 01000 },
+  { "STA", 01040 },
+  { "ADA", 01100 },
+  { "ADM", 01140 },
+  { "LAM", 01200 },
+  { "MUL", 01240 },
+  { "LDH", 01300 },
+  { "STH", 01340 },
+  { "SHD", 01400 },
+  { "SAE", 01440 },
+  { "SRO", 01500 },
+  { "BCL", 01540 },
+  { "BSE", 01600 },
+  { "BCO", 01640 },
+  { "DSC", 01740 },
+  { "ADD", 02000 },
+  { "STC", 04000 },
+  { "JMP", 06000 }
+};
+
 t_stat parse_sym(CONST char *cptr, t_addr addr, UNIT *uptr,
                   t_value *val, int32 sw)
 {
+  char gbuf[CBUFSIZE];
+  t_value val2;
   t_stat stat;
+  int i;
+
   *val = get_uint(cptr, 8, ~0, &stat);
-  if (stat != SCPE_OK)
-    return stat;
-  return 0;
+  if (*val > 07777)
+    return SCPE_ARG;
+  if (stat == SCPE_OK)
+    return SCPE_OK;
+
+  if (*cptr == '-') {
+    stat = parse_sym(cptr + 1, addr, uptr, val, sw);
+    if (stat != SCPE_OK)
+      return stat;
+    *val ^= 07777;
+    if (stat == SCPE_OK)
+      return SCPE_OK;
+  }
+
+  cptr = get_glyph(cptr, gbuf, 0);
+  for (i = 0; i < sizeof symbols / sizeof symbols[0]; i++) {
+    if (strcmp(gbuf, symbols[i].name) != 0)
+      continue;
+    *val = symbols[i].value;
+    if (*cptr) {
+      stat = parse_sym(cptr, addr, uptr, &val2, sw);
+      if (stat != SCPE_OK)
+        return stat;
+      *val |= val2;
+    }
+    return SCPE_OK;
+  }
+
+  return SCPE_ARG;
 }

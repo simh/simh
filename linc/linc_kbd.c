@@ -4,12 +4,10 @@
 /* Debug */
 #define DBG   0001
 
-static t_stat kbd_svc(UNIT *uptr);
-static t_stat kbd_reset(DEVICE *dptr);
+#define A (*(uint16 *)cpu_reg[2].loc)
+#define paused (*(int *)cpu_reg[11].loc)
 
-static UNIT kbd_unit = {
-  UDATA(&kbd_svc, UNIT_IDLE, 0)
-};
+static t_stat kbd_reset(DEVICE *dptr);
 
 static DEBTAB kbd_deb[] = {
   { "DBG", DBG },
@@ -17,8 +15,8 @@ static DEBTAB kbd_deb[] = {
 };
 
 DEVICE kbd_dev = {
-  "KBD", &kbd_unit, NULL, NULL,
-  1, 8, 12, 1, 8, 12,
+  "KBD", NULL, NULL, NULL,
+  0, 8, 12, 1, 8, 12,
   NULL, NULL, &kbd_reset,
   NULL, NULL, NULL, NULL, DEV_DEBUG, 0, kbd_deb,
   NULL, NULL, NULL, NULL, NULL, NULL
@@ -44,170 +42,6 @@ CASE  0  1  2  3  4  5  6  7  8  9 DEL
 static int kbd_pressed = 0;
 static uint16 kbd_code;
 
-void kbd_translate(int ch)
-{
-  switch (ch) {
-  case '0':
-    kbd_code = 000;
-    break;
-  case '1':
-    kbd_code = 001;
-    break;
-  case '2':
-    kbd_code = 002;
-    break;
-  case '3':
-    kbd_code = 003;
-    break;
-  case '4':
-    kbd_code = 004;
-    break;
-  case '5':
-    kbd_code = 005;
-    break;
-  case '6':
-    kbd_code = 006;
-    break;
-  case '7':
-    kbd_code = 007;
-    break;
-  case '8':
-    kbd_code = 010;
-    break;
-  case '9':
-    kbd_code = 011;
-    break;
-  case '\r': case '\n':
-    kbd_code = 012;
-    break;
-  case '\b': case 0177:
-    kbd_code = 013;
-    break;
-  case ' ':
-    kbd_code = 014;
-    break;
-  case '=': case 'i':
-    kbd_code = 015;
-    break;
-  case 'p': case 'u':
-    kbd_code = 016;
-    break;
-  case ',': case '-':
-    kbd_code = 017;
-    break;
-  case '.': case '+':
-    kbd_code = 020;
-    break;
-/*case '⊟':*/ case '|':
-    kbd_code = 021;
-    break;
-  case '[': case '#':
-    kbd_code = 022;
-    break;
- /*case CASE:*/
-    kbd_code = 023;
-    break;
-  case 'A': case 'a':
-    kbd_code = 024;
-    break;
-  case 'B': case 'b':
-    kbd_code = 025;
-    break;
-  case 'C': case 'c':
-    kbd_code = 026;
-    break;
-  case 'D': case 'd':
-    kbd_code = 027;
-    break;
-  case 'E': case 'e':
-    kbd_code = 030;
-    break;
-  case 'F': case 'f':
-    kbd_code = 031;
-    break;
-  case 'G': case 'g':
-    kbd_code = 032;
-    break;
-  case 'H': case 'h':
-    kbd_code = 033;
-    break;
-  case 'I': /*case 'i':*/
-    kbd_code = 034;
-    break;
-  case 'J': case 'j':
-    kbd_code = 035;
-    break;
-  case 'K': case 'k':
-    kbd_code = 036;
-    break;
-  case 'L': case 'l':
-    kbd_code = 037;
-    break;
-  case 'M': case 'm':
-    kbd_code = 040;
-    break;
-  case 'N': case 'n':
-    kbd_code = 041;
-    break;
-  case 'O': case 'o':
-    kbd_code = 042;
-    break;
-  case 'P': /*case 'p':*/
-    kbd_code = 043;
-    break;
-  case 'Q': case 'q':
-    kbd_code = 044;
-    break;
-  case 'R': case 'r':
-    kbd_code = 045;
-    break;
-  case 'S': case 's':
-    kbd_code = 046;
-    break;
-  case 'T': case 't':
-    kbd_code = 047;
-    break;
-  case 'U': /*case 'u':*/
-    kbd_code = 050;
-    break;
-  case 'V': case 'v':
-    kbd_code = 051;
-    break;
-  case 'W': case 'w':
-    kbd_code = 052;
-    break;
-  case 'X': case 'x':
-    kbd_code = 053;
-    break;
-  case 'Y': case 'y':
-    kbd_code = 054;
-    break;
-  case 'Z': case 'z':
-    kbd_code = 055;
-    break;
-  default:
-    return;
-  }
-  sim_debug(DBG, &kbd_dev, "Key struck %c -> %02o\n", ch, kbd_code);
-  kbd_pressed = 1;
-}
-
-static t_stat kbd_svc(UNIT *uptr)
-{
-  t_stat ch = sim_poll_kbd();
-
-  if ((ch & SCPE_KFLAG) == 0) {
-    sim_activate_after(&kbd_unit, 10000);
-    return ch;
-  }
-
-  if (ch & SCPE_BREAK)
-    ;
-  else
-    kbd_translate(ch & 0177);
-  return SCPE_OK;
-}
-
 int kbd_struck(void)
 {
   if (kbd_pressed)
@@ -219,11 +53,11 @@ uint16 kbd_key(uint16 wait)
 {
   if (kbd_pressed) {
     sim_debug(DBG, &kbd_dev, "KEY %02o\n", kbd_code);
-    sim_activate_abs(&kbd_unit, 1);
     kbd_pressed = 0;
     return kbd_code;
-  } else {
+  } else if (wait) {
     sim_debug(DBG, &kbd_dev, "KEY paused\n");
+    paused = 1;
   }
   return 0;
 }
@@ -399,12 +233,19 @@ static void kbd_convert(uint32 key)
     // ˣ 75
     // : 76
     // ʸ 77
+  case SIM_KEY_F11:
+    crt_toggle_fullscreen();
+    return;
   default:
     return;
   }
   sim_debug(DBG, &kbd_dev, "Key struck %s -> %02o\n",
             vid_key_name(key), kbd_code);
-  kbd_pressed = 1;
+  if (paused)
+    A = kbd_code;
+  else
+    kbd_pressed = 1;
+  paused = 0;
 }
 
 static int
@@ -421,7 +262,6 @@ kbd_reset(DEVICE *dptr)
 #ifdef USE_DISPLAY
   vid_display_kb_event_process = kbd_event;
 #endif
-  sim_activate_abs(&kbd_unit, 0);
 
   return SCPE_OK;
 }

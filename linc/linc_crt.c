@@ -44,6 +44,7 @@ static UNIT crt_unit = {
 static DEBTAB crt_deb[] = {
   { "DBG",  DBG },
   { "VVID", SIM_VID_DBG_VIDEO },
+  { "KVID", SIM_VID_DBG_KEY },
   { NULL, 0 }
 };
 
@@ -58,7 +59,7 @@ DEVICE crt_dev = {
   1, 8, 12, 1, 8, 12,
   NULL, NULL, &crt_reset,
   NULL, NULL, NULL,
-  NULL, DEV_DISABLE | DEV_DEBUG | DEV_DISPLAY, 0, crt_deb,
+  NULL, DEV_DISABLE | DEV_DEBUG, 0, crt_deb,
   NULL, NULL, NULL, NULL, NULL, NULL
 };
 
@@ -109,14 +110,7 @@ crt_point (uint16 x, uint16 y)
 #endif
 }
 
-/* Hook called when CRT goes idle. */
-void
-crt_idle (void)
+void crt_toggle_fullscreen(void)
 {
-}
-
-/* Display high voltage sync. */
-void
-crt_hvc (void)
-{
+  vid_set_fullscreen(!vid_is_fullscreen ());
 }
