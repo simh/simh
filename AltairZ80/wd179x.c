@@ -58,7 +58,7 @@
 #define WD179X_SECTOR_LEN   8192
 /* 2^(7 + WD179X_MAX_SEC_LEN) == WD179X_SECTOR_LEN */
 #define WD179X_MAX_SEC_LEN  6
-#define WD179X_MAX_SECTOR   26
+#define WD179X_MAX_SECTOR   50  /* SD-OS Double Density with 128-byte Sectors */
 
 #define CMD_PHASE 0
 #define EXEC_PHASE 1
@@ -137,6 +137,7 @@ typedef struct {
     uint16 external_fifo_len;
     uint8 *external_fifo;
     uint16 fdc_fifo_index;
+    uint8 dsmask;           /* READ ADDRESS double side mask */
     WD179X_DRIVE_INFO drive[WD179X_MAX_DRIVES];
 } WD179X_INFO;
 
@@ -161,6 +162,7 @@ extern uint8 GetBYTEWrapper(const uint32 Addr);
 #define UNIT_WD179X_WLK          (1 << UNIT_V_WD179X_WLK)
 #define UNIT_V_WD179X_VERBOSE    (UNIT_V_UF + 1) /* verbose mode, i.e. show error messages   */
 #define UNIT_WD179X_VERBOSE      (1 << UNIT_V_WD179X_VERBOSE)
+
 #define WD179X_CAPACITY_SSSD     (77*1*26*128)   /* Single-sided Single Density IBM Diskette1 */
 
 /* Write Track (format) Statemachine states */
@@ -202,8 +204,23 @@ static t_stat wd179x_sectWrite(WD179X_DRIVE_INFO* pDrive, uint8 Cyl, uint8 Head,
 static uint8 Do1793Command(uint8 cCommand);
 static t_stat wd179x_trackWrite(WD179X_DRIVE_INFO* pDrive, uint8 Cyl,
     uint8 Head, uint8 fillbyte, uint32* flags);
+static DISK_INFO *diskOpenExDsk(FILE *fileref, uint32 isVerbose, DEVICE *device, uint32 debugmask, uint32 verbosedebugmask);
+static t_stat diskParseDsk(DISK_INFO *myDisk, uint32 isVerbose);
+static t_stat sectReadDsk(DISK_INFO *myDisk, uint32 Cyl, uint32 Head, uint32 Sector, uint8 *buf, uint32 buflen, uint32 *flags, uint32 *readlen);
+static t_stat sectWriteDsk(DISK_INFO *myDisk, uint32 Cyl, uint32 Head, uint32 Sector, uint8 *buf, uint32 buflen, uint32 *flags, uint32 *writelen);
+static t_stat trackWriteDsk(DISK_INFO *myDisk,
+               uint32 Cyl,
+               uint32 Head,
+               uint32 numSectors,
+               uint32 sectorLen,
+               uint8 *sectorMap,
+               uint8 mode,
+               uint8 fillbyte,
+               uint32 *flags);
+static t_stat diskCreateIMD(DISK_INFO *myDisk, int32 Tracks, int32 Heads, uint8 Mode, uint16 nSecs, uint32 sectSize, uint8 startSector);
+static t_stat diskShowIMD(DISK_INFO *myDisk);
 
-WD179X_INFO wd179x_info_data = { { 0x0, 0, 0x30, 4 }, 1793, 0, 0 };
+WD179X_INFO wd179x_info_data = { { 0x0, 0, 0x30, 4 }, 1793, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 WD179X_INFO *wd179x_info = &wd179x_info_data;
 WD179X_INFO_PUB *wd179x_infop = (WD179X_INFO_PUB *)&wd179x_info_data;
 
@@ -226,7 +243,7 @@ static REG wd179x_reg[] = {
     { FLDATAD(DRIVE,       wd179x_info_data.sel_drive,     2, "Selected drive"),           },
     { FLDATAD(DRIVETYPE,   wd179x_info_data.drivetype,     1, "Drive Type"),               },
     { HRDATAD(STATUS,      wd179x_info_data.fdc_status,    8, "Status Register"),          },
-    { FLDATAD(VERIFY,      wd179x_info_data.drivetype,     1, "Type 1 cmd Verify flag"),   },
+    { FLDATAD(VERIFY,      wd179x_info_data.verify,        1, "Type 1 cmd Verify flag"),   },
     { HRDATAD(DATA,        wd179x_info_data.fdc_data,      8, "Data Register"),            },
     { FLDATAD(READ,        wd179x_info_data.fdc_read,      1, "True when reading"),        },
     { FLDATAD(WRITE,       wd179x_info_data.fdc_write,     1, "True when writing"),        },
@@ -244,6 +261,7 @@ static REG wd179x_reg[] = {
     { FLDATAD(STEPDIR,     wd179x_info_data.step_dir,      1, "Step direction"),           },
     { FLDATAD(IDXWAIT,     wd179x_info_data.index_pulse_wait, 1, "Waiting for interrupt on next index"), },
     { HRDATAD(CMDTYPE,     wd179x_info_data.cmdtype,       8, "Current FDC command"),      },
+    { HRDATAD(DSMASK,      wd179x_info_data.dsmask,        8, "Current READ ADDRESS DS mask"),      },
     { NULL }
 
 };
@@ -335,6 +353,7 @@ static t_stat wd179x_reset(DEVICE *dptr)
     }
 
     wd179x_info->cmdtype = 0;
+    wd179x_info->dsmask = 0;
 
     return SCPE_OK;
 }
@@ -402,7 +421,7 @@ uint8 wd179x_get_nheads(void)
         return 0;
     }
 
-    return(pDrive->nheads);
+    return(imdGetSides(pDrive->imd));
 
 }
 
@@ -440,18 +459,6 @@ t_stat wd179x_attach(UNIT *uptr, CONST char *cptr)
             /* Not an IMD, so assume DSK image type. */
             uptr->u3 = IMAGE_TYPE_DSK;
             uptr->capac = sim_fsize(uptr->fileref);
-
-            switch (uptr->capac) {
-                case WD179X_CAPACITY_SSSD:
-                    sim_debug(VERBOSE_MSG, &wd179x_dev, "WD179X[%d]: 8\" SSSD image attached.\n", i);
-                    wd179x_info->drive[i].nheads = 1;
-                    break;
-                default:
-                    sim_debug(ERROR_MSG, &wd179x_dev, "WD179X[%d]: %d-length disks images are not supported.\n",
-                        i, uptr->capac);
-                return SCPE_OPENERR;
-                    break;
-            }
         }
     } else {
         char* file_extension = strrchr(uptr->filename, '.');
@@ -494,8 +501,20 @@ t_stat wd179x_attach(UNIT *uptr, CONST char *cptr)
         wd179x_info->drive[i].nheads = imdGetSides(wd179x_info->drive[i].imd);
 
     } else {
-        wd179x_info->drive[i].imd = NULL;
-        wd179x_info->fdc_sec_len = 0; /* 128 byte sectors */
+        /* Create a fake IMD record */
+        wd179x_info->drive[i].imd = diskOpenExDsk(uptr->fileref, uptr->flags & UNIT_WD179X_VERBOSE,
+                                               &wd179x_dev, IMD_MSG, IMD_MSG);
+        if (wd179x_info->drive[i].imd == NULL) {
+            sim_printf("WD179X: Could not allocate IMD data for DSK image.\n");
+            wd179x_info->drive[i].uptr = NULL;
+            return SCPE_OPENERR;
+        }
+
+        wd179x_info->drive[i].nheads = imdGetSides(wd179x_info->drive[i].imd);
+
+        if (uptr->flags & UNIT_WD179X_VERBOSE) {
+            diskShowIMD(wd179x_info->drive[i].imd);
+        }
     }
 
     wd179x_info->drive[i].ready = 1;
@@ -572,19 +591,12 @@ uint8 floorlog2(unsigned int n)
 }
 
 static uint8 computeSectorSize(const WD179X_DRIVE_INFO *pDrive) {
-    if (pDrive->uptr->u3 == IMAGE_TYPE_IMD) {
-        return pDrive->track < MAX_CYL ? floorlog2(pDrive->imd->track[pDrive->track][wd179x_info->fdc_head].sectsize) - 7 : 0xF8;
-    }
-
-    return(0);  /* Hard coded to 128-byte sectors */
+    return pDrive->track < MAX_CYL ? floorlog2(pDrive->imd->track[pDrive->track][wd179x_info->fdc_head].sectsize) - 7 : 0xF8;
 }
 
 static uint8 testMode(const WD179X_DRIVE_INFO *pDrive) {
-    if (pDrive->uptr->u3 == IMAGE_TYPE_IMD) {
-        return pDrive->track < MAX_CYL ? IMD_MODE_MFM(pDrive->imd->track[pDrive->track][wd179x_info->fdc_head].mode) != (wd179x_info->ddens) : 0;
-    }
 
-    return 0;
+    return pDrive->track < MAX_CYL ? IMD_MODE_MFM(pDrive->imd->track[pDrive->track][wd179x_info->fdc_head].mode) != (wd179x_info->ddens) : 0;
 }
 
 uint8 WD179X_Read(const uint32 Addr)
@@ -639,7 +651,7 @@ uint8 WD179X_Read(const uint32 Addr)
                     wd179x_info->fdc_status &= ~(WD179X_STAT_BUSY);       /* Clear BUSY */
                     cData = sdata.raw[wd179x_info->fdc_dataindex];
                     if (wd179x_info->fdc_read_addr == TRUE) {
-                        sim_debug(STATUS_MSG, &wd179x_dev, "WD179X[%d]: " ADDRESS_FORMAT
+                        sim_debug(RD_DATA_MSG, &wd179x_dev, "WD179X[%d]: " ADDRESS_FORMAT
                                   " READ_ADDR[%d/%d] = 0x%02x\n",
                                   wd179x_info->sel_drive, PCX,
                                   wd179x_info->fdc_dataindex, wd179x_info->fdc_datacount, cData);
@@ -772,12 +784,13 @@ uint8 WD179X_Write(const uint32 Addr, uint8 cData)
         }
 
         if (wd179x_info->fdc_write_track == TRUE) {
+
             if (wd179x_info->fdc_fmt_state == FMT_GAP1) {
-                if (cData != 0xFC) {
+                if (cData != 0xFC && (cData != 0x00 && wd179x_info->fdc_gap[0] < 32)) {
                     wd179x_info->fdc_gap[0]++;
                 }
                 else {
-                    sim_debug(VERBOSE_MSG, &wd179x_dev, "WD179X: " ADDRESS_FORMAT
+                    sim_debug(FMT_MSG, &wd179x_dev, "WD179X: " ADDRESS_FORMAT
                         " FMT GAP1 Length = %d\n", PCX, wd179x_info->fdc_gap[0]);
                     wd179x_info->fdc_gap[1] = 0;
                     wd179x_info->fdc_fmt_state = FMT_GAP2;
@@ -787,7 +800,7 @@ uint8 WD179X_Write(const uint32 Addr, uint8 cData)
                     wd179x_info->fdc_gap[1]++;
                 }
                 else {
-                    sim_debug(VERBOSE_MSG, &wd179x_dev, "WD179X: " ADDRESS_FORMAT
+                    sim_debug(FMT_MSG, &wd179x_dev, "WD179X: " ADDRESS_FORMAT
                         " FMT GAP2 Length = %d\n", PCX, wd179x_info->fdc_gap[1]);
                     wd179x_info->fdc_gap[2] = 0;
                     wd179x_info->fdc_fmt_state = FMT_HEADER;
@@ -798,8 +811,8 @@ uint8 WD179X_Write(const uint32 Addr, uint8 cData)
                     wd179x_info->fdc_gap[2] = 0;
                     wd179x_info->fdc_fmt_state = FMT_GAP3;
                 } else {
-                    sim_debug(VERBOSE_MSG, &wd179x_dev, "WD179X: " ADDRESS_FORMAT
-                        " HEADER[%d]=%02x\n", PCX, wd179x_info->fdc_header_index, cData);
+                    sim_debug(FMT_MSG, &wd179x_dev, "WD179X: " ADDRESS_FORMAT
+                        " HEADER[%d]=%d\n", PCX, wd179x_info->fdc_header_index, cData);
                     switch (wd179x_info->fdc_header_index) {
                     case 0:
                         pDrive->track = cData;
@@ -821,7 +834,7 @@ uint8 WD179X_Write(const uint32 Addr, uint8 cData)
                     wd179x_info->fdc_gap[2]++;
                 }
                 else {
-                    sim_debug(VERBOSE_MSG, &wd179x_dev, "WD179X: " ADDRESS_FORMAT
+                    sim_debug(FMT_MSG, &wd179x_dev, "WD179X: " ADDRESS_FORMAT
                         " FMT GAP3 Length = %d\n", PCX, wd179x_info->fdc_gap[2]);
                     wd179x_info->fdc_fmt_state = FMT_DATA;
                     wd179x_info->fdc_dataindex = 0;
@@ -845,7 +858,7 @@ uint8 WD179X_Write(const uint32 Addr, uint8 cData)
                     }
                     wd179x_info->fdc_sectormap[wd179x_info->fdc_fmt_sector_count] = wd179x_info->fdc_sector;
                     wd179x_info->fdc_fmt_sector_count++;
-                    sim_debug(VERBOSE_MSG, &wd179x_dev, "WD179X: " ADDRESS_FORMAT
+                    sim_debug(FMT_MSG, &wd179x_dev, "WD179X: " ADDRESS_FORMAT
                         " FMT Data Length = %d\n", PCX, wd179x_info->fdc_dataindex);
 
                     sim_debug(FMT_MSG, &wd179x_dev, "WD179X: " ADDRESS_FORMAT
@@ -1151,9 +1164,6 @@ static uint8 Do1793Command(uint8 cCommand)
             if (testMode(pDrive)) {
                 wd179x_info->fdc_status = WD179X_STAT_NOT_FOUND; /* Sector not found */
                 wd179x_info->intrq = 1;
-            } else if ((pDrive->uptr->u3 == IMAGE_TYPE_DSK) && (wd179x_info->ddens == 1) && (wd179x_info->fdc_sec_len == 0)) {
-                wd179x_info->fdc_status = WD179X_STAT_NOT_FOUND; /* Sector not found */
-                wd179x_info->intrq = 1;
             } else {
                 wd179x_info->fdc_status = (WD179X_STAT_DRQ | WD179X_STAT_BUSY);     /* Set DRQ, BUSY */
                 wd179x_info->drq = 1;
@@ -1163,8 +1173,8 @@ static uint8 Do1793Command(uint8 cCommand)
                 wd179x_info->fdc_read_addr = TRUE;
 
                 sdata.raw[0] = pDrive->track;
-                sdata.raw[1] = wd179x_info->fdc_head;
-                sdata.raw[2] = wd179x_info->fdc_sector;
+                sdata.raw[1] = wd179x_info->fdc_head | ((imdGetSides(pDrive->imd) > 1) ? wd179x_info->dsmask : 0);
+                sdata.raw[2] = (wd179x_info->fdc_sector) ? wd179x_info->fdc_sector : 1;
                 sdata.raw[3] = wd179x_info->fdc_sec_len;
                 sdata.raw[4] = 0xAA; /* CRC1 */
                 sdata.raw[5] = 0x55; /* CRC2 */
@@ -1195,6 +1205,10 @@ static uint8 Do1793Command(uint8 cCommand)
             wd179x_info->fdc_read_addr = FALSE;
             wd179x_info->fdc_fmt_state = FMT_GAP1;  /* TRUE when writing an entire track */
             wd179x_info->fdc_fmt_sector_count = 0;
+            wd179x_info->fdc_gap[0] = 0;
+            wd179x_info->fdc_gap[1] = 0;
+            wd179x_info->fdc_gap[2] = 0;
+            wd179x_info->fdc_gap[3] = 0;
 
             break;
         /* Type IV Commands */
@@ -1356,33 +1370,15 @@ static t_stat wd179x_sectRead(WD179X_DRIVE_INFO* pDrive,
             readlen);
         break;
     case IMAGE_TYPE_DSK:
-    {
-        uint32 sec_offset;
-        uint32 rtn;
-
-        /* For DSK images, density information is not encoded in the file format,
-            * so enforce that 128-byte sectors are single-density. */
-        if ((wd179x_info->ddens == 1) && (wd179x_info->fdc_sec_len == 0)) {
-            status = SCPE_IOERR;
-            break;
-        }
-        sec_offset = (26 * 128 * Cyl) + ((Sector - 1) * 128);
-
-        if (sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET) == 0) {
-            rtn = sim_fread(sdata.raw, 1, WD179X_SECTOR_LEN_BYTES,
-                (pDrive->uptr)->fileref);
-            if (rtn != (WD179X_SECTOR_LEN_BYTES)) {
-                sim_debug(ERROR_MSG, &wd179x_dev, "WD179x[%d]: " ADDRESS_FORMAT
-                    " READ: sim_fread error.\n", wd179x_info->sel_drive, PCX);
-                status = SCPE_IOERR;
-            }
-        } else {
-            sim_debug(ERROR_MSG, &wd179x_dev, "WD179x[%d]: " ADDRESS_FORMAT
-                " READ: sim_fseek error.\n", wd179x_info->sel_drive, PCX);
-            status = SCPE_IOERR;
-        }
+        status = sectReadDsk(pDrive->imd,
+            Cyl,
+            Head,
+            Sector,
+            buf,
+            WD179X_SECTOR_LEN_BYTES,
+            flags,
+            readlen);
         break;
-    }
     default:
         sim_debug(ERROR_MSG, &wd179x_dev, "WD179x[%d]: Unsupported image type 0x%02x.\n",
             wd179x_info->sel_drive, pDrive->uptr->u3);
@@ -1449,33 +1445,15 @@ static t_stat wd179x_sectWrite(WD179X_DRIVE_INFO* pDrive,
                 (uint32 *)readlen);
             break;
         case IMAGE_TYPE_DSK:
-        {
-            uint32 sec_offset;
-            uint32 rtn;
-
-            /* For DSK images, density information is not encoded in the file format,
-                * so enforce that 128-byte sectors are single-density. */
-            if ((wd179x_info->ddens == 1) && (wd179x_info->fdc_sec_len == 0)) {
-                status = SCPE_IOERR;
-                break;
-            }
-
-            sec_offset = (26 * 128 * Cyl) + ((Sector - 1) * 128);
-
-            if (sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET) == 0) {
-                rtn = sim_fwrite(sdata.raw, 1, WD179X_SECTOR_LEN_BYTES,
-                    (pDrive->uptr)->fileref);
-                if (rtn != (WD179X_SECTOR_LEN_BYTES)) {
-                    sim_debug(ERROR_MSG, &wd179x_dev, "WD179x[%d]: " ADDRESS_FORMAT
-                        " WRITE: sim_fread error.\n", wd179x_info->sel_drive, PCX);
-                }
-            }
-            else {
-                sim_debug(ERROR_MSG, &wd179x_dev, "WD179x[%d]: " ADDRESS_FORMAT
-                    " WRITE: sim_fseek error.\n", wd179x_info->sel_drive, PCX);
-            }
+            status = sectWriteDsk(pDrive->imd,
+                Cyl,
+                Head,
+                Sector,
+                buf,
+                WD179X_SECTOR_LEN_BYTES,
+                flags,
+                (uint32 *)readlen);
             break;
-        }
         default:
             sim_debug(ERROR_MSG, &wd179x_dev, "WD179x[%d]: Unsupported image type 0x%02x.\n", wd179x_info->sel_drive, pDrive->uptr->u3);
             break;
@@ -1510,42 +1488,16 @@ static t_stat wd179x_trackWrite(WD179X_DRIVE_INFO* pDrive,
                 flags);
             break;
         case IMAGE_TYPE_DSK:
-        {
-            uint32 sec_offset;
-            uint32 rtn;
-            uint8 Sector;
-            uint16 i;
-            uint8 Fillbuf[128] = { 0 };
-
-            /* For DSK images, density information is not encoded in the file format,
-             * so enforce that 128-byte sectors are single-density. */
-            if ((wd179x_info->ddens == 1) && (wd179x_info->fdc_sec_len == 0)) {
-                status = SCPE_IOERR;
-                break;
-            }
-
-            for (i = 0; i < 128; i++) {
-                Fillbuf[i] = fillbyte;
-            }
-
-            for (Sector = 0; Sector < wd179x_info->fdc_fmt_sector_count; Sector++) {
-                sec_offset = (26 * 128 * Cyl) + (128 * Sector);
-
-                if (sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET) == 0) {
-                    rtn = sim_fwrite(Fillbuf, 1, WD179X_SECTOR_LEN_BYTES,
-                        (pDrive->uptr)->fileref);
-                    if (rtn != (WD179X_SECTOR_LEN_BYTES)) {
-                        sim_debug(ERROR_MSG, &wd179x_dev, "WD179x[%d]: " ADDRESS_FORMAT
-                            " FORMAT_TRACK: sim_fread error.\n", wd179x_info->sel_drive, PCX);
-                    }
-                }
-                else {
-                    sim_debug(ERROR_MSG, &wd179x_dev, "WD179x[%d]: " ADDRESS_FORMAT
-                        " FORMAT_TRACK: sim_fseek error.\n", wd179x_info->sel_drive, PCX);
-                }
-            }
+            status = trackWriteDsk(pDrive->imd,
+                Cyl,
+                Head,
+                wd179x_info->fdc_fmt_sector_count,
+                WD179X_SECTOR_LEN_BYTES,
+                wd179x_info->fdc_sectormap,
+                wd179x_info->ddens ? IMD_MODE_500K_MFM : IMD_MODE_250K_FM, /* data mode */
+                fillbyte,
+                flags);
             break;
-        }
         default:
             sim_debug(ERROR_MSG, &wd179x_dev, "WD179x[%d]: FORMAT_TRACK: Unsupported image type 0x%02x.\n", wd179x_info->sel_drive, pDrive->uptr->u3);
             break;
@@ -1553,5 +1505,363 @@ static t_stat wd179x_trackWrite(WD179X_DRIVE_INFO* pDrive,
     }
 
     return(status);
+}
+
+/*
+ * The following functions simulate an IMD disk
+ * when attaching DSK images. The DSK images are
+ * then treated as if they were in IMD format.
+ */
+
+typedef struct {
+    uint8 drivetype;
+    uint16 ntracks;
+    uint16 nsects;
+    uint16 sectsize;
+    uint8 mode;
+} WD179X_DSK_TABLE;
+
+/*
+ * Add new disk definitions here
+ */
+WD179X_DSK_TABLE wd179x_dsk_table[] = {
+    {8, 77, 26, 128, IMD_MODE_250K_FM},    /* 8" IBM 3740 (default) */
+    {8, 77, 26, 256, IMD_MODE_500K_MFM},   /* 8" IBM System 34 */
+    {8, 77, 50, 128, IMD_MODE_500K_MFM},   /* SD Systems Double Density */
+    {8, 77, 51, 128, IMD_MODE_500K_MFM},   /* Tarbell Double Density */
+    {0,  0,  0,   0, 0}                    /* End of disk table */
+};
+
+static t_stat diskParseDsk(DISK_INFO *myDisk, uint32 isVerbose)
+{
+    int32 Heads, Tracks, dskIdx;
+    uint32 fileSize, calcSize = 0;
+
+    if(myDisk == NULL) {
+        return (SCPE_OPENERR);
+    }
+
+    memset(myDisk->track, 0, (sizeof(TRACK_INFO)*MAX_CYL*MAX_HEAD));
+
+    /* Determine format from disk size */
+    fileSize = sim_fsize(myDisk->file);
+
+    for (Heads = 1; Heads <= MAX_HEAD; Heads++) {
+        for (dskIdx = 0; wd179x_dsk_table[dskIdx].drivetype; dskIdx++) {
+            calcSize = Heads * wd179x_dsk_table[dskIdx].sectsize * wd179x_dsk_table[dskIdx].ntracks * wd179x_dsk_table[dskIdx].nsects;
+
+            if (calcSize == fileSize) {
+                Tracks = wd179x_dsk_table[dskIdx].ntracks;
+
+                sim_printf("H:%d SS:%04d T:%02d SPT:%02d = %d\n",
+                    Heads, wd179x_dsk_table[dskIdx].sectsize, Tracks, wd179x_dsk_table[dskIdx].nsects, calcSize);
+
+                break;
+            }
+        }
+
+        if (calcSize == fileSize) {
+            break;
+        }
+    }
+
+    /* No match found... set default */
+    if (calcSize != fileSize) {
+        dskIdx = 0;
+
+        Tracks = wd179x_dsk_table[dskIdx].ntracks;
+        Heads = 1;
+    }
+
+    return diskCreateIMD(myDisk, Tracks, Heads,
+            wd179x_dsk_table[dskIdx].mode,
+            wd179x_dsk_table[dskIdx].nsects,
+            wd179x_dsk_table[dskIdx].sectsize,
+            1
+        );
+}
+
+static DISK_INFO *diskOpenExDsk(FILE *fileref, uint32 isVerbose, DEVICE *device, uint32 debugmask, uint32 verbosedebugmask)
+{
+    DISK_INFO *myDisk = NULL;
+
+    myDisk = (DISK_INFO*)calloc(1, sizeof(DISK_INFO));
+    if (myDisk == NULL) {
+        sim_printf("%s: %s(): memory allocation failure.\n", __FILE__, __FUNCTION__);
+        return NULL;
+    }
+
+    myDisk->file = fileref;
+    myDisk->device = device;
+    myDisk->debugmask = debugmask;
+    myDisk->verbosedebugmask = verbosedebugmask;
+
+    if (diskParseDsk(myDisk, isVerbose) != SCPE_OK) {
+        free(myDisk);
+        myDisk = NULL;
+    }
+
+    return myDisk;
+}
+
+/* Read a sector from a DSK image. */
+static t_stat sectReadDsk(DISK_INFO *myDisk,
+             uint32 Cyl,
+             uint32 Head,
+             uint32 Sector,
+             uint8 *buf,
+             uint32 buflen,
+             uint32 *flags,
+             uint32 *readlen)
+{
+    uint32 sectorFileOffset;
+    uint8 start_sect;
+    *readlen = 0;
+    *flags = 0;
+
+    /* Check parameters */
+    if(myDisk == NULL) {
+        *flags |= IMD_DISK_IO_ERROR_GENERAL;
+        return(SCPE_IOERR);
+    }
+
+    if(sectSeek(myDisk, Cyl, Head) != SCPE_OK) {
+        *flags |= IMD_DISK_IO_ERROR_GENERAL;
+        return(SCPE_IOERR);
+    }
+
+    if(Sector > myDisk->track[Cyl][Head].nsects) {
+        sim_debug(myDisk->debugmask, myDisk->device, "%s: invalid sector\n", __FUNCTION__);
+        *flags |= IMD_DISK_IO_ERROR_GENERAL;
+        return(SCPE_IOERR);
+    }
+
+    if(buflen < myDisk->track[Cyl][Head].sectsize) {
+        sim_printf("%s: Reading C:%d/H:%d/S:%d, len=%d: user buffer too short, need %d\n", __FUNCTION__, Cyl, Head, Sector, buflen, myDisk->track[Cyl][Head].sectsize);
+        *flags |= IMD_DISK_IO_ERROR_GENERAL;
+        return(SCPE_IOERR);
+    }
+
+    start_sect = myDisk->track[Cyl][Head].start_sector;
+
+    sectorFileOffset = myDisk->track[Cyl][Head].sectorOffsetMap[Sector-start_sect];
+
+    sim_debug(myDisk->debugmask, myDisk->device, "Reading C:%d/H:%d/S:%d, len=%d, offset=0x%08x\n", Cyl, Head, Sector, buflen, sectorFileOffset);
+
+    (void)sim_fseek(myDisk->file, sectorFileOffset, SEEK_SET);
+
+    if (sim_fread(buf, 1, myDisk->track[Cyl][Head].sectsize, myDisk->file) != myDisk->track[Cyl][Head].sectsize) {
+        sim_printf("SIM_IMD[%s]: sim_fread error for SECT_RECORD_NORM_DAM.\n", __FUNCTION__);
+    }
+    *readlen = myDisk->track[Cyl][Head].sectsize;
+
+    return(SCPE_OK);
+}
+
+/* Write a sector to a DSK image. */
+static t_stat sectWriteDsk(DISK_INFO *myDisk,
+              uint32 Cyl,
+              uint32 Head,
+              uint32 Sector,
+              uint8 *buf,
+              uint32 buflen,
+              uint32 *flags,
+              uint32 *writelen)
+{
+    uint32 sectorFileOffset;
+    uint8 start_sect;
+    *writelen = 0;
+
+    sim_debug(myDisk->debugmask, myDisk->device, "Writing C:%d/H:%d/S:%d, len=%d\n", Cyl, Head, Sector, buflen);
+
+    /* Check parameters */
+    if(myDisk == NULL) {
+        *flags = IMD_DISK_IO_ERROR_GENERAL;
+        return(SCPE_IOERR);
+    }
+
+    if(sectSeek(myDisk, Cyl, Head) != 0) {
+        *flags = IMD_DISK_IO_ERROR_GENERAL;
+        return(SCPE_IOERR);
+    }
+
+    if(Sector > myDisk->track[Cyl][Head].nsects) {
+        sim_debug(myDisk->debugmask, myDisk->device, "%s: invalid sector\n", __FUNCTION__);
+        *flags = IMD_DISK_IO_ERROR_GENERAL;
+        return(SCPE_IOERR);
+    }
+
+    if(myDisk->flags & FD_FLAG_WRITELOCK) {
+        sim_printf("Disk write-protected.\n");
+        *flags = IMD_DISK_IO_ERROR_WPROT;
+        return(SCPE_IOERR);
+    }
+
+    if(buflen < myDisk->track[Cyl][Head].sectsize) {
+        sim_printf("%s: user buffer too short [buflen %i < sectsize %i]\n",
+                   __FUNCTION__, buflen, myDisk->track[Cyl][Head].sectsize);
+        *flags = IMD_DISK_IO_ERROR_GENERAL;
+        return(SCPE_IOERR);
+    }
+
+    start_sect = myDisk->track[Cyl][Head].start_sector;
+
+    sectorFileOffset = myDisk->track[Cyl][Head].sectorOffsetMap[Sector-start_sect];
+
+    (void)sim_fseek(myDisk->file, sectorFileOffset, SEEK_SET);
+
+    sim_fwrite(buf, 1, myDisk->track[Cyl][Head].sectsize, myDisk->file);
+    *writelen = myDisk->track[Cyl][Head].sectsize;
+
+    return(SCPE_OK);
+}
+
+static t_stat trackWriteDsk(DISK_INFO *myDisk,
+               uint32 Cyl,
+               uint32 Head,
+               uint32 numSectors,
+               uint32 sectorLen,
+               uint8 *sectorMap,
+               uint8 mode,
+               uint8 fillbyte,
+               uint32 *flags)
+{
+    FILE *fileref;
+    uint8 *sectorData;
+    uint32 trackOffset;
+    unsigned long i;
+
+    *flags = 0;
+
+    /* Check parameters */
+    if(myDisk == NULL) {
+        *flags |= IMD_DISK_IO_ERROR_GENERAL;
+        return(SCPE_IOERR);
+    }
+
+    if(myDisk->flags & FD_FLAG_WRITELOCK) {
+        sim_printf("Disk write-protected, cannot format tracks.\n");
+        *flags |= IMD_DISK_IO_ERROR_WPROT;
+        return(SCPE_IOERR);
+    }
+
+    fileref = myDisk->file;
+
+    sim_debug(myDisk->debugmask, myDisk->device, "Formatting C:%d/H:%d/N:%d, len=%d, Fill=0x%02x\n", Cyl, Head, numSectors, sectorLen, fillbyte);
+
+    /* Side 0 or 1 */
+    Head &= 0x01;
+
+    /* Truncate the DSK file when formatting Cyl 0, Head 0 */
+    if((Cyl == 0) && (Head == 0))
+    {
+        /* Truncate the DSK file. */
+        if (sim_set_fsize(fileref, 0)) {
+            sim_printf("Disk truncation failed.\n");
+            *flags |= IMD_DISK_IO_ERROR_GENERAL;
+            return(SCPE_IOERR);
+        }
+
+        myDisk->ntracks = 1;
+        myDisk->nsides = 1;
+
+        /* Flush and re-parse the IMD file. */
+        fflush(fileref);
+    }
+
+    /* Adjust on the fly */
+    if ((Head + 1) > myDisk->nsides) {
+        myDisk->nsides = Head + 1;
+    }
+
+    if ((Cyl + 1) > myDisk->ntracks) {
+        myDisk->ntracks = Cyl + 1;
+    }
+
+    myDisk->track[Cyl][Head].nsects = numSectors;
+    myDisk->track[Cyl][Head].sectsize = sectorLen;
+    myDisk->track[Cyl][Head].mode = mode;
+
+    /* Seek to start of track */
+    trackOffset = (((Cyl * myDisk->nsides) + Head) * numSectors * sectorLen);
+
+//    sim_printf("Seeking to %08X T:%d H:%d N:%d L:%d S:%d\n", trackOffset, Cyl, Head, numSectors, sectorLen, myDisk->nsides);
+
+    (void)sim_fseek(myDisk->file, trackOffset, SEEK_SET);
+
+    /* Compute data length, and fill a sector buffer with the
+     * sector record type as the first byte, and fill the sector
+     * data with the fillbyte.
+     */
+    sectorData = (uint8 *)malloc(sectorLen);
+
+    if (sectorData == NULL) {
+        sim_printf("%s: %s(): memory allocation failure.\n", __FILE__, __FUNCTION__);
+        return SCPE_MEM;
+    }
+
+    memset(sectorData, fillbyte, sectorLen);
+
+    /* For each sector on the track, write the record type and sector data. */
+    for(i=0;i<numSectors;i++) {
+        myDisk->track[Cyl][Head].sectorOffsetMap[i] = (uint32) sim_ftell(fileref);
+
+        sim_fwrite(sectorData, 1, sectorLen, fileref);
+    }
+
+    /* Flush the file, and free the sector buffer. */
+    fflush(fileref);
+    free(sectorData);
+
+    return(SCPE_OK);
+}
+
+static t_stat diskCreateIMD(DISK_INFO *myDisk, int32 Tracks, int32 Heads, uint8 Mode, uint16 nSecs, uint32 sectSize, uint8 startSector)
+{
+    uint8 Track, Side, Sector;
+
+    myDisk->ntracks = Tracks;
+    myDisk->nsides = Heads;
+
+    for (Track = 0; Track < Tracks; Track++) {
+        for (Side = 0; Side < Heads; Side++) {
+            myDisk->track[Track][Side].mode = Mode;
+            myDisk->track[Track][Side].nsects = (uint8) nSecs;
+            myDisk->track[Track][Side].sectsize = sectSize;
+            myDisk->track[Track][Side].start_sector = startSector;
+
+            for (Sector = 0; Sector < myDisk->track[Track][Side].nsects; Sector++) {
+                myDisk->track[Track][Side].sectorOffsetMap[Sector] =
+                    (((Track * myDisk->nsides) + Side) *
+                    myDisk->track[Track][Side].nsects *
+                    myDisk->track[Track][Side].sectsize) +
+                    (Sector * myDisk->track[Track][Side].sectsize);
+                myDisk->track[Track][Side].logicalHead[Sector] = 0;
+                myDisk->track[Track][Side].logicalCyl[Sector] = Track;
+             }
+        }
+    }
+
+    return SCPE_OK;
+}
+
+static t_stat diskShowIMD(DISK_INFO *myDisk)
+{
+    uint8 Track, Side;
+
+    sim_printf("Tracks: %02d\n", myDisk->ntracks);
+    sim_printf("Sides:   %d\n", myDisk->nsides);
+
+    for (Track = 0; Track < myDisk->ntracks; Track++) {
+        for (Side = 0; Side < myDisk->nsides; Side++) {
+            sim_printf("T:%02d H:%d M:%d N:%02d S:%04d\n",
+                Track, Side,
+                myDisk->track[Track][Side].mode,
+                myDisk->track[Track][Side].nsects,
+                myDisk->track[Track][Side].sectsize);
+        }
+    }
+
+    return SCPE_OK;
 }
 

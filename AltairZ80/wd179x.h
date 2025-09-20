@@ -41,6 +41,7 @@ extern uint8 WD179X_Set_DMA(const uint32 dma_addr);
 extern uint8 WD179X_Read(const uint32 Addr);
 extern uint8 WD179X_Write(const uint32 Addr, uint8 cData);
 
+extern void wd179x_set_rpm(int rpm);
 extern void wd179x_external_restore(void);
 extern uint8 wd179x_get_nheads(void);
 
