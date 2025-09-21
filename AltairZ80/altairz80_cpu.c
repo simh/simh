@@ -7525,11 +7525,21 @@ static t_stat cpu_hex_load(FILE *fileref, CONST char *cptr, CONST char *fnam, in
     char linebuf[1024], datastr[1024], *bufptr;
     int32 bytecnt, rectype, databyte, chksum, line = 0, cnt = 0;
     uint32 makeROM = FALSE;
-    t_addr addr, org = 0;
+    t_addr addr, start = 0, offset = 0, org = -1;
+    CONST char *result;
 
     get_glyph(cptr, gbuf, 0);
     if (strcmp(gbuf, "ROM") == 0) {
         makeROM = TRUE;
+    } else {
+	start = strtotv(cptr, &result, 16) & ADDRMASKEXTENDED;
+        if (cptr != result)
+            org = start;
+        while (isspace(*result))
+            result++;
+        get_glyph(result, gbuf, 0);
+        if (strcmp(gbuf, "ROM") == 0)
+            makeROM = TRUE;
     }
 
     while (!feof(fileref)) {
@@ -7560,8 +7570,12 @@ static t_stat cpu_hex_load(FILE *fileref, CONST char *cptr, CONST char *fnam, in
         datastr[sizeof(datastr) - 1] = '\0';
 
         if ((rectype == 0) && (bytecnt > 0) && (addr+bytecnt <= MAXMEMORY)) {
-            if (cnt == 0)
-                org = addr;
+            if (cnt == 0) {
+                if (org == -1)
+                    org = addr;
+		else
+                    offset = org - addr;
+            }
 
             do {
                 if (sscanf(bufptr, "%2x", &databyte) != 1) {
@@ -7569,7 +7583,7 @@ static t_stat cpu_hex_load(FILE *fileref, CONST char *cptr, CONST char *fnam, in
                 }
                 bufptr += 2;
 
-                PutBYTEasROMorRAM(addr++, databyte, makeROM);
+                PutBYTEasROMorRAM(offset+addr++, databyte, makeROM);
 
                 chksum += databyte;
                 cnt++;
