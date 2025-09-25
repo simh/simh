@@ -10536,18 +10536,10 @@ for (rptr = lowr; rptr <= highr; rptr++) {
             if ((idx > lows) && (val == last_val))
                 continue;
             if (idx > val_start+1) {
-                if (idx-1 == val_start+1) {
-                    reason = ex_reg (ofile, val, flag, rptr, idx-1);
-                    sim_switches = saved_switches;
-                    if (reason != SCPE_OK)
-                        return reason;
-                    }
-                else {
-                    if (val_start+1 != idx-1)
-                        fprintf (ofile, "%s[%d]-%s[%d]: same as above\n", rptr->name, val_start+1, rptr->name, idx-1);
-                    else
-                        fprintf (ofile, "%s[%d]: same as above\n", rptr->name, val_start+1);
-                    }
+                if (val_start+1 != idx-1)
+                    fprintf (ofile, "%s[%d]-%s[%d]: same as above\n", rptr->name, val_start+1, rptr->name, idx-1);
+                else
+                    fprintf (ofile, "%s[%d]: same as above\n", rptr->name, val_start+1);
                 }
             last_val = val;
             val_start = idx;
