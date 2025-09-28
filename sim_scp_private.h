@@ -404,10 +404,26 @@ struct SEND {
     int32               extoff;                         /* extra offset */
     };
 
+/* Memory File */
+typedef struct MFILE {
+    char *buf;
+    size_t pos;
+    size_t size;
+    } MFILE;
+
+
 /* Private SCP only APIs */
 
 t_stat _sim_os_putchar (int32 out);
 t_bool _sim_running_as_root (void);
+
+/* Memory File Support */
+int Mprintf (MFILE *f, const char* fmt, ...) GCC_FMT_ATTR(2, 3);
+MFILE *MOpen (void);
+void MFlush (MFILE *f);
+int FMwrite (FILE *fout, MFILE *fdata);
+void MClose (MFILE *f);
+char *MFileData (MFILE *f);
 
 
 #endif /* defined(SIM_SCP_PRIVATE_DONT_REPEAT) */

@@ -17007,14 +17007,10 @@ pclose(f);
 return (0 == strcmp(response, "0"));
 }
 
+/* Memory File Support */
 
-typedef struct MFILE {
-    char *buf;
-    size_t pos;
-    size_t size;
-    } MFILE;
-
-static int Mprintf (MFILE *f, const char* fmt, ...)
+int 
+Mprintf (MFILE *f, const char* fmt, ...)
 {
     va_list arglist;
     int len;
@@ -17047,7 +17043,7 @@ static int Mprintf (MFILE *f, const char* fmt, ...)
 return 0;
 }
 
-static MFILE *
+MFILE *
 MOpen (void)
 {
 return (MFILE *)calloc (1, sizeof (MFILE));
@@ -17059,7 +17055,7 @@ MFlush (MFILE *f)
 f->pos = 0;
 }
 
-static int
+int
 FMwrite (FILE *fout, MFILE *fdata)
 {
 int ret = fwrite (fdata->buf, 1, fdata->pos, fout);
@@ -17068,11 +17064,26 @@ MFlush (fdata);
 return ret;
 }
 
-static void
+void
 MClose (MFILE *f)
 {
 free (f->buf);
 free (f);
+}
+
+char *
+MFileData (MFILE *f)
+{
+char *Data = NULL;
+
+if (f != NULL) {
+    Data = malloc (f->pos + 1);
+    if (Data != NULL) {
+        memcpy (Data, f->buf, f->pos);
+        Data[f->pos] = '\0';
+        }
+    }
+return Data;
 }
 
 /*
