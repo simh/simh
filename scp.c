@@ -3267,9 +3267,10 @@ if (!sim_quiet) {
     printf ("\n");
     show_version (stdout, NULL, NULL, 0, NULL);
     }
+else
+    show_version (stdnul, NULL, NULL, 1, NULL);         /* Quietly set SIM_OSTYPE */
 sim_timer_precalibrate_execution_rate ();
 sim_reset_time ();
-show_version (stdnul, NULL, NULL, 1, NULL);             /* Quietly set SIM_OSTYPE */
 sim_argv = argv;
 
 if (sim_switches & SWMASK ('T'))                        /* Command Line -T switch */
@@ -7178,7 +7179,7 @@ if (1) {
     }
 #endif
 if (flag == 0)
-    st = stdnul;
+    st = stdnul;        /*Startup Brief Mode doesn't produce more output until commit info later */
 if (1) {
     t_bool idle_capable;
     uint32 os_ms_sleep_1, os_tick_size;
@@ -7312,23 +7313,39 @@ if (1) {
                 } while (osversion[0] == '\0');
             _pclose (f);
             }
-        if ((f = _popen ("WMIC CPU Get NumberOfCores", "r"))) {
-            do {
-                if (NULL == fgets (cores, sizeof (cores), f))
-                    break;
-                sim_trim_endspc (cores);
-                } while (!isdigit (cores[0]));
-            _pclose (f);
+        strlcpy (wmicpath, sim_get_tool_path ("wmic"), sizeof (wmicpath));
+        if (wmicpath[0]) {
+            if ((f = _popen ("WMIC CPU Get NumberOfCores", "r"))) {
+                do {
+                    if (NULL == fgets (cores, sizeof (cores), f))
+                        break;
+                    sim_trim_endspc (cores);
+                    } while (!isdigit (cores[0]));
+                _pclose (f);
+                }
             }
-        setenv ("SIM_HOST_CORE_COUNT", cores, 1);
+        else {
+            if ((f = _popen ("PowerShell -C \"Get-CimInstance -ClassName Win32_Processor | Select-Object NumberOfCores\"", "r"))) {
+                memset (cores, 0, sizeof(cores));
+                do {
+                    if (NULL == fgets (cores, sizeof(cores)-1, f))
+                        break;
+                    sim_trim_spc (cores);
+                    if ((0 == memcmp (cores, "NumberOfCores", 13)) || /* skip header lines */
+                        (0 == memcmp (cores, "-------------", 13)))
+                        memset (cores, 0, sizeof (cores));
+                    } while (cores[0] == '\0');
+                _pclose (f);
+                }
+            }
+        if (isdigit (cores[0]))
+            setenv ("SIM_HOST_CORE_COUNT", cores, 1);
         setenv ("SIM_HOST_MAX_THREADS", procs, 1);
         fprintf (st, "\n        OS: %s", osversion);
         fprintf (st, "\n        Architecture: %s%s%s, %s%s%sLogical Processors: %s", arch, proc_arch3264 ? " on " : "", proc_arch3264 ? proc_arch3264  : "", (cores[0] == '\0') ? "" : "Cores: ", cores, (cores[0] == '\0') ? "" : ", ", procs);
         fprintf (st, "\n        Processor Id: %s, Level: %s, Revision: %s", proc_id ? proc_id : "", proc_level ? proc_level : "", proc_rev ? proc_rev : "");
-        strlcpy (wmicpath, sim_get_tool_path ("wmic"), sizeof (wmicpath));
         if (wmicpath[0]) {
-            strlcat (wmicpath, " cpu get name", sizeof (wmicpath));
-            if ((f = _popen (wmicpath, "r"))) {
+            if ((f = _popen ("WMIC CPU GET NAME", "r"))) {
                 memset (proc_name, 0, sizeof(proc_name));
                 do {
                     if (NULL == fgets (proc_name, sizeof(proc_name)-1, f))
@@ -7339,9 +7356,23 @@ if (1) {
                     } while (proc_name[0] == '\0');
                 _pclose (f);
                 }
-            if (proc_name[0] != '\0')
-                fprintf (st, "\n        Processor Name: %s", proc_name);
             }
+        else {
+            if ((f = _popen ("PowerShell -C \"Get-CimInstance -ClassName Win32_Processor | Select-Object Name\"", "r"))) {
+                memset (proc_name, 0, sizeof(proc_name));
+                do {
+                    if (NULL == fgets (proc_name, sizeof(proc_name)-1, f))
+                        break;
+                    sim_trim_endspc (proc_name);
+                    if ((0 == memcmp (proc_name, "Name", 4)) || /* skip header lines */
+                        (0 == memcmp (proc_name, "----", 4)))
+                        memset (proc_name, 0, sizeof (proc_name));
+                    } while (proc_name[0] == '\0');
+                _pclose (f);
+                }
+            }
+        if (proc_name[0] != '\0')
+            fprintf (st, "\n        Processor Name: %s", proc_name);
         strlcpy (os_type, "Windows", sizeof (os_type));
         strlcpy (tarversion, _get_tool_version ("tar"), sizeof (tarversion));
         if (tarversion[0]) {
@@ -17162,7 +17193,7 @@ for (i = 0; (dptr = devices[i]) != NULL; i++) {
         MFlush (f);
         if (rptr->flags & REG_DOUBLE) {
             Mprintf (f, "%s %s:%s used the %s macro but had REG_DOUBLE flag bit set\n", sim_name, dptr->name, rptr->name, rptr->macro);
-            Mprintf (f, "%s %s:%s REG_DOUBLE shoule never be specified as a register flag bit\n", sim_name, dptr->name, rptr->name, rptr->macro);
+            Mprintf (f, "%s %s:%s REG_DOUBLE should never be specified as a register flag bit\n", sim_name, dptr->name, rptr->name);
             Bad = TRUE;
             }
         if ((rptr->macro != NULL) && (0 == memcmp (rptr->macro, "DBRDATA", 7))) {
