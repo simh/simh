@@ -120,6 +120,7 @@ extern t_bool sim_end;              /* TRUE = little endian, FALSE = big endian 
 extern const char sim_file_path_separator;  /* Platform specific value \ or / as appropriate */
 
 char *sim_trim_endspc (char *cptr);
+char *sim_trim_spc (char *cptr);
 int sim_isspace (int c);
 #ifdef isspace
 #undef isspace

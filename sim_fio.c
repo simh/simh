@@ -2267,6 +2267,26 @@ while ((--tptr >= cptr) && sim_isspace (*tptr))
 return cptr;
 }
 
+/* Trim spaces from the beginning and end of a string
+
+    Inputs:
+        cptr    =       pointer to string
+    Outputs:
+        cptr    =       pointer to string
+*/
+
+char *sim_trim_spc (char *cptr)
+{
+char *tptr;
+
+tptr = cptr;
+while (sim_isspace (*tptr))
+    ++tptr;
+if (tptr != cptr)
+    memmove (cptr, tptr, strlen (tptr) + 1);
+return sim_trim_endspc (cptr);
+}
+
 int sim_isspace (int c)
 {
 return ((c < 0) || (c >= 128)) ? 0 : isspace (c);
