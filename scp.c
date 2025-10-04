@@ -7297,15 +7297,17 @@ if (1) {
         char *proc_level = getenv ("PROCESSOR_LEVEL");
         char *proc_rev = getenv ("PROCESSOR_REVISION");
         char *proc_arch3264 = getenv ("PROCESSOR_ARCHITEW6432");
-        char osversion[PATH_MAX+1] = "";
-        char cores[64] = "";
-        char tarversion[PATH_MAX+1] = "";
-        char curlversion[PATH_MAX+1] = "";
-        char wmicpath[PATH_MAX+1] = "";
-        char proc_name[CBUFSIZE] = "";
+        static char osversion[PATH_MAX+1] = "";
+        static char cores[64] = "";
+        static char tarversion[PATH_MAX+1] = "";
+        static char curlversion[PATH_MAX+1] = "";
+        static char wmicpath[PATH_MAX+1] = "";
+        static char powershellpath[PATH_MAX+1] = "";
+        static char proc_name[CBUFSIZE] = "";
         FILE *f;
 
-        if ((f = _popen ("ver", "r"))) {
+        if ((osversion[0] == '\0') &&
+            (f = _popen ("ver", "r"))) {
             do {
                 if (NULL == fgets (osversion, sizeof (osversion), f))
                     break;
@@ -7313,8 +7315,9 @@ if (1) {
                 } while (osversion[0] == '\0');
             _pclose (f);
             }
-        strlcpy (wmicpath, sim_get_tool_path ("wmic"), sizeof (wmicpath));
-        if (wmicpath[0]) {
+        if (wmicpath[0] == '\0')
+            strlcpy (wmicpath, sim_get_tool_path ("wmic"), sizeof (wmicpath));
+        if ((cores[0] == '\0') && (wmicpath[0] != '\0')) {
             if ((f = _popen ("WMIC CPU Get NumberOfCores", "r"))) {
                 do {
                     if (NULL == fgets (cores, sizeof (cores), f))
@@ -7325,15 +7328,23 @@ if (1) {
                 }
             }
         else {
-            if ((f = _popen ("PowerShell -C \"Get-CimInstance -ClassName Win32_Processor | Select-Object NumberOfCores\"", "r"))) {
+            if (powershellpath[0] == '\0')
+                strlcpy (powershellpath, sim_get_tool_path ("PowerShell"), sizeof (powershellpath));
+            if ((cores[0] == '\0') && (powershellpath[0] != '\0') &&
+                (f = _popen ("PowerShell -C \"Get-CimInstance -ClassName Win32_Processor | Select-Object NumberOfCores,Name\"", "r"))) {
                 memset (cores, 0, sizeof(cores));
+                memset (proc_name, 0, sizeof(proc_name));
                 do {
-                    if (NULL == fgets (cores, sizeof(cores)-1, f))
+                    if (NULL == fgets (proc_name, sizeof(proc_name)-1, f))
                         break;
-                    sim_trim_spc (cores);
+                    sim_trim_spc (proc_name);
+                    cptr = get_glyph_nc (proc_name, cores, 0);
+                    memmove (proc_name, cptr, 1 + strlen (cptr));
                     if ((0 == memcmp (cores, "NumberOfCores", 13)) || /* skip header lines */
-                        (0 == memcmp (cores, "-------------", 13)))
+                        (0 == memcmp (cores, "-------------", 13))) {
                         memset (cores, 0, sizeof (cores));
+                        memset (proc_name, 0, sizeof(proc_name));
+                        }
                     } while (cores[0] == '\0');
                 _pclose (f);
                 }
@@ -7344,7 +7355,7 @@ if (1) {
         fprintf (st, "\n        OS: %s", osversion);
         fprintf (st, "\n        Architecture: %s%s%s, %s%s%sLogical Processors: %s", arch, proc_arch3264 ? " on " : "", proc_arch3264 ? proc_arch3264  : "", (cores[0] == '\0') ? "" : "Cores: ", cores, (cores[0] == '\0') ? "" : ", ", procs);
         fprintf (st, "\n        Processor Id: %s, Level: %s, Revision: %s", proc_id ? proc_id : "", proc_level ? proc_level : "", proc_rev ? proc_rev : "");
-        if (wmicpath[0]) {
+        if ((proc_name[0] == '\0') && (wmicpath[0] != '\0')) {
             if ((f = _popen ("WMIC CPU GET NAME", "r"))) {
                 memset (proc_name, 0, sizeof(proc_name));
                 do {
@@ -7357,30 +7368,18 @@ if (1) {
                 _pclose (f);
                 }
             }
-        else {
-            if ((f = _popen ("PowerShell -C \"Get-CimInstance -ClassName Win32_Processor | Select-Object Name\"", "r"))) {
-                memset (proc_name, 0, sizeof(proc_name));
-                do {
-                    if (NULL == fgets (proc_name, sizeof(proc_name)-1, f))
-                        break;
-                    sim_trim_endspc (proc_name);
-                    if ((0 == memcmp (proc_name, "Name", 4)) || /* skip header lines */
-                        (0 == memcmp (proc_name, "----", 4)))
-                        memset (proc_name, 0, sizeof (proc_name));
-                    } while (proc_name[0] == '\0');
-                _pclose (f);
-                }
-            }
         if (proc_name[0] != '\0')
             fprintf (st, "\n        Processor Name: %s", proc_name);
         strlcpy (os_type, "Windows", sizeof (os_type));
-        strlcpy (tarversion, _get_tool_version ("tar"), sizeof (tarversion));
-        if (tarversion[0]) {
+        if (tarversion[0] == '\0')
+            strlcpy (tarversion, _get_tool_version ("tar"), sizeof (tarversion));
+        if (tarversion[0] != '\0') {
             fprintf (st, "\n        tar tool: %s", tarversion);
             setenv ("SIM_TAR_CMD_AVAILABLE", "TRUE", 1);
             }
-        strlcpy (curlversion, _get_tool_version ("curl"), sizeof (curlversion));
-        if (curlversion[0]) {
+        if (curlversion[0] == '\0')
+            strlcpy (curlversion, _get_tool_version ("curl"), sizeof (curlversion));
+        if (curlversion[0] != '\0') {
             fprintf (st, "\n        curl tool: %s", curlversion);
             setenv ("SIM_CURL_CMD_AVAILABLE", "TRUE", 1);
             }
