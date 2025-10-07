@@ -781,7 +781,7 @@ DEVICE cpu_dev = {
 #if PIDP10
                         /* Update MI register if address matches */
 #define UPDATE_MI(a)    if (!MI_flag && a == AS) { \
-	                     MI = MB; \
+                             MI = MB; \
                         }
 #else
 #define UPDATE_MI(a)
@@ -2331,7 +2331,7 @@ int Mem_write(int flag, int cur_context) {
             if (sim_brk_summ && sim_brk_test(last_addr, SWMASK('W')))
                 watch_stop = 1;
             M[last_addr] = MB;
-	        UPDATE_MI(last_addr);
+            UPDATE_MI(last_addr);
             modify = 0;
             return 0;
         }
