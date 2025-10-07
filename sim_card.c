@@ -33,9 +33,11 @@
                 First characters 6789----
                 Second character 21012345
                                  111
-                Top 4 bits of second character are 0.
-                It is unlikely that any other format could
-                look like this.
+                The lower order 4 bits of first word are all
+                zero. It is unlikely that any other format could
+                look like this. An ASCII card could match this
+                if it is all blank, but the trailing return would
+                cause it to fail this test.
 
         BCD Format:
                 Each record variable length (80 chars or less).
