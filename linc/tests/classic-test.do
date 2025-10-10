@@ -39,13 +39,11 @@ call test  25 SCRT4  037 027
 call test  26 ADDT1  041 031
 call test  27 FADRT1 042 032
 call test  30 FADRT2 043 033
-#Bad block.
-;call test  31 iBETA1 045 035
+call test  31 iBETA1 045 035
 call test  32 iBETA2 046 036
 call test  33 iBETA3 047 037
 call test  34 iBETA4 050 040
-#Block 51 same as 52.  Test 35 missing?
-;call test  35 LDAT1  051 041
+call test  35 LDAT1  051 041
 call test  36 STAT1  052 042
 call test  37 ADMT1  053 043
 call test  40 LAMT1  054 044
