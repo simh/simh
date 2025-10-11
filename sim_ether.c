@@ -1080,6 +1080,10 @@ t_stat eth_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const cha
   fprintf (st, "This simulator was not built with ethernet device support\n");
   return SCPE_OK;
   }
+const char *eth_attach_scp_help_string (DEVICE *dptr)
+  {
+  return "";
+  }
 t_stat eth_check_address_conflict (ETH_DEV* dev,
                                    ETH_MAC* const mac)
   {return SCPE_NOFNC;}
@@ -1393,7 +1397,6 @@ static t_bool eth_vde_network_available = FALSE;
 const char *eth_capabilities(void)
  {
  static char capabilities[CBUFSIZE] = "";
- char cap_env[2*CBUFSIZE];
 
  if (capabilities[0] != '\0')
      return capabilities;
@@ -1427,8 +1430,6 @@ const char *eth_capabilities(void)
  strlcat (capabilities, ":NAT", sizeof (capabilities));
 #endif
  strlcat (capabilities, ":UDP", sizeof (capabilities));
- snprintf (cap_env, sizeof(cap_env), "SIM_ETHER_CAPABILITIES=%s", capabilities);
- sim_set_environment (0, cap_env);
  return capabilities;
  }
 
@@ -3553,55 +3554,86 @@ strlcat (version, pcap_lib_version(), sizeof (version));
 return version;
 }
 
-t_stat eth_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+const char *eth_attach_scp_help_string (DEVICE *dptr)
 {
-fprintf (st, "%s attach help\n\n", dptr->name);
-fprintf (st, "   sim> SHOW ETHERNET\n");
-fprintf (st, "   Ethernet Packet Info: %s\n", eth_version());
-fprintf (st, "   ETH devices:\n");
+static char *eth_device_help_string = NULL;
+
+if ((eth_device_help_string != NULL) &&
+    (strstr (eth_device_help_string, dptr->name) == NULL)) {
+    free (eth_device_help_string);
+    eth_device_help_string = NULL;
+    }
+if (eth_device_help_string == NULL) {
+    MFILE *f = MOpen ();
+
+    if (f != NULL) {
+        Mprintf (f, " The device must be attached to a LAN device to communicate with systems\n");
+        Mprintf (f, " on that LAN.\n\n");
+        Mprintf (f, "+sim> SHOW ETHERNET\n");
+        Mprintf (f, "+Ethernet Packet Info: %s\n", eth_version());
+        Mprintf (f, "+ETH devices:\n");
+#if defined(_WIN32)
+        Mprintf (f, "+eth0   \\Device\\NPF_{A6F81789-B849-4220-B09B-19760D401A38} (Local Area Connection)\n");
+        Mprintf (f, "+eth1   udp:sourceport:remotehost:remoteport               (Integrated UDP bridge support)\n");
+#if defined(HAVE_SLIRP_NETWORK)
+        Mprintf (f, "+eth3   nat:{optional-nat-parameters}                      (Integrated NAT (SLiRP) support)\n");
+#endif
+#else
 #if defined(HAVE_VMNET_NETWORK)
-fprintf (st, "    eth0   en0                                  (Integrated bridged network (vmnet) support\n");
-fprintf (st, "                                                 Host IPv4 Address: 192.168.86.114/24\n");
-fprintf (st, "                                                 LinkType: Ethernet\n");
-fprintf (st, "                                                 MediaState: connected)\n");
-fprintf (st, "    eth1   en1                                  (Integrated bridged network (vmnet) support\n");
-fprintf (st, "                                                 LinkType: WiFi\n");
-fprintf (st, "                                                 MediaState: disconnected)\n");
-fprintf (st, "    eth2   tap:tapN{,HOSTIP=address/masklen}    (Integrated host-only (vmnet) support)\n");
+        Mprintf (f, "+eth0   en0                                  (Integrated bridged network (vmnet) support\n");
+        Mprintf (f, "                                                 Host IPv4 Address: 192.168.86.114/24\n");
+        Mprintf (f, "                                                 LinkType: Ethernet\n");
+        Mprintf (f, "                                                 MediaState: connected)\n");
+        Mprintf (f, "+eth1   en1                                  (Integrated bridged network (vmnet) support\n");
+        Mprintf (f, "                                                 LinkType: WiFi\n");
+        Mprintf (f, "                                                 MediaState: disconnected)\n");
+        Mprintf (f, "+eth2   tap:tapN{,HOSTIP=address/masklen}    (Integrated host-only (vmnet) support)\n");
 #if defined(USE_VMNET_SHARED_AS_NAT)
-fprintf (st, "    eth3   nat:{optional-nat-parameters}        (Integrated NAT (vmnet) support)\n");
+        Mprintf (f, "+eth3   nat:{optional-nat-parameters}        (Integrated NAT (vmnet) support)\n");
 #else
 #if defined(HAVE_SLIRP_NETWORK)
-fprintf (st, "    eth3   nat:{optional-nat-parameters}        (Integrated NAT (SLiRP) support)\n");
+        Mprintf (f, "+eth3   nat:{optional-nat-parameters}        (Integrated NAT (SLiRP) support)\n");
 #endif
 #endif
 #else /* !defined(HAVE_VMNET_NETWORK) */
-fprintf (st, "    eth0   en0                                  (No description available)\n");
+        Mprintf (f, "+eth0   en0                                  (No description available)\n");
 #if defined(HAVE_TAP_NETWORK)
-fprintf (st, "    eth1   tap:tapN                             (Integrated Tun/Tap support)\n");
+        Mprintf (f, "+eth1   tap:tapN                             (Integrated Tun/Tap support)\n");
 #endif
 #if defined(HAVE_VDE_NETWORK)
-if (eth_vde_network_available)
-  fprintf (st, "    eth2   vde:device{:switch-port-number}      (Integrated VDE support)\n");
+        if (eth_vde_network_available)
+          Mprintf (f, "+eth2   vde:device{:switch-port-number}      (Integrated VDE support)\n");
 #endif
 #if defined(HAVE_SLIRP_NETWORK)
-fprintf (st, "    eth3   nat:{optional-nat-parameters}        (Integrated NAT (SLiRP) support)\n");
+        Mprintf (f, "+eth3   nat:{optional-nat-parameters}        (Integrated NAT (SLiRP) support)\n");
 #endif
 #endif /* !defined(HAVE_VMNET_NETWORK) */
-fprintf (st, "    eth4   udp:sourceport:remotehost:remoteport (Integrated UDP bridge support)\n");
-fprintf (st, "   sim> ATTACH %s eth0\n\n", dptr->name);
-fprintf (st, "or equivalently:\n\n");
-fprintf (st, "   sim> ATTACH %s en0\n\n", dptr->name);
-fprintf (st, "Additionally:\n\n");
-fprintf (st, "   sim> ATTACH %s en1\n", dptr->name);
-fprintf (st, "   %%SIM-ERROR: Eth: OS device en1 is disconnected\n");
-fprintf (st, "To force a connection to a currently disconnected device:\n\n");
-fprintf (st, "   sim> ATTACH -F %s en1\n", dptr->name);
-fprintf (st, "   %%SIM-INFO: Eth: OS device en1 is disconnected\n");
-fprintf (st, "   %%SIM-INFO: Eth: opened OS device en1 - Integrated bridged network (vmnet) support\n\n");
-#if defined(HAVE_SLIRP_NETWORK) || defined(HAVE_VMNET_NETWORK)
-sim_nat_attach_help (st, dptr, uptr, flag, cptr);
+        Mprintf (f, "+eth4   udp:sourceport:remotehost:remoteport (Integrated UDP bridge support)\n");
+        Mprintf (f, "+sim> ATTACH %s eth0\n\n", dptr->name);
+        Mprintf (f, " or equivalently:\n\n");
+        Mprintf (f, "+sim> ATTACH %s en0\n\n", dptr->name);
 #endif
+        Mprintf (f, "\n Additionally:\n\n");
+        Mprintf (f, "+sim> ATTACH %s en1\n", dptr->name);
+        Mprintf (f, "+%%SIM-ERROR: Eth: OS device en1 is disconnected\n\n");
+        Mprintf (f, " To force a connection to a currently disconnected device:\n\n");
+        Mprintf (f, "+sim> ATTACH -F %s en1\n", dptr->name);
+        Mprintf (f, "+%%SIM-INFO: Eth: OS device en1 is disconnected\n");
+        Mprintf (f, "+%%SIM-INFO: Eth: opened OS device en1 - Integrated bridged network (vmnet) support\n\n");
+#if defined(HAVE_SLIRP_NETWORK) || defined(HAVE_VMNET_NETWORK)
+        Mprintf (f, "%s", sim_nat_attach_scp_help (dptr));
+#endif
+        eth_device_help_string = MFileData (f);
+        MClose (f);
+        }
+    }
+return eth_device_help_string;
+}
+
+t_stat eth_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+{
+fprintf (st, "%s attach help\n\n", dptr->name);
+scp_help (st, dptr, uptr, flag, eth_attach_scp_help_string (dptr), cptr);
 return SCPE_OK;
 }
 

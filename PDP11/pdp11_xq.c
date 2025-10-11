@@ -3298,47 +3298,7 @@ const char helpString[] =
     "\n"
      /****************************************************************************/
     "2 Attach\n"
-    " The device must be attached to a LAN device to communicate with systems\n"
-    " on that LAN\n"
-    "\n"
-    "+sim> SHOW %D ETH\n"
-    "+ETH devices:\n"
-#if defined(_WIN32)
-    "+ eth0   \\Device\\NPF_{A6F81789-B849-4220-B09B-19760D401A38} (Local Area Connection)\n"
-    "+ eth1   udp:sourceport:remotehost:remoteport               (Integrated UDP bridge support)\n"
-    "+sim> ATTACH %D eth0\n"
-#else
-    "+ eth0   en0      (No description available)\n"
-    "+ eth1   tap:tapN (Integrated Tun/Tap support)\n"
-    "+ eth2   udp:sourceport:remotehost:remoteport               (Integrated UDP bridge support)\n"
-    "+sim> ATTACH %D eth0\n"
-    "+sim> ATTACH %D en0\n"
-#endif
-    "+sim> ATTACH %D udp:1234:remote.host.com:1234\n"
-    "\n"
-    "2 Examples\n\n"
-    " Given a simulator that only wants to talk IP to the outside world use\n"
-    " the following example:\n"
-    " \n"
-    "+sim> ATTACH %D NAT:\n"
-    " \n"
-    " Given a simulator that only wants to talk IP but also wants to allow\n"
-    " incoming telnet use the following example:\n"
-    " \n"
-    "+sim> ATTACH %D NAT:tcp=2323:10.0.2.15:23\n"
-    " \n"
-    " This allows connections to host port 2323 to reach port 23 on the\n"
-    " simulated which is configured with IP Address 10.0.2.15\n"
-    "\n"
-    " Given a simulator that only wants to talk IP but also wants to allow\n"
-    " incoming telnet and ftp use the following example:\n"
-    " \n"
-    "+sim> ATTACH %D NAT:tcp=2323:10.0.2.15:23,tcp=2121:10.0.2.15:21\n"
-    " \n"
-    " This allows connections to host port 2323 to reach port 23 on the\n"
-    " simulated which is configured with IP Address 10.0.2.15 and connections\n"
-    " to host port 2121 to reach port 21 on the simulated system.\n"
-    "\n"
+    " %2A\n"
     "1 Monitoring\n"
     " The %D device configuration and state can be displayed with one of the\n"
     " available show commands.\n"
@@ -3376,35 +3336,7 @@ const char helpString[] =
     "+sim> SET %D DEBUG\n"
     "\n"
      /****************************************************************************/
-    "1 Dependencies\n"
-#if defined(_WIN32)
-    " The NPcap or WinPcap package must be installed in order to enable\n"
-    " communication with the host system or other computers on the local LAN.\n"
-    "\n"
-    " The NPcap package is available from https://github.com/nmap/npcap\n"
-    " The WinPcap package is available from http://www.winpcap.org/\n"
-#else
-    " To build simulators with the ability to communicate to other computers\n"
-    " on the local LAN, the libpcap development package must be installed on\n"
-    " the system which builds the simulator.\n"
-    "\n"
-#endif
-    "1 Privileges Required\n"
-#if defined(_WIN32)
-    " Windows systems can attach the simulated %D device to the local LAN\n"
-    " network interface without any special privileges as long as the\n"
-    " WinPcap package has been previously installed on the host system.\n"
-#else
-    " Linux, MacOS and most other Unix like systems require root privilege\n"
-    " to access network interfaces on the host system.\n"
-#endif
-    "1 Host Computer Communications\n"
-#if defined(_WIN32)
-    " On Windows using the WinPcap interface, the simulated %D device\n"
-    " can be used to communicate with the host computer on the same LAN\n"
-    " which it is attached to.\n"
-#else
-#endif
+    ETH_PLATFORM_SCP_DETAILS
      /****************************************************************************/
     "1 Performance\n"
     " On modern host systems and networks, the simulated DEQNA/DELQA/DELQA-T\n"
@@ -3426,8 +3358,7 @@ const char helpString[] =
     "++XS           VAX simulators\n"
     "++NI           AT&T 3b2 simulator\n"
     "++NIA-20       KL10 simulator\n"
-    "\n"
-    ;
+    "\n";
 return scp_help (st, dptr, uptr, flag, helpString, cptr);
 }
 

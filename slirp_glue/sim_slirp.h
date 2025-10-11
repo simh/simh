@@ -44,7 +44,7 @@ int sim_slirp_select (SLIRP *slirp, int ms_timeout);
 void sim_slirp_dispatch (SLIRP *slirp);
 void sim_slirp_show (SLIRP *slirp, FILE *st);
 int sim_nat_parse_args (NAT *nat, const char *args, int nat_type, char *errbuf, size_t errbuf_size);
-t_stat sim_nat_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *sim_nat_attach_scp_help(DEVICE *dptr);
 void sim_nat_show (NAT *nat, FILE *st);
 
 #endif /* HAVE_SLIRP_NETWORK */

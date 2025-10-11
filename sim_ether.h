@@ -348,6 +348,8 @@ t_stat eth_open   (ETH_DEV* dev, const char* name,      /* open ethernet interfa
                    DEVICE* dptr, uint32 dbit);
 t_stat eth_close  (ETH_DEV* dev);                       /* close ethernet interface */
 t_stat eth_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *eth_attach_scp_help_string (DEVICE *dptr);
+const char *eth_attach_flat_help_string (DEVICE *dptr);
 t_stat eth_write  (ETH_DEV* dev, ETH_PACK* packet,      /* write synchronous packet; */
                    ETH_PCALLBACK routine);              /*  callback when done */
 int eth_read      (ETH_DEV* dev, ETH_PACK* packet,      /* read single packet; */
@@ -406,6 +408,60 @@ t_stat sim_ether_test (DEVICE *dptr, const char *cptr); /* unit test routine */
 #define SIM_TEST_INIT
 #define SIM_TEST(xxx)
 #endif
+
+
+     /****************************************************************************/
+#if defined(_WIN32)
+#define ETH_PLATFORM_SCP_DEPENDENCIES                                              \
+    "1 Dependencies\n"                                                             \
+    " The NPcap or WinPcap package must be installed in order to enable\n"         \
+    " communication with the host system or other computers on the local LAN.\n"   \
+    "\n"                                                                           \
+    " The NPcap package is available from https://github.com/nmap/npcap\n"         \
+    " The WinPcap package is available from http://www.winpcap.org/\n"
+#else /* !defined(_WIN32) */
+#define ETH_PLATFORM_SCP_DEPENDENCIES                                              \
+    "1 Dependencies\n"                                                             \
+    " To build simulators with the ability to communicate to other computers\n"    \
+    " on the local LAN, the libpcap development package must be installed on\n"    \
+    " the system which builds the simulator.\n"                                    \
+    "\n"                          
+#endif  /* defined(_WIN32) */
+     /****************************************************************************/
+#if defined(_WIN32)
+#define ETH_PLATFORM_SCP_PRIVILEGES                                                \
+    "1 Privileges Required\n"                                                      \
+    " Windows systems can attach the simulated %D device to the local LAN\n"       \
+    " network interface without any special privileges as long as the\n"           \
+    " Npcap or WinPcap package has been previously installed on the host system.\n"
+#else /* !defined(_WIN32) */
+#define ETH_PLATFORM_SCP_PRIVILEGES                                                \
+    "1 Privileges Required\n"                                                      \
+    " Linux, macOS and most other Unix like systems require root privilege\n"      \
+    " to access network interfaces on the host system.\n"
+#endif  /* defined(_WIN32) */
+     /****************************************************************************/
+#if defined(_WIN32)
+#define ETH_PLATFORM_SCP_HOST_COMMUNICATIONS                                       \
+    "1 Host Computer Communications\n"                                             \
+    " On Windows using the WinPcap interface, the simulated %D device\n"           \
+    " can be used to communicate with the host computer on the same LAN\n"         \
+    " which it is attached to.\n"
+#else /* !defined(_WIN32) */
+#if defined(HAVE_VMNET_NETWORK)
+#define ETH_PLATFORM_SCP_HOST_COMMUNICATIONS                                       \
+    "1 Host Computer Communications\n"                                             \
+    " On macOS using the LAN or WiFi interfaces, the simulated %D device\n"        \
+    " can be used to communicate with the host computer and other computers\n"     \
+    " on the same LAN as well as reaching beyond across the Internet.\n"
+#else /* !defined(HAVE_VMNET_NETWORK) */
+#define ETH_PLATFORM_SCP_HOST_COMMUNICATIONS 
+#endif /* defined(HAVE_VMNET_NETWORK) */
+#endif  /* defined(_WIN32) */
+     /****************************************************************************/
+#define ETH_PLATFORM_SCP_DETAILS    ETH_PLATFORM_SCP_DEPENDENCIES           \
+                                    ETH_PLATFORM_SCP_PRIVILEGES             \
+                                    ETH_PLATFORM_SCP_HOST_COMMUNICATIONS
 
 #ifdef  __cplusplus
 }
