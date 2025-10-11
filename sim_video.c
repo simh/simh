@@ -2758,6 +2758,8 @@ t_stat vid_screenshot (const char *filename)
 {
 SDL_Event user_event;
 
+if (!vid_active)
+    return sim_messagef (SCPE_UDIS , "No video display is active\n");
 _screenshot_stat = -1;
 _screenshot_filename = filename;
 
