@@ -717,8 +717,9 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
     endif
     INCPATH += BIN/unix-build/local/include
     OS_CCDEFS += -IBIN/unix-build/local/include
-    LIBPATH += BIN/unix-build/local/lib
-    OS_LDFLAGS += -LBIN/unix-build/local/lib
+    ifneq (,$(shell if $(TEST) -d BIN/unix-build/local/lib; then echo extra libs; fi))
+      LIBPATH += BIN/unix-build/local/lib
+    endif
     ifeq (,$(and $(findstring -D_LARGEFILE64_SOURCE,$(OS_CCDEFS)),$(shell grep _LARGEFILE64_SOURCE $(call find_include,pthread))))
       OS_CCDEFS += -D_LARGEFILE64_SOURCE
     endif
@@ -742,7 +743,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
   $(info include paths are: ${INCPATH})
   need_search = $(strip $(shell ld -l$(1) /dev/null 2>&1 | grep $(1) | sed s/$(1)//))
   LD_SEARCH_NEEDED := $(call need_search,ZzzzzzzZ)
-  ifneq (,$(or $(findstring Android,$(shell uname -o)),$(call find_lib,m)))
+  ifneq (,$(or $(findstring Android,$(shell uname -a)),$(call find_lib,m)))
     OS_LDFLAGS += -lm
     $(info using libm: $(call find_lib,m))
   endif
@@ -781,11 +782,11 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
   ifneq (,$(call find_include,pcre))
     ifneq (,$(call find_lib,pcre))
       $(info using libpcre: $(call find_lib,pcre) $(call find_include,pcre))
+      OS_CCDEFS += -DHAVE_PCRE_H
+      OS_LDFLAGS += -lpcre
       ifeq ($(LD_SEARCH_NEEDED),$(call need_search,pcre))
         OS_LDFLAGS += -L$(dir $(call find_lib,pcre))
       endif
-      OS_CCDEFS += -DHAVE_PCRE_H
-      OS_LDFLAGS += -lpcre
     else
       export NEED_PCRE = TRUE
     endif
@@ -858,10 +859,12 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
       OS_CURSES_DEFS += -DHAVE_NCURSES -lncurses
     endif
   endif
-  ifneq (,$(call find_include,semaphore))
-    ifneq (, $(shell grep sem_timedwait $(call find_include,semaphore)))
-      OS_CCDEFS += -DHAVE_SEMAPHORE
-      $(info using semaphore: $(call find_include,semaphore))
+  ifeq (,$(findstring Android,$(shell uname -a)))
+    ifneq (,$(call find_include,semaphore))
+      ifneq (, $(shell grep sem_timedwait $(call find_include,semaphore)))
+        OS_CCDEFS += -DHAVE_SEMAPHORE
+        $(info using semaphore: $(call find_include,semaphore))
+      endif
     endif
   endif
   ifneq (,$(call find_include,sys/ioctl))
@@ -1674,6 +1677,9 @@ CC_OUTSPEC = -o $@
 export CC := ${GCC} ${CC_STD} -U__STRICT_ANSI__ ${CFLAGS_G} ${CFLAGS_O} ${CFLAGS_GIT} ${CFLAGS_I} -DSIM_COMPILER="${COMPILER_NAME}" $(SIM_BUILD_OS_VERSION) -DSIM_BUILD_TOOL=simh-makefile$(if $(BUILD_SEPARATE),-separate-compiles,-single-compile) -I . ${OS_CCDEFS} ${ROMS_OPT}
 ifneq (,${SIM_VERSION_MODE})
   CC += -DSIM_VERSION_MODE="${SIM_VERSION_MODE}"
+endif
+ifneq (,$(shell if $(TEST) -d BIN/unix-build/local/lib; then echo extra libs; fi))
+  OS_LDFLAGS += -LBIN/unix-build/local/lib
 endif
 ifneq (,$(and $(findstring -lpthread,$(NETWORK_LDFLAGS)),$(findstring -lpthread,$(VIDEO_LDFLAGS))))
   export LDFLAGS := ${OS_LDFLAGS} $(NETWORK_LDFLAGS:-lpthread=) ${VIDEO_LDFLAGS} ${VIDEO_TTF_LDFLAGS} ${LDFLAGS_O}
