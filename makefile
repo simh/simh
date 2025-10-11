@@ -13,9 +13,6 @@
 #   Linux x86 targeting Android (using agcc script)
 #   Haiku x86 (with gcc4)
 #
-# Android targeted builds should invoke GNU make with GCC=agcc on
-# the command line.
-#
 # In general, the logic below will detect and build with the available
 # features which the host build environment provides.
 #
@@ -264,38 +261,51 @@ endif
 find_exe = $(abspath $(strip $(firstword $(foreach dir,$(strip $(subst :, ,${PATH})),$(wildcard $(dir)/$(1))))))
 find_lib = $(firstword $(abspath $(strip $(firstword $(foreach dir,$(strip ${LIBPATH}),$(foreach ext,$(strip ${LIBEXT}),$(wildcard $(dir)/lib$(1).$(ext))))))))
 find_include = $(abspath $(strip $(firstword $(foreach dir,$(strip ${INCPATH}),$(wildcard $(dir)/$(1).h)))))
+# macOS with Homebrew or MacPorts
 ifeq (Darwin,$(OSTYPE))
   eq = $(if $(or $(1),$(2)),$(and $(findstring $(1),$(2)),$(findstring $(2),$(1))),1)
   ifneq (,$(or $(call eq,/usr/local/bin/brew,$(call find_exe,brew)),$(call eq,/opt/homebrew/bin/brew,$(call find_exe,brew))))
     PKG_MGR = HOMEBREW
     PKG_CMD = brew install
+    PKG_FIND = brew search
   else
     ifeq (/opt/local/bin/port,$(call find_exe,port))
       PKG_MGR = MACPORTS
       PKG_CMD = port install
+      PKG_FIND = port search --name
     endif
   endif
 endif
 ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,apt-get)))
-  ifneq (Android,$(shell uname -o))
-    PKG_MGR = APT
-    PKG_CMD = apt-get install
-  else
+  ifeq (Android,$(shell uname -o))
+    # Android with termux
     PKG_MGR = TERMUX
     PKG_CMD = pkg install
     PKG_NO_SUDO = YES
+    PKG_FIND = pkg search
+  else
+    # Debian, Ubuntu (and its many derivatives like Kubuntu, Xubuntu, Lubuntu, Ubuntu Mate, Pop!_OS) and Linux Mint
+    # Deepin, MX Linux, Raspberry Pi OS, Peppermint OS, Bodhi Linux
+    PKG_MGR = APT
+    PKG_CMD = apt-get install
+    PKG_FIND = apt list
   endif
 endif
 ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,yum)))
+  # Early Red Had, Fedora, CentOS, Rocky and Alma Linux distributions
   PKG_MGR = YUM
   PKG_CMD = yum install
+  PKG_FIND = yum search
 endif
 ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,apk)))
+  # Alpine Linux
   PKG_MGR = APK
   PKG_CMD = apk add
+  PKG_FIND = apk list
   PKG_NO_SUDO = YES
 endif
 ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,dnf)))
+  # More Modern Red Had, Fedora, CentOS, Rocky and Alma Linux distributions
   PKG_MGR = DNF
   ifneq (,$(shell dnf repolist | grep crb))
     PKG_CMD = dnf --enablerepo=crb install
@@ -304,20 +314,24 @@ ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,dnf)))
   endif
 endif
 ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,zypper)))
+  # openSUSE and SUSE Linux Enterprise
   PKG_MGR = ZYPPER
   PKG_CMD = zypper install
 endif
 ifneq (,$(and $(findstring NetBSD,$(OSTYPE)),$(call find_exe,pkgin)))
+  # NetBSD
   PKG_MGR = PKGSRC
   PKG_CMD = pkgin install
   PKG_NO_SUDO = YES
 endif
 ifneq (,$(and $(findstring FreeBSD,$(OSTYPE)),$(call find_exe,pkg)))
+  # FreeBSD
   PKG_MGR = PKGBSD
   PKG_CMD = pkg install
   PKG_NO_SUDO = YES
 endif
 ifneq (,$(and $(findstring OpenBSD,$(OSTYPE)),$(call find_exe,pkg_add)))
+  # OpenBSD
   PKG_MGR = PKGADD
   PKG_CMD = pkg_add
   PKG_NO_SUDO = YES
@@ -335,19 +349,20 @@ DPKG_ZLIB      = 8
 DPKG_SDL_TTF   = 9
 DPKG_GMAKE     = 10
 DPKG_CURL      = 11
+DPKG_BUILD     = 12
 ifneq (3,${SIM_MAJOR})
-  # Platform Pkg Names  COMPILER PCAP          VDE            PCRE         EDITLINE      SDL               PNG            ZLIB       SDL_TTF           GMAKE CURL
-  PKGS_SRC_HOMEBREW   = -        -             vde            pcre         libedit       sdl2              libpng         zlib       sdl2_ttf          make  -
-  PKGS_SRC_MACPORTS   = -        -             vde2           pcre         libedit       libsdl2           libpng         zlib       libsdl2_ttf       gmake -
-  PKGS_SRC_APT        = gcc      libpcap-dev   libvdeplug-dev libpcre3-dev libedit-dev   libsdl2-dev       libpng-dev     -          libsdl2-ttf-dev   -     curl
-  PKGS_SRC_YUM        = gcc      libpcap-devel -              pcre-devel   libedit-devel SDL2-devel        libpng-devel   zlib-devel SDL2_ttf-devel    -     -
-  PKGS_SRC_DNF        = gcc      libpcap-devel -              pcre-devel   libedit-devel SDL2-devel        libpng-devel   zlib-devel SDL2_ttf-devel    -     -
-  PKGS_SRC_ZYPPER     = gcc      libpcap-devel -              -            libedit-devel sdl2-compat-devel libpng16-devel zlib-devel SDL2_ttf-devel    make  -
-  PKGS_SRC_APK        = clang    libpcap-devel -              -            libedit-devel sdl2-compat-devel libpng-devel   -          sdl2_ttf-devel    gmake curl
-  PKGS_SRC_PKGSRC     = -        -             -              pcre         editline      SDL2              png            zlib       SDL2_ttf          gmake -
-  PKGS_SRC_PKGBSD     = -        -             -              pcre         libedit       sdl2              png            -          sdl2_ttf          gmake -
-  PKGS_SRC_PKGADD     = -        -             -              pcre         -             sdl2              png            -          sdl2-ttf          gmake -
-  PKGS_SRC_TERMUX     = clang    libpcap       -              pcre         -             -                 -              -          -                 -     curl
+  # Platform Pkg Names  COMPILER PCAP          VDE            PCRE         EDITLINE      SDL               PNG            ZLIB       SDL_TTF           GMAKE CURL  BUILD-TOOL
+  PKGS_SRC_HOMEBREW   = -        -             vde            pcre         libedit       sdl2              libpng         zlib       sdl2_ttf          make  -     -
+  PKGS_SRC_MACPORTS   = -        -             vde2           pcre         libedit       libsdl2           libpng         zlib       libsdl2_ttf       gmake -     -
+  PKGS_SRC_APT        = gcc      libpcap-dev   libvdeplug-dev libpcre3-dev libedit-dev   libsdl2-dev       libpng-dev     -          libsdl2-ttf-dev   -     curl  build-essential:/usr/share/build-essential
+  PKGS_SRC_YUM        = gcc      libpcap-devel -              pcre-devel   libedit-devel SDL2-devel        libpng-devel   zlib-devel SDL2_ttf-devel    -     -     -
+  PKGS_SRC_DNF        = gcc      libpcap-devel -              pcre-devel   libedit-devel SDL2-devel        libpng-devel   zlib-devel SDL2_ttf-devel    -     -     -
+  PKGS_SRC_ZYPPER     = gcc-c++  libpcap-devel -              -            libedit-devel sdl2-compat-devel libpng16-devel zlib-devel SDL2_ttf-devel    make  -     -
+  PKGS_SRC_APK        = clang    libpcap-devel -              -            libedit-devel sdl2-compat-devel libpng-devel   -          sdl2_ttf-devel    gmake curl  -
+  PKGS_SRC_PKGSRC     = -        -             -              pcre         editline      SDL2              png            zlib       SDL2_ttf          gmake -     -
+  PKGS_SRC_PKGBSD     = -        -             -              pcre         libedit       SDL2              png            -          sdl2_ttf          gmake -     -
+  PKGS_SRC_PKGADD     = -        -             -              pcre         -             sdl2              png            -          sdl2-ttf          gmake -     -
+  PKGS_SRC_TERMUX     = clang    libpcap       -              pcre         -             -                 -              -          -                 -     curl  -
   ifneq (0,$(TESTS))
     ifneq (,${TEST_ARG})
       export TEST_ARG
@@ -700,6 +715,10 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
         endif
       endif
     endif
+    INCPATH += BIN/unix-build/local/include
+    OS_CCDEFS += -IBIN/unix-build/local/include
+    LIBPATH += BIN/unix-build/local/lib
+    OS_LDFLAGS += -LBIN/unix-build/local/lib
     ifeq (,$(and $(findstring -D_LARGEFILE64_SOURCE,$(OS_CCDEFS)),$(shell grep _LARGEFILE64_SOURCE $(call find_include,pthread))))
       OS_CCDEFS += -D_LARGEFILE64_SOURCE
     endif
@@ -723,7 +742,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
   $(info include paths are: ${INCPATH})
   need_search = $(strip $(shell ld -l$(1) /dev/null 2>&1 | grep $(1) | sed s/$(1)//))
   LD_SEARCH_NEEDED := $(call need_search,ZzzzzzzZ)
-  ifneq (,$(call find_lib,m))
+  ifneq (,$(or $(findstring Android,$(shell uname -o)),$(call find_lib,m)))
     OS_LDFLAGS += -lm
     $(info using libm: $(call find_lib,m))
   endif
@@ -762,18 +781,40 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
   ifneq (,$(call find_include,pcre))
     ifneq (,$(call find_lib,pcre))
       $(info using libpcre: $(call find_lib,pcre) $(call find_include,pcre))
-      ifneq (,$(ALL_DEPENDENCIES))
-        OS_CCDEFS += -DHAVE_PCRE_H
-        OS_LDFLAGS += -lpcre
-        ifeq ($(LD_SEARCH_NEEDED),$(call need_search,pcre))
-          OS_LDFLAGS += -L$(dir $(call find_lib,pcre))
-        endif
+      ifeq ($(LD_SEARCH_NEEDED),$(call need_search,pcre))
+        OS_LDFLAGS += -L$(dir $(call find_lib,pcre))
       endif
+      OS_CCDEFS += -DHAVE_PCRE_H
+      OS_LDFLAGS += -lpcre
     else
-      NEEDED_PKGS += DPKG_PCRE
+      export NEED_PCRE = TRUE
     endif
   else
-    NEEDED_PKGS += DPKG_PCRE
+    export NEED_PCRE = TRUE
+  endif
+  ifneq (,$(NEED_PCRE))
+    DESIRED_PCRE = $(word $(DPKG_PCRE),$(PKGS_SRC_$(strip $(PKG_MGR))))
+    ifneq (,$(PKG_FIND))
+      DESIRED_AVAILABLE = $(shell $(PKG_FIND) 2>/dev/null $(DESIRED_PCRE) | grep $(DESIRED_PCRE))
+    endif
+    ifneq (,$(DESIRED_AVAILABLE))
+      NEEDED_PKGS += DPKG_PCRE
+    else
+      BUILD_EXTRA = $(word $(DPKG_BUILD),$(PKGS_SRC_$(strip $(PKG_MGR))))
+      BUILD_EXTRA_PKG = $(word 1,$(subst :, ,$(BUILD_EXTRA)))
+      BUILD_EXTRA_TEST = $(word 2,$(subst :, ,$(BUILD_EXTRA)))
+      ifneq (,$(BUILD_EXTRA_TEST))
+        ifneq (installed,$(shell if $(TEST) -d $(BUILD_EXTRA_TEST); then echo installed; fi))
+          NEEDED_PKGS += DPKG_BUILD
+          $(info Need Build Support package: $(BUILD_EXTRA_PKG))
+        else
+          $(info Building missing PCRE dependency)
+          UNIX_BUILD = $(shell if $(TEST) -d .; then if $(TEST) -d BIN/unix-build; then cd BIN/unix-build; else mkdir -p BIN; cd BIN; git clone https://github.com/simh/unix-build; cd unix-build; fi; make NEED_PCRE=$(NEED_PCRE) >/dev/null 2>&1; fi)
+          OS_CCDEFS += -DHAVE_PCRE_H $(UNIX_BUILD)
+          OS_LDFLAGS += -lpcre
+        endif
+      endif
+    endif
   endif
   # Find libedit BSD licensed library for readline support.
   ifneq (,$(call find_lib,edit))
@@ -1442,8 +1483,9 @@ endif # Win32 (via MinGW)
 ifeq (clean,$(strip ${MAKECMDGOALS}))
   # a simple clean has no dependencies 
   NEEDED_PKGS =
+  OPTIONAL_PKGS =
 endif
-USEFUL_PACKAGES = $(filter-out -,$(foreach word,$(NEEDED_PKGS),$(word $($(word)),$(PKGS_SRC_$(strip $(PKG_MGR))))))
+USEFUL_PACKAGES = $(filter-out -,$(foreach word,$(NEEDED_PKGS),$(word 1,$(subst :, ,$(word $($(word)),$(PKGS_SRC_$(strip $(PKG_MGR))))))))
 OPTIONAL_PACKAGES = $(filter-out -,$(foreach word,$(OPTIONAL_PKGS),$(word $($(word)),$(PKGS_SRC_$(strip $(PKG_MGR))))))
 USEFUL_PLURAL =  $(if $(word 2,$(USEFUL_PACKAGES) $(OPTIONAL_PACKAGES)),s,)
 USEFUL_MULTIPLE_HIST = $(if $(word 2,$(USEFUL_PACKAGES) $(OPTIONAL_PACKAGES)),were,was)
