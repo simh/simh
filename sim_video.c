@@ -1159,6 +1159,9 @@ switch (key) {
     case SDLK_BACKSLASH:
         return SIM_KEY_BACKSLASH;
 
+    case SDLK_LESS:
+        return SIM_KEY_LEFT_BACKSLASH;
+
     case SDLK_RIGHTBRACKET:
         return SIM_KEY_RIGHT_BRACKET;
 
