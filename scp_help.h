@@ -49,6 +49,15 @@
  *     * %S    - Inserts the current simulator name (e.g. "PDP-10")
  *     * %C    - Inserts the current value of the sim_vm_interval_units string
  *     * %I    - Inserts the current value of the sim_vm_step_unit string
+ *     * %{#}A - Inserts the internal device type ATTACH string based on the type of
+ *               the device (DEV_DISK, DEV_TAPE, DEV_SCSI, DEV_MUX, DEV_CARD, DEV_ETHER, 
+ *               DEV_DISPLAY) for the device being processed.  Each of these device types 
+ *               may or may not have an ATTACH string available.  If none is available, 
+ *               then nothing is inserted.  The insertion occurs BEFORE the whole input 
+ *               is processed for its hierarchical/structural sections.  This allows
+ *               the inserted string to add to the heirarchy when desired.
+ *               The # is optional.  When present, the number # is added to each 
+ *               hierarchy level indicated in the included ATTACH string inserted.
  *     * %#s   - Inserts the string suppled in the "#"th optional argument to the help
  *               routine.  # starts with 1.  Any embedded newlines will cause following
  *               text to be indented.
