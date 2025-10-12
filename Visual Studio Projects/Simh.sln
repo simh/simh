@@ -393,6 +393,11 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ND100", "nd100.vcproj", "{F
 		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "linc", "linc.vcproj", "{58E9E172-1CC9-4BA6-8176-F832B11DB1EC}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -715,6 +720,10 @@ Global
 		{F3623A45-3B4C-4880-83D8-1CD49D36A67C}.Debug|Win32.Build.0 = Debug|Win32
 		{F3623A45-3B4C-4880-83D8-1CD49D36A67C}.Release|Win32.ActiveCfg = Release|Win32
 		{F3623A45-3B4C-4880-83D8-1CD49D36A67C}.Release|Win32.Build.0 = Release|Win32
+		{58E9E172-1CC9-4BA6-8176-F832B11DB1EC}.Debug|Win32.ActiveCfg = Debug|Win32
+		{58E9E172-1CC9-4BA6-8176-F832B11DB1EC}.Debug|Win32.Build.0 = Debug|Win32
+		{58E9E172-1CC9-4BA6-8176-F832B11DB1EC}.Release|Win32.ActiveCfg = Release|Win32
+		{58E9E172-1CC9-4BA6-8176-F832B11DB1EC}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
