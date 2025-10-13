@@ -553,11 +553,11 @@ cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
   uint32 x;
 
   if (cptr == NULL)
-    return SCPE_ARG;
+    return sim_messagef (SCPE_ARG, "Missing history value\n");
 
   x = get_uint (cptr, 10, 1000000, &r);
   if (r != SCPE_OK)
-    return r;
+    return sim_messagef (SCPE_ARG, "Invalid Numeric Value: %s.  Maximum is %d\n", cptr, 1000000);
 
   history = (HISTORY *)calloc (x, sizeof (*history));
   if (history == NULL)
@@ -583,6 +583,10 @@ cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
     j = history_m + history_i - history_n;
 
   for (i = 0; i < history_n; i++) {
+    if (stop_cpu) {                 /* Control-C (SIGINT) */
+      stop_cpu = FALSE;
+      break;                        /* abandon remaining output */
+    }
     fprintf (st, "%06o %06o  ",
              history[j].PC,
              history[j].IR);
