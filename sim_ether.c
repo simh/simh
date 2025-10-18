@@ -2921,8 +2921,10 @@ if (0 == strncmp("tap:", savname, 4)) {
         tun = -1;
         }
       else {
+        *eth_api = ETH_API_TAP;
         *fd_handle = (SOCKET)tun;
         strcpy(savname, ifr.ifr_name);
+        return SCPE_OK;
         }
       }
     else
@@ -2978,6 +2980,11 @@ if (0 == strncmp("tap:", savname, 4)) {
     if ((tun >= 0) && (errbuf[0] != 0)) {
       close(tun);
       tun = -1;
+      }
+    else {
+      *eth_api = ETH_API_TAP;
+      *fd_handle = (SOCKET)tun;
+      return SCPE_OK;
       }
     }
 #else /* !(defined(HAVE_BSDTUNTAP) && defined(HAVE_TAP_NETWORK)) */
