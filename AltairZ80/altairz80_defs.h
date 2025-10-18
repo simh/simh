@@ -86,6 +86,8 @@ typedef enum {
 #define UNIT_CPU_SWITCHER       (1 << UNIT_CPU_V_SWITCHER)
 #define UNIT_CPU_V_PO           (UNIT_V_UF+7)               /* enable programmed output messages            */
 #define UNIT_CPU_PO             (1 << UNIT_CPU_V_PO)
+#define UNIT_CPU_V_ALTAIRDBLROM (UNIT_V_UF+8)               /* ALTAIR original Disk Boot Loader exists      */
+#define UNIT_CPU_ALTAIRDBLROM   (1 << UNIT_CPU_V_ALTAIRDBLROM)
 
 #define ADDRESS_FORMAT          "[0x%08x]"
 

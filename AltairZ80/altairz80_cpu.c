@@ -144,6 +144,7 @@ extern int32 hdsk_io    (const int32 port, const int32 io, const int32 data);
 extern int32 simh_dev   (const int32 port, const int32 io, const int32 data);
 extern int32 sr_dev     (const int32 port, const int32 io, const int32 data);
 extern void install_ALTAIRbootROM(void);
+extern void install_ALTAIRdblROM(void);
 extern void do_SIMH_sleep(void);
 extern void prepareMemoryAccessMessage(const t_addr loc);
 extern void prepareInstructionMessage(const t_addr loc, const uint32 op);
@@ -164,6 +165,8 @@ static int32 switchcpu_io       (const int32 port, const int32 io, CONST int32 d
 
 static t_stat cpu_set_altairrom     (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 static t_stat cpu_set_noaltairrom   (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat cpu_set_altairdblrom  (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat cpu_set_noaltairdblrom(UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 static t_stat cpu_set_nommu         (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 static t_stat cpu_set_banked        (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 static t_stat cpu_set_nonbanked     (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
@@ -540,6 +543,10 @@ static MTAB cpu_mod[] = {
         NULL, NULL, "Enable Altair ROM for 8080 / Z80"  },
     { UNIT_CPU_ALTAIRROM,   0,                  "NOALTAIRROM",  "NOALTAIRROM",  &cpu_set_noaltairrom,
         NULL, NULL, "Disable Altair ROM for 8080 / Z80"},
+    { UNIT_CPU_ALTAIRDBLROM,UNIT_CPU_ALTAIRDBLROM, "ALTAIRDBLROM",    "ALTAIRDBLROM",    &cpu_set_altairdblrom,
+        NULL, NULL, "Enable Altair DBL ROM for 8080 / Z80"  },
+    { UNIT_CPU_ALTAIRDBLROM,   0,                  "NOALTAIRDBLROM",  "NOALTAIRDBLROM",  &cpu_set_noaltairdblrom,
+        NULL, NULL, "Disable Altair DBL ROM for 8080 / Z80"},
     { UNIT_CPU_VERBOSE,     UNIT_CPU_VERBOSE,   "VERBOSE",      "VERBOSE",      NULL, &cpu_show,
         NULL, "Enable verbose messages"     },
     { UNIT_CPU_VERBOSE,     0,                  "QUIET",        "QUIET",        NULL, NULL,
@@ -6856,6 +6863,8 @@ static void cpu_clear(t_bool unmap) {
             mmu_table[i] = EMPTY_PAGE;
     if (cpu_unit.flags & UNIT_CPU_ALTAIRROM)
         install_ALTAIRbootROM();
+    else if (cpu_unit.flags & UNIT_CPU_ALTAIRDBLROM)
+        install_ALTAIRdblROM();
     m68k_clear_memory();
     clockHasChanged = FALSE;
 }
@@ -6866,11 +6875,23 @@ static t_stat cpu_clear_command(UNIT *uptr, int32 value, CONST char *cptr, void 
 }
 
 static t_stat cpu_set_altairrom(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
+    cpu_unit.flags &= ~(UNIT_CPU_ALTAIRDBLROM);
     install_ALTAIRbootROM();
     return SCPE_OK;
 }
 
 static t_stat cpu_set_noaltairrom(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
+    mmu_table[ALTAIR_ROM_LOW >> LOG2PAGESIZE] = MEMORYSIZE < MAXBANKSIZE ?
+        EMPTY_PAGE : RAM_PAGE;
+    return SCPE_OK;
+}
+static t_stat cpu_set_altairdblrom(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
+    cpu_unit.flags &= ~(UNIT_CPU_ALTAIRROM);
+    install_ALTAIRdblROM();
+    return SCPE_OK;
+}
+
+static t_stat cpu_set_noaltairdblrom(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
     mmu_table[ALTAIR_ROM_LOW >> LOG2PAGESIZE] = MEMORYSIZE < MAXBANKSIZE ?
         EMPTY_PAGE : RAM_PAGE;
     return SCPE_OK;
