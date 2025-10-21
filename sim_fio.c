@@ -2589,8 +2589,10 @@ typedef struct FILE_STATS {
     int Lines;
     t_bool IsInScpDir;
     t_bool HasBinary;
+    char *BinaryLines;
     t_bool IsSource;
     t_bool HasTabs;
+    char *TabLines;
     t_bool HasSimSockInclude;
     int BenignIncludeCount;
     char **BenignIncludes;
@@ -2636,6 +2638,23 @@ for (i = 0; i < count; i++) {
         fprintf (sim_problem_list, "%s\r\n", buf);
     }
 return result;
+}
+
+static _check_source_add_line_to_list (char **line_list, int line_num)
+{
+char num[12];
+size_t list_size = 0;
+
+snprintf (num, sizeof (num), "%s%d", (*line_list == NULL) ? "" : ", ", line_num + 1);
+if (*line_list == NULL) {
+    list_size = strlen (num) + 1;
+    *line_list = calloc (list_size, 1);
+    }
+else {
+    list_size = strlen (*line_list) + strlen (num) + 1;
+    *line_list = realloc (*line_list, list_size);
+    }
+strlcat (*line_list, num, list_size);
 }
 
 static t_bool _source_problem_check (FILE_STATS *Stats)
@@ -2718,13 +2737,16 @@ for (byte=0; (byte < FileSize) && (bincount < 100); ++byte) {
             break;
         case '\t':
             ++tabcount;
+            _check_source_add_line_to_list (&Stats->TabLines, lfcount);
             break;
         default:
             if (sim_isspace (data[byte]))
                 ++wscount;
             else {
-                if (!sim_isprint (data[byte]))
+                if (!sim_isprint (data[byte])) {
                     ++bincount;
+                    _check_source_add_line_to_list (&Stats->BinaryLines, lfcount);
+                    }
                 }
             break;
         }
@@ -2966,6 +2988,12 @@ if ((sim_switches & SWMASK ('D')) || (File->ProblemFile) ||
             }
         }
     sim_printf ("\n");
+    if (File->BinaryLines)
+        sim_printf ("Lines with Non-Ascii Data: %s\n", File->BinaryLines);
+    free (File->BinaryLines);
+    if (File->TabLines)
+        sim_printf ("Lines with Tabs: %s\n", File->TabLines);
+    free (File->TabLines);
     if (File->HasSimSockInclude)
         sim_printf ("Has unneeded include of sim_sock.h\n");
     _check_source_print_string_list ("Benign (unneeded) System Include Files", File->BenignIncludes,   File->BenignIncludeCount);
