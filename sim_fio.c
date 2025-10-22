@@ -2640,7 +2640,26 @@ for (i = 0; i < count; i++) {
 return result;
 }
 
-static _check_source_add_line_to_list (char **line_list, int line_num)
+static t_bool _source_problem_bool_emit (const char *RelativePath, const char *problem, t_bool hasproblem)
+{
+int j;
+char buf[CBUFSIZE];
+t_bool result = FALSE;
+
+if (hasproblem) {
+    snprintf (buf, sizeof (buf), "%s:%s:", RelativePath, problem);
+    for (j = 0; j < exception_count; j++)
+        if (strcmp (sim_exceptions[j], buf) == 0)
+            break;
+    if (j == exception_count)
+        result |= TRUE;
+    if (result && (sim_problem_list != NULL))
+        fprintf (sim_problem_list, "%s\r\n", buf);
+    }
+return result;
+}
+
+static void _check_source_add_line_to_list (char **line_list, int line_num)
 {
 char num[12];
 size_t list_size = 0;
@@ -2671,6 +2690,8 @@ if ((!Stats->IsInScpDir) &&
     result |= _source_problem_emit (Stats->RelativePath, "PlatformDefine", Stats->PlatformDefineCount, Stats->PlatformDefines);
     result |= _source_problem_emit (Stats->RelativePath, "ScpAPI", Stats->ScpAPICount, Stats->ScpAPIs);
     }
+result |= _source_problem_bool_emit (Stats->RelativePath, "HasBinary", Stats->HasBinary);
+result |= _source_problem_bool_emit (Stats->RelativePath, "HasTabs", Stats->HasTabs);
 return result;
 }
 
