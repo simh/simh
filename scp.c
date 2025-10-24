@@ -2966,7 +2966,7 @@ t_stat reason;
 MEMFILE mbuf;
 
 memset (&mbuf, 0, sizeof (mbuf));
-mbuf.buf = malloc (512);            /* Pre allocate a memory buffer to avoid */
+mbuf.buf = (char *)malloc (512);    /* Pre allocate a memory buffer to avoid */
 mbuf.size = 512;                    /* potential double vsnprintf to expand the buffer */
 sim_mfile = &mbuf;
 if (vm_flag || ((reason = fprint_sym (sim_tmpfile, addr, val, uptr, sw)) > 0)) {
@@ -5428,7 +5428,7 @@ if (sim_switches & SWMASK ('R')) {      /* Regular Expression Compare? */
         int *ovector = NULL;
         static size_t sim_if_re_match_sub_count = 0;
 
-        re_buf = calloc (strlen (s2) + 1, 1);
+        re_buf = (char *)calloc (strlen (s2) + 1, 1);
         if ((s2[0] == s2[strlen(s2)- 1]) && ((s2[0] == '\"') || (s2[0] == '\'')))
             memcpy (re_buf, s2 + 1, strlen(s2)-2);       /* extract string without surrounding quotes */
         else
@@ -15542,7 +15542,7 @@ if (dptr != NULL) {
                 break;
             }
         explen = strlen (htext) + insert_size;  /* size includes \0 since we're skipping the %A */
-        exptext = malloc (explen);
+        exptext = (char *)malloc (explen);
         memcpy (exptext, htext, ep - htext);
         if (addlevel > 0) { /* Need to find and adjust level indications */
             const char *ins = insert_string;
@@ -17162,7 +17162,7 @@ MFileData (MFILE *f)
 char *Data = NULL;
 
 if (f != NULL) {
-    Data = malloc (f->pos + 1);
+    Data = (char *)malloc (f->pos + 1);
     if (Data != NULL) {
         memcpy (Data, f->buf, f->pos);
         Data[f->pos] = '\0';

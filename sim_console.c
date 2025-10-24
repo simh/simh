@@ -180,7 +180,7 @@ int32 sim_int_char = 005;                               /* interrupt character *
 int32 sim_dbg_int_char = 0;                             /* SIGINT char under debugger */
 t_bool sim_dbg_signal = FALSE;                          /* Enable SIGINT to debugger */
 static t_bool sim_running_under_debugger = FALSE;
-static char *sim_controlling_debugger = NULL;           /* gdb or lldb when sim_running_under_debugger is TRUE */
+static const char *sim_controlling_debugger = NULL;     /* gdb or lldb when sim_running_under_debugger is TRUE */
 #define RUNNING_UNDER_GDB (sim_running_under_debugger && (strcmp (sim_controlling_debugger, "gdb") == 0))
 #define RUNNING_UNDER_LLDB (sim_running_under_debugger && (strcmp (sim_controlling_debugger, "lldb") == 0))
 static t_bool sigint_message_issued = FALSE;

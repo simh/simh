@@ -2667,11 +2667,11 @@ size_t list_size = 0;
 snprintf (num, sizeof (num), "%s%d", (*line_list == NULL) ? "" : ", ", line_num + 1);
 if (*line_list == NULL) {
     list_size = strlen (num) + 1;
-    *line_list = calloc (list_size, 1);
+    *line_list = (char *)calloc (list_size, 1);
     }
 else {
     list_size = strlen (*line_list) + strlen (num) + 1;
-    *line_list = realloc (*line_list, list_size);
+    *line_list = (char *)realloc (*line_list, list_size);
     }
 strlcat (*line_list, num, list_size);
 }
