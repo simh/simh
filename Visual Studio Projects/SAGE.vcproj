@@ -199,23 +199,23 @@
 			Filter="cpp;c;cxx;def;odl;idl;hpj;bat;asm"
 			>
 			<File
-				RelativePath="..\SAGE\i8251.c"
+				RelativePath="..\SAGE\sage_i8251.c"
 				>
 			</File>
 			<File
-				RelativePath="..\SAGE\i8253.c"
+				RelativePath="..\SAGE\sage_i8253.c"
 				>
 			</File>
 			<File
-				RelativePath="..\SAGE\i8255.c"
+				RelativePath="..\SAGE\sage_i8255.c"
 				>
 			</File>
 			<File
-				RelativePath="..\SAGE\i8259.c"
+				RelativePath="..\SAGE\sage_i8259.c"
 				>
 			</File>
 			<File
-				RelativePath="..\SAGE\i8272.c"
+				RelativePath="..\SAGE\sage_i8272.c"
 				>
 			</File>
 			<File
