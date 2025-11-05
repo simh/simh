@@ -788,9 +788,7 @@ return filesystem_size;
 t_stat sim_disk_set_async (UNIT *uptr, int latency)
 {
 #if !defined(SIM_ASYNCH_IO)
-char *msg = "Disk: cannot operate asynchronously\r\n";
-sim_printf ("%s", msg);
-return SCPE_NOFNC;
+return sim_messagef (SCPE_NOFNC, "Disk: cannot operate asynchronously\n");
 #else
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 pthread_attr_t attr;

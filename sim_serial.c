@@ -998,8 +998,8 @@ for (i=0; (ports < max) && (i < 64); ++i) {
     }
 #else /* Non Linux/HP-UX, just try some well known device names */
 /* modern UNIX serial port names - usually USB */
-static char *serial_unix_serial_names[] = { "S", "U", "USB", ".serial", ".usbserial", NULL};
-char **sp;
+static const char *serial_unix_serial_names[] = { "S", "U", "USB", ".serial", ".usbserial", NULL};
+const char **sp;
 
 for (sp = serial_unix_serial_names; *sp; sp++) {
     for (i=0; (ports < max) && (i <= 64); ++i) {

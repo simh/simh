@@ -62,23 +62,22 @@
 # then GNU make should be invoked with TESTS=0 on the command
 # line.
 #
-# The default build will compile all input source files with a
-# single compile and link operation.  This is most optimal when
-# building all simulators or just a single simulator which you
-# merely plan to run.  If you're developing new code for a
-# simulator, it is more efficient to compile each source module
-# into it's own object and then to link all the objects into the
-# simulator binary.  This allows only the changed modules to be
-# compiled instead of all of the input files resulting in much
-# quicker builds during active simulator development.  GNU make
-# can be invoked with BUILD_SEPARATE=1 on the command line (or
-# defined as an exported environment variable) and separate
-# objects will be built and linked into the resulting simulator.
+# The default build has been changed to perform each simulator's
+# build in separate compiles for each source module and then 
+# a separate link operation.  This will better support folks
+# doing active simulator development and hardly impact everyone
+# else.  Simulators can optionally be built with a single compile
+# and link step.  GNU make can be invoked with BUILD_SEPARATE=0
+# on the command line (or defined as an exported environment 
+# variable) and a single compile and link command will be 
+# performed to produce each simulator.  This is most optimal 
+# when building all simulators or just a single simulator which you
+# merely plan to run.
 #
-# The default make output will show the details of each compile
-# and link command executed.  GNU make can be invoked with QUIET=1
+# The default make output will show summary info about each compile
+# and link command executed.  GNU make can be invoked with QUIET=0
 # on the command line (or defined as an exported environment
-# variable) a summary of the executed command will be displayed
+# variable) and details of the executed commands will be displayed
 # in the make output.
 #
 # Default test execution will produce summary output.  Detailed
@@ -171,11 +170,19 @@ ifeq ($(WIN32),)
 else
   SIM_MAJOR=$(shell for /F "tokens=3" %%i in ('findstr /c:"SIM_MAJOR" sim_rev.h') do echo %%i)
 endif
+# Default to BUILD_SEPARATE=1, but accept command line and environment variable overrides
+ifeq (,$(BUILD_SEPARATE))
+  BUILD_SEPARATE=1
+endif
 # Assure that only BUILD_SEPARATE=1 will cause separate compiles
 ifeq (,$(BUILD_SEPARATE))
   override BUILD_SEPARATE=
 endif
 export BUILD_SEPARATE
+# Default to QUIET=1, but accept command line and environment variable overrides
+ifeq (,$(QUIET))
+  QUIET=1
+endif
 ifeq (,$(QUIET))
   override QUIET=
 endif
@@ -570,6 +577,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
     ifeq (Darwin,$(OSTYPE))
       OSNAME = OSX
       LIBEXT = dylib
+      OS_CCDEFS += -fno-common
       ifneq (include,$(findstring include,$(UNSUPPORTED_BUILD)))
         INCPATH:=$(shell LANG=C; ${GCC} -x c -v -E /dev/null 2>&1 | grep -A 10 '> search starts here' | grep '^ ' | awk '{ print $$1 }' | tr '\n' ' ')
       endif
@@ -846,7 +854,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
   ifneq (,$(call find_exe,gmake))
     override MAKE = $(call find_exe,gmake)
   endif
-  ifneq (,$(and $(findstring 3.,$(GNUMakeVERSION)),$(BUILD_SEPARATE)))
+  ifneq (,$(and $(findstring 3.,$(GNUMakeVERSION)),$(findstring 1,$(BUILD_SEPARATE))))
     NEEDED_PKGS += DPKG_GMAKE
   endif
   ifeq (,$(call find_exe,curl))
@@ -1648,7 +1656,11 @@ ifneq (clean,${MAKECMDGOALS})
   $(info ***)
   $(info *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) being built with:)
   $(info *** $(BUILD_FEATURES).)
-  $(info *** - $(if $(BUILD_SEPARATE),Each source module compiled separately,Building using a single compile and link).)
+  $(info *** - $(if $(findstring 1,$(BUILD_SEPARATE)),Each source module compiled separately,Building using a single compile and link).)
+  ifeq (1,$(QUIET))
+    $(info *** - Summary Compile and Link commands are displayed.)
+    $(info ***   Put QUIET=0 on the make command line to see command details.)
+  endif
   ifneq (,$(NETWORK_FEATURES))
     $(info *** $(NETWORK_FEATURES).)
   endif
@@ -1678,7 +1690,7 @@ ifneq ($(DONT_USE_READER_THREAD),)
 endif
 
 CC_OUTSPEC = -o $@
-export CC := ${GCC} ${CC_STD} -U__STRICT_ANSI__ ${CFLAGS_G} ${CFLAGS_O} ${CFLAGS_GIT} ${CFLAGS_I} -DSIM_COMPILER="${COMPILER_NAME}" $(SIM_BUILD_OS_VERSION) -DSIM_BUILD_TOOL=simh-makefile$(if $(BUILD_SEPARATE),-separate-compiles,-single-compile) -I . ${OS_CCDEFS} ${ROMS_OPT}
+export CC := ${GCC} ${CC_STD} -U__STRICT_ANSI__ ${CFLAGS_G} ${CFLAGS_O} ${CFLAGS_GIT} ${CFLAGS_I} -DSIM_COMPILER="${COMPILER_NAME}" $(SIM_BUILD_OS_VERSION) -DSIM_BUILD_TOOL=simh-makefile$(if $(findstring 1,$(BUILD_SEPARATE)),-separate-compiles,-single-compile) -I . ${OS_CCDEFS} ${ROMS_OPT}
 ifneq (,${SIM_VERSION_MODE})
   CC += -DSIM_VERSION_MODE="${SIM_VERSION_MODE}"
 endif
@@ -1711,7 +1723,7 @@ BIN = BIN/
 ifneq (,$(call find_exe,gmake))
   override MAKE = $(call find_exe,gmake)
 endif
-ifneq (,$(and $(findstring 3.,$(GNUMakeVERSION)),$(BUILD_SEPARATE)))
+ifneq (,$(and $(findstring 3.,$(GNUMakeVERSION)),$(findstring 1,$(BUILD_SEPARATE))))
   ifeq (HOMEBREW,$(PKG_MGR))
     $(info *** You can't build with separate compiles using version $(GNUMakeVERSION))
     $(info *** of GNU make.  A GNU make version 4 or later is required.)
@@ -2760,7 +2772,7 @@ $(BIN)vax8600$(EXE) : ${VAX8600} ${SIM} ${BUILD_ROMS}
 nd100 : $(BIN)nd100$(EXE)
 
 $(BIN)nd100$(EXE) : ${ND100} ${SIM}
-	$(MAKEIT) OPTS="$(ND100_OPT)"
+	$(MAKEIT) OPTS="$(ND100_OPT)" NOCPP=1
 
 
 nova : $(BIN)nova$(EXE)
@@ -3088,7 +3100,7 @@ else # end of primary make recipies
     $(error ERROR ***  Missing build options.)
   endif
 
-  ifneq (,$(QUIET))
+  ifeq (1,$(QUIET))
     CC := @$(CC)
   endif
 
@@ -3151,49 +3163,49 @@ endef
 
 $(BLDDIR)/%.o : $(word 1,$(DIRS))/%.c
 	-@$(MKDIR) $(call pathfix,$(dir $@))
-  ifneq (,$(QUIET))
+  ifeq (1,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : $(word 1,$(DIRS))/*/%.c
 	-@$(MKDIR) $(call pathfix,$(dir $@))
-  ifneq (,$(QUIET))
+  ifeq (1,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : $(word 1,$(DIRS))/*/*/%.c
 	-@$(MKDIR) $(call pathfix,$(dir $@))
-  ifneq (,$(QUIET))
+  ifeq (1,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : display/%.c
 	-@$(MKDIR) $(call pathfix,$(dir $@))
-  ifneq (,$(QUIET))
+  ifeq (1,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : slirp/%.c
 	-@$(MKDIR) $(call pathfix,$(dir $@))
-  ifneq (,$(QUIET))
+  ifeq (1,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : slirp_glue/%.c
 	-@$(MKDIR) $(call pathfix,$(dir $@))
-  ifneq (,$(QUIET))
+  ifeq (1,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : %.c
 	-@$(MKDIR) $(call pathfix,$(dir $@))
-  ifneq (,$(QUIET))
+  ifeq (1,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
@@ -3201,42 +3213,42 @@ $(BLDDIR)/%.o : %.c
 ifneq (,$(word 2,$(DIRS)))
 $(BLDDIR)/%.o : $(word 2,$(DIRS))/%.c
 	-@$(MKDIR) $(call pathfix,$(dir $@))
-  ifneq (,$(QUIET))
+  ifeq (1,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : $(word 2,$(DIRS))/*/%.c
 	@$(MKDIR) $(call pathfix,$(dir $@))
-  ifneq (,$(QUIET))
+  ifeq (1,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : $(word 2,$(DIRS))/*/*/%.c
 	@$(MKDIR) $(call pathfix,$(dir $@))
-  ifneq (,$(QUIET))
+  ifeq (1,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
 ifneq (,$(word 3,$(DIRS)))
 $(BLDDIR)/%.o : $(word 3,$(DIRS))/%.c
 	@$(MKDIR) $(call pathfix,$(dir $@))
-  ifneq (,$(QUIET))
+  ifeq (1,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : $(word 3,$(DIRS))/*/%.c
 	@$(MKDIR) $(call pathfix,$(dir $@))
-  ifneq (,$(QUIET))
+  ifeq (1,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
 
 $(BLDDIR)/%.o : $(word 3,$(DIRS))/*/*/%.c
 	@$(MKDIR) $(call pathfix,$(dir $@))
-  ifneq (,$(QUIET))
+  ifeq (1,$(QUIET))
 	@echo Compiling $< into $@
   endif
 	$(CC) -c $< -o $@ ${OPTS}
@@ -3248,11 +3260,11 @@ endif
       override TEST_NAME = $(TARGETNAME)
     endif
 
-    ifneq (,$(BUILD_SEPARATE))
+    ifneq (,$(findstring 1,$(BUILD_SEPARATE)))
 # Multiple Separate compiles for each input
 $(TARGET): $(OBJS)
 	$(MKDIRBIN)
-    ifneq (,$(QUIET))
+    ifeq (1,$(QUIET))
 	  @echo Linking $(TARGET)
     endif
 	  ${CC} $(OBJS) ${OPTS} ${LNK_OPTS} -o $@ ${LDFLAGS}
@@ -3260,7 +3272,7 @@ $(TARGET): $(OBJS)
 # Single Compile and Link of all inputs
 $(TARGET): $(DEPS)
 	$(MKDIRBIN)
-    ifneq (,$(QUIET))
+    ifeq (1,$(QUIET))
 	  @echo Compile and Linking $(DEPS) into $(TARGET)
     endif
 	${CC} $(DEPS) ${OPTS} ${LNK_OPTS} -o $@ ${LDFLAGS}

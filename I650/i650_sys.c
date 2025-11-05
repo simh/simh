@@ -710,7 +710,7 @@ int Shift_Digits(t_int64 * d, int nDigits)
  */
 uint16 *deck_alloc(int nCards)
 {
-    return malloc(nCards * 80 * sizeof(uint16));
+    return (uint16 *)malloc(nCards * 80 * sizeof(uint16));
 }
 
 /*
