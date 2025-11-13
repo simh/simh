@@ -398,6 +398,7 @@ static t_stat sim_os_disk_rdsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *s
 static t_stat sim_os_disk_read (UNIT *uptr, t_offset addr, uint8 *buf, uint32 *bytesread, uint32 bytes);
 static t_stat sim_os_disk_wrsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectswritten, t_seccnt sects);
 static t_stat sim_os_disk_write (UNIT *uptr, t_offset addr, uint8 *buf, uint32 *byteswritten, uint32 bytes);
+static t_stat sim_os_disk_set_size (UNIT *uptr, t_offset addr);
 static t_stat sim_os_disk_info_raw (FILE *f, uint32 *sector_size, uint32 *removable, uint32 *is_cdrom);
 static char *HostPathToVhdPath (const char *szHostPath, char *szVhdPath, size_t VhdPathSize);
 static char *VhdPathToHostPath (const char *szVhdPath, char *szHostPath, size_t HostPathSize);
@@ -2856,7 +2857,6 @@ static t_stat get_disk_footer (UNIT *uptr, struct disk_context **pctx)
 {
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 struct simh_disk_footer *f = (struct simh_disk_footer *)calloc (1, sizeof (*f));
-t_offset container_size;
 t_offset sim_fsize_ex (FILE *fptr);
 uint32 bytesread;
 
@@ -2867,18 +2867,18 @@ if (pctx != NULL)
 sim_debug_unit (ctx->dbit, uptr, "get_disk_footer(%s)\n", sim_uname (uptr));
 switch (DK_GET_FMT (uptr)) {                            /* case on format */
     case DKUF_F_STD:                                    /* SIMH format */
-        container_size = sim_fsize_ex (uptr->fileref);
-        if ((container_size != (t_offset)-1) && (container_size > (t_offset)sizeof (*f)) &&
-            (sim_fseeko (uptr->fileref, container_size - sizeof (*f), SEEK_SET) == 0) &&
+        ctx->container_size = sim_fsize_ex (uptr->fileref);
+        if ((ctx->container_size != (t_offset)-1) && (ctx->container_size > (t_offset)sizeof (*f)) &&
+            (sim_fseeko (uptr->fileref, ctx->container_size - sizeof (*f), SEEK_SET) == 0) &&
             (sizeof (*f) == sim_fread (f, 1, sizeof (*f), uptr->fileref)))
             break;
         free (f);
         f = NULL;
         break;
     case DKUF_F_RAW:                                    /* RAW format */
-        container_size = sim_os_disk_size_raw (uptr->fileref);
-        if ((container_size != (t_offset)-1) && (container_size > (t_offset)sizeof (*f)) &&
-            (sim_os_disk_read (uptr, container_size - sizeof (*f), (uint8 *)f, &bytesread, sizeof (*f)) == SCPE_OK) &&
+        ctx->container_size = sim_os_disk_size_raw (uptr->fileref);
+        if ((ctx->container_size != (t_offset)-1) && (ctx->container_size > (t_offset)sizeof (*f)) &&
+            (sim_os_disk_read (uptr, ctx->container_size - sizeof (*f), (uint8 *)f, &bytesread, sizeof (*f)) == SCPE_OK) &&
             (bytesread == sizeof (*f)))
             break;
         free (f);
@@ -2920,10 +2920,9 @@ switch (DK_GET_FMT (uptr)) {                            /* case on format */
                 }
             memset (f->CreationTime, 0, sizeof (f->CreationTime));
             strlcpy ((char*)f->CreationTime, ctime (&creation_time), sizeof (f->CreationTime));
-            container_size = sim_vhd_disk_size (uptr->fileref);
+            ctx->container_size = sim_vhd_disk_size (uptr->fileref);
             if ((f->SectorSize != 0) && (NtoHl (f->SectorSize) <= 65536)) /* Range check for Coverity sake */
-                f->SectorCount = NtoHl ((uint32)(container_size / NtoHl (f->SectorSize)));
-            container_size += sizeof (*f);      /* Adjust since it is removed below */
+                f->SectorCount = NtoHl ((uint32)(ctx->container_size / NtoHl (f->SectorSize)));
             f->AccessFormat = DKUF_F_VHD;
             f->Checksum = NtoHl (eth_crc32 (0, f, sizeof (*f) - sizeof (f->Checksum)));
             }
@@ -2939,23 +2938,26 @@ if (f) {
         f = NULL;
         }
     else {
-        /* We've got a valid footer, but it may need to be corrected or have missing pieces added */
-        if (((f->MediaID == 0) && (((uptr->drvtyp != NULL) ? uptr->drvtyp->MediaId : 0) != 0)) ||
-            ((sim_disk_find_type (uptr, (char *)f->DriveType) != NULL) &&
-             (NtoHl (f->Geometry) != sim_disk_drvtype_geometry (sim_disk_find_type (uptr, (char *)f->DriveType), NtoHl (f->SectorCount)))) ||
-            ((NtoHl (f->ElementEncodingSize) == 1) &&   /* Encoding still 1 and SCSI disk/cdrom drive */
-             ((0 == memcmp (f->DriveType, "RZ", 2)) ||
-              (0 == memcmp (f->DriveType, "RR", 2))))) {
-            f->ElementEncodingSize = NtoHl (2);
-            if ((uptr->flags & UNIT_RO) == 0) {
-                DEVICE *dptr = uptr->dptr;
-                t_addr saved_capac = uptr->capac;
-                uint32 capac_factor = ((dptr->dwidth / dptr->aincr) >= 32) ? 8 : ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* capacity units (quadword: 8, word: 2, byte: 1) */
+        if (DK_GET_FMT (uptr) != DKUF_F_VHD) {
+            DEVICE *dptr = uptr->dptr;
+            uint32 f_SectorSize = NtoHl (f->SectorSize);
+            uint32 f_SectorCount = NtoHl (f->SectorCount);
+            t_offset f_Highwater = ((((t_offset)NtoHl (f->Highwater[0])) << 32) | ((t_offset)NtoHl (f->Highwater[1])));
+            DRVTYP *drvtyp = sim_disk_find_type (uptr, (char *)f->DriveType);
 
-                uptr->capac = (t_addr)(((t_offset)NtoHl(f->SectorCount) * NtoHl(f->SectorSize)) / capac_factor);
-                store_disk_footer (uptr, (char *)f->DriveType);
-                uptr->capac = saved_capac;
-                *f = *ctx->footer;                  /* copy updated footer */
+            /* We've got a valid footer, but it may need to be corrected or have missing pieces added */
+            if (((f->MediaID == 0) && (((uptr->drvtyp != NULL) ? uptr->drvtyp->MediaId : 0) != 0)) ||
+                ((sim_disk_find_type (uptr, (char *)f->DriveType) != NULL) &&
+                 (NtoHl (f->Geometry) != sim_disk_drvtype_geometry (sim_disk_find_type (uptr, (char *)f->DriveType), NtoHl (f->SectorCount)))) ||
+                ((NtoHl (f->ElementEncodingSize) == 1) &&   /* Encoding still 1 and SCSI disk/cdrom drive */
+                 ((0 == memcmp (f->DriveType, "RZ", 2)) ||
+                  (0 == memcmp (f->DriveType, "RR", 2)))) ||
+                  ((drvtyp != NULL) && (ctx->container_size != (sizeof (*f) + (((t_offset)drvtyp->size) * drvtyp->sectsize))))) {
+                f->ElementEncodingSize = NtoHl (2);
+                ctx->footer = f;
+                if ((uptr->flags & UNIT_RO) == 0)
+                    store_disk_footer (uptr, (char *)f->DriveType);
+                f = ctx->footer;            /* Get possibly updated metadata footer */
                 }
             }
         if ((uptr->flags & UNIT_RO) == 0) {
@@ -2984,12 +2986,9 @@ if (f) {
                 free (filename);
                 }
             }
-        free (ctx->footer);
-        ctx->footer = f;
         if (NtoHl (f->MediaID) != 0)
             ctx->media_id = NtoHl (f->MediaID);
         ctx->highwater = (((t_offset)NtoHl (f->Highwater[0])) << 32) | ((t_offset)NtoHl (f->Highwater[1]));
-        container_size -= sizeof (*f);
         sim_debug_unit (ctx->dbit, uptr, "Footer: %s - %s\n"
             "   Simulator:           %s\n"
             "   DriveType:           %s\n"
@@ -3015,19 +3014,20 @@ if (f) {
             "   HighwaterSector:     %u\n", (uint32)(ctx->highwater/ctx->sector_size));
         }
     }
-sim_debug_unit (ctx->dbit, uptr, "Container Size: %u sectors %u bytes each\n", (uint32)(container_size/ctx->sector_size), ctx->sector_size);
-ctx->container_size = container_size;
+sim_debug_unit (ctx->dbit, uptr, "Container Size: %u sectors %u bytes each\n", (uint32)(ctx->container_size/ctx->sector_size), ctx->sector_size);
 return SCPE_OK;
 }
 
 static t_stat store_disk_footer (UNIT *uptr, const char *dtype)
 {
 DEVICE *dptr;
+DRVTYP *drvtyp;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 struct stat statb;
 struct simh_disk_footer *f;
 struct simh_disk_footer *old_f = ctx->footer;
 time_t now = time (NULL);
+t_bool Fixed = FALSE;
 t_offset total_sectors;
 t_offset highwater;
 
@@ -3039,7 +3039,15 @@ if (sim_stat (uptr->filename, &statb))
     memset (&statb, 0, sizeof (statb));
 f = (struct simh_disk_footer *)calloc (1, sizeof (*f));
 f->AccessFormat = DK_GET_FMT (uptr);
-total_sectors = (((t_offset)uptr->capac) * ctx->capac_factor * ((dptr->flags & DEV_SECTORS) ? ctx->sector_size : 1)) / ctx->sector_size;
+drvtyp = sim_disk_find_type (uptr, dtype);
+if ((drvtyp != NULL) && 
+    ((drvtyp->flags & DRVFL_SETSIZE) == 0)) {
+    if ((old_f != NULL) && (NtoHl (old_f->SectorCount) != drvtyp->size))
+        Fixed = TRUE;
+    uptr->capac = drvtyp->size * drvtyp->sectsize * ctx->capac_factor / ((dptr->flags & DEV_SECTORS) ? ctx->sector_size : 1);
+    total_sectors = ((t_offset)uptr->capac) / ((dptr->flags & DEV_SECTORS) ? 1 : ctx->sector_size);
+    }
+total_sectors = (drvtyp != NULL) ? (t_offset)drvtyp->size : (((t_offset)uptr->capac) * ctx->capac_factor * ((dptr->flags & DEV_SECTORS) ? ctx->sector_size : 1)) / ctx->sector_size;
 memcpy (f->Signature, "simh", 4);
 f->FooterVersion = FOOTER_VERSION;
 memset (f->CreatingSimulator, 0, sizeof (f->CreatingSimulator));
@@ -3053,30 +3061,73 @@ memset (f->CreationTime, 0, sizeof (f->CreationTime));
 strlcpy ((char*)f->CreationTime, ctime (&now), sizeof (f->CreationTime));
 memset (f->DeviceName, 0, sizeof (f->DeviceName));
 strlcpy ((char*)f->DeviceName, dptr->name, sizeof (f->DeviceName));
-f->MediaID = (uptr->drvtyp != NULL) ? NtoHl (uptr->drvtyp->MediaId) : 0;
+f->MediaID = (drvtyp != NULL) ? NtoHl (drvtyp->MediaId) : 0;
 f->DataWidth = NtoHl (uptr->dptr->dwidth);
-f->Geometry = NtoHl (sim_disk_drvtype_geometry (sim_disk_find_type (uptr, (char *)f->DriveType), (uint32)total_sectors));
-highwater = sim_fsize_name_ex (uptr->filename);
-/* Align Initial Highwater to a sector boundary */
-highwater = ((highwater + ctx->sector_size - 1) / ctx->sector_size) * ctx->sector_size;
+if ((old_f != NULL) && ((old_f->Highwater[0] != 0) || (old_f->Highwater[1] != 0)))
+    highwater = ((t_offset)NtoHl (old_f->Highwater[1])) | (((t_offset)NtoHl (old_f->Highwater[0])) << 32);
+else {
+    highwater = sim_fsize_name_ex (uptr->filename);
+    /* Align Initial Highwater to a sector boundary */
+    highwater = ((highwater + ctx->sector_size - 1) / ctx->sector_size) * ctx->sector_size;
+    }
+if ((old_f != NULL) || (highwater > (total_sectors * ctx->sector_size))) {
+    if ((old_f != NULL) && (highwater != (NtoHl (old_f->SectorCount) * ctx->sector_size)))
+        highwater -= sizeof (*old_f);
+    if ((drvtyp != NULL) && ((drvtyp->flags & DRVFL_SETSIZE) != 0)) { /* Settable size meta data fixup */
+        total_sectors = highwater / ctx->sector_size;
+        f->SectorCount = NtoHl ((uint32)total_sectors);
+        Fixed = TRUE;
+        }
+    }
 f->Highwater[0] = NtoHl ((uint32)(highwater >> 32));
 f->Highwater[1] = NtoHl ((uint32)(highwater & 0xFFFFFFFF));
+f->Geometry = NtoHl (sim_disk_drvtype_geometry (drvtyp, (uint32)total_sectors));
 f->Checksum = NtoHl (eth_crc32 (0, f, sizeof (*f) - sizeof (f->Checksum)));
+uptr->capac = ((dptr->flags & DEV_SECTORS) != 0) ? (t_addr)NtoHl (f->SectorCount) : (t_addr)NtoHl (f->SectorCount) * ctx->sector_size;
+ctx->container_size = (t_offset)(NtoHl (f->SectorCount)) * ctx->sector_size;
+ctx->highwater = highwater;
 if ((old_f != NULL) &&
     (f->DataWidth           == old_f->DataWidth) &&
     (f->SectorSize          == old_f->SectorSize) &&
+    (f->SectorCount         == old_f->SectorCount) &&
     (f->MediaID             == old_f->MediaID) &&
     (f->ElementEncodingSize == old_f->ElementEncodingSize) &&
     (f->Geometry            == old_f->Geometry) &&
-    (f->FooterVersion       == old_f->FooterVersion)) /* Unchanged? */
+    (f->FooterVersion       == old_f->FooterVersion)) { /* Unchanged? */
     free(f);
-else {
+    }
+else {      /* meta data changed or created */
+    sim_debug_unit (ctx->dbit, uptr, "Updating %sFooter: %s - %s\n"
+        "   Simulator:           %s\n"
+        "   DriveType:           %s\n"
+        "   SectorSize:          %u\n"
+        "   SectorCount:         %u\n"
+        "   TransferElementSize: %s\n"
+        "   FooterVersion:       %u\n"
+        "   AccessFormat:        %u\n"
+        "   CreationTime:        %s",
+        Fixed ? "after fixing " : "",
+        sim_uname (uptr), uptr->filename,
+        f->CreatingSimulator, f->DriveType, NtoHl(f->SectorSize), NtoHl (f->SectorCount),
+        _disk_tranfer_encoding (NtoHl (f->ElementEncodingSize)), f->FooterVersion, f->AccessFormat, f->CreationTime);
+    if (f->DeviceName[0] != '\0')
+        sim_debug_unit (ctx->dbit, uptr,
+            "   DeviceName:          %s\n", (char *)f->DeviceName);
+    if (f->DataWidth != 0)
+        sim_debug_unit (ctx->dbit, uptr,
+            "   DataWidth:           %d bits\n", NtoHl(f->DataWidth));
+    if (f->MediaID != 0)
+        sim_debug_unit (ctx->dbit, uptr,
+            "   MediaID:             0x%08X (%s)\n", NtoHl(f->MediaID), sim_disk_decode_mediaid (NtoHl(f->MediaID)));
+    sim_debug_unit (ctx->dbit, uptr,
+        "   HighwaterSector:     %u\n", (uint32)(ctx->highwater/ctx->sector_size));
     free (ctx->footer);
     ctx->footer = f;
     switch (f->AccessFormat) {
         case DKUF_F_STD:                                    /* SIMH format */
             if (sim_fseeko ((FILE *)uptr->fileref, total_sectors * ctx->sector_size, SEEK_SET) == 0) {
                 sim_fwrite (f, sizeof (*f), 1, (FILE *)uptr->fileref);
+                sim_set_fsize ((FILE *)uptr->fileref, (t_addr)(total_sectors * ctx->sector_size + sizeof (*f)));
                 fclose ((FILE *)uptr->fileref);
                 sim_set_file_times (uptr->filename, statb.st_atime, statb.st_mtime);
                 uptr->fileref = sim_fopen (uptr->filename, "rb+");
@@ -3086,6 +3137,7 @@ else {
             break;
         case DKUF_F_RAW:                                    /* Raw Physical Disk Access */
             sim_os_disk_write (uptr, total_sectors * ctx->sector_size, (uint8 *)f, NULL, sizeof (*f));
+            sim_os_disk_set_size (uptr, (t_offset)(total_sectors * ctx->sector_size + sizeof (*f)));
             sim_os_disk_close_raw (uptr->fileref);
             sim_set_file_times (uptr->filename, statb.st_atime, statb.st_mtime);
             uptr->fileref = sim_os_disk_open_raw (uptr->filename, "rb+");
@@ -3127,7 +3179,7 @@ if (ctx->highwater <= footer_highwater)
 
 if (sim_stat (uptr->filename, &statb))
     memset (&statb, 0, sizeof (statb));
-total_sectors = (((t_offset)uptr->capac) * ctx->capac_factor * ((dptr->flags & DEV_SECTORS) ? 512 : 1)) / ctx->sector_size;
+total_sectors = (((t_offset)uptr->capac) * ctx->capac_factor * ((dptr->flags & DEV_SECTORS) ? ctx->sector_size : 1)) / ctx->sector_size;
 highwater = ctx->highwater;
 f->Highwater[0] = NtoHl ((uint32)(highwater >> 32));
 f->Highwater[1] = NtoHl ((uint32)(highwater & 0xFFFFFFFF));
@@ -4012,6 +4064,8 @@ if (container_size && (container_size != (t_offset)-1) &&
                 }
             }
         }
+    if ((uptr->drvtyp != NULL) && (ctx != NULL))
+        ctx->media_id = uptr->drvtyp->MediaId;
     }
 
 if ((uptr->flags & UNIT_RO) == 0) {     /* Opened Read/Write? */
@@ -4982,7 +5036,7 @@ static t_stat sim_os_disk_read (UNIT *uptr, t_offset addr, uint8 *buf, uint32 *b
 OVERLAPPED pos;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 
-sim_debug_unit (ctx->dbit, uptr, "sim_os_disk_read(unit=%d, addr=0x%X, bytes=%u)\n", (int)(uptr - ctx->dptr->units), (uint32)addr, bytes);
+sim_debug_unit (ctx->dbit, uptr, "sim_os_disk_read(unit=%d, addr=0x%X%08X, bytes=%u)\n", (int)(uptr - ctx->dptr->units), (uint32)(addr >> 32), (uint32)addr, bytes);
 
 memset (&pos, 0, sizeof (pos));
 pos.Offset = (DWORD)addr;
@@ -5039,12 +5093,31 @@ static t_stat sim_os_disk_write (UNIT *uptr, t_offset addr, uint8 *buf, uint32 *
 OVERLAPPED pos;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 
-sim_debug_unit (ctx->dbit, uptr, "sim_os_disk_write(unit=%d, lba=0x%X, bytes=%u)\n", (int)(uptr - ctx->dptr->units), (uint32)addr, bytes);
+memset (&pos, 0, sizeof (pos));
+pos.Offset = (DWORD)addr;
+pos.OffsetHigh = (DWORD)(addr >> 32);
+
+sim_debug_unit (ctx->dbit, uptr, "sim_os_disk_write(unit=%d, addr=0x%X%08X, bytes=%u)\n", (int)(uptr - ctx->dptr->units), (uint32)pos.OffsetHigh, (uint32)pos.Offset, bytes);
+
+if (WriteFile ((HANDLE)(uptr->fileref), buf, bytes, (LPDWORD)byteswritten, &pos))
+    return SCPE_OK;
+_set_errno_from_status (GetLastError ());
+return SCPE_IOERR;
+}
+
+static t_stat sim_os_disk_set_size (UNIT *uptr, t_offset addr)
+{
+OVERLAPPED pos;
+struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 
 memset (&pos, 0, sizeof (pos));
 pos.Offset = (DWORD)addr;
 pos.OffsetHigh = (DWORD)(addr >> 32);
-if (WriteFile ((HANDLE)(uptr->fileref), buf, bytes, (LPDWORD)byteswritten, &pos))
+
+sim_debug_unit (ctx->dbit, uptr, "sim_os_disk_set_size(unit=%d, addr=0x%X%08X)\n", (int)(uptr - ctx->dptr->units), (uint32)pos.OffsetHigh, (uint32)pos.Offset);
+
+if ((INVALID_SET_FILE_POINTER != SetFilePointer ((HANDLE)(uptr->fileref), pos.Offset, &pos.OffsetHigh, FILE_BEGIN)) &&
+    (SetEndOfFile((HANDLE)(uptr->fileref)) != 0))
     return SCPE_OK;
 _set_errno_from_status (GetLastError ());
 return SCPE_IOERR;
@@ -5182,7 +5255,7 @@ static t_stat sim_os_disk_read (UNIT *uptr, t_offset addr, uint8 *buf, uint32 *r
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 ssize_t bytesread;
 
-sim_debug_unit (ctx->dbit, uptr, "sim_os_disk_read(unit=%d, addr=0x%X, bytes=%u)\n", (int)(uptr - ctx->dptr->units), (uint32)addr, bytes);
+sim_debug_unit (ctx->dbit, uptr, "sim_os_disk_read(unit=%d, addr=0x%X%08X, bytes=%u)\n", (int)(uptr - ctx->dptr->units), (uint32)(addr >> 32), (uint32)addr, bytes);
 
 bytesread = pread((int)((long)uptr->fileref), buf, bytes, (off_t)addr);
 if (bytesread < 0) {
@@ -5230,7 +5303,7 @@ static t_stat sim_os_disk_write (UNIT *uptr, t_offset addr, uint8 *buf, uint32 *
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 ssize_t byteswritten;
 
-sim_debug_unit (ctx->dbit, uptr, "sim_os_disk_write(unit=%d, addr=0x%X, bytes=%u)\n", (int)(uptr - ctx->dptr->units), (uint32)addr, bytes);
+sim_debug_unit (ctx->dbit, uptr, "sim_os_disk_write(unit=%d, addr=0x%X%08X, bytes=%u)\n", (int)(uptr - ctx->dptr->units), (uint32)(addr >> 32), (uint32)addr, bytes);
 
 if (rbyteswritten)
     *rbyteswritten = 0;
@@ -5239,6 +5312,18 @@ if (byteswritten < 0)
     return SCPE_IOERR;
 if (rbyteswritten)
     *rbyteswritten = byteswritten;
+return SCPE_OK;
+}
+
+static t_stat sim_os_disk_set_size (UNIT *uptr, t_offset addr)
+{
+struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
+int fd = (int)((long)uptr->fileref);
+
+sim_debug_unit (ctx->dbit, uptr, "sim_os_disk_set_size(unit=%d, addr=0x%X%08X)\n", (int)(uptr - ctx->dptr->units), (uint32)(addr >> 32), (uint32)addr);
+
+if (ftruncate (fd, (off_t)addr) == -1)
+    return SCPE_IOERR;
 return SCPE_OK;
 }
 
@@ -5332,6 +5417,11 @@ return SCPE_NOFNC;
 static t_stat sim_os_disk_write (UNIT *uptr, t_offset addr, uint8 *buf, uint32 *byteswritten, uint32 bytes)
 {
 *byteswritten = 0;
+return SCPE_NOFNC;
+}
+
+static t_stat sim_os_disk_set_size (UNIT *uptr, t_offset addr)
+{
 return SCPE_NOFNC;
 }
 
