@@ -1733,7 +1733,13 @@ ifneq (,$(and $(findstring 3.,$(GNUMakeVERSION)),$(findstring 1,$(BUILD_SEPARATE
     override MAKE = $(call find_exe,gmake)
   else
     $(info makefile:error *** You can't build with separate compiles using version $(GNUMakeVERSION))
-    $(error of GNU make.  A GNU make version 4 or later is required.)
+    $(info makefile:error *** of GNU make.  Until you install GNU make version 4 or)
+    $(info makefile:error *** later, you can build with BUILD_SEPARATE=0 on the make)
+    $(info makefile:error *** command line or have that defined in an environment)
+    $(info makefile:error *** variable, a GNU make version 4 or later is required.)
+    $(info makefile:error *** Rerunning your original make command now with)
+    $(info makefile:error *** with BUILD_SEPARATE=0.)
+    $(error Done: $(shell $(MAKE) $(MAKECMDGOALS) $(subst BUILD_SEPARATE=1,BUILD_SEPARATE=0,$(EXTRAS))1>&2))
   endif
 endif
 MAKEIT = @+$(MAKE) -f $(MAKEFILE_LIST) TARGET="$@" DEPS="$^"
