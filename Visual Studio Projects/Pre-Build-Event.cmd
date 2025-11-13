@@ -38,7 +38,7 @@ set _ARG=
 rem Everything implicitly requires BUILD to also be set to have 
 rem any meaning, it always gets set.
 set _X_BUILD=BUILD
-set _X_REQUIRED_WINDOWS_BUILD=20250613
+set _X_REQUIRED_WINDOWS_BUILD=20251112
 call :FindVCVersion _VC_VER _MSVC_VER _MSVC_TOOLSET_VER  _MSVC_TOOLSET_DIR
 echo _VC_VER=%_VC_VER%
 echo _MSVC_VER=%_MSVC_VER%
@@ -328,6 +328,14 @@ echo *****************************************************
 set _exit_reason=Can't rename ../../windows-build-windows-build to ../../windows-build
 goto _ProjectInfo
 :_notice4
+if not "%_TRIED_PULL%" == "" goto _do_notice4
+if not exist ..\..\windows-build\.git goto _do_notice4
+pushd ..\..\windows-build
+"%_GIT_GIT%" pull https://github.com/simh/windows-build
+popd
+set _TRIED_PULL=1
+goto _check_build
+:_do_notice4
 echo *********************************
 echo *********************************
 echo **  Visual Studio Version: %_VC_VER%  Compiler Version: %_MSVC_VER% Toolset Version: %_MSVC_TOOLSET_VER% **
