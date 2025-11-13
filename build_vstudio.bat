@@ -33,6 +33,7 @@
 set _BUILD_CONFIG=Release
 set _BUILD_PROJECTS=
 set _REBUILD_PROJECTS=
+set _BUILD_PROJECT_NAMES=
 set _BUILD_PROJECT_DIR=%~dp0Visual Studio Projects\
 :_CheckArg
 if "%1" == "" goto _DoneArgs
@@ -41,6 +42,7 @@ if /i "%1" == "Release" set _BUILD_CONFIG=Release& shift & goto _CheckArg
 call :GetFileName "%_BUILD_PROJECT_DIR%%1.vcproj" _BUILD_PROJECT
 if exist "%_BUILD_PROJECT_DIR%%1.vcproj" set _BUILD_PROJECTS=%_BUILD_PROJECTS%;%_BUILD_PROJECT%
 if exist "%_BUILD_PROJECT_DIR%%1.vcproj" set _REBUILD_PROJECTS=%_REBUILD_PROJECTS%;%_BUILD_PROJECT%:Rebuild
+if exist "%_BUILD_PROJECT_DIR%%1.vcproj" set _BUILD_PROJECT_NAMES=%_BUILD_PROJECT_NAMES% %_BUILD_PROJECT%
 if exist "%_BUILD_PROJECT_DIR%%1.vcproj" shift & goto _CheckArg
 echo ** ERROR ** ERROR ** ERROR ** ERROR ** ERROR ** ERROR
 echo ** ERROR ** ERROR ** ERROR ** ERROR ** ERROR ** ERROR
@@ -52,35 +54,37 @@ echo ** ERROR ** ERROR ** ERROR ** ERROR ** ERROR ** ERROR
 exit /b 1
 
 :_DoneArgs
+if "%_BUILD_PROJECT_NAMES%" == "" echo Building All Projects with %_BUILD_CONFIG% Configuration
+if not "%_BUILD_PROJECT_NAMES%" == "" echo Building%_BUILD_PROJECT_NAMES% Projects with %_BUILD_CONFIG% Configuration
 set _VC_VER=
-call :FindVCVersion _VC_VER
+call :FindVCVersion _VC_VER _MSVC_VER _MSVC_TOOLSET_VER  _MSVC_TOOLSET_DIR
 if not "%_VC_VER%" == "" goto GotVC
 if exist "%ProgramFiles(x86)%\Microsoft Visual Studio 9.0\VC\vcvarsall.bat" call "%ProgramFiles(x86)%\Microsoft Visual Studio 9.0\VC\vcvarsall.bat" 
-call :FindVCVersion _VC_VER
+call :FindVCVersion _VC_VER _MSVC_VER _MSVC_TOOLSET_VER  _MSVC_TOOLSET_DIR
 if not "%_VC_VER%" == "" goto GotVC
 if exist "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars32.bat" call "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars32.bat"
-call :FindVCVersion _VC_VER
+call :FindVCVersion _VC_VER _MSVC_VER _MSVC_TOOLSET_VER  _MSVC_TOOLSET_DIR
 if not "%_VC_VER%" == "" goto GotVC
 if exist "%ProgramFiles%\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvars32.bat" call "%ProgramFiles%\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvars32.bat"
-call :FindVCVersion _VC_VER
+call :FindVCVersion _VC_VER _MSVC_VER _MSVC_TOOLSET_VER  _MSVC_TOOLSET_DIR
 if not "%_VC_VER%" == "" goto GotVC
 if exist "%ProgramFiles%\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars32.bat" call "%ProgramFiles%\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars32.bat"
-call :FindVCVersion _VC_VER
+call :FindVCVersion _VC_VER _MSVC_VER _MSVC_TOOLSET_VER  _MSVC_TOOLSET_DIR
 if not "%_VC_VER%" == "" goto GotVC
 if exist "%ProgramFiles(x86)%\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars32.bat" call "%ProgramFiles(x86)%\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars32.bat"
-call :FindVCVersion _VC_VER
+call :FindVCVersion _VC_VER _MSVC_VER _MSVC_TOOLSET_VER  _MSVC_TOOLSET_DIR
 if not "%_VC_VER%" == "" goto GotVC
 if exist "%ProgramFiles(x86)%\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars32.bat" call "%ProgramFiles(x86)%\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars32.bat"
-call :FindVCVersion _VC_VER
+call :FindVCVersion _VC_VER _MSVC_VER _MSVC_TOOLSET_VER  _MSVC_TOOLSET_DIR
 if not "%_VC_VER%" == "" goto GotVC
 if exist "%ProgramFiles(x86)%\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" call "%ProgramFiles(x86)%\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" x86
-call :FindVCVersion _VC_VER
+call :FindVCVersion _VC_VER _MSVC_VER _MSVC_TOOLSET_VER  _MSVC_TOOLSET_DIR
 if not "%_VC_VER%" == "" goto GotVC
 if exist "%ProgramFiles(x86)%\Microsoft Visual Studio 12.0\VC\vcvarsall.bat" call "%ProgramFiles(x86)%\Microsoft Visual Studio 12.0\VC\vcvarsall.bat" x86
-call :FindVCVersion _VC_VER
+call :FindVCVersion _VC_VER _MSVC_VER _MSVC_TOOLSET_VER  _MSVC_TOOLSET_DIR
 if not "%_VC_VER%" == "" goto GotVC
 if exist "%ProgramFiles(x86)%\Microsoft Visual Studio 10.0\VC\vcvarsall.bat" call "%ProgramFiles(x86)%\Microsoft Visual Studio 10.0\VC\vcvarsall.bat" x86
-call :FindVCVersion _VC_VER
+call :FindVCVersion _VC_VER _MSVC_VER _MSVC_TOOLSET_VER  _MSVC_TOOLSET_DIR
 if not "%_VC_VER%" == "" goto GotVC
 
 echo ** ERROR ** ERROR ** ERROR ** ERROR ** ERROR ** ERROR **
@@ -118,13 +122,29 @@ exit /B 0
 
 :FindVCVersion
 call :WhichInPath cl.exe _VC_CL_
-for /f "tokens=3-9 delims=\" %%a in ("%_VC_CL_%") do call :VCCheck _VC_VER_NUM_ "%%a" "%%b" "%%c" "%%d" "%%e" "%%f" "%%g"
+for /f "tokens=3-10 delims=\" %%a in ("%_VC_CL_%") do call :VCCheck _VC_VER_NUM_ "%%a" "%%b" "%%c" "%%d" "%%e" "%%f" "%%g" "%%h"
 for /f "delims=." %%a in ("%_VC_VER_NUM_%") do set %1=%%a
+set _VC_CL_STDERR_=%TEMP%\cl_stderr%_TARGET%.tmp
+set VS_UNICODE_OUTPUT=
+"%_VC_CL_%" /? 2>"%_VC_CL_STDERR_%" 1>NUL <NUL
+for /f "usebackq tokens=4-9" %%a in (`findstr Version "%_VC_CL_STDERR_%"`) do call :MSVCCheck _MSVC_VER_NUM_ "%%a" "%%b" "%%c" "%%d" "%%e"
+if "%4" NEQ "" set %4=%_MSVC_TOOLSET_%
+if "%_MSVC_TOOLSET_%" NEQ "" set _MSVC_TOOLSET_=v%_MSVC_TOOLSET_:~0,2%%_MSVC_TOOLSET_:~3,1%
+if "%3" NEQ "" set %3=%_MSVC_TOOLSET_%
+set _MSVC_TOOLSET_=
+set %2=%_MSVC_VER_NUM_%
+set _MSVC_VER_NUM_=
+for /f "delims=." %%a in ("%_MSVC_VER_NUM_%") do set %2=%%a
+del %_VC_CL_STDERR_%
+set _VC_CL_STDERR_=
 set _VC_CL=
 exit /B 0
 
+:: Scan the elements of the file path of cl.exe to determine the Visual
+:: Studio Version and potentially the toolset version
 :VCCheck
 set _VC_TMP=%1
+set _VC_TOOLSET=
 :_VCCheck_Next
 shift
 set _VC_TMP_=%~1
@@ -135,9 +155,48 @@ if "%_VC_NUM_%" neq "" set %_VC_TMP%=%~1
 if "%_VC_NUM_%" neq "" goto _VCCheck_Done
 goto _VCCheck_Next
 :_VCCheck_Done
+set _VC_TMP=_MSVC_TOOLSET_
+:_VCTSCheck_Next
+shift
+set _VC_TMP_=%~1
+if "%_VC_TMP_%" equ "" goto _VCTSCheck_Done
+call :IsNumeric _VC_NUM_ %_VC_TMP_%
+if "%_VC_NUM_%" neq "" set %_VC_TMP%=%~1
+if "%_VC_NUM_%" neq "" goto _VCTSCheck_Done
+goto _VCTSCheck_Next
+:_VCTSCheck_Done
 set _VC_TMP_=
 set _VC_TMP=
 set _VC_NUM_=
+exit /B 0
+
+:MSVCCheck
+set _MSVC_TMP=%1
+:_MSVCCheck_Next
+shift
+set _MSVC_TMP_=%~1
+if "%_MSVC_TMP_%" equ "" goto _VCCheck_Done
+call :IsNumeric _MSVC_NUM_ %_MSVC_TMP_%
+if "%_MSVC_NUM_%" neq "" set %_MSVC_TMP%=%~1
+if "%_MSVC_NUM_%" neq "" goto _MSVCCheck_Done
+goto _MSVCCheck_Next
+:_MSVCCheck_Done
+set _MSVC_TMP_=
+set _MSVC_TMP=
+set _MSVC_NUM_=
+exit /B 0
+
+:CheckDirectoryVCSupport
+set _VC_Check_Path=%~3%~2/
+set _VC_Check_Path=%_VC_Check_Path:/=\%
+set _X_VC_VER=
+set _XX_VC_VER_DIR=lib-VC%_VC_VER%
+if "%_XX_VC_VER_DIR%" equ "lib-VC9" set _XX_VC_VER_DIR=lib-VC2008
+if exist "%_VC_Check_Path%\VisualCVersionSupport.txt" for /F "usebackq tokens=2*" %%i in (`findstr /C:"_VC_VER=%_VC_VER% " "%_VC_Check_Path%\VisualCVersionSupport.txt"`) do SET _X_VC_VER=%%i %%j
+if "%_XX_VC_VER_DIR%" neq "%2" exit /B 0
+if "%_VC_VER%" equ "2022" set _VC_Check_Path=%_VC_Check_Path%%_MSVC_VER%\
+if not exist "%_VC_Check_Path%VisualCVersionSupport.txt" exit /B 1
+for /F "usebackq tokens=2*" %%k in (`findstr /C:"_VC_VER=%_VC_VER% " "%_VC_Check_Path%VisualCVersionSupport.txt"`) do set %1=%_VC_Check_Path%
 exit /B 0
 
 :IsNumeric
@@ -187,7 +246,7 @@ goto _NextProject
 
 :_DoMSBuild
 if "%_X_SLN_VERSION%" == "10.00" set _NEW_SLN_FILE=%_BUILD_PROJECT_DIR%Simh-%_VC_VER%.sln
-if "%_X_SLN_VERSION%" == "10.00" copy /y "%_SLN_FILE%" "%_NEW_SLN_FILE%" >NUL & echo Converting the VS2008 projects to VS%_VC_VER%, this will take several (3-5) minutes & DevEnv /Upgrade "%_NEW_SLN_FILE%" & set _SLN_FILE=%_NEW_SLN_FILE%
+if "%_X_SLN_VERSION%" == "10.00" copy /y "%_SLN_FILE%" "%_NEW_SLN_FILE%" >NUL & echo Converting the VS2008 projects to VS%_VC_VER%, this will take several (5-8) minutes & DevEnv /Upgrade "%_NEW_SLN_FILE%" & set _SLN_FILE=%_NEW_SLN_FILE%
 set _NEW_SLN_FILE=
 if not "%_VC_VER%" == "2022" goto _RunBuild
 if exist "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\MSBuild\Microsoft\VC\v150\Platforms\x64\PlatformToolsets\v141_xp" goto _DoXPConvert
@@ -196,12 +255,14 @@ if exist "%ProgramFiles%\Microsoft Visual Studio\2022\Community\MSBuild\Microsof
 goto _RunBuild
 
 :_DoXPConvert
+echo Doing XP Convert
 set _X_PROJS_CONVERTED=
 for /F "usebackq tokens=1" %%a in (`findstr /C:"<WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>" "%_BUILD_PROJECT_DIR%BuildROMs.vcxproj"`) do set _X_PROJS_CONVERTED=%%a
 if not "%_X_PROJS_CONVERTED%" == "" goto _RunBuild
 echo Converting the VS2022 projects to generate XP compatible binaries
 Powershell -NoLogo -File "%~dp0\Visual Studio Projects\ConvertToXPProject.ps1" "%~dp0\Visual Studio Projects\*.vcxproj"
 set _X_PROJS_CONVERTED=
+
 :_RunBuild
 if "%_BUILD_PROJECTS%" == "" MSBuild /nologo "%_SLN_FILE%" /maxCpuCount:%_BUILD_PARALLEL% /Target:Rebuild /Property:Configuration=%_BUILD_CONFIG% /Property:Platform=Win32 /fileLogger "/fileLoggerParameters:LogFile=%_BUILD_PROJECT_DIR%Build-VS%_VC_VER%.log" & goto :EOF
 set _BUILD_PROJECTS=%_BUILD_PROJECTS:~1%
