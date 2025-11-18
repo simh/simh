@@ -1,7 +1,7 @@
 *.jpg binary
 *.png binary
-*.sln binary
-*.vcproj binary
+*.sln text eol=crlf
+*.vcproj text eol=crlf
 *.exe binary
 *.lda binary
 *.bin binary

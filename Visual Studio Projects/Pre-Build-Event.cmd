@@ -25,6 +25,8 @@ rem       - performing the activities which make confirm or generate the git
 rem         repository commit id available in an include file during compiles.
 rem
 rem
+set _CONFIGURATION_DIR=%~p1
+if not "Debug" == "%_CONFIGURATION_DIR:~-6,-1%" if not "Debug\BuildTools" == "%_CONFIGURATION_DIR:~-17,-1%" set _CONFIGURATION_NAME=Release
 
 set _PDB=%~dpn1.pdb
 if exist "%_PDB%" del/q "%_PDB%"
@@ -63,8 +65,8 @@ goto _next_arg
 pushd ..
 if "%_X_ROM%" == "" goto _done_rom
 SET _BLD=
-if exist BIN\NT\Win32-Debug\BuildTools\BuildROMs.exe SET _BLD=BIN\NT\Win32-Debug\BuildTools\BuildROMs.exe
-if exist BIN\NT\Win32-Release\BuildTools\BuildROMs.exe SET _BLD=BIN\NT\Win32-Release\BuildTools\BuildROMs.exe
+if exist BIN\NT\Win32-Debug\BuildTools\BuildROMs.exe SET _BLD=BIN\NT\Win32-%_CONFIGURATION_NAME%\BuildTools\BuildROMs.exe
+if exist BIN\NT\Win32-Release\BuildTools\BuildROMs.exe SET _BLD=BIN\NT\Win32-%_CONFIGURATION_NAME%\BuildTools\BuildROMs.exe
 if "%_BLD%" == "" echo ************************************************
 if "%_BLD%" == "" echo ************************************************
 if "%_BLD%" == "" echo **  Project dependencies are not correct.     **
@@ -149,6 +151,8 @@ if "%_MSVC_TOOLSET_VER%" EQU "v140" set _VC_VER=2015
 if "%_MSVC_TOOLSET_VER%" EQU "v141" set _VC_VER=2017
 if "%_MSVC_TOOLSET_VER%" EQU "v142" set _VC_VER=2019
 if "%_MSVC_TOOLSET_VER%" EQU "v143" set _VC_VER=2022
+if "%_MSVC_TOOLSET_VER%" EQU "v144" set _VC_VER=2022
+if "%_MSVC_TOOLSET_VER%" EQU "v145" set _VC_VER=2026
 for /F "usebackq tokens=2*" %%i in (`findstr /C:"_VC_VER=%_VC_VER% " ..\..\windows-build\lib\VisualCVersionSupport.txt`) do SET _X_VC_VER=%%i %%j
 for /F "usebackq delims== tokens=2" %%i in (`findstr /C:"_MSVC_VER=" ..\..\windows-build\lib\VisualCVersionSupport.txt`) do SET _X_MSVC_VER=%%i
 echo _MSVC_VER=%_MSVC_VER%
@@ -354,6 +358,21 @@ echo **  version of Microsoft Visual Studio and use     **
 echo **  that.                                          **
 echo *****************************************************
 echo *****************************************************
+echo.
+echo _CONFIGURATION_NAME=%_CONFIGURATION_NAME%
+echo.
+echo *****************************************************
+echo *****************************************************
+echo ** Prior Library Support has generally been known  **
+echo ** to work when build Debug mode simulators.       **
+echo **                                                 **
+echo ** All simulators running in Release mode need     **
+echo ** Microsoft Visual Studio specific support for    **
+echo ** the current version.                            **
+echo *****************************************************
+echo *****************************************************
+if "%_CONFIGURATION_NAME%" == "Release" goto _ProjectInfo
+goto _done_library
 goto _ProjectInfo
 :_ProjectInfo
 type 0ReadMe_Projects.txt
