@@ -152,8 +152,9 @@ static t_stat m2sio_svc(UNIT *uptr);
 static t_stat m2sio_reset(DEVICE *dptr, int32 (*routine)(const int32, const int32, const int32));
 static t_stat m2sio0_reset(DEVICE *dptr);
 static t_stat m2sio1_reset(DEVICE *dptr);
-static t_stat m2sio_attach(UNIT *uptr, CONST char *cptr);
+static t_stat m2sio_attach(UNIT *uptr, const char *cptr);
 static t_stat m2sio_detach(UNIT *uptr);
+static t_stat m2sio_set_console(UNIT *uptr, int32 value, const char *cptr, void *desc);
 static t_stat m2sio_set_baud(UNIT *uptr, int32 value, const char *cptr, void *desc);
 static t_stat m2sio_show_baud(FILE *st, UNIT *uptr, int32 value, const void *desc);
 static t_stat m2sio_config_line(UNIT *uptr);
@@ -165,6 +166,7 @@ static int32 m2sio_stat(DEVICE *dptr, int32 io, int32 data);
 static int32 m2sio_data(DEVICE *dptr, int32 io, int32 data);
 static void m2sio_int(UNIT *uptr);
 static int32 m2sio_map_kbdchar(UNIT *uptr, int32 ch);
+static t_stat m2sio_show_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 
 static M2SIO_REG m2sio0_reg;
 static M2SIO_REG m2sio1_reg;
@@ -210,10 +212,7 @@ static TMXR m2sio1_tmxr = {                     /* multiplexer descriptor */
 static MTAB m2sio_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,                      "IOBASE",  "IOBASE",
         &set_iobase, &show_iobase, NULL, "Sets MITS 2SIO base I/O address"   },
-    { UNIT_M2SIO_CONSOLE,   UNIT_M2SIO_CONSOLE, "CONSOLE",   "CONSOLE",   NULL, NULL, NULL,
-        "Port checks for console input" },
-    { UNIT_M2SIO_CONSOLE,   0,                  "NOCONSOLE", "NOCONSOLE", NULL, NULL, NULL,
-        "Port does not check for console input" },
+
     { UNIT_M2SIO_MAP,         0,                  "NOMAP",    "NOMAP",    NULL, NULL, NULL,
         "Do not map any character" }, /*  disable character mapping                         */
     { UNIT_M2SIO_MAP,         UNIT_M2SIO_MAP,  "MAP",      "MAP",      NULL, NULL, NULL,
@@ -238,6 +237,10 @@ static MTAB m2sio_mod[] = {
         "Force CTS active low" },
     { UNIT_M2SIO_CTS,       0,                  "NOCTS",     "NOCTS",     NULL, NULL, NULL,
         "CTS follows status line (default)" },
+
+    { MTAB_XTD | MTAB_VUN,  UNIT_M2SIO_CONSOLE, NULL, "CONSOLE",   &m2sio_set_console, NULL, NULL, "Set as CONSOLE" },
+    { MTAB_XTD | MTAB_VUN,  0,                  NULL, "NOCONSOLE", &m2sio_set_console, NULL, NULL, "Remove as CONSOLE" },
+
     { MTAB_XTD|MTAB_VDV|MTAB_VALR,  0,   "BAUD",  "BAUD",  &m2sio_set_baud, &m2sio_show_baud,
         NULL, "Set baud rate (default=9600)" },
     { 0 }
@@ -322,7 +325,7 @@ DEVICE m2sio0_dev = {
     m2sio_dt,           /* debug flags */
     NULL,               /* mem size routine */
     NULL,               /* logical name */
-    NULL,               /* help */
+    &m2sio_show_help,   /* help */
     NULL,               /* attach help */
     NULL,               /* context for help */
     &m2sio_description  /* description */
@@ -351,7 +354,7 @@ DEVICE m2sio1_dev = {
     m2sio_dt,           /* debug flags */
     NULL,               /* mem size routine */
     NULL,               /* logical name */
-    NULL,               /* help */
+    &m2sio_show_help,   /* help */
     NULL,               /* attach help */
     NULL,               /* context for help */
     &m2sio_description  /* description */
@@ -389,11 +392,19 @@ static t_stat m2sio_reset(DEVICE *dptr, int32 (*routine)(const int32, const int3
     }
 
     /* Connect/Disconnect I/O Ports at base address */
-    if (dptr->flags & DEV_DIS) {
+    if (dptr->flags & DEV_DIS) { /* Device is disabled */
         s100_bus_remio(res->io_base, res->io_size, routine);
+        s100_bus_noconsole(&dptr->units[0]);
+
+        return SCPE_OK;
     }
-    else {
-        s100_bus_addio(res->io_base, res->io_size, routine, dptr->name);
+
+    /* Device is enabled */
+    s100_bus_addio(res->io_base, res->io_size, routine, dptr->name);
+
+    /* Set as CONSOLE unit  */
+    if (dptr->units[0].flags & UNIT_M2SIO_CONSOLE) {
+        s100_bus_console(&dptr->units[0]);
     }
 
     /* Set DEVICE for this UNIT */
@@ -407,15 +418,13 @@ static t_stat m2sio_reset(DEVICE *dptr, int32 (*routine)(const int32, const int3
     reg->stb = M2SIO_CTS | M2SIO_DCD;
     reg->txp = FALSE;
     reg->dcdl = FALSE;
+
     if (dptr->units[0].flags & UNIT_ATT) {
         m2sio_config_rts(dptr, 1);    /* disable RTS */
     }
 
-    if (!(dptr->flags & DEV_DIS)) {
-        sim_activate(&dptr->units[0], dptr->units[0].wait);
-    } else {
-        sim_cancel(&dptr->units[0]);
-    }
+    /* Start service routine */
+    sim_activate(&dptr->units[0], dptr->units[0].wait);
 
     sim_debug(STATUS_MSG, dptr, "reset adapter.\n");
 
@@ -521,10 +530,8 @@ static t_stat m2sio_svc(UNIT *uptr)
             tmxr_poll_rx(res->tmxr);
 
             c = tmxr_getc_ln(res->tmxr->ldsc);
-        } else if (uptr->flags & UNIT_M2SIO_CONSOLE) {
-            c = sim_poll_kbd();
         } else {
-            c = 0xff;
+            c = s100_bus_poll_kbd(uptr);
         }
 
         if (c & (TMXR_VALID | SCPE_KFLAG)) {
@@ -544,7 +551,7 @@ static t_stat m2sio_svc(UNIT *uptr)
 
 
 /* Attach routine */
-static t_stat m2sio_attach(UNIT *uptr, CONST char *cptr)
+static t_stat m2sio_attach(UNIT *uptr, const char *cptr)
 {
     DEVICE *dptr;
     RES *res;
@@ -598,6 +605,18 @@ static t_stat m2sio_detach(UNIT *uptr)
     }
 
     return SCPE_UNATT;
+}
+
+static t_stat m2sio_set_console(UNIT *uptr, int32 value, const char *cptr, void *desc)
+{
+    if (value == UNIT_M2SIO_CONSOLE) {
+        s100_bus_console(uptr);
+    }
+    else {
+        s100_bus_noconsole(uptr);
+    }
+
+    return SCPE_OK;
 }
 
 static t_stat m2sio_set_baud(UNIT *uptr, int32 value, const char *cptr, void *desc)
@@ -893,3 +912,22 @@ static int32 m2sio_map_kbdchar(UNIT *uptr, int32 ch)
 
     return ch;
 }
+
+static t_stat m2sio_show_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+{
+    fprintf (st, "\nAltair 8800 88-2SIO (%s)\n", dptr->name);
+
+    fprint_set_help (st, dptr);
+    fprint_show_help (st, dptr);
+    fprint_reg_help (st, dptr);
+    fprintf(st, "\n\n");
+    tmxr_attach_help(st, dptr, uptr, flag, cptr);
+
+    fprintf(st, "----- NOTES -----\n\n");
+    fprintf(st, "Only one device may poll the host keyboard for CONSOLE input.\n");
+    fprintf(st, "Use SET %s CONSOLE to select this UNIT as the CONSOLE device.\n", sim_dname(dptr));
+    fprintf(st, "\nUse SHOW BUS CONSOLE to display the current CONSOLE device.\n\n");
+
+    return SCPE_OK;
+}
+

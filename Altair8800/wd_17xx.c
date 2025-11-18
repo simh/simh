@@ -157,6 +157,13 @@ void wd17xx_sel_side(WD17XX_INFO *wd, uint8 side)
     }
 }
 
+void wd17xx_sel_drive_type(WD17XX_INFO *wd, uint8 type)
+{
+    if (wd != NULL) {
+        wd->drivetype = type;
+    }
+}
+
 uint8 wd17xx_intrq(WD17XX_INFO *wd)
 {
     if (wd != NULL) {
@@ -208,7 +215,7 @@ uint8 wd17xx_inp(WD17XX_INFO *wd, uint8 port)
             wd->status |= (wd->dsk->unit == NULL || wd->dsk->unit->fileref == NULL) ? WD17XX_STAT_NRDY : 0;
             sim_debug(wd->dbg_verbose, wd->dptr, WD17XX_NAME ADDRESS_FORMAT
                       " RD STATUS = 0x%02x, CMDTYPE=%x\n", s100_bus_get_addr(), wd->status, wd->cmdtype);
-            wd17xx_set_intrq(wd, FALSE);
+//            wd17xx_set_intrq(wd, FALSE);
             r = wd->status;
             break;
 
@@ -593,7 +600,7 @@ static void wd17xx_command(WD17XX_INFO *wd, uint8 cmd)
 
             wd->status |= (WD17XX_STAT_DRQ);       /* Set DRQ */
             wd->drq = 1;
-            wd->fdc_datacount = wd->dsk->fmt.track[wd->track][wd->side].sectorsize;
+            wd->fdc_datacount = dsk_sector_size(wd->dsk, wd->track, wd->side);
             wd->fdc_dataindex = 0;
             wd->fdc_write = TRUE;
             wd->fdc_write_track = FALSE;
@@ -625,7 +632,7 @@ static void wd17xx_command(WD17XX_INFO *wd, uint8 cmd)
 
                 sbuf[0] = wd->track;
                 sbuf[1] = wd->side;
-                sbuf[2] = wd->sector;
+                sbuf[2] = (wd->sector < dsk_start_sector(wd->dsk, wd->track, wd->side)) ? wd->sector : dsk_start_sector(wd->dsk, wd->track, wd->side);
                 sbuf[3] = wd->fdc_sec_len;
                 sbuf[4] = 0xAA; /* CRC1 */
                 sbuf[5] = 0x55; /* CRC2 */
@@ -706,7 +713,7 @@ static void wd17xx_command(WD17XX_INFO *wd, uint8 cmd)
         case WD17XX_CMD_STEPOUTU:
             if (wd->verify) { /* Verify the selected track/side is ok. */
                 sim_debug(wd->dbg_verbose, wd->dptr, WD17XX_NAME ADDRESS_FORMAT " Verify ", s100_bus_get_addr());
-                if (dsk_validate(wd->dsk, wd->track, wd->side, wd->sector) != SCPE_OK) {
+                if (dsk_validate(wd->dsk, wd->track, 0, 1) != SCPE_OK) { /* Not validating side or sector */
                         sim_debug(wd->dbg_verbose, wd->dptr, WD17XX_NAME "FAILED\n");
                         wd->status |= WD17XX_STAT_SEEK; /* Seek error */
                 } else {
@@ -814,9 +821,9 @@ static uint8 wd17xx_sec_len(WD17XX_INFO *wd)
 
     secsize = dsk_sector_size(wd->dsk, wd->track, wd->side);
 
-    for (i = 0; i < 4; i++) {
-        if ( (1 << i) == secsize ) {
-            sim_debug(wd->dbg_read | wd->dbg_write, wd->dptr, "%d sector size = %02X sector len field\n", secsize, i);
+    for (i = 0; i <= 4; i++) {
+        if ( (0x80 << i) == secsize ) {
+            sim_debug(wd->dbg_verbose | wd->dbg_write, wd->dptr, "%d sector size = %02X sector len field\n", secsize, i);
             return i;
         }
     }

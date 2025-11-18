@@ -41,6 +41,8 @@ static int32 PO = 0;               /* programmed output register */
 static t_stat po_reset             (DEVICE *dptr);
 static int32 po_io                 (const int32 addr, const int32 rw, const int32 data);
 
+static t_stat po_show_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+
 static const char* po_description(DEVICE *dptr) {
     return "Front Panel";
 }
@@ -73,7 +75,7 @@ DEVICE po_dev = {
     NULL, NULL, &po_reset,
     NULL, NULL, NULL,
     NULL, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), 0,
-    po_dt, NULL, NULL, NULL, NULL, NULL, &po_description
+    po_dt, NULL, NULL, &po_show_help, NULL, NULL, &po_description
 };
 
 static t_stat po_reset(DEVICE *dptr) {
@@ -105,5 +107,16 @@ static int32 po_io(const int32 addr, const int32 rw, const int32 data)
     }
 
     return 0x0ff;
+}
+
+static t_stat po_show_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+{
+    fprintf (st, "\nProgrammed Output (%s)\n", dptr->name);
+
+    fprint_set_help (st, dptr);
+    fprint_show_help (st, dptr);
+    fprint_reg_help (st, dptr);
+
+    return SCPE_OK;
 }
 

@@ -49,7 +49,8 @@ static t_stat rom_dis_dbl(UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 static t_stat rom_dis_hdsk(UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 static t_stat rom_dis_altmon(UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 static t_stat rom_dis_turmon(UNIT *uptr, int32 value, CONST char *cptr, void *desc);
-static t_stat rom_show_roms(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+static t_stat rom_show_list(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+static t_stat rom_show_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 
 static int32 M[MAXBANKSIZE];
 
@@ -106,8 +107,7 @@ static MTAB rom_mod[] = {
     { UNIT_ROM_TURMON,      0,                  "NO" ROM_MITS_TURMON_NAME,   "NO" ROM_MITS_TURMON_NAME,   &rom_dis_turmon,  NULL,
         NULL, "Disable " ROM_MITS_TURMON_DESC   },
 
-    { MTAB_XTD|MTAB_VDV|MTAB_NMO, 1, "ROMS", NULL,
-        NULL, &rom_show_roms, (void *) "Hmmmm", "Show available ROMs" },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO,  0, "LIST",    NULL, NULL, &rom_show_list,   NULL, "Show available ROMs" },
 
     { 0 }
 };
@@ -123,7 +123,9 @@ DEVICE rom_dev = {
     NULL, NULL, &rom_reset,
     NULL, NULL, NULL,
     NULL, (DEV_DISABLE | DEV_DEBUG), 0,
-    rom_dt, NULL, NULL, NULL, NULL, NULL, &rom_description
+    rom_dt, NULL, NULL,
+    &rom_show_help, NULL, NULL,
+    &rom_description
 };
 
 static t_stat rom_reset(DEVICE *dptr) {
@@ -216,7 +218,7 @@ static t_stat rom_dis_altmon(UNIT *uptr, int32 value, CONST char *cptr, void *de
     return rom_enadis(UNIT_ROM_ALTMON, FALSE);
 }
 
-static t_stat rom_show_roms(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+static t_stat rom_show_list(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
     ROM *r = rom_table;
 
@@ -229,6 +231,21 @@ static t_stat rom_show_roms(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
     }
 
     fprintf(st, "\n* = enabled\n");
+
+    return SCPE_OK;
+}
+
+static t_stat rom_show_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+{
+    fprintf (st, "\nAltair 8800 ROM (%s)\n", dptr->name);
+
+    fprint_set_help (st, dptr);
+    fprint_show_help (st, dptr);
+    fprint_reg_help (st, dptr);
+
+    fprintf(st, "\nVarious ROMs are available through the ROM device. A list of ROMs is available using\n");
+    fprintf(st, "the SHOW ROM LIST command. To enable a ROM, enter SET ROM <name>. To disable a ROM,\n");
+    fprintf(st, "enter SET ROM NO<name>. Enabled ROMs can be seen with the SHOW BUS CONFIG command.\n\n");
 
     return SCPE_OK;
 }

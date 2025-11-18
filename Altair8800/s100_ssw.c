@@ -31,7 +31,7 @@
 #include "s100_bus.h"
 #include "s100_ssw.h"
 
-#define DEVICE_NAME "FP"
+#define DEVICE_NAME "SSW"
 
 static int32 poc = TRUE;       /* Power On Clear */
 
@@ -40,24 +40,22 @@ static int32 SSW = 0;              /* sense switch register */
 static t_stat ssw_reset             (DEVICE *dptr);
 static int32 ssw_io                 (const int32 addr, const int32 rw, const int32 data);
 
+static t_stat ssw_show_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+
 static const char* ssw_description(DEVICE *dptr) {
-    return "Sense Switches";
+    return "Front Panel Sense Switches";
 }
 
 static UNIT ssw_unit = {
-    UDATA (NULL, UNIT_SSW_VERBOSE, 0)
+    UDATA (NULL, 0, 0)
 };
 
 static REG ssw_reg[] = {
-    { HRDATAD (SSW, SSW, 8, "Front panel sense switches pseudo register") },
+    { HRDATAD (SSWVAL, SSW, 8, "Front panel sense switches pseudo register") },
     { NULL }
 };
 
 static MTAB ssw_mod[] = {
-    { UNIT_SSW_VERBOSE,     UNIT_SSW_VERBOSE, "VERBOSE", "VERBOSE", NULL, NULL,
-        NULL, "Enable verbose messages"  },
-    { UNIT_SSW_VERBOSE,     0,               "QUIET",   "QUIET",   NULL, NULL,
-        NULL, "Disable verbose messages" },
     { 0 }
 };
 
@@ -72,7 +70,9 @@ DEVICE ssw_dev = {
     NULL, NULL, &ssw_reset,
     NULL, NULL, NULL,
     NULL, (DEV_DISABLE | DEV_DEBUG), 0,
-    ssw_dt, NULL, NULL, NULL, NULL, NULL, &ssw_description
+    ssw_dt, NULL, NULL,
+    &ssw_show_help, NULL, NULL,
+    &ssw_description
 };
 
 static t_stat ssw_reset(DEVICE *dptr) {
@@ -99,5 +99,18 @@ static int32 ssw_io(const int32 addr, const int32 rw, const int32 data)
     }
 
     return 0x0ff;
+}
+
+static t_stat ssw_show_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+{
+    fprintf (st, "\nAltair 8800 Front Panel Sense Switches (%s)\n", dptr->name);
+
+    fprint_set_help (st, dptr);
+    fprint_show_help (st, dptr);
+    fprint_reg_help (st, dptr);
+
+    fprintf (st, "\nUse DEP SSWVAL <val> to set the value returned by an IN 0FFH instruction.\n\n");
+
+    return SCPE_OK;
 }
 

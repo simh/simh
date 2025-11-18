@@ -143,6 +143,7 @@ extern WD17XX_INFO * wd17xx_release(WD17XX_INFO *wd);
 extern void wd17xx_reset(WD17XX_INFO *wd);
 extern void wd17xx_sel_dden(WD17XX_INFO *wd, uint8 dden);
 extern void wd17xx_sel_side(WD17XX_INFO *wd, uint8 side);
+extern void wd17xx_sel_drive_type(WD17XX_INFO *wd, uint8 type);
 extern void wd17xx_set_fdctype(WD17XX_INFO *wd, int fdctype);
 extern void wd17xx_set_dsk(WD17XX_INFO *wd, DSK_INFO *dsk);
 extern void wd17xx_set_intena(WD17XX_INFO *wd, int32 ena);

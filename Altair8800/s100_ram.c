@@ -45,6 +45,7 @@ static t_stat ram_randomize_command (UNIT *uptr, int32 value, CONST char *cptr, 
 static t_stat ram_size_command      (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 static void ram_clear               (void);
 static void ram_randomize           (void);
+static t_stat ram_show_help         (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 static const char* ram_description  (DEVICE *dptr);
 
 static void PutBYTE(register uint32 Addr, const register uint32 Value);
@@ -119,7 +120,7 @@ DEVICE ram_dev = {
     ram_dt,                    /* debug flags */
     NULL,                      /* mem size routine */
     NULL,                      /* logical name */
-    NULL,                      /* help */
+    &ram_show_help,            /* help */
     NULL,                      /* attach help */
     NULL,                      /* context available to help routines */
     &ram_description           /* device description */
@@ -306,6 +307,17 @@ static t_stat ram_clear_command(UNIT *uptr, int32 value, CONST char *cptr, void 
 static t_stat ram_randomize_command(UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
     ram_randomize();
+
+    return SCPE_OK;
+}
+
+static t_stat ram_show_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+{
+    fprintf (st, "\nAltair 8800 RAM (%s)\n", dptr->name);
+
+    fprint_set_help (st, dptr);
+    fprint_show_help (st, dptr);
+    fprint_reg_help (st, dptr);
 
     return SCPE_OK;
 }

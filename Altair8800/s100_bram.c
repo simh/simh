@@ -47,6 +47,7 @@ static t_stat bram_set_type          (int32 type);
 static t_stat bram_type_command      (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 static void bram_clear               (void);
 static void bram_randomize           (void);
+static t_stat bram_show_help         (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 static const char* bram_description  (DEVICE *dptr);
 
 static void PutBYTE(register uint32 Addr, const register uint32 Value);
@@ -79,7 +80,7 @@ static UNIT bram_unit = {
 };
 
 static REG bram_reg[] = {
-    { FLDATAD (POC,     poc,       0x01,         "Power on Clear flag"), },
+    { FLDATAD (POC,     poc,            0x01,         "Power on Clear flag"), },
     { HRDATAD (BANK,    bram_bank,      MAXBANKS2LOG, "Selected bank"), },
     { DRDATAD (BANKS,   bram_banks,     8,            "Number of banks"), },
     { DRDATAD (TYPE,    bram_type,      8,            "RAM type"), },
@@ -122,32 +123,32 @@ static DEBTAB bram_dt[] = {
 };
 
 DEVICE bram_dev = {
-    DEV_NAME,                   /* name */
-    &bram_unit,                 /* units */
-    bram_reg,                   /* registers */
-    bram_mod,                   /* modifiers */
+    DEV_NAME,                  /* name */
+    &bram_unit,                /* units */
+    bram_reg,                  /* registers */
+    bram_mod,                  /* modifiers */
     1,                         /* # units */
     ADDRWIDTH,                 /* address radix */
     ADDRWIDTH,                 /* address width */
     1,                         /* addr increment */
     DATAWIDTH,                 /* data radix */
     DATAWIDTH,                 /* data width */
-    &bram_ex,                   /* examine routine */
-    &bram_dep,                  /* deposit routine */
-    &bram_reset,                /* reset routine */
+    &bram_ex,                  /* examine routine */
+    &bram_dep,                 /* deposit routine */
+    &bram_reset,               /* reset routine */
     NULL,                      /* boot routine */
     NULL,                      /* attach routine */
     NULL,                      /* detach routine */
     NULL,                      /* context */
     (DEV_DISABLE | DEV_DIS | DEV_DEBUG), /* flags */
     0,                         /* debug control */
-    bram_dt,                    /* debug flags */
+    bram_dt,                   /* debug flags */
     NULL,                      /* mem size routine */
     NULL,                      /* logical name */
-    NULL,                      /* help */
+    &bram_show_help,           /* help */
     NULL,                      /* attach help */
     NULL,                      /* context available to help routines */
-    &bram_description           /* device description */
+    &bram_description          /* device description */
 };
 
 static t_stat bram_reset(DEVICE *dptr)
@@ -209,6 +210,9 @@ static int32 bram_io(const int32 addr, const int32 rw, const int32 data)
             case BRAM_TYPE_ERAM:
                 if (data >= 0 && data < B[bram_type].banks) {
                     bram_bank = data;
+                    if (bram_unit.flags & UNIT_BRAM_VERBOSE) {
+                        sim_printf("%s selecting bank %d\n", B[bram_type].name, data);
+                    }
                 } else {
                     sim_printf("Invalid bank select 0x%02x for %s\n", data, B[bram_type].name);
                 }
@@ -247,6 +251,7 @@ static int32 bram_io(const int32 addr, const int32 rw, const int32 data)
                         break;
                 }
                 break;
+
             case BRAM_TYPE_CRAM:
                 switch(data & 0x7F) {
                     case 0x01:
@@ -327,7 +332,7 @@ static void bram_addio(int32 type)
 {
     if (type > BRAM_TYPE_NONE && type <= BRAM_TYPE_MAX) {
         if (B[type].size) {
-            s100_bus_addio(B[type].baseport, B[type].size, &bram_io, B[type].name);
+            s100_bus_addio_out(B[type].baseport, B[type].size, &bram_io, B[type].name);
         }
     }
 }
@@ -335,7 +340,7 @@ static void bram_addio(int32 type)
 static void bram_remio(int32 type)
 {
     if (type > BRAM_TYPE_NONE && type <= BRAM_TYPE_MAX) {
-        s100_bus_remio(B[type].baseport, B[type].size, &bram_io);
+        s100_bus_remio_out(B[type].baseport, B[type].size, &bram_io);
     }
 }
 
@@ -462,5 +467,16 @@ static void bram_randomize()
             M[i] = sim_rand() & DATAMASK;
         }
     }
+}
+
+static t_stat bram_show_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+{
+    fprintf (st, "\nAltair 8800 Banked RAM (%s)\n", dptr->name);
+
+    fprint_set_help (st, dptr);
+    fprint_show_help (st, dptr);
+    fprint_reg_help (st, dptr);
+
+    return SCPE_OK;
 }
 

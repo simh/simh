@@ -270,7 +270,7 @@ DEVICE z80_dev = {
     NULL, NULL, &z80_reset,
     NULL, NULL, NULL,
     NULL, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), 0,
-    z80_dt, NULL, NULL, NULL, NULL, NULL, &z80_description
+    z80_dt, NULL, NULL, &z80_show_help, NULL, NULL, &z80_description
 };
 
 /* the following tables precompute some common subexpressions
@@ -5707,6 +5707,7 @@ static t_stat z80_reset(DEVICE *dptr)
 t_bool z80_is_pc_a_subroutine_call (t_addr **ret_addrs)
 {
     static t_addr returns[2] = {0, 0};
+
     switch (z80_chiptype) {
         case CHIP_TYPE_8080:
         case CHIP_TYPE_Z80:
@@ -5723,15 +5724,17 @@ t_bool z80_is_pc_a_subroutine_call (t_addr **ret_addrs)
                     returns[0] = PC_S + 3;
                     *ret_addrs = returns;
                     return TRUE;
+
                 default:
                     return FALSE;
             }
             break;
 
         default:
-            return FALSE;
             break;
     }
+
+    return FALSE;
 }
 
 static t_stat chip_show(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
@@ -6200,7 +6203,6 @@ static void printHex4(char* string, const uint32 value) {
 
     Inputs:
         *val            =   instructions to disassemble
-        useZ80Mnemonics =   > 0 iff Z80 mnemonics are to be used
         addr            =   current PC
     Outputs:
         *S              =   output text
@@ -6217,9 +6219,8 @@ int32 z80_dasm(char *S, const uint32 *val, const int32 addr) {
     const char *T, *T1;
     uint8 J = 0, Offset = 0;
     uint16 B = 0;
-    int32 useZ80Mnemonics = FALSE;  // Make this a part of a DASM structure
 
-    if (useZ80Mnemonics)
+    if (z80_chiptype == CHIP_TYPE_Z80)
         switch(val[B]) {
 
             case 0xcb:
@@ -6538,5 +6539,16 @@ static int32 parse_X80(const char *cptr, const int32 addr, uint32 *val, const ch
 t_stat z80_parse_sym(CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
     return (parse_X80(cptr, addr, val, z80_chiptype == CHIP_TYPE_Z80 ? MnemonicsZ80 : Mnemonics8080));
+}
+
+t_stat z80_show_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+{
+    fprintf (st, "\nIntel 8080 / Zilog Z80 CPU (%s)\n", dptr->name);
+
+    fprint_set_help (st, dptr);
+    fprint_show_help (st, dptr);
+    fprint_reg_help (st, dptr);
+
+    return SCPE_OK;
 }
 

@@ -31,18 +31,54 @@
 #include "sim_defs.h"
 #include "altair8800_dsk.h"
 
-static int calc_offset(DSK_INFO *d);
+static void calc_offset(DSK_INFO *d);
 static void fill_sector(DSK_INFO *d, uint8 *b, int32 track, int32 head, int32 sector);
 
-t_stat dsk_init(DSK_INFO *d, UNIT *unit, int tracks, int heads, int interleaved) {
+/*
+ * INTERLEAVED disk images are structured as follows:
+ *
+ * +------------------+
+ * | TRACK 0 / HEAD 0 |
+ * +------------------+
+ * | TRACK 0 / HEAD 1 |
+ * +------------------+
+ * | TRACK 1 / HEAD 0 |
+ * +------------------+
+ * | TRACK 1 / HEAD 1 |
+ * +------------------+
+ * | TRACK n / HEAD 0 |
+ * +------------------+
+ * | TRACK n / HEAD 1 |
+ * +------------------+
+ *
+ * NON-INTERLEAVED disk images are structured as follows:
+ *
+ * +------------------+
+ * | TRACK 0 / HEAD 0 |
+ * +------------------+
+ * | TRACK 1 / HEAD 0 |
+ * +------------------+
+ * | TRACK n / HEAD 0 |
+ * +------------------+
+ * | TRACK 0 / HEAD 1 |
+ * +------------------+
+ * | TRACK 1 / HEAD 1 |
+ * +------------------+
+ * | TRACK n / HEAD 1 |
+ * +------------------+
+ *
+ */
+
+t_stat dsk_init(DSK_INFO *d, UNIT *unit, int tracks, int heads, int interleaved)
+{
     if (d == NULL) {
-        return 1;
+        return SCPE_ARG;
     }
     if (tracks < 1 || tracks > DSK_MAX_TRACKS) {
-        return 1;
+        return SCPE_ARG;
     }
     if (heads < 1 || heads > DSK_MAX_HEADS) {
-        return 1;
+        return SCPE_ARG;
     }
 
     d->unit = unit;
@@ -50,7 +86,7 @@ t_stat dsk_init(DSK_INFO *d, UNIT *unit, int tracks, int heads, int interleaved)
     d->fmt.heads = heads;
     d->fmt.interleaved = interleaved;
 
-    return 0;
+    return SCPE_OK;
 }
 
 t_stat dsk_init_format(DSK_INFO *d, int strack, int etrack, int shead, int ehead, int den, int secs, int secsize, int stsec)
@@ -58,16 +94,16 @@ t_stat dsk_init_format(DSK_INFO *d, int strack, int etrack, int shead, int ehead
     int tr, hd, offset = 0;
 
     if (d == NULL) {
-        return 1;
+        return SCPE_ARG;
     }
     if (strack < 0 || strack > d->fmt.tracks - 1) {
-        return 1;
+        return SCPE_ARG;
     }
     if (shead < 0 || shead > d->fmt.heads - 1) {
-        return 1;
+        return SCPE_ARG;
     }
     if (strack > etrack || shead > ehead) {
-        return 1;
+        return SCPE_ARG;
     }
 
     if (d->fmt.tracks < (etrack - strack + 1)) {
@@ -101,10 +137,10 @@ t_stat dsk_init_format(DSK_INFO *d, int strack, int etrack, int shead, int ehead
 
     calc_offset(d);
 
-    return 0;
+    return SCPE_OK;
 }
 
-static int calc_offset(DSK_INFO *d) {
+static void calc_offset(DSK_INFO *d) {
     int t, h, offset = 0;
 
     if (d->fmt.interleaved && d->fmt.heads > 1) {
@@ -129,8 +165,6 @@ static int calc_offset(DSK_INFO *d) {
             }
         }
     }
-
-    return 0;
 }
 
 t_stat dsk_validate(DSK_INFO *d, int track, int head, int sector)
@@ -144,7 +178,7 @@ t_stat dsk_validate(DSK_INFO *d, int track, int head, int sector)
         return SCPE_IOERR;
     }
     if (sector < d->fmt.track[track][head].startsector || sector > (d->fmt.track[track][head].sectors - ((d->fmt.track[track][head].startsector) ? 0 : 1))) {
-        sim_printf("DSK: ** Invalid sector number %d > %d\n", d->fmt.track[track][head].sectors, sector);
+        sim_printf("DSK: ** Invalid sector number. track/head %d/%d has %d sectors. %d requested.\n", track, head, d->fmt.track[track][head].sectors, sector);
         return SCPE_IOERR;
     }
 
@@ -153,37 +187,65 @@ t_stat dsk_validate(DSK_INFO *d, int track, int head, int sector)
 
 int32 dsk_size(DSK_INFO *d)
 {
+    if (d != NULL && d->unit != NULL && d->unit->fileref != NULL) {
+        return sim_fsize(d->unit->fileref);
+    }
+
     return 0;
 }
 
 int32 dsk_tracks(DSK_INFO *d)
 {
-    return d->fmt.tracks;
+    if (d != NULL) {
+        return d->fmt.tracks;
+    }
+
+    return 0;
 }
 
 int32 dsk_track_size(DSK_INFO *d, int32 track, int32 head)
 {
-    return d->fmt.track[track][head].sectors * d->fmt.track[track][head].sectorsize;
+    if (d != NULL) {
+        return d->fmt.track[track][head].sectors * d->fmt.track[track][head].sectorsize;
+    }
+
+    return 0;
 }
 
 int32 dsk_sectors(DSK_INFO *d, int32 track, int32 head)
 {
-    return d->fmt.track[track][head].sectors;
+    if (d != NULL) {
+        return d->fmt.track[track][head].sectors;
+    }
+
+    return 0;
 }
 
 int32 dsk_sector_size(DSK_INFO *d, int32 track, int32 head)
 {
-    return d->fmt.track[track][head].sectorsize;
+    if (d != NULL) {
+        return d->fmt.track[track][head].sectorsize;
+    }
+
+    return 0;
 }
 
 int32 dsk_start_sector(DSK_INFO *d, int32 track, int32 head)
 {
-    return d->fmt.track[track][head].startsector;
+    if (d != NULL) {
+        return d->fmt.track[track][head].startsector;
+    }
+
+    return 0;
 }
 
 int32 dsk_sector_offset(DSK_INFO *d, int32 track, int32 head, int32 sector)
 {
-    return d->fmt.track[track][head].offset + (dsk_sector_size(d, track, head) * (sector - dsk_start_sector(d, track, head)));
+    if (d != NULL) {
+        return d->fmt.track[track][head].offset + (dsk_sector_size(d, track, head) * (sector - dsk_start_sector(d, track, head)));
+    }
+
+    return 0;
 }
 
 t_stat dsk_read_sector(DSK_INFO *d, int32 track, int32 head, int32 sector, uint8 *buf, int32 *bytesread)
@@ -191,8 +253,8 @@ t_stat dsk_read_sector(DSK_INFO *d, int32 track, int32 head, int32 sector, uint8
     int32 b, ssize;
     t_stat r = SCPE_OK;
 
-    if (d->unit == NULL || d->unit->fileref == NULL) {
-        return SCPE_IERR;
+    if (d == NULL || d->unit == NULL || d->unit->fileref == NULL) {
+        return SCPE_ARG;
     }
 
     if ((r = dsk_validate(d, track, head, sector)) != 0) {
@@ -223,8 +285,8 @@ t_stat dsk_write_sector(DSK_INFO *d, int32 track, int32 head, int32 sector, cons
     int b, ssize, offset;
     int r = SCPE_OK;
 
-    if (d->unit == NULL || d->unit->fileref == NULL) {
-        return SCPE_IERR;
+    if (d == NULL || d->unit == NULL || d->unit->fileref == NULL) {
+        return SCPE_ARG;
     }
 
     if ((r = dsk_validate(d, track, head, sector)) != 0) {
@@ -251,6 +313,10 @@ t_stat dsk_write_sector(DSK_INFO *d, int32 track, int32 head, int32 sector, cons
 
 t_stat dsk_read_track(DSK_INFO *d, int32 track, int32 head, uint8 *buf)
 {
+    if (d == NULL || d->unit == NULL || d->unit->dptr == NULL) {
+        return SCPE_ARG;
+    }
+
     sim_debug(d->dbg_verbose, d->unit->dptr, "DSK RD TRK: T:%d H:%d\n", track, head);
 
     return SCPE_OK;
@@ -260,6 +326,10 @@ t_stat dsk_write_track(DSK_INFO *d, int32 track, int32 head, uint8 fill)
 {
     int s, ssize, start;
     unsigned char *b;
+
+    if (d == NULL) {
+        return SCPE_ARG;
+    }
 
     ssize = dsk_sector_size(d, track, head);
     start = dsk_start_sector(d, track, head);
@@ -285,6 +355,10 @@ t_stat dsk_format(DSK_INFO *d, uint8 fill)
 {
     int t, h;
 
+    if (d == NULL) {
+        return SCPE_ARG;
+    }
+
     for (t = 0; t < d->fmt.tracks; t++) {
         for (h = 0; h < d->fmt.heads; h++) {
             dsk_write_track(d, t, h, fill);
@@ -298,6 +372,10 @@ void dsk_dump_buf(const uint8 *b, int32 size)
 {
     int i;
 
+    if (b == NULL) {
+        return;
+    }
+
     for (i = 0; i < size; i++) {
         if ((i & 0x0f) == 0x00) {
             sim_printf("%04X: ", i);
@@ -308,6 +386,10 @@ void dsk_dump_buf(const uint8 *b, int32 size)
 
 static void fill_sector(DSK_INFO *d, uint8 *b, int32 track, int32 head, int32 sector)
 {
+    if (d == NULL || b == NULL) {
+        return;
+    }
+
     memset(b, sector, dsk_sector_size(d, track, head));
     b[0] = track;
 }

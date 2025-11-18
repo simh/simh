@@ -25,6 +25,7 @@
 
 */
 
+#include "sim_defs.h"
 #include "altair8800_sys.h"
 #include "s100_z80.h"
 #include "s100_bus.h"
@@ -33,7 +34,9 @@ static t_stat bus_reset               (DEVICE *dptr);
 static t_stat bus_dep                 (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 static t_stat bus_ex                  (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 static t_stat bus_cmd_memory          (int32 flag, CONST char *cptr);
-static t_stat bus_show                (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+static t_stat bus_show_config         (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+static t_stat bus_show_console        (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+static t_stat bus_show_help           (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 static t_stat bus_hexload_command     (int32 flag, CONST char *cptr);
 static t_stat bus_hexsave_command     (int32 flag, CONST char *cptr);
 static t_stat hexload                 (const char *filename, t_addr bias);
@@ -62,6 +65,9 @@ IDEV idev_out[MAXPAGE];
 
 int32 nulldev(CONST int32 addr, CONST int32 io, CONST int32 data) { return 0xff; }
 
+/* Which UNIT is the CONSOLE */
+UNIT *bus_console = NULL;
+
 static CONST char* bus_description(DEVICE *dptr) {
     return "S100 Bus";
 }
@@ -80,10 +86,14 @@ static REG bus_reg[] = {
 };
 
 static MTAB bus_mod[] = {
-    { UNIT_BUS_VERBOSE,     UNIT_BUS_VERBOSE,   "VERBOSE",      "VERBOSE",      NULL, &bus_show,
+    { UNIT_BUS_VERBOSE,     UNIT_BUS_VERBOSE,   "VERBOSE",      "VERBOSE",      NULL, NULL,
         NULL, "Enable verbose messages"     },
     { UNIT_BUS_VERBOSE,     0,                  "QUIET",        "QUIET",        NULL, NULL,
         NULL, "Disable verbose messages"                },
+
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO,  0, "CONFIG",   NULL, NULL, &bus_show_config,  NULL, "Show BUS configuration" },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO,  0, "CONSOLE",  NULL, NULL, &bus_show_console, NULL, "Show CONSOLE unit" },
+
     { 0 }
 };
 
@@ -109,7 +119,7 @@ DEVICE bus_dev = {
     &bus_ex, &bus_dep, &bus_reset,
     NULL, NULL, NULL,
     NULL, DEV_DEBUG, 0,
-    bus_dt, NULL, NULL, NULL, NULL, NULL, &bus_description
+    bus_dt, NULL, NULL, &bus_show_help, NULL, NULL, &bus_description
 };
 
 /* Simulator-specific commands */
@@ -164,12 +174,10 @@ static t_stat bus_dep(t_value val, t_addr addr, UNIT *uptr, int32 sw)
     return SCPE_OK;
 }
 
-static t_stat bus_show(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+static t_stat bus_show_config(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
     CONST char *last = NULL;
     int i, spage, epage;
-
-    fprintf(st, "VERBOSE\n");
 
     /* show memory */
     fprintf(st, "\nMEMORY:\n");
@@ -201,6 +209,18 @@ static t_stat bus_show(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
             fprintf(st, "%-8.8s\n", sys_strupr(idev_out[i].name));
         }
     }
+
+    fprintf(st, "\n");
+
+    bus_show_console(st, NULL, 0, NULL);
+
+    return SCPE_OK;
+}
+
+static t_stat bus_show_console(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+    /* show current CONSOLE unit */
+    fprintf(st, "CONSOLE Unit: %s\n", (bus_console == NULL) ? "NONE" : sim_uname(bus_console));
 
     return SCPE_OK;
 }
@@ -929,6 +949,51 @@ t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
         return SCPE_IERR;
 
     fprintf(st, "I/O=0x%02X-0x%02X", res->io_base, res->io_base + res->io_size-1);
+
+    return SCPE_OK;
+}
+
+/* Set new CONSOLE unit */
+t_stat s100_bus_console(UNIT *uptr)
+{
+    bus_console = uptr;
+
+    return SCPE_ARG;
+}
+
+/* Set new CONSOLE unit */
+UNIT *s100_bus_get_console()
+{
+    return bus_console;
+}
+
+t_stat s100_bus_noconsole(UNIT *uptr)
+{
+    if (bus_console == uptr) {
+        bus_console = NULL;
+
+        return SCPE_OK;
+    }
+
+    return SCPE_ARG;
+}
+
+t_stat s100_bus_poll_kbd(UNIT *uptr)
+{
+    if (bus_console == uptr) {
+        return sim_poll_kbd();
+    }
+
+    return SCPE_OK;
+}
+
+static t_stat bus_show_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+{
+    fprintf (st, "\nAltair 8800 Bus (%s)\n", dptr->name);
+
+    fprint_set_help (st, dptr);
+    fprint_show_help (st, dptr);
+    fprint_reg_help (st, dptr);
 
     return SCPE_OK;
 }

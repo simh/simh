@@ -2238,6 +2238,8 @@ ALTAIR8800 = \
     ${ALTAIR8800D}/s100_z80.c \
     ${ALTAIR8800D}/mits_2sio.c \
     ${ALTAIR8800D}/mits_dsk.c \
+    ${ALTAIR8800D}/sds_sbc200.c \
+    ${ALTAIR8800D}/sds_vfii.c \
     ${ALTAIR8800D}/tarbell_fdc.c \
     ${ALTAIR8800D}/wd_17xx.c
 ALTAIR8800_OPT = $(ALTAIR8800_GCC_OPT) -I ${ALTAIR8800D} -DUSE_SIM_VIDEO ${VIDEO_CCDEFS}

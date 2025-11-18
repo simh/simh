@@ -1,4 +1,4 @@
-/* altair8800_sys.h
+/* sds_vfii.h
 
    Copyright (c) 2025 Patrick A. Linstruth
 
@@ -24,46 +24,37 @@
    in this Software without prior written authorization from Patrick Linstruth.
 
    History:
-   11/07/25 Initial version
+   11/16/25 Initial version
 
 */
 
-#ifndef _ALTAIR8800_SYS_H
-#define _ALTAIR8800_SYS_H
+#ifndef _VFII_FDC_H
+#define _VFII_FDC_H
 
-#include "sim_defs.h"
+#define VFII_NUM_DRIVES  4
 
-#define SIM_EMAX            6
+#define VFII_IO_BASE     0x63
+#define VFII_IO_SIZE     5
 
-extern DEVICE bus_dev;
-extern DEVICE cpu_dev;
-extern DEVICE ssw_dev;
-extern DEVICE simh_dev;
-extern DEVICE z80_dev;
-extern DEVICE ram_dev;
-extern DEVICE bram_dev;
-extern DEVICE rom_dev;
-extern DEVICE po_dev;
-extern DEVICE mdsk_dev;
-extern DEVICE m2sio0_dev;
-extern DEVICE m2sio1_dev;
-extern DEVICE sio_dev;
-extern DEVICE sbc200_dev;
-extern DEVICE tarbell_dev;
-extern DEVICE vfii_dev;
+#define VFII_PROM_BASE   0x0000
+#define VFII_PROM_SIZE   32
+#define VFII_PROM_MASK   (VFII_PROM_SIZE - 1)
 
-extern char memoryAccessMessage[256];
-extern char instructionMessage[256];
+/* VFII Register Offsets */
+#define VFII_REG_STATUS   0x00   /* Status Port       */
+#define VFII_REG_CONTROL  0x00   /* Control Port      */
 
-extern int32 sys_find_unit_index(UNIT* uptr);
+#define VFII_DSEL_MASK          0x0f
+#define VFII_SIDE_MASK          0x10
+#define VFII_SIZE_MASK          0x20
+#define VFII_DDEN_MASK          0x40
+#define VFII_WAIT_MASK          0x80
 
-extern void sys_set_cpu_instr(t_stat (*routine)(void));
-extern void sys_set_cpu_pc(REG *reg);
-extern void sys_set_cpu_pc_value(t_value (*routine)(void));
-extern void sys_set_cpu_parse_sym(t_stat (*routine)(CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw));
-extern void sys_set_cpu_dasm(int32 (*routine)(char *S, const uint32 *val, const int32 addr));
-extern void sys_set_cpu_is_subroutine_call(t_bool (*routine)(t_addr **ret_addrs));
-extern char *sys_strupr(const char *str);
-extern uint8 sys_floorlog2(unsigned int n);
+
+#define VFII_FLAG_DRQ           0x80  /* End of Job (DRQ) */
+
+#define VFII_SD_CAPACITY        (77*26*128)                  /* SSSD 8" (IBM 3740) Disk Capacity */
+#define VFII_DD_CAPACITY        (77*26*256)                  /* SSDD 8" DD Disk Capacity         */
 
 #endif
+

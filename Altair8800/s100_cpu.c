@@ -62,8 +62,12 @@ static const char* cpu_description(DEVICE *dptr) {
 }
 
 static CPU cpu[] = {
-    { &z80_dev, &z80_pc_reg, &z80_chiptype, &z80_instr, &z80_pc_value, &z80_parse_sym, &z80_dasm, &z80_is_pc_a_subroutine_call }, // 8080
-    { &z80_dev, &z80_pc_reg, &z80_chiptype, &z80_instr, &z80_pc_value, &z80_parse_sym, &z80_dasm, &z80_is_pc_a_subroutine_call }, // Z80
+    { &z80_dev, &z80_pc_reg, &z80_chiptype, &z80_instr, &z80_pc_value,
+        &z80_parse_sym, &z80_dasm, &z80_is_pc_a_subroutine_call, &z80_show_help }, // 8080
+
+    { &z80_dev, &z80_pc_reg, &z80_chiptype, &z80_instr, &z80_pc_value,
+        &z80_parse_sym, &z80_dasm, &z80_is_pc_a_subroutine_call, &z80_show_help }, // Z80
+
     { NULL, NULL, NULL, NULL, NULL, NULL, NULL }
 };
 
@@ -198,6 +202,7 @@ static void cpu_set_dasm(int32 (*routine)(char *S, const uint32 *val, const int3
 
 static void cpu_set_is_subroutine_call(t_bool (*routine)(t_addr **ret_addrs))
 {
+    sim_vm_is_subroutine_call = routine;
 }
 
 t_stat fprint_sym(FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw)

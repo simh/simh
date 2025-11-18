@@ -65,5 +65,6 @@ extern t_bool z80_is_pc_a_subroutine_call (t_addr **ret_addrs);
 extern int32 z80_dasm(char *S, const uint32 *val, const int32 addr);
 extern t_stat z80_cmd_reg(int32 flag, CONST char *cptr);
 extern t_bool z80_is_pc_a_subroutine_call(t_addr **ret_addrs);
+extern t_stat z80_show_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 
 #endif

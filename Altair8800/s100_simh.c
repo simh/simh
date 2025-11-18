@@ -42,6 +42,7 @@ static int32 simh_io_data(const int32 port, const int32 io, const int32 data);
 static int32 simh_io_cmd(const int32 port, const int32 io, const int32 data);
 static int32 simh_cmd_in(const int32 port);
 static int32 simh_cmd_out(const int32 port, const int32 data);
+static t_stat simh_show_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 static void createCPMCommandLine(void);
 static void attachCPM(UNIT *uptr, int32 readOnly);
 static void detachCPM(UNIT *uptr);
@@ -125,7 +126,7 @@ DEVICE simh_dev = {
     NULL, NULL, &simh_dev_reset,
     NULL, NULL, NULL,
     NULL, (DEV_DISABLE | DEV_DEBUG), 0,
-    generic_dt, NULL, NULL, NULL, NULL, NULL, &simh_description
+    generic_dt, NULL, NULL, &simh_show_help, NULL, NULL, &simh_description
 };
 
 static char cpmCommandLine[CPM_COMMAND_LINE_LENGTH];
@@ -491,5 +492,16 @@ static int32 simh_io_cmd(const int32 port, const int32 io, const int32 data)
     }
 
     return result;
+}
+
+static t_stat simh_show_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+{
+    fprintf (st, "\nSIMH Pseudo Device (%s)\n", dptr->name);
+
+    fprint_set_help (st, dptr);
+    fprint_show_help (st, dptr);
+    fprint_reg_help (st, dptr);
+
+    return SCPE_OK;
 }
 

@@ -70,11 +70,13 @@ DEVICE *sim_devices[] = {
     &bram_dev,
     &rom_dev,
     &po_dev,
-    &dsk_dev,
+    &mdsk_dev,
     &m2sio0_dev,
     &m2sio1_dev,
     &sio_dev,
+    &sbc200_dev,
     &tarbell_dev,
+    &vfii_dev,
     NULL
 };
 

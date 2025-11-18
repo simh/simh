@@ -37,15 +37,24 @@
 #define UNIT_SIO_CONSOLE        (1 << UNIT_SIO_V_CONSOLE)
 
 typedef struct {
-    char  *name;      /* Name                       */
-    int32 base;       /* Base Port                  */
-    int32 status;     /* Status Port Offset         */
-    int32 data;       /* Data Port Offset           */
-    int32 rdf_mask;   /* Receive Data Full Mask     */
-    int32 rdf_bit;    /* Receive Data Full Bit      */
-    int32 tbe_mask;   /* Transmit Buffer Empty Mask */
-    int32 tbe_bit;    /* Transmit Buffer Empty Bit  */
+    uint8 type;     /* Type Value                        */
+    char *name;     /* Name                              */
+    char *desc;     /* Description                       */
+    int32 base;     /* Base Port                         */
+    int32 stat;     /* Status Port Offset                */
+    int32 data;     /* Data Port Offset                  */
+    int32 rdre;     /* Receive Data Register Empty Mask  */
+    int32 rdrf;     /* Receive Data Register Full Mask   */
+    int32 tdre;     /* Transmit Data Register Empty Mask */
+    int32 tdrf;     /* Transmit Data Register Full Mask  */
 } SIO;
+
+typedef struct {
+    uint8 type;     /* Board SIO Configuration Type      */
+    char *name;     /* Board Name                        */
+    char *desc;     /* Board Description                 */
+    int32 base;     /* Board Base I/O Address            */
+} SIO_BOARD;
 
 #endif
 

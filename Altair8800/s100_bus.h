@@ -120,6 +120,11 @@ extern int32 nulldev(CONST int32 addr, CONST int32 io, CONST int32 data);
 extern uint32 s100_bus_set_addr(uint32 pc);
 extern uint32 s100_bus_get_addr(void);
 
+extern t_stat s100_bus_console(UNIT *uptr);
+extern UNIT *s100_bus_get_console(void);
+extern t_stat s100_bus_noconsole(UNIT *uptr);
+extern t_stat s100_bus_poll_kbd(UNIT *uptr);
+
 extern int32 s100_bus_in(int32 port);
 extern void s100_bus_out(int32 port, int32 data);
 extern int32 s100_bus_memr(t_addr addr);

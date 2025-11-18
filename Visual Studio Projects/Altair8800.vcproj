@@ -252,6 +252,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\Altair8800\sds_sbc200.c"
+				>
+			</File>
+			<File
+				RelativePath="..\Altair8800\sds_vfii.c"
+				>
+			</File>
+			<File
 				RelativePath="..\Altair8800\tarbell_fdc.c"
 				>
 			</File>
@@ -374,6 +382,10 @@
 			</File>
 			<File
 				RelativePath="..\Altair8800\s100_z80.h"
+				>
+			</File>
+			<File
+				RelativePath="..\Altair8800\sds_vfii.h"
 				>
 			</File>
 			<File

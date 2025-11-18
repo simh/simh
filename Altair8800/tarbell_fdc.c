@@ -36,7 +36,7 @@
 
 #define DEV_NAME    "TARBELL"
 
-WD17XX_INFO *wd17xx = NULL;
+static WD17XX_INFO *wd17xx = NULL;
 
 /* Debug flags */
 #define VERBOSE_MSG (1 << 0)
@@ -80,6 +80,7 @@ static void tarbell_enable_prom(void);
 static void tarbell_disable_prom(void);
 static int32 tarbell_io(const int32 port, const int32 io, const int32 data);
 static int32 tarbell_memio(const int32 addr, const int32 rw, const int32 data);
+static t_stat tarbell_show_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 static const char* tarbell_description(DEVICE *dptr);
 
 static UNIT tarbell_unit[TARBELL_NUM_DRIVES] = {
@@ -134,7 +135,7 @@ DEVICE tarbell_dev = {
     NULL, NULL, &tarbell_reset,
     &tarbell_boot, &tarbell_attach, &tarbell_detach,
     &tarbell_res, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), 0,
-    tarbell_dt, NULL, NULL, NULL, NULL, NULL, &tarbell_description
+    tarbell_dt, NULL, NULL, &tarbell_show_help, NULL, NULL, &tarbell_description
 };
 
 /* Reset routine */
@@ -266,7 +267,7 @@ static int32 tarbell_io(const int32 port, const int32 io, const int32 data)
 {
     int32 result = 0xff;
 
-    if(io) { /* I/O Write */
+    if (io == S100_IO_WRITE) { /* I/O Write */
 
         switch (port & TARBELL_IO_MASK) {
             case WD17XX_REG_COMMAND:
@@ -336,6 +337,19 @@ static int32 tarbell_io(const int32 port, const int32 io, const int32 data)
     return result;
 }
 
+/*
+ * The Tarbell Floppy Disk Constroller has a 32-byte PROM
+ * located at 0x0000. The PROM loads the first sector of
+ * track 0 from drive 0 into 0x0000. Since the PROM is
+ * active at 0x0000, the Tarbell asserts /PHANTOM. While
+ * /PHANTOM is asserted, memory reads from 0x0000-0x001f
+ * will be provided by the Tarbell PROM, while memory
+ * writes to those locations will be handled by the RAM
+ * board. /PHANTOM is simulated below by passing requests
+ * to the RAM board configured on the BUS for the first
+ * page of RAM. The PROM is disabled and /PHANTOM is
+ * deasserted when A5 is active.
+ */
 static int32 tarbell_memio(const int32 addr, const int32 rw, const int32 data)
 {
     if (rw == S100_IO_READ) {
@@ -440,3 +454,16 @@ static t_stat tarbell_show_prom(FILE *st, UNIT *uptr, int32 val, CONST void *des
 
     return SCPE_OK;
 }
+
+static t_stat tarbell_show_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+{
+    fprintf (st, "\nTarbell Model 1011/2022 Disk Controller (%s)\n", dptr->name);
+
+    fprint_set_help (st, dptr);
+    fprint_show_help (st, dptr);
+    fprint_reg_help (st, dptr);
+    tmxr_attach_help(st, dptr, uptr, flag, cptr);
+
+    return SCPE_OK;
+}
+
