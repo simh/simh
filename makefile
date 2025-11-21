@@ -216,6 +216,10 @@ ifneq (3,${SIM_MAJOR})
   ifneq (,$(or $(findstring pdp6,${MAKECMDGOALS}),$(findstring pdp10-ka,${MAKECMDGOALS}),$(findstring pdp10-ki,${MAKECMDGOALS})))
     VIDEO_USEFUL = true
   endif
+  # building the Altair8800 could use video support
+  ifneq (,$(findstring altair8800,${MAKECMDGOALS}))
+    VIDEO_USEFUL = true
+  endif
   # building the AltairZ80 could use video support
   ifneq (,$(findstring altairz80,${MAKECMDGOALS}))
     VIDEO_USEFUL = true
@@ -2218,6 +2222,29 @@ ALTAIR = ${ALTAIRD}/altair_sio.c ${ALTAIRD}/altair_cpu.c ${ALTAIRD}/altair_dsk.c
 ALTAIR_OPT = -I ${ALTAIRD}
 
 
+ALTAIR8800D = ${SIMHD}/Altair8800
+ALTAIR8800 = \
+    ${ALTAIR8800D}/altair8800_sys.c \
+    ${ALTAIR8800D}/altair8800_dsk.c \
+    ${ALTAIR8800D}/s100_bus.c \
+    ${ALTAIR8800D}/s100_bram.c \
+    ${ALTAIR8800D}/s100_cpu.c \
+    ${ALTAIR8800D}/s100_po.c \
+    ${ALTAIR8800D}/s100_simh.c \
+    ${ALTAIR8800D}/s100_sio.c \
+    ${ALTAIR8800D}/s100_ssw.c \
+    ${ALTAIR8800D}/s100_ram.c \
+    ${ALTAIR8800D}/s100_rom.c \
+    ${ALTAIR8800D}/s100_z80.c \
+    ${ALTAIR8800D}/mits_2sio.c \
+    ${ALTAIR8800D}/mits_dsk.c \
+    ${ALTAIR8800D}/sds_sbc200.c \
+    ${ALTAIR8800D}/sds_vfii.c \
+    ${ALTAIR8800D}/tarbell_fdc.c \
+    ${ALTAIR8800D}/wd_17xx.c
+ALTAIR8800_OPT = $(ALTAIR8800_GCC_OPT) -I ${ALTAIR8800D} -DUSE_SIM_VIDEO ${VIDEO_CCDEFS}
+
+
 ALTAIRZ80D = ${SIMHD}/AltairZ80
 ALTAIRZ80 = ${ALTAIRZ80D}/altairz80_cpu.c ${ALTAIRZ80D}/altairz80_cpu_nommu.c \
 	${ALTAIRZ80D}/s100_dazzler.c \
@@ -2540,8 +2567,8 @@ ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	microvax2000 infoserver100 infoserver150vxt microvax3100 microvax3100e \
 	vaxstation3100m30 vaxstation3100m38 vaxstation3100m76 vaxstation4000m60 \
 	microvax3100m80 vaxstation4000vlc infoserver1000 \
-	nd100 nova eclipse hp2100 hp3000 i1401 i1620 s3 altair altairz80 gri \
-	i7094 ibm1130 id16 id32 sds lgp h316 cdc1700 \
+	nd100 nova eclipse hp2100 hp3000 i1401 i1620 s3 altair altair8800 \
+	altairz80 gri i7094 ibm1130 id16 id32 sds lgp h316 cdc1700 \
 	swtp6800mp-a swtp6800mp-a2 tx-0 ssem b5500 intel-mds \
 	scelbi 3b2 3b2-700 i701 i704 i7010 i7070 i7080 i7090 \
 	sigma uc15 pdp10-ka pdp10-ki pdp10-kl pdp10-ks pdp6 i650 \
@@ -2867,6 +2894,12 @@ altair : $(BIN)altair$(EXE)
 
 $(BIN)altair$(EXE) : ${ALTAIR} ${SIM}
 	$(MAKEIT) OPTS="$(ALTAIR_OPT)"
+
+
+altair8800 : $(BIN)altair8800$(EXE)
+
+$(BIN)altair8800$(EXE) : ${ALTAIR8800} ${SIM}
+	$(MAKEIT) OPTS="$(ALTAIR8800_OPT)"
 
 
 altairz80 : $(BIN)altairz80$(EXE)
