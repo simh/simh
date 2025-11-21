@@ -950,7 +950,7 @@ while (reason == 0) {
             break;
 
         case 0x61:                                      /* AMASK */
-            res = rbv & ~arch_mask;
+            res = rbv & ~((t_uint64)arch_mask);
             break;
 
         case 0x64:                                      /* CMOVLE */

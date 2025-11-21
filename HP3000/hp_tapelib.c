@@ -1732,7 +1732,8 @@ else {                                                  /* otherwise the command
         dpprintf (cvptr->device, TL_DEB_CMD, "%s succeeded\n",
                   opcode_names [opcode]);
 
-        outbound = IFGTC | RQSRV | Class_Control;       /* indicate that a control command was executed */
+        outbound = (CNTLR_IFN_IBUS)IFGTC | (CNTLR_IFN_IBUS)RQSRV | (CNTLR_IFN_IBUS)Class_Control;
+                                                        /* indicate that a control command was executed */
         }
 
     else if (flags & CMXEQ) {                           /* otherwise if the command is to be executed */
@@ -1745,7 +1746,8 @@ else {                                                  /* otherwise the command
             CNTLR_UPTR->PHASE = Wait_Phase;             /*   then set up the wait phase */
             CNTLR_UPTR->OPCODE = opcode;                /*     and command opcode on the controller unit */
 
-            outbound = IFGTC | RQSRV | cmd_props [opcode].class;    /* return the transfer class (read or write) */
+            outbound = (CNTLR_IFN_IBUS)IFGTC | (CNTLR_IFN_IBUS)RQSRV | (CNTLR_IFN_IBUS)(cmd_props [opcode].class);
+                                                        /* return the transfer class (read or write) */
             }
 
         else {                                          /* otherwise it's a control command */
@@ -1765,7 +1767,8 @@ else {                                                  /* otherwise the command
 
             activate_unit (cvptr, uptr);                /* schedule the start phase */
 
-            outbound = IFGTC | Class_Control;           /* indicate a control command is executing */
+            outbound = (CNTLR_IFN_IBUS)IFGTC | (CNTLR_IFN_IBUS)Class_Control;
+                                                                /* indicate a control command is executing */
             }
         }
 

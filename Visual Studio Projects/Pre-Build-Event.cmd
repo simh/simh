@@ -25,7 +25,9 @@ rem       - performing the activities which make confirm or generate the git
 rem         repository commit id available in an include file during compiles.
 rem
 rem
+
 set _CONFIGURATION_DIR=%~p1
+set _CONFIGURATION_NAME=Debug
 if not "Debug" == "%_CONFIGURATION_DIR:~-6,-1%" if not "Debug\BuildTools" == "%_CONFIGURATION_DIR:~-17,-1%" set _CONFIGURATION_NAME=Release
 
 set _PDB=%~dpn1.pdb
@@ -40,7 +42,7 @@ set _ARG=
 rem Everything implicitly requires BUILD to also be set to have 
 rem any meaning, it always gets set.
 set _X_BUILD=BUILD
-set _X_REQUIRED_WINDOWS_BUILD=20251112
+set _X_REQUIRED_WINDOWS_BUILD=20251119
 call :FindVCVersion _VC_VER _MSVC_VER _MSVC_TOOLSET_VER  _MSVC_TOOLSET_DIR
 echo _VC_VER=%_VC_VER%
 echo _MSVC_VER=%_MSVC_VER%
@@ -65,8 +67,7 @@ goto _next_arg
 pushd ..
 if "%_X_ROM%" == "" goto _done_rom
 SET _BLD=
-if exist BIN\NT\Win32-Debug\BuildTools\BuildROMs.exe SET _BLD=BIN\NT\Win32-%_CONFIGURATION_NAME%\BuildTools\BuildROMs.exe
-if exist BIN\NT\Win32-Release\BuildTools\BuildROMs.exe SET _BLD=BIN\NT\Win32-%_CONFIGURATION_NAME%\BuildTools\BuildROMs.exe
+if exist "BIN\NT\Win32-%_CONFIGURATION_NAME%\BuildTools\BuildROMs.exe" SET _BLD=BIN\NT\Win32-%_CONFIGURATION_NAME%\BuildTools\BuildROMs.exe
 if "%_BLD%" == "" echo ************************************************
 if "%_BLD%" == "" echo ************************************************
 if "%_BLD%" == "" echo **  Project dependencies are not correct.     **
@@ -77,8 +78,7 @@ if "%_BLD%" == "" echo error: Review the Output Tab for more details.
 if "%_BLD%" == "" exit 1
 %_BLD%
 if not errorlevel 1 goto _done_rom
-if not exist "BIN\NT\Win32-Release\BuildTools\BuildROMs.exe" exit 1
-del "BIN\NT\Win32-Release\BuildTools\BuildROMs.exe"
+if not exist "BIN\NT\Win32-%_CONFIGURATION_NAME%\BuildTools\BuildROMs.exe" exit 1
 popd
 goto _do_rom
 :_done_rom
@@ -530,6 +530,7 @@ if "%_VC_NUM_%" neq "" set %_VC_TMP%=%~1
 if "%_VC_NUM_%" neq "" goto _VCCheck_Done
 goto _VCCheck_Next
 :_VCCheck_Done
+if "%~1" equ "18" set %_VC_TMP%=2026
 set _VC_TMP=_MSVC_TOOLSET_
 :_VCTSCheck_Next
 shift
