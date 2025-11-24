@@ -36,13 +36,15 @@
 #include "s100_cpu.h"
 #include "s100_simh.h"
 
-static t_stat simh_dev_reset(DEVICE *dptr);
+static t_stat simh_reset(DEVICE *dptr);
 static int32 simh_io_status(const int32 port, const int32 io, const int32 data);
 static int32 simh_io_data(const int32 port, const int32 io, const int32 data);
 static int32 simh_io_cmd(const int32 port, const int32 io, const int32 data);
 static int32 simh_cmd_in(const int32 port);
 static int32 simh_cmd_out(const int32 port, const int32 data);
 static t_stat simh_show_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+static void deleteNameList(void);
+static void processDirEntry(const char *directory, const char *filename, t_offset FileSize, const struct stat *filestat, void *context);
 static void createCPMCommandLine(void);
 static void attachCPM(UNIT *uptr, int32 readOnly);
 static void detachCPM(UNIT *uptr);
@@ -121,13 +123,23 @@ const char* simh_description(DEVICE *dptr) {
 DEVICE simh_dev = {
     "SIMH", &simh_unit, simh_reg, simh_mod,
     1, ADDRRADIX, ADDRWIDTH, 1, DATARADIX, DATAWIDTH,
-    NULL, NULL, &simh_dev_reset,
+    NULL, NULL, &simh_reset,
     NULL, NULL, NULL,
     NULL, (DEV_DISABLE | DEV_DEBUG), 0,
     generic_dt, NULL, NULL, &simh_show_help, NULL, NULL, &simh_description
 };
 
+typedef struct NameNode {
+    char *name;
+    struct NameNode *next;
+} NameNode_t;
+
 static char cpmCommandLine[CPM_COMMAND_LINE_LENGTH];
+static NameNode_t *nameListHead         = NULL;
+static NameNode_t *currentName          = NULL;
+static int32 currentNameIndex           = 0;
+static int32 lastPathSeparatorIndex     = 0;
+static int32 firstPathCharacterIndex    = 0;
 
 /*  Z80 or 8080 programs communicate with the SIMH pseudo device via port 0xfe.
         The following principles apply:
@@ -183,6 +195,7 @@ static char cpmCommandLine[CPM_COMMAND_LINE_LENGTH];
 #define setZ80CPUCmd              19  /* 19 set the CPU to a Z80                                              */
 #define set8080CPUCmd             20  /* 20 set the CPU to an 8080                                            */
 #define getHostOSPathSeparatorCmd 28  /* 28 obtain the file path separator of the OS under which SIMH runs    */
+#define getHostFilenamesCmd       29  /* 29 perform wildcard expansion and obtain list of file names          */
 #define kSimhPseudoDeviceCommands 35  /* Highest AltairZ80 SIMH command                                       */
 
 static const char *cmdNames[kSimhPseudoDeviceCommands] = {
@@ -215,7 +228,7 @@ static const char *cmdNames[kSimhPseudoDeviceCommands] = {
     "Undefined",
     "Undefined",
     "getHostOSPathSeparator",
-    "Undefined",
+    "getHostFilenames",
     "Undefined",
     "Undefined",
     "Undefined",
@@ -225,7 +238,7 @@ static const char *cmdNames[kSimhPseudoDeviceCommands] = {
 
 static char version[] = "SIMH005";
 
-static t_stat simh_dev_reset(DEVICE *dptr) {
+static t_stat simh_reset(DEVICE *dptr) {
     if (dptr->flags & DEV_DIS) {
         s100_bus_remio(0xfe, 1, &simh_io_cmd);        /* Command Port */
     }
@@ -244,6 +257,32 @@ static t_stat simh_dev_reset(DEVICE *dptr) {
 
     return SCPE_OK;
 }
+
+static void deleteNameList(void)
+{
+    while (nameListHead != NULL) {
+        NameNode_t *next = nameListHead -> next;
+        free(nameListHead -> name);
+        free(nameListHead);
+        nameListHead = next;
+    }
+
+    currentName = NULL;
+    currentNameIndex = 0;
+}
+
+static void processDirEntry(const char *directory, const char *filename, t_offset FileSize, const struct stat *filestat, void *context)
+{
+    if (filename != NULL) {
+        NameNode_t *top = (NameNode_t *) malloc(sizeof(NameNode_t));
+        if (top) {
+            top->name = strdup(filename);
+            top->next = nameListHead;
+            nameListHead = top;
+        }
+    }
+}
+
 
 static void createCPMCommandLine(void) {
     int32 i, len = (s100_bus_memr(FCBAddress) & 0x7f); /* 0x80 contains length of command line, discard first char   */
@@ -332,17 +371,43 @@ static int32 simh_cmd_in(const int32 port)
             result = sim_file_path_separator;
             break;
 
+        case getHostFilenamesCmd:
+            if (nameListHead != NULL) {
+                if (currentName == NULL) {
+                    deleteNameList();
+                    lastCommand = 0;
+                }
+                else if (firstPathCharacterIndex <= lastPathSeparatorIndex) {
+                    result = cpmCommandLine[firstPathCharacterIndex++];
+                }
+                else {
+                    result = currentName -> name[currentNameIndex];
+
+                    if (result == 0) {
+                        currentName = currentName -> next;
+                        firstPathCharacterIndex = currentNameIndex = 0;
+                    }
+                    else {
+                        currentNameIndex++;
+                    }
+                }
+            }
+            break;
+
         default:
             sim_debug(VERBOSE_MSG, &simh_dev, "SIMH: " ADDRESS_FORMAT
                       " Undefined IN from SIMH pseudo device on port %03xh ignored.\n",
                       s100_bus_get_addr(), port);
+
             result = lastCommand = 0;
     }
 
     return result;
 }
 
-static int32 simh_cmd_out(const int32 port, const int32 data) {
+static int32 simh_cmd_out(const int32 port, const int32 data)
+{
+    t_stat result;
 
     switch(lastCommand) {
         default: /* lastCommand not yet set */
@@ -394,6 +459,40 @@ static int32 simh_cmd_out(const int32 port, const int32 data) {
                 case getHostOSPathSeparatorCmd:
                     break;
 
+                case getHostFilenamesCmd:   /* list files of host file directory */
+                    if (nameListHead == NULL) {
+
+                        createCPMCommandLine();
+
+                        lastPathSeparatorIndex = 0;
+
+                        while (cpmCommandLine[lastPathSeparatorIndex]) {
+                            lastPathSeparatorIndex++;
+                        }
+
+                        while ((lastPathSeparatorIndex >= 0) && (cpmCommandLine[lastPathSeparatorIndex] != sim_file_path_separator)) {
+                            lastPathSeparatorIndex--;
+                        }
+
+                        firstPathCharacterIndex = 0;
+
+                        deleteNameList();
+
+                        result = sim_dir_scan(cpmCommandLine, processDirEntry, NULL);
+
+                        if (result == SCPE_OK) {
+                            currentName = nameListHead;
+                            currentNameIndex = 0;
+                        }
+                        else {
+                            deleteNameList();
+
+                            sim_debug(VERBOSE_MSG, &simh_dev, "SIMH: " ADDRESS_FORMAT " Cannot expand '%s'. Error is %s.\n",
+                                      s100_bus_get_addr(), cpmCommandLine, sim_error_text(result));
+                        }
+                    }
+                    break;
+
                 default:
                     sim_debug(CMD_MSG, &simh_dev, "SIMH: " ADDRESS_FORMAT
                               " Unknown command (%i) to SIMH pseudo device on port %03xh ignored.\n",
@@ -404,20 +503,22 @@ static int32 simh_cmd_out(const int32 port, const int32 data) {
     return 0xff; /* ignored, since OUT */
 }
 
-/* port 0xfc is a device for communication SIMH <--> Altair machine */
+/* port 0x12 is a device for communication SIMH <--> Altair machine */
 static int32 simh_io_status(const int32 port, const int32 io, const int32 data)
 {
-    if (io == S100_IO_READ) {                                          /* IN                                       */
-        if ((simh_unit.flags & UNIT_ATT) == 0) {             /* SIMH is not attached                      */
+    if (io == S100_IO_READ) {                                /* IN                   */
+        if ((simh_unit.flags & UNIT_ATT) == 0) {             /* SIMH is not attached */
             if ((simh_dev.dctrl & VERBOSE_MSG) && (warnUnattachedSIMH < warnLevelSIMH)) {
                 warnUnattachedSIMH++;
-/*06*/          sim_debug(VERBOSE_MSG, &simh_dev, "PTR: " ADDRESS_FORMAT
+
+                sim_debug(VERBOSE_MSG, &simh_dev, "PTR: " ADDRESS_FORMAT
                           " Attempt to test status of unattached SIMH[0x%02x]. 0x02 returned.\n", s100_bus_get_addr(), port);
             }
+
             return SIMH_CAN_WRITE;
         }
-                                                            /* if EOF then SIMH_CAN_WRITE else
-                                                                (SIMH_CAN_WRITE and SIMH_CAN_READ)        */
+
+        /* if EOF then SIMH_CAN_WRITE else (SIMH_CAN_WRITE and SIMH_CAN_READ) */
         return simh_unit.u3 ? SIMH_CAN_WRITE : (SIMH_CAN_READ | SIMH_CAN_WRITE);
     }                                                       /* OUT follows                              */
     if (data == SIMH_RESET) {
@@ -425,47 +526,58 @@ static int32 simh_io_status(const int32 port, const int32 io, const int32 data)
         sim_debug(CMD_MSG, &simh_dev, "SIMH: " ADDRESS_FORMAT
                   " Command OUT(0x%03x) = 0x%02x\n", s100_bus_get_addr(), port, data);
     }
+
     return 0x00;                                            /* ignored since OUT                        */
 }
 
-/* port 0xfd is a device for communication SIMH <--> Altair machine */
+/* port 0x13 is a device for communication SIMH <--> Altair machine */
 static int32 simh_io_data(const int32 port, const int32 io, const int32 data)
 {
     int32 ch;
 
-    if (io == S100_IO_READ) {                                /* IN                                       */
-        if (simh_unit.u3) {                                  /* EOF reached, no more data available      */
+    if (io == S100_IO_READ) {  /* IN                                       */
+        if (simh_unit.u3) {    /* EOF reached, no more data available      */
             if ((simh_dev.dctrl & VERBOSE_MSG) && (warnSIMHEOF < warnLevelSIMH)) {
                 warnSIMHEOF++;
-/*07*/          sim_debug(VERBOSE_MSG, &simh_dev, "PTR: " ADDRESS_FORMAT
+
+                sim_debug(VERBOSE_MSG, &simh_dev, "PTR: " ADDRESS_FORMAT
                           " SIMH[0x%02x] attempted to read past EOF. 0x00 returned.\n", s100_bus_get_addr(), port);
             }
+
             return 0x00;
         }
+
         if ((simh_unit.flags & UNIT_ATT) == 0) {             /* not attached                             */
             if ((simh_dev.dctrl & VERBOSE_MSG) && (warnUnattachedSIMH < warnLevelSIMH)) {
                 warnUnattachedSIMH++;
-/*08*/          sim_debug(VERBOSE_MSG, &simh_dev, "SIMH: " ADDRESS_FORMAT
+                sim_debug(VERBOSE_MSG, &simh_dev, "SIMH: " ADDRESS_FORMAT
                           " Attempt to read from unattached SIMH[0x%02x]. 0x00 returned.\n", s100_bus_get_addr(), port);
             }
+
             return 0x00;
         }
+
         if ((ch = getc(simh_unit.fileref)) == EOF) {         /* end of file?                             */
             simh_unit.u3 = TRUE;                             /* remember EOF reached                     */
             sim_debug(VERBOSE_MSG, &simh_dev, "SIMH: " ADDRESS_FORMAT
                       " EOF on read\n", s100_bus_get_addr());
+
             return CONTROLZ_CHAR;                           /* ^Z denotes end of text file in CP/M      */
         }
+
         return ch & 0xff;
     }                                                       /* OUT follows                              */
-    if (simh_unit.flags & UNIT_ATT)                          /* unit must be attached                    */
+
+    if (simh_unit.flags & UNIT_ATT) {                       /* unit must be attached                    */
         putc(data, simh_unit.fileref);
-                                                            /* else ignore data                         */
+    }
     else if ((simh_dev.dctrl & VERBOSE_MSG) && (warnUnattachedSIMH < warnLevelSIMH)) {
         warnUnattachedSIMH++;
-/*09*/  sim_debug(VERBOSE_MSG, &simh_dev, "SIMH: " ADDRESS_FORMAT
+
+        sim_debug(VERBOSE_MSG, &simh_dev, "SIMH: " ADDRESS_FORMAT
                   " Attempt to output '0x%02x' to unattached SIMH[0x%02x] - ignored.\n", s100_bus_get_addr(), data, port);
     }
+
     return 0x00;                                            /* ignored since OUT                        */
 }
 
@@ -481,7 +593,8 @@ static int32 simh_io_cmd(const int32 port, const int32 io, const int32 data)
                   port, result, result,
                   (32 <= (result & 0xff)) && ((result & 0xff) <= 127) ? (result & 0xff) : '?');
 
-    } else {
+    }
+    else {
         sim_debug(OUT_MSG, &simh_dev, "SIMH: " ADDRESS_FORMAT
                   " OUT(0x%02x) <- %i (0x%02x, '%c')\n", s100_bus_get_addr(),
                   port, data, data,

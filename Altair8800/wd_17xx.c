@@ -45,6 +45,7 @@ static uint8 wd17xx_sec_len(WD17XX_INFO *wd);
 static t_stat wd17xx_read_sector(WD17XX_INFO *wd, uint8 *sbuf, int32 *bytesread);
 static t_stat wd17xx_write_sector(WD17XX_INFO *wd, uint8 *sbuf, int32 *byteswritten);
 static void wd17xx_set_intrq(WD17XX_INFO *wd, int32 value);
+static void wd17xx_set_drq(WD17XX_INFO *wd, int32 value);
 
 WD17XX_INFO * wd17xx_init(DEVICE *dptr)
 {
@@ -601,13 +602,13 @@ static void wd17xx_command(WD17XX_INFO *wd, uint8 cmd)
 
             wd->status |= (WD17XX_STAT_DRQ);       /* Set DRQ */
             wd->status |= (wd->dsk->unit->flags & UNIT_RO) ? WD17XX_STAT_WP : 0;       /* Set WP  */
-            wd->drq = 1;
             wd->fdc_datacount = dsk_sector_size(wd->dsk, wd->track, wd->side);
             wd->fdc_dataindex = 0;
             wd->fdc_write = TRUE;
             wd->fdc_write_track = FALSE;
             wd->fdc_read = FALSE;
             wd->fdc_readadr = FALSE;
+            wd17xx_set_drq(wd, 1);
 
             sbuf[wd->fdc_dataindex] = wd->data;
             break;
@@ -626,11 +627,11 @@ static void wd17xx_command(WD17XX_INFO *wd, uint8 cmd)
                 wd17xx_set_intrq(wd, TRUE);
             } else {
                 wd->status = (WD17XX_STAT_DRQ | WD17XX_STAT_BUSY);     /* Set DRQ, BUSY */
-                wd->drq = 1;
                 wd->fdc_datacount = 6;
                 wd->fdc_dataindex = 0;
                 wd->fdc_read = TRUE;
                 wd->fdc_readadr = TRUE;
+                wd17xx_set_drq(wd, 1);
 
                 sbuf[0] = wd->track;
                 sbuf[1] = wd->side;
@@ -676,13 +677,13 @@ static void wd17xx_command(WD17XX_INFO *wd, uint8 cmd)
             sim_debug(wd->dbg_command, wd->dptr, WD17XX_NAME ADDRESS_FORMAT " CMD=FORCE_INTR\n", s100_bus_get_addr());
             if ((cmd & WD17XX_CMD_MASK) == 0) { /* I0-I3 == 0, no intr, but clear BUSY and terminate command */
                 wd->status &= ~(WD17XX_STAT_DRQ | WD17XX_STAT_BUSY); /* Clear DRQ, BUSY */
-                wd->drq = 0;
                 wd->fdc_write = FALSE;
                 wd->fdc_read = FALSE;
                 wd->fdc_write_track = FALSE;
                 wd->fdc_readadr = FALSE;
                 wd->fdc_datacount = 0;
                 wd->fdc_dataindex = 0;
+                wd17xx_set_drq(wd, 0);
             }
             else if (cmd & 0x08) {   /* Immediate Interrupt */
                 wd17xx_set_intrq(wd, TRUE);
@@ -757,7 +758,7 @@ static void wd17xx_command(WD17XX_INFO *wd, uint8 cmd)
                 s100_bus_int(1 << wd->intvector, wd->intvector * 2);
             }
 
-            wd->drq = 1;
+            wd17xx_set_drq(wd, 1);
             break;
 
         /* Type IV Commands */
@@ -838,6 +839,12 @@ static void wd17xx_set_intrq(WD17XX_INFO *wd, int32 value)
 {
     wd->intrq = (value) ? TRUE : FALSE;  /* INTRQ and DRQ are mutually exclusive */
     wd->drq = !wd->intrq;
+}
+
+static void wd17xx_set_drq(WD17XX_INFO *wd, int32 value)
+{
+    wd->drq = (value) ? TRUE : FALSE;  /* INTRQ and DRQ are mutually exclusive */
+    wd->intrq = !wd->drq;
 }
 
 void wd17xx_show(WD17XX_INFO *wd)
