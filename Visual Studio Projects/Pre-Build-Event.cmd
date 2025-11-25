@@ -42,7 +42,7 @@ set _ARG=
 rem Everything implicitly requires BUILD to also be set to have 
 rem any meaning, it always gets set.
 set _X_BUILD=BUILD
-set _X_REQUIRED_WINDOWS_BUILD=20251119
+set _X_REQUIRED_WINDOWS_BUILD=20251125
 call :FindVCVersion _VC_VER _MSVC_VER _MSVC_TOOLSET_VER  _MSVC_TOOLSET_DIR
 echo _VC_VER=%_VC_VER%
 echo _MSVC_VER=%_MSVC_VER%
@@ -146,7 +146,6 @@ set _X_LAST_WINDOWS_BUILD=
 if not exist ../../windows-build/lib/VisualCVersionSupport.txt goto _find_vc_support
 
 set _X_VC_VER=
-SET _X_MSVC_VER=
 if "%_MSVC_TOOLSET_VER%" EQU "v140" set _VC_VER=2015
 if "%_MSVC_TOOLSET_VER%" EQU "v141" set _VC_VER=2017
 if "%_MSVC_TOOLSET_VER%" EQU "v142" set _VC_VER=2019
@@ -154,11 +153,6 @@ if "%_MSVC_TOOLSET_VER%" EQU "v143" set _VC_VER=2022
 if "%_MSVC_TOOLSET_VER%" EQU "v144" set _VC_VER=2022
 if "%_MSVC_TOOLSET_VER%" EQU "v145" set _VC_VER=2026
 for /F "usebackq tokens=2*" %%i in (`findstr /C:"_VC_VER=%_VC_VER% " ..\..\windows-build\lib\VisualCVersionSupport.txt`) do SET _X_VC_VER=%%i %%j
-for /F "usebackq delims== tokens=2" %%i in (`findstr /C:"_MSVC_VER=" ..\..\windows-build\lib\VisualCVersionSupport.txt`) do SET _X_MSVC_VER=%%i
-echo _MSVC_VER=%_MSVC_VER%
-echo _X_MSVC_VER=%_X_MSVC_VER%
-if "%_X_VC_VER%" neq "" if "%_X_MSVC_VER%" neq "" echo Library support for %_X_VC_VER% (%_X_MSVC_VER%) is available
-if "%_X_VC_VER%" neq "" if "%_X_MSVC_VER%" neq "" goto _done_libsdl
 if "%_X_VC_VER%" neq "" echo Library support for %_X_VC_VER% is available
 if "%_X_VC_VER%" neq "" goto _done_libsdl
 :_find_vc_support
@@ -167,7 +161,7 @@ for /d %%i in ("../../windows-build/lib/*") do call :CheckDirectoryVCSupport _X_
 if "%_X_VC_VER_DIR%" equ "" goto _notice4
 :_make_vc_support_active
 for /F "usebackq tokens=2*" %%i in (`findstr /C:"_VC_VER=%_VC_VER% " "%_X_VC_VER_DIR%\VisualCVersionSupport.txt"`) do SET _X_VC_VER=%%i %%j
-echo Enabling Library support for %_X_VC_VER%
+echo Enabling Library support for %_X_VC_VER% from %_X_VC_VER_DIR%
 call "%_X_VC_VER_DIR%\Install-Library-Support.cmd"
 :_done_libsdl
 call :FindVCVersion _VC_VER _MSVC_VER _MSVC_TOOLSET_VER _MSVC_TOOLSET_DIR
@@ -359,18 +353,6 @@ echo **  that.                                          **
 echo *****************************************************
 echo *****************************************************
 echo.
-echo _CONFIGURATION_NAME=%_CONFIGURATION_NAME%
-echo.
-echo *****************************************************
-echo *****************************************************
-echo ** Prior Library Support has generally been known  **
-echo ** to work when build Debug mode simulators.       **
-echo **                                                 **
-echo ** All simulators running in Release mode need     **
-echo ** Microsoft Visual Studio specific support for    **
-echo ** the current version.                            **
-echo *****************************************************
-echo *****************************************************
 if "%_CONFIGURATION_NAME%" == "Release" goto _ProjectInfo
 goto _done_library
 goto _ProjectInfo
@@ -565,12 +547,6 @@ exit /B 0
 :CheckDirectoryVCSupport
 set _VC_Check_Path=%~3%~2/
 set _VC_Check_Path=%_VC_Check_Path:/=\%
-set _X_VC_VER=
-set _XX_VC_VER_DIR=lib-VC%_VC_VER%
-if "%_XX_VC_VER_DIR%" equ "lib-VC9" set _XX_VC_VER_DIR=lib-VC2008
-if exist "%_VC_Check_Path%\VisualCVersionSupport.txt" for /F "usebackq tokens=2*" %%i in (`findstr /C:"_VC_VER=%_VC_VER% " "%_VC_Check_Path%\VisualCVersionSupport.txt"`) do SET _X_VC_VER=%%i %%j
-if "%_XX_VC_VER_DIR%" neq "%2" exit /B 0
-if "%_VC_VER%" equ "2022" set _VC_Check_Path=%_VC_Check_Path%%_MSVC_VER%\
 if not exist "%_VC_Check_Path%VisualCVersionSupport.txt" exit /B 1
 for /F "usebackq tokens=2*" %%k in (`findstr /C:"_VC_VER=%_VC_VER% " "%_VC_Check_Path%VisualCVersionSupport.txt"`) do set %1=%_VC_Check_Path%
 exit /B 0

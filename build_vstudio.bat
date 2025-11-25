@@ -62,18 +62,6 @@ set _VC_DIR=%ProgramFiles(x86)%\Microsoft Visual Studio 9.0
 if exist "%_VC_DIR%\VC\vcvarsall.bat" call "%_VC_DIR%\VC\vcvarsall.bat" 
 call :FindVCVersion _VC_VER _MSVC_VER _MSVC_TOOLSET_VER  _MSVC_TOOLSET_DIR
 if not "%_VC_VER%" == "" goto GotVC
-set _VC_DIR=%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise
-if exist "%_VC_DIR%\VC\Auxiliary\Build\vcvars32.bat" call "%_VC_DIR%\VC\Auxiliary\Build\vcvars32.bat"
-call :FindVCVersion _VC_VER _MSVC_VER _MSVC_TOOLSET_VER  _MSVC_TOOLSET_DIR
-if not "%_VC_VER%" == "" goto GotVC
-set _VC_DIR=%ProgramFiles%\Microsoft Visual Studio\2022\Professional
-if exist "%_VC_DIR%\VC\Auxiliary\Build\vcvars32.bat" call "%_VC_DIR%\VC\Auxiliary\Build\vcvars32.bat"
-call :FindVCVersion _VC_VER _MSVC_VER _MSVC_TOOLSET_VER  _MSVC_TOOLSET_DIR
-if not "%_VC_VER%" == "" goto GotVC
-set _VC_DIR=%ProgramFiles%\Microsoft Visual Studio\2022\Community
-if exist "%_VC_DIR%\VC\Auxiliary\Build\vcvars32.bat" call "%_VC_DIR%\VC\Auxiliary\Build\vcvars32.bat"
-call :FindVCVersion _VC_VER _MSVC_VER _MSVC_TOOLSET_VER  _MSVC_TOOLSET_DIR
-if not "%_VC_VER%" == "" goto GotVC
 set _VC_DIR=%ProgramFiles%\Microsoft Visual Studio\18\Enterprise
 if exist "%_VC_DIR%\VC\Auxiliary\Build\vcvars32.bat" call "%_VC_DIR%\VC\Auxiliary\Build\vcvars32.bat"
 call :FindVCVersion _VC_VER _MSVC_VER _MSVC_TOOLSET_VER  _MSVC_TOOLSET_DIR
@@ -83,6 +71,18 @@ if exist "%_VC_DIR%\VC\Auxiliary\Build\vcvars32.bat" call "%_VC_DIR%\VC\Auxiliar
 call :FindVCVersion _VC_VER _MSVC_VER _MSVC_TOOLSET_VER  _MSVC_TOOLSET_DIR
 if not "%_VC_VER%" == "" goto GotVC
 set _VC_DIR=%ProgramFiles%\Microsoft Visual Studio\18\Community
+if exist "%_VC_DIR%\VC\Auxiliary\Build\vcvars32.bat" call "%_VC_DIR%\VC\Auxiliary\Build\vcvars32.bat"
+call :FindVCVersion _VC_VER _MSVC_VER _MSVC_TOOLSET_VER  _MSVC_TOOLSET_DIR
+if not "%_VC_VER%" == "" goto GotVC
+set _VC_DIR=%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise
+if exist "%_VC_DIR%\VC\Auxiliary\Build\vcvars32.bat" call "%_VC_DIR%\VC\Auxiliary\Build\vcvars32.bat"
+call :FindVCVersion _VC_VER _MSVC_VER _MSVC_TOOLSET_VER  _MSVC_TOOLSET_DIR
+if not "%_VC_VER%" == "" goto GotVC
+set _VC_DIR=%ProgramFiles%\Microsoft Visual Studio\2022\Professional
+if exist "%_VC_DIR%\VC\Auxiliary\Build\vcvars32.bat" call "%_VC_DIR%\VC\Auxiliary\Build\vcvars32.bat"
+call :FindVCVersion _VC_VER _MSVC_VER _MSVC_TOOLSET_VER  _MSVC_TOOLSET_DIR
+if not "%_VC_VER%" == "" goto GotVC
+set _VC_DIR=%ProgramFiles%\Microsoft Visual Studio\2022\Community
 if exist "%_VC_DIR%\VC\Auxiliary\Build\vcvars32.bat" call "%_VC_DIR%\VC\Auxiliary\Build\vcvars32.bat"
 call :FindVCVersion _VC_VER _MSVC_VER _MSVC_TOOLSET_VER  _MSVC_TOOLSET_DIR
 if not "%_VC_VER%" == "" goto GotVC
@@ -251,10 +251,10 @@ if %_BUILD_PARALLEL% GTR %NUMBER_OF_PROCESSORS% set _BUILD_PARALLEL=%NUMBER_OF_P
 set _SLN_FILE=%_BUILD_PROJECT_DIR%Simh.sln
 if exist "%_BUILD_PROJECT_DIR%Simh-%_VC_VER%.sln" set _SLN_FILE=%_BUILD_PROJECT_DIR%Simh-%_VC_VER%.sln
 SET _X_SLN_VERSION=
-echo _SLN_FILE=%_SLN_FILE%
 for /F "usebackq tokens=8" %%a in (`findstr /C:"Microsoft Visual Studio Solution File, Format Version" "%_SLN_FILE%"`) do SET _X_SLN_VERSION=%%a
 
 if not "%_VC_VER%" == "9" goto _DoMSBuild
+echo _SLN_FILE=%_SLN_FILE%
 if "%_BUILD_PROJECTS%" == "" vcbuild /nologo /M%_BUILD_PARALLEL% /useenv /rebuild "%_SLN_FILE%" "%_BUILD_CONFIG%|Win32" & goto :EOF
 
 set _BUILD_PROJECTS=%_BUILD_PROJECTS:~1%
@@ -269,9 +269,12 @@ goto _NextProject
 
 :_DoMSBuild
 if "%_X_SLN_VERSION%" == "10.00" set _NEW_SLN_FILE=%_BUILD_PROJECT_DIR%Simh-%_VC_VER%.sln
+if "%_X_SLN_VERSION%" == "10.00" echo _NEW_SLN_FILE=%_NEW_SLN_FILE%
+if "%_X_SLN_VERSION%" == "10.00" if exist "%_BUILD_PROJECT_DIR%.vs" rmdir/s/q "%_BUILD_PROJECT_DIR%.vs" 
 if "%_X_SLN_VERSION%" == "10.00" copy /y "%_SLN_FILE%" "%_NEW_SLN_FILE%" >NUL & echo Converting the VS2008 projects to VS%_VC_VER%, this will take several (5-8) minutes... & echo Project conversion starting at %TIME% & DevEnv /Upgrade "%_NEW_SLN_FILE%" & set _SLN_FILE=%_NEW_SLN_FILE%
 if not "%_NEW_SLN_FILE%" == "" echo Project conversion completed at %TIME%
 set _NEW_SLN_FILE=
+if not "%_X_SLN_VERSION%" == "10.00" echo _SLN_FILE=%_SLN_FILE%
 if not "%_VC_VER%" == "2022" if not "%_VC_VER%" == "2026" goto _RunBuild
 if exist "%_VC_DIR%\MSBuild\Microsoft\VC\v150\Platforms\Win32\PlatformToolsets\v141" goto _DoV141Convert
 for /F "usebackq tokens=8" %%a in (`findstr /C:"Microsoft Visual Studio Solution File, Format Version" "%_SLN_FILE%"`) do SET _X_SLN_VERSION=%%a
