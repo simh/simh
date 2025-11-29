@@ -94,29 +94,8 @@ that only run on the system that built it or one running the same OS.
 If you're using Visual Studio Community 2022 or 2026, and you follow these 
 installation instructions, you can also build simulator executables using
 the newer Visual Studio IDE and tools while not necessarily needing updated
-windows_build support.  This is convenient since both VS2022 and VS2026
-come up with updates possibly many times per month and once an update is
-installed, the windows_update build support won't be available for the 
-latest version.  This problem only affects simulators compiled in Release
-mode.  Once projects are converted, by the build_vstudio.bat file directly
-with the IDE, the Visual Studio 2022 or 2026 IDE for further development.
-
-- New install
-  - In the "Workloads" pane, check "Desktop development with C++" workload's
-    checkbox, if not already checked.
-  - Click on the tab labeled "Individual components"
-  - In the "Individual components" pane:
-    - Scroll down and check the box next to "MSVC v141 - VS 2017 C++ x64/x86 build tools (v14.16)"
-  - Continue to customize your VS 2022 installation as needed.
-  - Click on "Install" in the lower right hand corner
-
-- Modifying an existing VS2022 installation
-  - Click on the Visual Studio 2022 `Modify` button.
-  - In the "Modifying --" window, click on "Individual Components"
-  - Click on the tab labeled "Individual components"
-  - In the "Individual components" pane:
-  - In the "Individual components" pane:
-    - Scroll down and check the box next to "MSVC v141 - VS 2017 C++ x64/x86 build tools (v14.16)"
-  - Continue to customize your VS 2022 installation as needed.
-  - Click on the "Modify" button in the lower right corner of the Window.
-
+windows_build support.  Once projects are converted by the build_vstudio.bat 
+file or directly with the Visual Studio 2022 or 2026 IDE, the IDE can be
+used for further development.  If merely building a simulator is all that 
+you need building your preferred simulators from the command line may be 
+easiest.

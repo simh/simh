@@ -1,5 +1,5 @@
 @echo off
-:: Rebuild all of SIMH simulators using Visual Studio
+:: Rebuild all (or some) of SIMH simulators using Visual Studio
 ::
 :: If this procedure is not invoked from a Developer command prompt
 :: then the VS2008 tools are preferred if VS2008 is installed, 
@@ -9,16 +9,23 @@
 :: If this is invoked with Visual Studio 2022 or 2026 installed 
 :: along with the "C++ for Windows Support for VS 2017 (v141) tools"
 :: option installed, then the project files will be converted, if 
-:: needed, to leverage the stable windows_build support that doesn't 
-:: change at least every month.
+:: needed, to include support for those tools.
 ::
 :: If this procedure is invoked from a Developer command prompt
 :: then the tool chain provided with the command prompt is used
 :: to build the simh projects.
 ::
-:: A single argument to this procedure may be the word Debug, which 
+:: An argument to this procedure may be the word Debug, which 
 :: will cause Debug binaries to be built rather than the Release 
 :: binaries which is the default.
+::
+:: An argument to this procedure may be the word Clean, which
+:: will cause all the outputs produced by this procedure or 
+:: activities produced by the Visual Studio IDE to be removed
+:: before possible converting of the simh.sln and or building
+:: anything.  If the simh.sln had been previously converted
+:: by the IDE to support a newer version of Visual Studio,
+:: that conversion will also be undone.
 ::
 :: The default is to build all simulators mentioned in the simh solution.
 :: Optionally, individual simulators may be built by listing the specific
@@ -34,11 +41,13 @@ set _BUILD_CONFIG=Release
 set _BUILD_PROJECTS=
 set _REBUILD_PROJECTS=
 set _BUILD_PROJECT_NAMES=
+set _BUILD_CLEAN_FIRST=
 set _BUILD_PROJECT_DIR=%~dp0Visual Studio Projects\
 :_CheckArg
 if "%1" == "" goto _DoneArgs
 if /i "%1" == "Debug" set _BUILD_CONFIG=Debug& shift & goto _CheckArg
 if /i "%1" == "Release" set _BUILD_CONFIG=Release& shift & goto _CheckArg
+if /i "%1" == "Clean" set _BUILD_CLEAN_FIRST=True& shift & goto _CheckArg
 call :GetFileName "%_BUILD_PROJECT_DIR%%1.vcproj" _BUILD_PROJECT
 if exist "%_BUILD_PROJECT_DIR%%1.vcproj" set _BUILD_PROJECTS=%_BUILD_PROJECTS%;%_BUILD_PROJECT%
 if exist "%_BUILD_PROJECT_DIR%%1.vcproj" set _REBUILD_PROJECTS=%_REBUILD_PROJECTS%;%_BUILD_PROJECT%:Rebuild
@@ -241,7 +250,23 @@ exit /B 0
 set %2=%~n1
 exit /B 0
 
+:DoClean
+if exist "%~1..\BIN" echo Removing everything from .\BIN & rmdir/s/q "%~1..\BIN"
+if exist "%~1*.vcxproj*" echo Removing .vcxproj Projects & del "%~1*.vcxproj*" & if exist "%~1.vs" rmdir /s /q "%~1.vs"
+for %%a in ("%~1Simh-*.sln") do echo Removing "%%a" & del "%%a"
+set _X_SLN_VERSION=
+for /F "usebackq tokens=8" %%a in (`findstr /C:"Microsoft Visual Studio Solution File, Format Version" "%~1Simh.sln"`) do SET _X_SLN_VERSION=%%a
+SET _X_BACKUP_SLN_DIR=
+if not "%_X_SLN_VERSION%" == "10.00" for /D %%a in ("%~1Backup*") do if exist "%%a\Simh.sln" SET _X_BACKUP_SLN_DIR=%%a
+if not "%_X_BACKUP_SLN_DIR%" == "" echo Restoring original Simh.sln & move /y "%_X_BACKUP_SLN_DIR%\Simh.sln" "%~1" > NUL 2>&1
+if not "%_X_BACKUP_SLN_DIR%" == "" rmdir /s /q "%_X_BACKUP_SLN_DIR%"
+SET _X_BACKUP_SLN_DIR=
+:DoneClean
+exit /B 0
+
 :GotVC
+if not "%_BUILD_CLEAN_FIRST%" == "" call :DoClean "%_BUILD_PROJECT_DIR%"
+if not "%_BUILD_CLEAN_FIRST%" == "" if "%_BUILD_PROJECT_NAMES%" == "" exit /B 0
 if "%_BUILD_PROJECT_NAMES%" == "" echo Building All Projects with %_BUILD_CONFIG% Configuration
 if not "%_BUILD_PROJECT_NAMES%" == "" echo Building%_BUILD_PROJECT_NAMES% Projects with %_BUILD_CONFIG% Configuration
 echo Building with Visual Studio Components from %_VC_DIR%
