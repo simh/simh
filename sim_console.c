@@ -4292,20 +4292,26 @@ return SCPE_OK;
 static t_stat sim_os_connect_telnet (int port)
 {
 char gbuf[CBUFSIZE];
-const char *program = sim_get_tool_path ("osascript");
+const char *program = sim_get_tool_path ("putty");
 
+
+if (program[0] != '\0') {
+    snprintf (gbuf, sizeof (gbuf), "nohup putty telnet://localhost:%d 2>/dev/null&", port);
+    return spawn_cmd (0, gbuf);
+    }
+program = sim_get_tool_path ("telnet");
+if (program[0] == '\0') {
+    sim_messagef (SCPE_NOFNC, "Can't find a telnet program to connect to the console in a window\n");
+    return sim_messagef (SCPE_NOFNC, "You likely need to install the telnet client from your OS distribution\n");
+    }
+program = sim_get_tool_path ("osascript");
 if (program[0] != '\0') {
     snprintf (gbuf, sizeof (gbuf), "osascript -e 'tell application \"Terminal\" to do script \"telnet localhost %d; exit\"'", port);
     return spawn_cmd (0, gbuf);
     }
-program = sim_get_tool_path ("putty");
-if (program[0] != '\0') {
-    snprintf (gbuf, sizeof (gbuf), "nohup putty telnet://localhost:%d' 2>/dev/null&", port);
-    return spawn_cmd (0, gbuf);
-    }
 program = sim_get_tool_path ("gnome-terminal");
 if (program[0] != '\0') {
-    snprintf (gbuf, sizeof (gbuf), "nohup gnome-terminal -- telnet localhost %d' 2>/dev/null&", port);
+    snprintf (gbuf, sizeof (gbuf), "nohup gnome-terminal -- 'telnet localhost %d' 2>/dev/null&", port);
     return spawn_cmd (0, gbuf);
     }
 program = sim_get_tool_path ("uxterm");
@@ -4318,7 +4324,12 @@ if (program[0] != '\0') {
     snprintf (gbuf, sizeof (gbuf), "nohup xterm -e 'telnet localhost %d' 2>/dev/null&", port);
     return spawn_cmd (0, gbuf);
     }
-return sim_messagef (SCPE_NOFNC, "Can't find a telnet program to connect to the console in a window\n");
+program = sim_get_tool_path ("konsole");
+if (program[0] != '\0') {
+    snprintf (gbuf, sizeof (gbuf), "nohup konsole -e 'telnet localhost %d' 2>/dev/null&", port);
+    return spawn_cmd (0, gbuf);
+    }
+return sim_messagef (SCPE_NOFNC, "Can't find a way to create a window to run telnet in on this system\n");
 }
 
 #endif
