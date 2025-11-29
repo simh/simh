@@ -6747,6 +6747,8 @@ if ((dptr = find_dev (gbuf))) {                         /* device match? */
     shtb = show_dev_tab;                                /* global table */
     lvl = MTAB_VDV;                                     /* device match */
     GET_SWITCHES (cptr);                                /* get more switches */
+    if (dptr->numunits == 1)                            /* Single unit devices have optional */
+        lvl |= MTAB_VUN;                                /*  unit number */
     }
 else {
     if ((dptr = find_unit (gbuf, &uptr))) {             /* unit match? */
@@ -6802,13 +6804,16 @@ while (*cptr != 0) {                                    /* do all mods */
     if ((cvptr = strchr (gbuf, '=')))                   /* = value? */
         *cvptr++ = 0;
     for (mptr = dptr->modifiers; mptr && (mptr->mask != 0); mptr++) {
-        if (((mptr->mask & MTAB_XTD)?                   /* right level? */
-            ((mptr->mask & lvl) == lvl): (MTAB_VUN & lvl)) &&
-            ((mptr->disp && mptr->pstring &&            /* named disp? */
-            (MATCH_CMD (gbuf, mptr->pstring) == 0))
-            )) {
-            if (cvptr && !MODMASK(mptr,MTAB_SHP))
-                return sim_messagef (SCPE_ARG, "Invalid Argument: %s=%s\n", gbuf, cvptr);
+        if ((mptr->disp) && (mptr->pstring) &&          /* display routine and match string */
+            (MATCH_CMD (gbuf, mptr->pstring) == 0)) {   /* matches option? */
+            if (mptr->mask & MTAB_XTD) {                /* extended? */
+                if (((lvl & mptr->mask) & ~MTAB_XTD) == 0)
+                    return sim_messagef (SCPE_ARG, "Non-existant %s parameter: %s\n", (lvl & MTAB_VUN) ? "Device" : "Unit", mptr->pstring);
+                if ((lvl & MTAB_VUN) && (uptr->flags & UNIT_DIS))
+                    return sim_messagef (SCPE_UDIS, "Unit disabled: %s\n", sim_uname (uptr));
+                if (cvptr && !MODMASK(mptr,MTAB_SHP))
+                    return sim_messagef (SCPE_ARG, "Invalid Argument: %s=%s\n", mptr->pstring, cvptr);
+                }
             show_one_mod (ofile, dptr, uptr, mptr, cvptr, 1);
             break;
             }                                           /* end if */
@@ -7776,7 +7781,7 @@ if (uflag) {
         if (!uptr->dctrl)
             return SCPE_OK;
         if (dptr->debflags == NULL)
-            fprintf (st, "%s: Debugging enabled\n", sim_uname (uptr));
+            fprintf (st, "  Unit: %-6s Debugging enabled\n", sim_uname (uptr));
         else {
             uint32 dctrl = uptr->dctrl;
 
@@ -7786,7 +7791,7 @@ if (uflag) {
                     if (any)
                         fputc (';', st);
                     else
-                        fprintf (st, "%s: Debug=", sim_uname (uptr));
+                        fprintf (st, "  Unit: %-6s Debug=", sim_uname (uptr));
                     fputs (dep->name, st);
                     any = 1;
                     }
