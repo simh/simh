@@ -524,7 +524,7 @@ MTAB tq_mod[] = {
 #define DBG_INI  0x0002                                 /* display setup/init sequence info */
 #define DBG_REG  0x0004                                 /* trace read/write registers */
 #define DBG_REQ  0x0008                                 /* display transfer requests */
-#define DBG_TAP  0x0010                                 /* display sim_tape activities */
+#define DBG_TAP  MTSE_DBG_API                           /* display sim_tape activities */
 #define DBG_STR  MTSE_DBG_STR                           /* display tape structure detail */
 #define DBG_POS  MTSE_DBG_POS                           /* display position activities */
 #define DBG_DAT  MTSE_DBG_DAT                           /* display transfer data */

@@ -389,7 +389,7 @@ MTAB ts_mod[] = {
 /* debugging bitmaps */
 #define DBG_REG  0x0001                                 /* display read/write register access */
 #define DBG_REQ  0x0002                                 /* display transfer requests */
-#define DBG_TAP  MTSE_DBG_STR                           /* display sim_tape and tape structure detail */
+#define DBG_TAP  MTSE_DBG_API|MTSE_DBG_STR              /* display sim_tape and tape structure detail */
 #define DBG_POS  MTSE_DBG_POS                           /* display position activities */
 #define DBG_DAT  MTSE_DBG_DAT                           /* display transfer data */
 

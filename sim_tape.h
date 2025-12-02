@@ -173,9 +173,10 @@ typedef void (*TAPE_PCALLBACK)(UNIT *unit, t_stat status);
 /* Tape Internal Debug flags */
 
 #define MTSE_DBG_API   0x10000000                       /* API Trace */
-#define MTSE_DBG_DAT   0x20000000                       /* Debug Data */
-#define MTSE_DBG_POS   0x40000000                       /* Debug Positioning activities */
-#define MTSE_DBG_STR   0x80000000                       /* Debug Tape Structure */
+#define MTSE_DBG_INT   0x20000000                       /* API Internal activities */
+#define MTSE_DBG_DAT   0x40000000                       /* Debug Data */
+#define MTSE_DBG_POS   0x80000000                       /* Debug Positioning activities */
+#define MTSE_DBG_STR   0x08000000                       /* Debug Tape Structure */
 
 /* Prototypes */
 

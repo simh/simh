@@ -65,7 +65,7 @@
 #define SCSI_DBG_MSG    0x02000000                      /* SCSI messages */
 #define SCSI_DBG_BUS    0x04000000                      /* bus activity */
 #define SCSI_DBG_DSK    0x08000000                      /* disk activity */
-#define SCSI_DBG_TAP    0x10000000                      /* tape activity */
+#define SCSI_DBG_TAP    MTSE_DBG_API                    /* tape activity */
 
 #define SCSI_WLK        (UNIT_WLK|UNIT_RO)              /* hwre write lock */
 
