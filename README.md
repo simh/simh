@@ -79,11 +79,12 @@ Simulator binaries for x86 Linus, x86 macOS, and Windows for all recent changes 
 - Support for building simulators without built-in boot or ROM code when building with DONT_USE_INTERNAL_ROM is defined, but to automatically and transparently fetch the needed ROM or other boot code when it is needed.  This is possibly useful for systems which don't want to distribute simulators with build-in binary code which may have unknown copyright status.
 - Reasonable output produced for all simulators from HELP BOOT.
 - Fix occasional hang of IBM1130 simulator while building with Visual Studio.
-- Building with the simh makefile can optionally compile each source file separately and store the compiled result.   This approach lends itself to quicker building for folks who are developing new simulators or new simulator modules.  This was requested and discussed in #697.  Invoking make with BUILD_SEPARATE=1 on the make command line or as an exported environment variable will achieve separate compiles.  Invoking make with QUIET=1 on the make command line or as an exported environment variable will summary output of activities being performed instead of full compiler commands.
+- Building with the simh makefile defaults to compiling each source file separately and store the compiled result.   This approach lends itself to quicker building for folks who are developing new simulators or new simulator modules.  This was requested and discussed in #697.  Invoking make with BUILD_SEPARATE=0 on the make command line or as an exported environment variable will disable separate compiles.
+- Building with the simh makefile defaults to displaying a summary of what is happening in each build step.  Invoking make with QUIET=0 on the make command line or as an exported environment variable will cause the display of the full compiler or linker command being performed instead of the summary commands.
 - TAPE and SCSI libraries have been extended to fully support partial record reads of fixed sized records which may contain multiple records in recorded data.  Images of this type are common for QIC tape archives generally available on bitsavers and elsewhere.  Attach time checking on simulated QIC tape devices reports possible problems that may occur.
 - Appveyor CI/CD builds of all simulators for Linux, macOS and Windows platforms.
 - All the available simulator defined environment variables are documented in the help and sim_doc document file.
-- SET CONSOLE TELNET=CONNECT will start a telnet session to the simulator console in a separate window.
+- SET CONSOLE TELNET=CONNECT will start a telnet session to the simulator console in a separate window on all supported host systems.
 - Support for building on systems with the gameoftrees.org (got) source control system.
 - Frontpanel API improvements, document clarifications and bug fixes.
 - Added a SET CLOCK NOCALIBRATE mode.  
@@ -110,6 +111,7 @@ Simulator binaries for x86 Linus, x86 macOS, and Windows for all recent changes 
 - Simh global/startup configuration commands can be contained in the first of simh.ini found in: 1) The current working directory, 2) The User login directory, 3) The directory containing the simulator executable, 4) The ~/Library/Preferences directory, 5) The /Library/Preferences directory, or 6) The /etc directory.
 - Enhanced Ethernet functionality on macOS which leverages the OS provided vmnet capabilities.  This is available on all intel and Apple Silicon macOS systems starting with Catalina (10.15) which was released in 2019.
 - SCP IF command supports RegEx comparisons.
+- Windows builds are supported running all versions of Microsoft Visual Studio, including the most recent VS2026.
 
 #### All simulators build cleanly under OpenVMS on ia64 systems.
 
@@ -144,6 +146,8 @@ Simulator binaries for x86 Linus, x86 macOS, and Windows for all recent changes 
 ### All relevant changes in Bob Supnik's simh v3.12-4 release have been merged into this repo
 
 ### Bill Beech has made significant enhancements and bug fixes to the SWTP simulators along with a new disk controller from Roberto Sancho Villa
+
+### Patrick Linstruth has written a new Altair8800 simulator.
 
 
 ## WHAT'S NEW since simh v3.9
