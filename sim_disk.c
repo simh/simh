@@ -2867,7 +2867,7 @@ if (pctx != NULL)
 sim_debug_unit (ctx->dbit, uptr, "get_disk_footer(%s)\n", sim_uname (uptr));
 switch (DK_GET_FMT (uptr)) {                            /* case on format */
     case DKUF_F_STD:                                    /* SIMH format */
-        ctx->container_size = sim_fsize_ex (uptr->fileref);
+        ctx->container_size = sim_fsize_ex (uptr->fileref); /* This includes meta data if it is present */
         if ((ctx->container_size != (t_offset)-1) && (ctx->container_size > (t_offset)sizeof (*f)) &&
             (sim_fseeko (uptr->fileref, ctx->container_size - sizeof (*f), SEEK_SET) == 0) &&
             (sizeof (*f) == sim_fread (f, 1, sizeof (*f), uptr->fileref)))
@@ -2876,7 +2876,7 @@ switch (DK_GET_FMT (uptr)) {                            /* case on format */
         f = NULL;
         break;
     case DKUF_F_RAW:                                    /* RAW format */
-        ctx->container_size = sim_os_disk_size_raw (uptr->fileref);
+        ctx->container_size = sim_os_disk_size_raw (uptr->fileref);/* This includes meta data if it is present */
         if ((ctx->container_size != (t_offset)-1) && (ctx->container_size > (t_offset)sizeof (*f)) &&
             (sim_os_disk_read (uptr, ctx->container_size - sizeof (*f), (uint8 *)f, &bytesread, sizeof (*f)) == SCPE_OK) &&
             (bytesread == sizeof (*f)))
@@ -2923,6 +2923,7 @@ switch (DK_GET_FMT (uptr)) {                            /* case on format */
             ctx->container_size = sim_vhd_disk_size (uptr->fileref);
             if ((f->SectorSize != 0) && (NtoHl (f->SectorSize) <= 65536)) /* Range check for Coverity sake */
                 f->SectorCount = NtoHl ((uint32)(ctx->container_size / NtoHl (f->SectorSize)));
+            ctx->container_size += sizeof (*f);     /* Adjust since it is removed below */
             f->AccessFormat = DKUF_F_VHD;
             f->Checksum = NtoHl (eth_crc32 (0, f, sizeof (*f) - sizeof (f->Checksum)));
             }
@@ -2938,6 +2939,10 @@ if (f) {
         f = NULL;
         }
     else {
+        if (ctx->footer != f) {
+            free (ctx->footer);
+            ctx->footer = f;
+            }
         if (DK_GET_FMT (uptr) != DKUF_F_VHD) {
             DEVICE *dptr = uptr->dptr;
             uint32 f_SectorSize = NtoHl (f->SectorSize);
@@ -2954,10 +2959,12 @@ if (f) {
                   (0 == memcmp (f->DriveType, "RR", 2)))) ||
                   ((drvtyp != NULL) && (ctx->container_size != (sizeof (*f) + (((t_offset)drvtyp->size) * drvtyp->sectsize))))) {
                 f->ElementEncodingSize = NtoHl (2);
-                ctx->footer = f;
                 if ((uptr->flags & UNIT_RO) == 0)
                     store_disk_footer (uptr, (char *)f->DriveType);
-                f = ctx->footer;            /* Get possibly updated metadata footer */
+                if (f != ctx->footer) {
+                    free (f);
+                    f = ctx->footer;                /* Get possibly updated metadata footer */
+                    }
                 }
             }
         if ((uptr->flags & UNIT_RO) == 0) {
@@ -2968,6 +2975,8 @@ if (f) {
                 int32 saved_switches = sim_switches;
                 uint32 saved_flags;
 
+                if (f != ctx->footer)
+                    free (f);                       /* discard local footer since detach will clear the context */
                 uptr->flags |= UNIT_ATT;            /* mark as attached so detach works */
                 sim_disk_detach (uptr);
                 saved_flags = uptr->flags;
@@ -2982,12 +2991,14 @@ if (f) {
                 ctx = (struct disk_context *)uptr->disk_ctx;/* attach repopulates the context */
                 if (pctx != NULL)
                     *pctx = ctx;
-                *f = *ctx->footer;                  /* copy updated footer */
+                f = ctx->footer;                    /* get updated footer */
+                ctx->container_size += sizeof (*f); /* Adjust since it is removed below */
                 free (filename);
                 }
             }
         if (NtoHl (f->MediaID) != 0)
             ctx->media_id = NtoHl (f->MediaID);
+        ctx->container_size -= sizeof (*f);         /* the footer isn't part of the container data space */
         ctx->highwater = (((t_offset)NtoHl (f->Highwater[0])) << 32) | ((t_offset)NtoHl (f->Highwater[1]));
         sim_debug_unit (ctx->dbit, uptr, "Footer: %s - %s\n"
             "   Simulator:           %s\n"
@@ -3013,6 +3024,8 @@ if (f) {
         sim_debug_unit (ctx->dbit, uptr,
             "   HighwaterSector:     %u\n", (uint32)(ctx->highwater/ctx->sector_size));
         }
+    if (f != ctx->footer)
+        free (f);
     }
 sim_debug_unit (ctx->dbit, uptr, "Container Size: %u sectors %u bytes each\n", (uint32)(ctx->container_size/ctx->sector_size), ctx->sector_size);
 return SCPE_OK;
