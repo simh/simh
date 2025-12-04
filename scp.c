@@ -3857,10 +3857,10 @@ if (dptr->flags & DEV_DISABLE) {
 if ((dptr->flags & DEV_DEBUG) || (dptr->debflags)) {
     fprint_header (st, &found, header);
     snprintf (buf, sizeof (buf), "set %s DEBUG", sim_dname (dptr));
-    snprintf (extra, sizeof (extra), "Enables debugging for device %s", sim_dname (dptr));
+    snprintf (extra, sizeof (extra), "Enables %sdebugging for device %s", (dptr->debflags) ? "all " : "", sim_dname (dptr));
     fprint_wrapped (st, buf, 30, gap, extra, 80);
     snprintf (buf, sizeof (buf), "set %s NODEBUG", sim_dname (dptr));
-    snprintf (extra, sizeof (extra), "Disables debugging for device %s", sim_dname (dptr));
+    snprintf (extra, sizeof (extra), "Disables %sdebugging for device %s", (dptr->debflags) ? "all " : "", sim_dname (dptr));
     fprint_wrapped (st, buf, 30, gap, extra, 80);
     if (dptr->debflags) {
         snprintf (buf, sizeof (buf), "set %s DEBUG=", sim_dname (dptr));
