@@ -335,7 +335,7 @@ DIB ts_dib = {
     1, IVCL (TS), VEC_AUTO, { NULL }, IOLN_TS
     };
 
-UNIT ts_unit = { UDATA (&ts_svc, UNIT_ATTABLE + UNIT_ROABLE + UNIT_DISABLE, 0) };
+UNIT ts_unit = { UDATA (&ts_svc, UNIT_ATTABLE + UNIT_ROABLE, 0) };
 
 REG ts_reg[] = {
     { GRDATAD (TSSR,         tssr, DEV_RDX, 16, 0, "status register") },
@@ -1227,8 +1227,10 @@ t_stat ts_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr
 fprintf (st, "TS11 Magnetic Tape (TS)\n\n");
 fprint_set_help (st, dptr);
 fprint_show_help (st, dptr);
-fprintf (st, "\nThe type options can be used only when a unit is not attached to a file.  The\n");
-fprintf (st, "bad block option can be used only when a unit is attached to a file.\n");
+fprintf (st, "\nTS11 options include the ability to set units write enabled or write locked, and\n");
+fprintf (st, "to specify the tape length.  The TS11 FORMAT option can be used only when a unit\n");
+fprintf (st, "is not attached to a file or explicitly as part of an attach command with the\n");
+fprintf (st, "-F switch.\n\n");
 #if defined (VM_PDP11)
 fprintf (st, "The TS11 device supports the BOOT command.\n");
 #else
