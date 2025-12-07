@@ -22,7 +22,7 @@
    This is the standard card reader.
    This is the standard card punch.
 
-   Input formats are accepted in a variaty of formats:
+   Input formats are accepted in a variety of formats:
         Standard ASCII: one record per line.
                 returns are ignored.
                 tabs are expanded to modules 8 characters.
@@ -47,7 +47,7 @@
                 Bits 5-0 are character.
 
         CBN Format:
-                Each record 160 charaters.
+                Each record 160 characters.
                 First char has bit 7 set. Rest set to 0.
                 Bit 6 is odd parity.
                 Bit 5-0 of first character are top 6 bits
@@ -70,7 +70,7 @@
     is not enough octal numbers to span a full card the remainder of the
     card will not be punched.
 
-    Also ~eor, will generate a 7/8/9 punch card. An ~eof will gernerate a
+    Also ~eor, will generate a 7/8/9 punch card. An ~eof will generate a
     6/7/9 punch card, and a ~eoi will generate a 6/7/8/9 punch.
 
     A single line of ~ will set the EOF flag when that card is read.
