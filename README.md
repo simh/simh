@@ -112,6 +112,7 @@ Simulator binaries for x86 Linus, x86 macOS, and Windows for all recent changes 
 - Enhanced Ethernet functionality on macOS which leverages the OS provided vmnet capabilities.  This is available on all intel and Apple Silicon macOS systems starting with Catalina (10.15) which was released in 2019.
 - SCP IF command supports RegEx comparisons.
 - Windows builds are supported running all versions of Microsoft Visual Studio, including the most recent VS2026.
+- All simulators build with full functionality on illumos Open Indiana.
 
 #### All simulators build cleanly under OpenVMS on ia64 systems.
 

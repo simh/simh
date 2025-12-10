@@ -632,7 +632,10 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
         ifeq (SunOS,$(OSTYPE))
           OSNAME = Solaris
           ifneq (lib,$(findstring lib,$(UNSUPPORTED_BUILD)))
-            LIBPATH := $(shell LANG=C; crle | grep 'Default Library Path' | awk '{ print $$5 }' | sed 's/:/ /g')
+            ifneq (,$(shell gcc -dumpmachine 2>&1 | grep 64))
+              _LIB64 := -64
+            endif
+            LIBPATH := $(shell LANG=C; crle $(_LIB64) | grep 'Default Library Path' | awk '{ print $$5 }' | sed 's/:/ /g')
           endif
           LIBEXT = so
           OS_LDFLAGS += -lsocket -lnsl
