@@ -2564,6 +2564,7 @@ static const char *_check_source_platform_defines[] = {
     "__amd64__",
     "__x86_64__",
     "__itanium__",
+    "__illumos__",
     "NDEBUG",
     "_DEBUG",
     NULL
