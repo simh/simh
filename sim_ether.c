@@ -1126,8 +1126,11 @@ t_stat sim_ether_test (DEVICE *dptr, const char *cptr)
 #else    /* endif unimplemented */
 
 
-#if (defined (xBSD) || defined (__APPLE__)) && (defined (HAVE_TAP_NETWORK) || defined (HAVE_PCAP_NETWORK))
+#if (defined (xBSD) || defined (__APPLE__) || defined (__illumos__)) && (defined (HAVE_TAP_NETWORK) || defined (HAVE_PCAP_NETWORK))
 #include <sys/ioctl.h>
+#if (!defined (FIONBIO)) && defined (HAVE_SYS_FILIO)
+#include <sys/filio.h>
+#endif
 #include <net/bpf.h>
 #endif
 
@@ -1453,6 +1456,7 @@ else {
   /* copy device list into the passed structure */
   for (used=0, dev=alldevs; dev && (used < max); dev=dev->next) {
     char Info[ETH_DEV_INFO_MAX];
+    static const ETH_MAC zeros = {0, 0, 0, 0, 0, 0};
 
     edev.eth_api = ETH_API_PCAP;
     eth_get_nic_hw_addr (&edev, dev->name, 0, Info);
@@ -1460,11 +1464,17 @@ else {
       continue;
     if ((dev->flags & PCAP_IF_LOOPBACK) || (!strcmp("any", dev->name)))
       continue;
+    if (memcmp (edev.host_nic_phy_hw_addr, zeros, sizeof (ETH_MAC)) == 0)
+      continue;
     strlcpy(list[used].name, dev->name, sizeof(list[used].name));
     if (dev->description)
       strlcpy(list[used].desc, dev->description, sizeof(list[used].desc));
     else {
+#if defined (__illumos__)
+      strlcpy(list[used].desc, "Bridged Ethernet support", sizeof(list[used].desc));
+#else
       strlcpy(list[used].desc, "No description available", sizeof(list[used].desc));
+#endif
       if (Info[0] != '\0')
         snprintf(list[used].info, sizeof(list[used].info), "%s", Info);
       }
@@ -2124,11 +2134,12 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, const char *devname, int set_on, c
     FILE *f;
     int i;
     char tool[CBUFSIZE];
-    const char *turnon[] = {
+    static const ETH_MAC zeros = {0, 0, 0, 0, 0, 0};
+    static const char *turnon[] = {
         "ip link set dev %.*s up 2>/dev/null",
         "ifconfig %.*s up 2>/dev/null",
         NULL};
-    const char *MACpatterns[] = {
+    static const char *MACpatterns[] = {
         "ip link show %.*s 2>/dev/null | grep [0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F] 2>/dev/null",
         "ip link show %.*s 2>/dev/null | grep -E [0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F] 2>/dev/null",
         "ip link show %.*s 2>/dev/null | egrep [0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F] 2>/dev/null",
@@ -2136,7 +2147,7 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, const char *devname, int set_on, c
         "ifconfig %.*s 2>/dev/null | grep -E [0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F] 2>/dev/null",
         "ifconfig %.*s 2>/dev/null | egrep [0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F] 2>/dev/null",
         NULL};
-    const char *IPv4patterns[] = {
+    static const char *IPv4patterns[] = {
         "ip -4 address show %.*s 2>/dev/null | grep 'inet '    2>/dev/null",
         "ip -4 address show %.*s 2>/dev/null | grep -E 'inet ' 2>/dev/null",
         "ip -4 address show %.*s 2>/dev/null | egrep 'inet '   2>/dev/null",
@@ -2144,15 +2155,15 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, const char *devname, int set_on, c
         "ifconfig %.*s 2>/dev/null | grep -E 'inet '           2>/dev/null",
         "ifconfig %.*s 2>/dev/null | egrep 'inet '             2>/dev/null",
         NULL};
-    const char *LinkTypepatterns[] = {
+    static const char *LinkTypepatterns[] = {
         "ipconfig getsummary %.*s 2>/dev/null | grep 'InterfaceType'    2>/dev/null | awk '{ print $3 }'",
         "nmcli device 2>/dev/null | grep %.*s 2>/dev/null | grep 'Wired connection'      2>/dev/null | awk '{ print $2 }'",
         "nmcli device 2>/dev/null | grep %.*s 2>/dev/null | grep -e 'wifi' -e 'ethernet' 2>/dev/null | awk '{ print $2 }'",
         NULL};
-    const char *LinkStatuspatterns[] = {
+    static const char *LinkStatuspatterns[] = {
         "ifconfig %.*s 2>/dev/null | grep 'status: ' 2>/dev/null | awk '{if ($0 ~ /status: inactive/) { print \"MediaState: disconnected\" } else {if ($0 ~ /status: active/) { print \"MediaState: connected\" }}}'",
         NULL};
-    const char *LinkStatusDownpatterns[] = {
+    static const char *LinkStatusDownpatterns[] = {
         "ip -4 link show %.*s 2>/dev/null     | grep 'NO-CARRIER'       2>/dev/null | grep 'state DOWN' 2>/dev/null",
         NULL};
 
@@ -2225,14 +2236,16 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, const char *devname, int set_on, c
                   unsigned int byt1, byt2, byt3, byt4;
                   int j;
                   char *p2 = strstr(p1, "netmask");
-                  int netmask = 0xFFFFFFFF;
+                  uint32 netmask = 0xFFFFFFFF;
                   char cidr[4];
 
                   if (NULL != p2) {
                     if (4 == sscanf(p2, "netmask %u.%u.%u.%u", &byt1, &byt2, &byt3, &byt4))
                       netmask = (byt1 << 24) | (byt2 << 16) | (byt3 << 8) | byt4;
-                    else
-                      sscanf(p2, "netmask 0x%x", &netmask);
+                    else {
+                      if (1 != sscanf(p2, "netmask 0x%x", &netmask))
+                        sscanf(p2, "netmask %x", &netmask);
+                      }
                     if (netmask != 0xFFFFFFFF) {
                       for (j = 0; j < 32; j++)
                         if (0 == (netmask & (1 << (31 - j)))) {
@@ -2383,8 +2396,36 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, const char *devname, int set_on, c
           }
         }
       }
-    }
+#if defined (__illumos__)
+    if (memcmp (dev->host_nic_phy_hw_addr, zeros, sizeof (ETH_MAC)) != 0) {
+      t_bool promisc_mode = FALSE;
 
+      snprintf(command, sizeof(command), "ifconfig %s 2>/dev/null", devname);
+      get_glyph_nc (command, tool, 0);
+      if (sim_get_tool_path (tool)[0]) {
+        if (NULL != (f = popen(command, "r"))) {
+          while (fgets(result, sizeof(result), f) != NULL) {
+            if (strstr (result, "PROMISC") != NULL) {
+              promisc_mode = TRUE;
+              break;
+              }
+            }
+          pclose(f);
+          }
+        if (promisc_mode == FALSE) {
+          snprintf(command, sizeof(command), "dladm create-vnic -l %s vnic99; dladm set-linkprop -p promisc-filtered=off vnic0 2>/dev/null", devname);
+          get_glyph_nc (command, tool, 0);
+          if (sim_get_tool_path (tool)[0]) {
+            if (NULL != (f = popen(command, "r"))) {
+              while (fgets(result, sizeof(result), f) != NULL);
+              pclose(f);
+              }
+            }
+          }
+        }
+      }
+#endif
+    }
 #endif
 }
 
@@ -5234,7 +5275,7 @@ if (dev->error_reopen_count)
   fprintf(st, "  Error Reopen Count:      %d\n", (int)dev->error_reopen_count);
 if (1) {
   int i, count = 0;
-  ETH_MAC zeros = {0, 0, 0, 0, 0, 0};
+  static const ETH_MAC zeros = {0, 0, 0, 0, 0, 0};
   char  buffer[20];
 
   for (i = 0; i < ETH_FILTER_MAX; i++) {

@@ -51,7 +51,12 @@ Relatively recently, macOS (since version 10.15 sometime in 2019) has
 functionality integrated into the OS that automatically provides bridging to 
 address this problem.  The capability is provided by the vmnet facility of 
 the OS.  The simh sim_ether layer now leverages this vmnet functionality 
-(when available), and building of simh on automatically includes it.
+(when available), and building of simh on macOS automatically includes it.
+In general, "attach xq eth0" will be useful to support this as well as
+"attach xq eth1" will work using WiFi if it is connected to a network.
+
+Relatively recently, SunOS (aka illumos) internally provides functionality
+so that host<->simulator network traffic also simply works.
 
 The following steps were performed to get a working SIMH vax simulator
 sharing a physical NIC and allowing Host<->SIMH vax communications:

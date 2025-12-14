@@ -889,6 +889,9 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
   ifneq (,$(call find_include,sys/ioctl))
     OS_CCDEFS += -DHAVE_SYS_IOCTL
   endif
+  ifneq (,$(and $(call find_include,sys/filio),$(shell grep FIONBIO $(call find_include,sys/filio))))
+    OS_CCDEFS += -DHAVE_SYS_FILIO
+  endif
   ifneq (,$(call find_include,linux/cdrom))
     OS_CCDEFS += -DHAVE_LINUX_CDROM
   endif

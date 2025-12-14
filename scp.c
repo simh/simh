@@ -7080,6 +7080,7 @@ fprintf (st, "%s", sprint_capac (dptr, uptr));
 const char *sim_get_tool_path (const char *tool)
 {
 char findcmd[PATH_MAX+1];
+char notfound[PATH_MAX+1];
 static char toolpath[PATH_MAX+1];
 FILE *f;
 
@@ -7103,6 +7104,9 @@ if ((f = popen (findcmd, "r"))) {
         sim_trim_endspc (toolpath);
         } while (toolpath[0] == '\0');
     pclose (f);
+    snprintf (notfound, sizeof (notfound), "%s not found", tool);
+    if (strcmp (notfound, toolpath) == 0)
+        toolpath[0] = '\0';
     }
 if (toolpath[0] == '\0') { /* Not found yet? */
 #if defined(FIND_CMD_EXTRA) /* Try with alternative command */
@@ -7114,6 +7118,12 @@ if (toolpath[0] == '\0') { /* Not found yet? */
             sim_trim_endspc (toolpath);
             } while (toolpath[0] == '\0');
         pclose (f);
+        snprintf (notfound, sizeof (notfound), "%s not found", tool);
+        if (strcmp (notfound, toolpath) == 0)
+            toolpath[0] = '\0';
+        snprintf (notfound, sizeof (notfound), "no %s in ", tool);
+        if (strstr (toolpath, notfound) != NULL)
+            toolpath[0] = '\0';
         }
 #endif
     }
@@ -7549,6 +7559,53 @@ if (1) {
             if (procs[0] != '\0') {
                 fprintf (st, ", Logical Processors: %s", procs);
                 setenv ("SIM_HOST_MAX_THREADS", procs, 1);
+                }
+            }
+#elif defined (__illumos__)
+        if ((f = popen ("psrinfo -p -v 2>/dev/null", "r"))) {
+            char line[256];
+            int n1, n2;
+            int cores = 0;
+            int procs = 0;
+            char proc_name[PATH_MAX+1] = "";
+            char *c;
+
+            do {
+                if (NULL == fgets (line, sizeof (line), f))
+                    break;
+                sim_trim_endspc (line);
+                if (2 == sscanf (line, "The physical processor has %d cores and %d virtual processors", &n1, &n2)) {
+                    cores = n1;
+                    procs = n2;
+                    continue;
+                    }
+                if (1 == sscanf (line, "The physical processor has %d virtual processors", &n1)) {
+                    procs = n1;
+                    continue;
+                    }
+                if ((memcmp (line, "      ", 6) == 0) ||
+                    (line[0] == '\t')) {
+                    if ((c = strchr (line, '['))) {
+                        *c = '\0';
+                        sim_trim_spc (line);
+                        }
+                    strlcpy (proc_name, line, sizeof (proc_name));
+                    }
+                } while ((proc_name[0] == '\0') || (cores == 0) || (procs == 0));
+            pclose (f);
+            if (proc_name[0] != '\0')
+                fprintf (st, "\n        Processor Name: %s", proc_name);
+            if ((procs != 0) || (cores != 0))
+                fprintf (st, "\n        ");
+            if (cores != 0) {
+                snprintf (line, sizeof (line), "%d", cores);
+                fprintf (st, "Cores: %s", line);
+                setenv ("SIM_HOST_CORE_COUNT", line, 1);
+                }
+            if (procs != 0) {
+                snprintf (line, sizeof (line), "%d", procs);
+                fprintf (st, "%sLogical Processors: %s", (cores != 0) ? ", " : "", line);
+                setenv ("SIM_HOST_MAX_THREADS", line, 1);
                 }
             }
 #endif
