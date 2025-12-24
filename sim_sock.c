@@ -1192,7 +1192,7 @@ if (connectaddr != NULL) {
     p_getnameinfo((struct sockaddr *)&clientname, size, *connectaddr, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
     if (0 == memcmp("::ffff:", *connectaddr, 7))        /* is this a IPv4-mapped IPv6 address? */
         memmove(*connectaddr, 7+*connectaddr,           /* prefer bare IPv4 address */
-                strlen(*connectaddr) - 7 + 1);          /* length to include terminating \0 */
+                strlen(7+*connectaddr) + 1);            /* length to include terminating \0 */
     }
 
 if (!(opt_flags & SIM_SOCK_OPT_BLOCKING)) {
@@ -1278,7 +1278,7 @@ int ret = 0;
 ret = p_getnameinfo(addr, size, hostnamebuf, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
 if (0 == memcmp("::ffff:", hostnamebuf, 7))        /* is this a IPv4-mapped IPv6 address? */
     memmove(hostnamebuf, 7+hostnamebuf,            /* prefer bare IPv4 address */
-            strlen(hostnamebuf) + 7 - 1);          /* length to include terminating \0 */
+            strlen(7+hostnamebuf) + 1);            /* length to include terminating \0 */
 if (!ret)
     ret = p_getnameinfo(addr, size, NULL, 0, portnamebuf, NI_MAXSERV, NI_NUMERICSERV);
 return ret;
