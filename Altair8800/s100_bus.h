@@ -91,31 +91,31 @@ typedef struct {
 
 /* data structure for IN/OUT instructions */
 typedef struct idev {
-    int32 (*routine)(CONST int32 addr, CONST int32 rw, CONST int32 data);
-    CONST char *name;
+    int32 (*routine)(const int32 addr, const int32 rw, const int32 data);
+    const char *name;
 } IDEV;
 
 typedef struct { /* Structure to describe memory device address space */
-    int32 (*routine)(CONST int32 addr, CONST int32 rw, CONST int32 data);
-    CONST char *name; /* name of handler routine */
+    int32 (*routine)(const int32 addr, const int32 rw, const int32 data);
+    const char *name; /* name of handler routine */
 } MDEV;
 
-extern t_stat s100_bus_addio(int32 port, int32 size, int32 (*routine)(CONST int32, CONST int32, CONST int32), CONST char* name);
-extern t_stat s100_bus_addio_in(int32 port, int32 size, int32 (*routine)(CONST int32, CONST int32, CONST int32), CONST char* name);
-extern t_stat s100_bus_addio_out(int32 port, int32 size, int32 (*routine)(CONST int32, CONST int32, CONST int32), CONST char* name);
-extern t_stat s100_bus_remio(int32 port, int32 size, int32 (*routine)(CONST int32, CONST int32, CONST int32));
-extern t_stat s100_bus_remio_in(int32 port, int32 size, int32 (*routine)(CONST int32, CONST int32, CONST int32));
-extern t_stat s100_bus_remio_out(int32 port, int32 size, int32 (*routine)(CONST int32, CONST int32, CONST int32));
+extern t_stat s100_bus_addio(int32 port, int32 size, int32 (*routine)(const int32, const int32, const int32), const char* name);
+extern t_stat s100_bus_addio_in(int32 port, int32 size, int32 (*routine)(const int32, const int32, const int32), const char* name);
+extern t_stat s100_bus_addio_out(int32 port, int32 size, int32 (*routine)(const int32, const int32, const int32), const char* name);
+extern t_stat s100_bus_remio(int32 port, int32 size, int32 (*routine)(const int32, const int32, const int32));
+extern t_stat s100_bus_remio_in(int32 port, int32 size, int32 (*routine)(const int32, const int32, const int32));
+extern t_stat s100_bus_remio_out(int32 port, int32 size, int32 (*routine)(const int32, const int32, const int32));
 extern t_stat s100_bus_addmem(int32 baseaddr, uint32 size, 
-    int32 (*routine)(CONST int32 addr, CONST int32 rw, CONST int32 data), CONST char *name);
+    int32 (*routine)(const int32 addr, const int32 rw, const int32 data), const char *name);
 extern t_stat s100_bus_remmem(int32 baseaddr, uint32 size, 
-    int32 (*routine)(CONST int32 addr, CONST int32 rw, CONST int32 data));
-extern t_stat s100_bus_setmem_dflt(int32 (*routine)(CONST int32 addr, CONST int32 rw, CONST int32 data), CONST char *name);
-extern t_stat s100_bus_remmem_dflt(int32 (*routine)(CONST int32 addr, CONST int32 rw, CONST int32 data));
+    int32 (*routine)(const int32 addr, const int32 rw, const int32 data));
+extern t_stat s100_bus_setmem_dflt(int32 (*routine)(const int32 addr, const int32 rw, const int32 data), const char *name);
+extern t_stat s100_bus_remmem_dflt(int32 (*routine)(const int32 addr, const int32 rw, const int32 data));
 
 extern void s100_bus_get_idev(int32 port, IDEV *idev_in, IDEV *idev_out);
 extern void s100_bus_get_mdev(int32 addr, MDEV *mdev);
-extern int32 nulldev(CONST int32 addr, CONST int32 io, CONST int32 data);
+extern int32 nulldev(const int32 addr, const int32 io, const int32 data);
 
 extern uint32 s100_bus_set_addr(uint32 pc);
 extern uint32 s100_bus_get_addr(void);
@@ -147,10 +147,10 @@ extern void s100_bus_clr_nmi(void);
 
 #define sim_map_resource(a,b,c,d,e,f) s100_map_resource(a,b,c,d,e,f)
 
-extern t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
-extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
-extern t_stat set_membase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
-extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+extern t_stat set_iobase(UNIT *uptr, int32 val, const char *cptr, void *desc);
+extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, const void *desc);
+extern t_stat set_membase(UNIT *uptr, int32 val, const char *cptr, void *desc);
+extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, const void *desc);
 extern void cpu_raise_interrupt(uint32 irq);
 
 #endif

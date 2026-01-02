@@ -2243,6 +2243,7 @@ ALTAIR8800 = \
     ${ALTAIR8800D}/s100_rom.c \
     ${ALTAIR8800D}/s100_z80.c \
     ${ALTAIR8800D}/mits_2sio.c \
+    ${ALTAIR8800D}/mits_acr.c \
     ${ALTAIR8800D}/mits_dsk.c \
     ${ALTAIR8800D}/sds_sbc200.c \
     ${ALTAIR8800D}/sds_vfii.c \

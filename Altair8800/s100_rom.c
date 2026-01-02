@@ -44,12 +44,12 @@ static const char* rom_description  (DEVICE *dptr);
 static uint32 GetBYTE(register uint32 Addr);
 
 static t_stat rom_enadis(int32 value, int32 ena);
-static t_stat rom_ena(UNIT *uptr, int32 value, CONST char *cptr, void *desc);
-static t_stat rom_dis_dbl(UNIT *uptr, int32 value, CONST char *cptr, void *desc);
-static t_stat rom_dis_hdsk(UNIT *uptr, int32 value, CONST char *cptr, void *desc);
-static t_stat rom_dis_altmon(UNIT *uptr, int32 value, CONST char *cptr, void *desc);
-static t_stat rom_dis_turmon(UNIT *uptr, int32 value, CONST char *cptr, void *desc);
-static t_stat rom_show_list(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+static t_stat rom_ena(UNIT *uptr, int32 value, const char *cptr, void *desc);
+static t_stat rom_dis_dbl(UNIT *uptr, int32 value, const char *cptr, void *desc);
+static t_stat rom_dis_hdsk(UNIT *uptr, int32 value, const char *cptr, void *desc);
+static t_stat rom_dis_altmon(UNIT *uptr, int32 value, const char *cptr, void *desc);
+static t_stat rom_dis_turmon(UNIT *uptr, int32 value, const char *cptr, void *desc);
+static t_stat rom_show_list(FILE *st, UNIT *uptr, int32 val, const void *desc);
 static t_stat rom_show_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 
 static int32 M[MAXBANKSIZE];
@@ -193,32 +193,32 @@ static t_stat rom_enadis(int32 value, int32 ena)
     return SCPE_OK;
 }
 
-static t_stat rom_ena(UNIT *uptr, int32 value, CONST char *cptr, void *desc)
+static t_stat rom_ena(UNIT *uptr, int32 value, const char *cptr, void *desc)
 {
     return rom_enadis(value, TRUE);
 }
 
-static t_stat rom_dis_dbl(UNIT *uptr, int32 value, CONST char *cptr, void *desc)
+static t_stat rom_dis_dbl(UNIT *uptr, int32 value, const char *cptr, void *desc)
 {
     return rom_enadis(UNIT_ROM_DBL, FALSE);
 }
 
-static t_stat rom_dis_hdsk(UNIT *uptr, int32 value, CONST char *cptr, void *desc)
+static t_stat rom_dis_hdsk(UNIT *uptr, int32 value, const char *cptr, void *desc)
 {
     return rom_enadis(UNIT_ROM_HDSK, FALSE);
 }
 
-static t_stat rom_dis_turmon(UNIT *uptr, int32 value, CONST char *cptr, void *desc)
+static t_stat rom_dis_turmon(UNIT *uptr, int32 value, const char *cptr, void *desc)
 {
     return rom_enadis(UNIT_ROM_TURMON, FALSE);
 }
 
-static t_stat rom_dis_altmon(UNIT *uptr, int32 value, CONST char *cptr, void *desc)
+static t_stat rom_dis_altmon(UNIT *uptr, int32 value, const char *cptr, void *desc)
 {
     return rom_enadis(UNIT_ROM_ALTMON, FALSE);
 }
 
-static t_stat rom_show_list(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+static t_stat rom_show_list(FILE *st, UNIT *uptr, int32 val, const void *desc)
 {
     ROM *r = rom_table;
 

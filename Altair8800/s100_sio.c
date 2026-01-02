@@ -24,7 +24,8 @@
    in this Software without prior written authorization from Patrick Linstruth.
 
    History:
-   07-Nov-2025 Initial version
+   07-Nov-2025   PAL   Initial version
+   23-Nov-2025   PAL   Do not add IO to the BUS if device is disabled
 
 */
 
@@ -73,15 +74,17 @@ static int32 sio_rdre;   /* Receive Data Register Empty Flag */
 static int32 sio_tdre;   /* Transmit Buffer Full Empty       */
 
 static t_stat sio_reset(DEVICE *dptr);
+static t_stat sio_addio(UNIT *uptr);
+static t_stat sio_remio();
 static int32 sio_io(const int32 addr, const int32 rw, const int32 data);
 static int32 sio_io_in(const int32 addr);
 static void sio_io_out(const int32 addr, int32 data);
-static t_stat sio_set_board(UNIT *uptr, int32 value, CONST char *cptr, void *desc);
-static t_stat sio_set_type (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
-static t_stat sio_set_val(UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat sio_set_board(UNIT *uptr, int32 value, const char *cptr, void *desc);
+static t_stat sio_set_type (UNIT *uptr, int32 value, const char *cptr, void *desc);
+static t_stat sio_set_val(UNIT *uptr, int32 value, const char *cptr, void *desc);
 static t_stat sio_set_console(UNIT *uptr, int32 value, const char *cptr, void *desc);
-static t_stat sio_show_config(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
-static t_stat sio_show_list(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+static t_stat sio_show_config(FILE *st, UNIT *uptr, int32 val, const void *desc);
+static t_stat sio_show_list(FILE *st, UNIT *uptr, int32 val, const void *desc);
 static t_stat sio_show_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 
 static const char* sio_description(DEVICE *dptr) {
@@ -161,8 +164,9 @@ static t_stat sio_reset(DEVICE *dptr)
 {
     if (dptr->flags & DEV_DIS) {    /* Disable Device */
         if (sio_type != SIO_TYPE_NONE) {
-            s100_bus_remio(sio.stat, 1, &sio_io);
-            s100_bus_remio(sio.data, 1, &sio_io);
+            sio_remio();
+
+            sio_type = SIO_TYPE_NONE;
 
             s100_bus_noconsole(&dptr->units[0]);
         }
@@ -188,7 +192,40 @@ static t_stat sio_reset(DEVICE *dptr)
     sio_rdre = TRUE;
     sio_tdre = TRUE;
 
+    sio_addio(&dptr->units[0]);
+
     sim_debug(STATUS_MSG, dptr, "reset adapter.\n");
+
+    return SCPE_OK;
+}
+
+static t_stat sio_remio()
+{
+    s100_bus_remio(sio.base + sio.stat, 1, &sio_io);
+    s100_bus_remio(sio.base + sio.data, 1, &sio_io);
+
+    return SCPE_OK;
+}
+
+static t_stat sio_addio(UNIT *uptr)
+{
+    DEVICE *dptr;
+
+    if (uptr == NULL) {
+        return SCPE_IERR;
+    }
+
+    if ((dptr = find_dev_from_unit(uptr)) == NULL) {
+        return SCPE_IERR;
+    }
+
+    if (dptr->flags & DEV_DIS) {
+        sim_printf("%s device not enabled yet.\n", dptr->name);
+    }
+    else if (sio_type != SIO_TYPE_NONE) {
+        s100_bus_addio(sio.base + sio.stat, 1, &sio_io, SIO_SNAME"S");
+        s100_bus_addio(sio.base + sio.data, 1, &sio_io, SIO_SNAME"D");
+    }
 
     return SCPE_OK;
 }
@@ -242,7 +279,7 @@ static void sio_io_out(const int32 addr, int32 data)
     }
 }
 
-static t_stat sio_set_type(UNIT *uptr, int32 value, CONST char *cptr, void *desc)
+static t_stat sio_set_type(UNIT *uptr, int32 value, const char *cptr, void *desc)
 {
     int32 result, base;
 
@@ -251,8 +288,7 @@ static t_stat sio_set_type(UNIT *uptr, int32 value, CONST char *cptr, void *desc
     }
 
     if (sio_type != SIO_TYPE_NONE) {
-        s100_bus_remio(sio.base + sio.stat, 1, &sio_io);
-        s100_bus_remio(sio.base + sio.data, 1, &sio_io);
+        sio_remio();
     }
 
     sio_type = value;
@@ -277,14 +313,15 @@ static t_stat sio_set_type(UNIT *uptr, int32 value, CONST char *cptr, void *desc
             }
         }
 
-        s100_bus_addio(sio.base + sio.stat, 1, &sio_io, SIO_SNAME"S");
-        s100_bus_addio(sio.base + sio.data, 1, &sio_io, SIO_SNAME"D");
+        if (!(uptr->flags & UNIT_DIS)) {
+            sio_addio(uptr);
+        }
     }
 
     return SCPE_OK;
 }
 
-static t_stat sio_set_board(UNIT *uptr, int32 value, CONST char *cptr, void *desc)
+static t_stat sio_set_board(UNIT *uptr, int32 value, const char *cptr, void *desc)
 {
     char cbuf[10];
     int i = 0;
@@ -303,13 +340,16 @@ static t_stat sio_set_board(UNIT *uptr, int32 value, CONST char *cptr, void *des
     return SCPE_ARG;
 }
 
-static t_stat sio_set_val(UNIT *uptr, int32 value, CONST char *cptr, void *desc)
+static t_stat sio_set_val(UNIT *uptr, int32 value, const char *cptr, void *desc)
 {
     uint32 val;
 
     if (cptr == NULL || sscanf(cptr, "%02x", &val) == 0) {
         return SCPE_ARG;
     }
+
+    /* Remove current configuration */
+    sio_remio();
 
     val &= DATAMASK;
 
@@ -351,12 +391,17 @@ static t_stat sio_set_val(UNIT *uptr, int32 value, CONST char *cptr, void *desc)
     sio.type = SIO_TYPE_CUST;
     sio_type = SIO_TYPE_CUST;
 
+    /* Add new configuration */
+    if (!(uptr->flags & UNIT_DIS)) {
+        sio_addio(uptr);
+    }
+
     return SCPE_OK;
 }
 
 static t_stat sio_set_console(UNIT *uptr, int32 value, const char *cptr, void *desc)
 {
-    if (value == UNIT_SIO_CONSOLE) {
+    if (value == UNIT_SIO_CONSOLE && !(uptr->flags & UNIT_DIS)) {
         s100_bus_console(uptr);
     }
     else {
@@ -366,7 +411,7 @@ static t_stat sio_set_console(UNIT *uptr, int32 value, const char *cptr, void *d
     return SCPE_OK;
 }
 
-static t_stat sio_show_config(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+static t_stat sio_show_config(FILE *st, UNIT *uptr, int32 val, const void *desc)
 {
     if (sio_type != SIO_TYPE_NONE) {
         sim_printf("SIO Base Address:    %02X\n\n", sio.base);
@@ -388,7 +433,7 @@ static t_stat sio_show_config(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
     return SCPE_OK;
 }
 
-static t_stat sio_show_list(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+static t_stat sio_show_list(FILE *st, UNIT *uptr, int32 val, const void *desc)
 {
     int i;
 

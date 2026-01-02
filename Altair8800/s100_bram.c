@@ -37,14 +37,14 @@ static t_stat bram_ex                (t_value *vptr, t_addr addr, UNIT *uptr, in
 static int32 bram_io                 (const int32 addr, const int32 rw, const int32 data);
 static int32 bram_memio              (const int32 addr, const int32 rw, const int32 data);
 static t_stat bram_set_banks         (int32 banks);
-static t_stat bram_clear_command     (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
-static t_stat bram_enable_command    (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
-static t_stat bram_randomize_command (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
-static t_stat bram_banks_command     (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat bram_clear_command     (UNIT *uptr, int32 value, const char *cptr, void *desc);
+static t_stat bram_enable_command    (UNIT *uptr, int32 value, const char *cptr, void *desc);
+static t_stat bram_randomize_command (UNIT *uptr, int32 value, const char *cptr, void *desc);
+static t_stat bram_banks_command     (UNIT *uptr, int32 value, const char *cptr, void *desc);
 static void bram_addio               (int32 type);
 static void bram_remio               (int32 type);
 static t_stat bram_set_type          (int32 type);
-static t_stat bram_type_command      (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat bram_type_command      (UNIT *uptr, int32 value, const char *cptr, void *desc);
 static void bram_clear               (void);
 static void bram_randomize           (void);
 static t_stat bram_show_help         (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
@@ -363,7 +363,7 @@ static t_stat bram_set_type(int32 type)
     return SCPE_OK;
 }
 
-static t_stat bram_type_command(UNIT *uptr, int32 value, CONST char *cptr, void *desc)
+static t_stat bram_type_command(UNIT *uptr, int32 value, const char *cptr, void *desc)
 {
     return bram_set_type(value);
 }
@@ -385,7 +385,7 @@ static t_stat bram_set_banks(int32 banks) {
     return SCPE_OK;
 }
 
-static t_stat bram_banks_command(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
+static t_stat bram_banks_command(UNIT *uptr, int32 value, const char *cptr, void *desc) {
     int32 result, banks;
 
     if (cptr == NULL) {
@@ -402,7 +402,7 @@ static t_stat bram_banks_command(UNIT *uptr, int32 value, CONST char *cptr, void
     return SCPE_ARG | SCPE_NOMESSAGE;
 }
 
-static t_stat bram_enable_command(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
+static t_stat bram_enable_command(UNIT *uptr, int32 value, const char *cptr, void *desc) {
     int32 size;
     t_addr start, end;
 
@@ -437,14 +437,14 @@ static t_stat bram_enable_command(UNIT *uptr, int32 value, CONST char *cptr, voi
     return SCPE_OK;
 }
 
-static t_stat bram_clear_command(UNIT *uptr, int32 value, CONST char *cptr, void *desc)
+static t_stat bram_clear_command(UNIT *uptr, int32 value, const char *cptr, void *desc)
 {
     bram_clear();
 
     return SCPE_OK;
 }
 
-static t_stat bram_randomize_command(UNIT *uptr, int32 value, CONST char *cptr, void *desc)
+static t_stat bram_randomize_command(UNIT *uptr, int32 value, const char *cptr, void *desc)
 {
     bram_randomize();
 

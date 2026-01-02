@@ -23,6 +23,9 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Patrick Linstruth.
 
+   History:
+   07-Nov-2025   PAL   Initial version
+
 */
 
 #include "sim_defs.h"
@@ -33,12 +36,12 @@
 static t_stat bus_reset               (DEVICE *dptr);
 static t_stat bus_dep                 (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 static t_stat bus_ex                  (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
-static t_stat bus_cmd_memory          (int32 flag, CONST char *cptr);
-static t_stat bus_show_config         (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
-static t_stat bus_show_console        (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+static t_stat bus_cmd_memory          (int32 flag, const char *cptr);
+static t_stat bus_show_config         (FILE *st, UNIT *uptr, int32 val, const void *desc);
+static t_stat bus_show_console        (FILE *st, UNIT *uptr, int32 val, const void *desc);
 static t_stat bus_show_help           (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
-static t_stat bus_hexload_command     (int32 flag, CONST char *cptr);
-static t_stat bus_hexsave_command     (int32 flag, CONST char *cptr);
+static t_stat bus_hexload_command     (int32 flag, const char *cptr);
+static t_stat bus_hexsave_command     (int32 flag, const char *cptr);
 static t_stat hexload                 (const char *filename, t_addr bias);
 static t_stat hexsave                 (FILE *outFile, t_addr start, t_addr end);
 
@@ -63,12 +66,12 @@ uint8 dataBus[MAX_INT_VECTORS];  /* Data bus value          */
 IDEV idev_in[MAXPAGE];
 IDEV idev_out[MAXPAGE];
 
-int32 nulldev(CONST int32 addr, CONST int32 io, CONST int32 data) { return 0xff; }
+int32 nulldev(const int32 addr, const int32 io, const int32 data) { return 0xff; }
 
 /* Which UNIT is the CONSOLE */
 UNIT *bus_console = NULL;
 
-static CONST char* bus_description(DEVICE *dptr) {
+static const char* bus_description(DEVICE *dptr) {
     return "S100 Bus";
 }
 
@@ -162,9 +165,9 @@ static t_stat bus_dep(t_value val, t_addr addr, UNIT *uptr, int32 sw)
     return SCPE_OK;
 }
 
-static t_stat bus_show_config(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+static t_stat bus_show_config(FILE *st, UNIT *uptr, int32 val, const void *desc)
 {
-    CONST char *last = NULL;
+    const char *last = NULL;
     int i, spage, epage;
 
     /* show memory */
@@ -205,7 +208,7 @@ static t_stat bus_show_config(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
     return SCPE_OK;
 }
 
-static t_stat bus_show_console(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+static t_stat bus_show_console(FILE *st, UNIT *uptr, int32 val, const void *desc)
 {
     /* show current CONSOLE unit */
     fprintf(st, "CONSOLE Unit: %s\n", (bus_console == NULL) ? "NONE" : sim_uname(bus_console));
@@ -225,7 +228,7 @@ void s100_bus_get_idev(int32 port, IDEV *idev_in, IDEV *idev_out)
     }
 }
 
-t_stat s100_bus_addio(int32 port, int32 size, int32 (*routine)(CONST int32, CONST int32, CONST int32), CONST char *name)
+t_stat s100_bus_addio(int32 port, int32 size, int32 (*routine)(const int32, const int32, const int32), const char *name)
 {
     s100_bus_addio_in(port, size, routine, name);
     s100_bus_addio_out(port, size, routine, name);
@@ -233,7 +236,7 @@ t_stat s100_bus_addio(int32 port, int32 size, int32 (*routine)(CONST int32, CONS
     return SCPE_OK;
 }
 
-t_stat s100_bus_addio_in(int32 port, int32 size, int32 (*routine)(CONST int32, CONST int32, CONST int32), CONST char *name)
+t_stat s100_bus_addio_in(int32 port, int32 size, int32 (*routine)(const int32, const int32, const int32), const char *name)
 {
     int i;
 
@@ -249,7 +252,7 @@ t_stat s100_bus_addio_in(int32 port, int32 size, int32 (*routine)(CONST int32, C
     return SCPE_OK;
 }
 
-t_stat s100_bus_addio_out(int32 port, int32 size, int32 (*routine)(CONST int32, CONST int32, CONST int32), CONST char *name)
+t_stat s100_bus_addio_out(int32 port, int32 size, int32 (*routine)(const int32, const int32, const int32), const char *name)
 {
     int i;
 
@@ -266,7 +269,7 @@ t_stat s100_bus_addio_out(int32 port, int32 size, int32 (*routine)(CONST int32, 
 }
 
 
-t_stat s100_bus_remio(int32 port, int32 size, int32 (*routine)(CONST int32, CONST int32, CONST int32))
+t_stat s100_bus_remio(int32 port, int32 size, int32 (*routine)(const int32, const int32, const int32))
 {
     s100_bus_remio_in(port, size, routine);
     s100_bus_remio_out(port, size, routine);
@@ -274,7 +277,7 @@ t_stat s100_bus_remio(int32 port, int32 size, int32 (*routine)(CONST int32, CONS
     return SCPE_OK;
 }
 
-t_stat s100_bus_remio_in(int32 port, int32 size, int32 (*routine)(CONST int32, CONST int32, CONST int32))
+t_stat s100_bus_remio_in(int32 port, int32 size, int32 (*routine)(const int32, const int32, const int32))
 {
     int i;
 
@@ -292,7 +295,7 @@ t_stat s100_bus_remio_in(int32 port, int32 size, int32 (*routine)(CONST int32, C
     return SCPE_OK;
 }
 
-t_stat s100_bus_remio_out(int32 port, int32 size, int32 (*routine)(CONST int32, CONST int32, CONST int32))
+t_stat s100_bus_remio_out(int32 port, int32 size, int32 (*routine)(const int32, const int32, const int32))
 {
     int i;
 
@@ -323,7 +326,7 @@ void s100_bus_get_mdev(int32 addr, MDEV *mdev)
 }
 
 t_stat s100_bus_addmem(int32 baseaddr, uint32 size, 
-    int32 (*routine)(CONST int32 addr, CONST int32 rw, CONST int32 data), CONST char *name)
+    int32 (*routine)(const int32 addr, const int32 rw, const int32 data), const char *name)
 {
     int32 page;
     uint32 i;
@@ -346,7 +349,7 @@ t_stat s100_bus_addmem(int32 baseaddr, uint32 size,
     return SCPE_OK;
 }
 
-t_stat s100_bus_setmem_dflt(int32 (*routine)(CONST int32 addr, CONST int32 rw, CONST int32 data), CONST char *name)
+t_stat s100_bus_setmem_dflt(int32 (*routine)(const int32 addr, const int32 rw, const int32 data), const char *name)
 {
     mdev_dflt.routine = routine;
     mdev_dflt.name = name;
@@ -355,7 +358,7 @@ t_stat s100_bus_setmem_dflt(int32 (*routine)(CONST int32 addr, CONST int32 rw, C
 }
 
 t_stat s100_bus_remmem(int32 baseaddr, uint32 size, 
-    int32 (*routine)(CONST int32 addr, CONST int32 rw, CONST int32 data))
+    int32 (*routine)(const int32 addr, const int32 rw, const int32 data))
 {
     int32 page;
     uint32 i;
@@ -372,7 +375,7 @@ t_stat s100_bus_remmem(int32 baseaddr, uint32 size,
     return SCPE_OK;
 }
 
-t_stat s100_bus_remmem_dflt(int32 (*routine)(CONST int32 addr, CONST int32 rw, CONST int32 data))
+t_stat s100_bus_remmem_dflt(int32 (*routine)(const int32 addr, const int32 rw, const int32 data))
 {
     if (mdev_dflt.routine == routine) {
         mdev_dflt.routine = &nulldev;
@@ -474,7 +477,7 @@ void s100_bus_clr_nmi()
     nmiInterrupt = FALSE;
 }
 
-static t_stat bus_cmd_memory(int32 flag, CONST char *cptr)
+static t_stat bus_cmd_memory(int32 flag, const char *cptr)
 {
     char abuf[16];
     t_addr lo, hi, last;
@@ -536,12 +539,12 @@ static t_stat bus_cmd_memory(int32 flag, CONST char *cptr)
     ALTAIRROM/NOALTAIRROM settings are ignored.
 */
 
-t_stat sim_load(FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
+t_stat sim_load(FILE *fileref, const char *cptr, const char *fnam, int flag)
 {
     int32 i;
     uint32 addr, cnt = 0, org;
     t_addr j, lo, hi;
-    CONST char *result;
+    const char *result;
     char gbuf[CBUFSIZE];
 
     if (flag) { /* dump ram to file */
@@ -593,7 +596,7 @@ t_stat sim_load(FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
     return SCPE_OK;
 }
 
-static t_stat bus_hexload_command(int32 flag, CONST char *cptr)
+static t_stat bus_hexload_command(int32 flag, const char *cptr)
 {
     char filename[4*CBUFSIZE];
     t_addr lo = 0, hi = 0;
@@ -618,7 +621,7 @@ static t_stat bus_hexload_command(int32 flag, CONST char *cptr)
     return SCPE_OK;
 }
 
-static t_stat bus_hexsave_command(int32 flag, CONST char *cptr)
+static t_stat bus_hexsave_command(int32 flag, const char *cptr)
 {
     char filename[4*CBUFSIZE];
     FILE *sfile;
@@ -810,39 +813,46 @@ static t_stat hexsave(FILE *outFile, t_addr start, t_addr end)
  */
 
 /* Set Memory Base Address routine */
-t_stat set_membase(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+t_stat set_membase(UNIT *uptr, int32 val, const char *cptr, void *desc)
 {
     DEVICE *dptr;
     RES *res;
     uint32 newba;
     t_stat r;
 
-    if (cptr == NULL)
+    if (cptr == NULL) {
         return SCPE_ARG;
+    }
 
-    if (uptr == NULL)
+    if (uptr == NULL) {
         return SCPE_IERR;
+    }
 
-    if ((dptr = find_dev_from_unit(uptr)) == NULL)
+    if ((dptr = find_dev_from_unit(uptr)) == NULL) {
         return SCPE_IERR;
+    }
 
     res = (RES *) dptr->ctxt;
 
-    if (res == NULL)
+    if (res == NULL) {
         return SCPE_IERR;
+    }
 
     newba = get_uint (cptr, 16, 0xFFFF, &r);
 
-    if (r != SCPE_OK)
+    if (r != SCPE_OK) {
         return r;
+    }
 
-    if ((newba > 0xFFFF) || (newba % res->mem_size))
+    if ((newba > 0xFFFF) || (newba % res->mem_size)) {
         return SCPE_ARG;
+    }
 
     if (dptr->flags & DEV_DIS) {
         sim_printf("device not enabled yet.\n");
         res->mem_base = newba & ~(res->mem_size-1);
-    } else {
+    }
+    else {
         dptr->flags |= DEV_DIS;
         dptr->reset(dptr);
         res->mem_base = newba & ~(res->mem_size-1);
@@ -854,21 +864,24 @@ t_stat set_membase(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 }
 
 /* Show Base Address routine */
-t_stat show_membase(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+t_stat show_membase(FILE *st, UNIT *uptr, int32 val, const void *desc)
 {
     DEVICE *dptr;
     RES *res;
 
-    if (uptr == NULL)
+    if (uptr == NULL) {
         return SCPE_IERR;
+    }
 
-    if ((dptr = find_dev_from_unit(uptr)) == NULL)
+    if ((dptr = find_dev_from_unit(uptr)) == NULL) {
         return SCPE_IERR;
+    }
 
     res = (RES *) dptr->ctxt;
 
-    if (res == NULL)
+    if (res == NULL) {
         return SCPE_IERR;
+    }
 
     fprintf(st, "MEM=0x%04X-0x%04X", res->mem_base, res->mem_base + res->mem_size-1);
 
@@ -876,34 +889,40 @@ t_stat show_membase(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 }
 
 /* Set Memory Base Address routine */
-t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+t_stat set_iobase(UNIT *uptr, int32 val, const char *cptr, void *desc)
 {
     DEVICE *dptr;
     RES *res;
     uint32 newba;
     t_stat r;
 
-    if (cptr == NULL)
+    if (cptr == NULL) {
         return SCPE_ARG;
+    }
 
-    if (uptr == NULL)
+    if (uptr == NULL) {
         return SCPE_IERR;
+    }
 
-    if ((dptr = find_dev_from_unit(uptr)) == NULL)
+    if ((dptr = find_dev_from_unit(uptr)) == NULL) {
         return SCPE_IERR;
+    }
 
     res = (RES *) dptr->ctxt;
 
-    if (res == NULL)
+    if (res == NULL) {
         return SCPE_IERR;
+    }
 
     newba = get_uint (cptr, 16, 0xFF, &r);
 
-    if (r != SCPE_OK)
+    if (r != SCPE_OK) {
         return r;
+    }
 
-    if ((newba > 0xFF) || (newba % res->io_size))
+    if ((newba > 0xFF) || (newba % res->io_size)) {
         return SCPE_ARG;
+    }
 
     if (dptr->flags & DEV_DIS) {
         sim_printf("device not enabled yet.\n");
@@ -920,21 +939,24 @@ t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 }
 
 /* Show I/O Base Address routine */
-t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, const void *desc)
 {
     DEVICE *dptr;
     RES *res;
 
-    if (uptr == NULL)
+    if (uptr == NULL) {
         return SCPE_IERR;
+    }
 
-    if ((dptr = find_dev_from_unit(uptr)) == NULL)
+    if ((dptr = find_dev_from_unit(uptr)) == NULL) {
         return SCPE_IERR;
+    }
 
     res = (RES *) dptr->ctxt;
 
-    if (res == NULL)
+    if (res == NULL) {
         return SCPE_IERR;
+    }
 
     fprintf(st, "I/O=0x%02X-0x%02X", res->io_base, res->io_base + res->io_size-1);
 

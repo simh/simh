@@ -1,4 +1,4 @@
-/* altair8800_sys.h
+/* mits_acr.h
 
    Copyright (c) 2025 Patrick A. Linstruth
 
@@ -24,47 +24,19 @@
    in this Software without prior written authorization from Patrick Linstruth.
 
    History:
-   11/07/25 Initial version
+   12/27/25 Initial version
 
 */
 
-#ifndef _ALTAIR8800_SYS_H
-#define _ALTAIR8800_SYS_H
+#ifndef MITS_ACR_H_
+#define MITS_ACR_H_
 
-#include "sim_defs.h"
+#define UNIT_ACR_V_VERBOSE      (UNIT_V_UF+0)
+#define UNIT_ACR_VERBOSE        (1 << UNIT_ACR_V_VERBOSE)
 
-#define SIM_EMAX            6
+#define ACR_IOBASE      0x06
+#define ACR_IOSIZE      2
 
-extern DEVICE bus_dev;
-extern DEVICE cpu_dev;
-extern DEVICE ssw_dev;
-extern DEVICE simh_dev;
-extern DEVICE z80_dev;
-extern DEVICE ram_dev;
-extern DEVICE bram_dev;
-extern DEVICE rom_dev;
-extern DEVICE po_dev;
-extern DEVICE mdsk_dev;
-extern DEVICE m2sio0_dev;
-extern DEVICE m2sio1_dev;
-extern DEVICE acr_dev;
-extern DEVICE sio_dev;
-extern DEVICE sbc200_dev;
-extern DEVICE tarbell_dev;
-extern DEVICE vfii_dev;
-
-extern char memoryAccessMessage[256];
-extern char instructionMessage[256];
-
-extern int32 sys_find_unit_index(UNIT* uptr);
-
-extern void sys_set_cpu_instr(t_stat (*routine)(void));
-extern void sys_set_cpu_pc(REG *reg);
-extern void sys_set_cpu_pc_value(t_value (*routine)(void));
-extern void sys_set_cpu_parse_sym(t_stat (*routine)(const char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw));
-extern void sys_set_cpu_dasm(int32 (*routine)(char *S, const uint32 *val, const int32 addr));
-extern void sys_set_cpu_is_subroutine_call(t_bool (*routine)(t_addr **ret_addrs));
-extern char *sys_strupr(const char *str);
-extern uint8 sys_floorlog2(unsigned int n);
+#define ACR_RDRE        0x01
 
 #endif

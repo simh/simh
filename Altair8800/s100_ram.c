@@ -36,13 +36,13 @@ static t_stat ram_reset             (DEVICE *dptr);
 static t_stat ram_dep               (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 static t_stat ram_ex                (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 static int32 ram_memio              (const int32 addr, const int32 rw, const int32 data);
-static t_stat ram_default_ena       (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
-static t_stat ram_default_dis       (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat ram_default_ena       (UNIT *uptr, int32 value, const char *cptr, void *desc);
+static t_stat ram_default_dis       (UNIT *uptr, int32 value, const char *cptr, void *desc);
 static t_stat ram_set_memsize       (int32 value);
-static t_stat ram_clear_command     (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
-static t_stat ram_enable_command    (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
-static t_stat ram_randomize_command (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
-static t_stat ram_size_command      (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat ram_clear_command     (UNIT *uptr, int32 value, const char *cptr, void *desc);
+static t_stat ram_enable_command    (UNIT *uptr, int32 value, const char *cptr, void *desc);
+static t_stat ram_randomize_command (UNIT *uptr, int32 value, const char *cptr, void *desc);
+static t_stat ram_size_command      (UNIT *uptr, int32 value, const char *cptr, void *desc);
 static void ram_clear               (void);
 static void ram_randomize           (void);
 static t_stat ram_show_help         (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
@@ -185,14 +185,14 @@ static uint32 GetBYTE(register uint32 Addr)
     return M[Addr & ADDRMASK] & DATAMASK; /* RAM */
 }
 
-static t_stat ram_default_ena(UNIT *uptr, int32 value, CONST char *cptr, void *desc)
+static t_stat ram_default_ena(UNIT *uptr, int32 value, const char *cptr, void *desc)
 {
     s100_bus_setmem_dflt(&ram_memio, "RAM"); /* Set RAM as default memory device */
 
     return SCPE_OK;
 }
 
-static t_stat ram_default_dis(UNIT *uptr, int32 value, CONST char *cptr, void *desc)
+static t_stat ram_default_dis(UNIT *uptr, int32 value, const char *cptr, void *desc)
 {
     s100_bus_remmem_dflt(&ram_memio);       /* Remove RAM as default memory device */
 
@@ -246,7 +246,7 @@ static void ram_randomize()
     }
 }
 
-static t_stat ram_size_command(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
+static t_stat ram_size_command(UNIT *uptr, int32 value, const char *cptr, void *desc) {
     int32 size, result;
 
     if (cptr == NULL) {
@@ -263,7 +263,7 @@ static t_stat ram_size_command(UNIT *uptr, int32 value, CONST char *cptr, void *
     return SCPE_ARG | SCPE_NOMESSAGE;
 }
 
-static t_stat ram_enable_command(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
+static t_stat ram_enable_command(UNIT *uptr, int32 value, const char *cptr, void *desc) {
     int32 size;
     t_addr start, end;
 
@@ -298,14 +298,14 @@ static t_stat ram_enable_command(UNIT *uptr, int32 value, CONST char *cptr, void
     return SCPE_OK;
 }
 
-static t_stat ram_clear_command(UNIT *uptr, int32 value, CONST char *cptr, void *desc)
+static t_stat ram_clear_command(UNIT *uptr, int32 value, const char *cptr, void *desc)
 {
     ram_clear();
 
     return SCPE_OK;
 }
 
-static t_stat ram_randomize_command(UNIT *uptr, int32 value, CONST char *cptr, void *desc)
+static t_stat ram_randomize_command(UNIT *uptr, int32 value, const char *cptr, void *desc)
 {
     ram_randomize();
 

@@ -639,7 +639,7 @@ typedef struct {
 static const char* sbc200_description(DEVICE *dptr);
 static t_stat sbc200_svc(UNIT *uptr);
 static t_stat sbc200_reset(DEVICE *dptr);
-static t_stat sbc200_attach(UNIT *uptr, CONST char *cptr);
+static t_stat sbc200_attach(UNIT *uptr, const char *cptr);
 static t_stat sbc200_detach(UNIT *uptr);
 static t_stat sbc200_set_console(UNIT *uptr, int32 value, const char *cptr, void *desc);
 static t_stat sbc200_set_baud(UNIT *uptr, int32 value, const char *cptr, void *desc);
@@ -941,7 +941,7 @@ static t_stat sbc200_svc(UNIT *uptr)
 
 
 /* Attach routine */
-static t_stat sbc200_attach(UNIT *uptr, CONST char *cptr)
+static t_stat sbc200_attach(UNIT *uptr, const char *cptr)
 {
     t_stat r;
 

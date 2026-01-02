@@ -131,11 +131,11 @@ static int32 poc = TRUE; /* Power On Clear */
 #define INCR(val) IR_S = (IR_S & ~0x7f) | ((IR_S + (val)) & 0x7f)
 
 /* function prototypes */
-static t_stat z80_set_chiptype      (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
-static t_stat z80_set_hist          (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
-static t_stat z80_show_hist         (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
-static t_stat z80_show              (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
-static t_stat chip_show             (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+static t_stat z80_set_chiptype      (UNIT *uptr, int32 value, const char *cptr, void *desc);
+static t_stat z80_set_hist          (UNIT *uptr, int32 val, const char *cptr, void *desc);
+static t_stat z80_show_hist         (FILE *st, UNIT *uptr, int32 val, const void *desc);
+static t_stat z80_show              (FILE *st, UNIT *uptr, int32 val, const void *desc);
+static t_stat chip_show             (FILE *st, UNIT *uptr, int32 val, const void *desc);
 static t_stat z80_reset(DEVICE *dptr);
 static const char* z80_description(DEVICE *dptr);
 
@@ -5732,7 +5732,7 @@ t_bool z80_is_pc_a_subroutine_call (t_addr **ret_addrs)
     return FALSE;
 }
 
-static t_stat chip_show(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+static t_stat chip_show(FILE *st, UNIT *uptr, int32 val, const void *desc)
 {
     fprintf(st, z80_unit.flags & UNIT_Z80_OPSTOP ? "ITRAP, " : "NOITRAP, ");
     if ((z80_chiptype >= 0) && (z80_chiptype < NUM_CHIP_TYPE)) {
@@ -5742,7 +5742,7 @@ static t_stat chip_show(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
     return SCPE_OK;
 }
 
-static t_stat z80_show(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+static t_stat z80_show(FILE *st, UNIT *uptr, int32 val, const void *desc)
 {
     if (z80_unit.flags & UNIT_CPU_VERBOSE) {
         fprintf(st, "VERBOSE");
@@ -5751,7 +5751,7 @@ static t_stat z80_show(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
     return SCPE_OK;
 }
 
-static t_stat z80_set_chiptype(UNIT *uptr, int32 value, CONST char *cptr, void *desc)
+static t_stat z80_set_chiptype(UNIT *uptr, int32 value, const char *cptr, void *desc)
 {
     if (z80_chiptype != value) {
         if (z80_unit.flags & UNIT_CPU_VERBOSE) {
@@ -5764,7 +5764,7 @@ static t_stat z80_set_chiptype(UNIT *uptr, int32 value, CONST char *cptr, void *
     return SCPE_OK;
 }
 
-static t_stat z80_set_hist(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+static t_stat z80_set_hist(UNIT *uptr, int32 val, const char *cptr, void *desc)
 {
     uint32 i, lnt;
     t_stat r;
@@ -5828,10 +5828,10 @@ static t_stat z80_set_hist(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
     return SCPE_OK;
 }
 
-t_stat z80_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+t_stat z80_show_hist (FILE *st, UNIT *uptr, int32 val, const void *desc)
 {
     int32 k, di, lnt;
-    CONST char *cptr = (CONST char *) desc;
+    const char *cptr = (const char *) desc;
     t_stat r;
     insthist_t *h;
 
@@ -5910,7 +5910,7 @@ t_value z80_pc_value (void) {
     return (t_value) PCX;
 }
 
-t_stat z80_cmd_reg(int32 flag, CONST char *cptr)
+t_stat z80_cmd_reg(int32 flag, const char *cptr)
 {
     t_value op[INST_MAX_BYTES];
     int i;
@@ -6531,7 +6531,7 @@ static int32 parse_X80(const char *cptr, const int32 addr, uint32 *val, const ch
     return SCPE_ARG;
 }
 
-t_stat z80_parse_sym(CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
+t_stat z80_parse_sym(const char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
     return (parse_X80(cptr, addr, val, z80_chiptype == CHIP_TYPE_Z80 ? MnemonicsZ80 : Mnemonics8080));
 }

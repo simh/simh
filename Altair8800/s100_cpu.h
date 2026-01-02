@@ -49,7 +49,7 @@ typedef struct {
     ChipType *chiptype;
     t_stat   (*instr)(void);
     t_value  (*pc_val)(void);
-    t_stat   (*parse_sym)(CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw);
+    t_stat   (*parse_sym)(const char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw);
     int32    (*dasm)(char *S, const uint32 *val, const int32 addr);
     t_bool   (*isc)(t_addr **ret_addrs);
     t_stat   (*help)(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);

@@ -137,7 +137,7 @@ static int32 mdsk12(const int32 port, const int32 io, const int32 data);
 
 static t_stat mdsk_boot(int32 unitno, DEVICE *dptr);
 static t_stat mdsk_reset(DEVICE *dptr);
-static t_stat mdsk_attach(UNIT *uptr, CONST char *cptr);
+static t_stat mdsk_attach(UNIT *uptr, const char *cptr);
 static t_stat mdsk_show_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 static const char* mdsk_description(DEVICE *dptr);
 
@@ -305,7 +305,7 @@ static t_stat mdsk_reset(DEVICE *dptr)
 }
 /* mdsk_attach - determine type of drive attached based on disk image size */
 
-static t_stat mdsk_attach(UNIT *uptr, CONST char *cptr)
+static t_stat mdsk_attach(UNIT *uptr, const char *cptr)
 {
     int32 thisUnitIndex;
     int32 imageSize;

@@ -208,6 +208,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\Altair8800\mits_acr.c"
+				>
+			</File>
+			<File
 				RelativePath="..\Altair8800\mits_dsk.c"
 				>
 			</File>
@@ -334,6 +338,10 @@
 			</File>
 			<File
 				RelativePath="..\Altair8800\mits_2sio.h"
+				>
+			</File>
+			<File
+				RelativePath="..\Altair8800\mits_acr.h"
 				>
 			</File>
 			<File

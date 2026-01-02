@@ -50,7 +50,7 @@ static RES vfii_res = { VFII_IO_BASE, VFII_IO_SIZE, 0x0000, 0x0000 };
 static DSK_INFO dsk_info[VFII_NUM_DRIVES];
 
 static t_stat vfii_reset(DEVICE *vfii_dev);
-static t_stat vfii_attach(UNIT *uptr, CONST char *cptr);
+static t_stat vfii_attach(UNIT *uptr, const char *cptr);
 static t_stat vfii_detach(UNIT *uptr);
 static t_stat vfii_boot(int32 unitno, DEVICE *dptr);
 static int32 vfii_io(const int32 port, const int32 io, const int32 data);
@@ -188,7 +188,7 @@ static t_stat vfii_boot(int32 unitno, DEVICE *dptr)
 }
 
 /* Attach routine */
-static t_stat vfii_attach(UNIT *uptr, CONST char *cptr)
+static t_stat vfii_attach(UNIT *uptr, const char *cptr)
 {
     t_stat r;
     int d;

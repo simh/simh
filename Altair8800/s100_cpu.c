@@ -46,14 +46,14 @@ static char *cpu_chipname[] = {
 };
 
 static t_stat (*cpu_instr)(void) = NULL;
-static t_stat (*cpu_parse_sym)(CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw) = NULL;
+static t_stat (*cpu_parse_sym)(const char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw) = NULL;
 static int32  (*cpu_dasm)(char *S, const uint32 *val, const int32 addr) = NULL;
 
 static t_stat cpu_reset(DEVICE *dptr);
 static void cpu_set_instr(t_stat (*routine)(void));
 static void cpu_set_pc(REG *reg);
 static void cpu_set_pc_value(t_value (*routine)(void));
-static void cpu_set_parse_sym(t_stat (*routine)(CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw));
+static void cpu_set_parse_sym(t_stat (*routine)(const char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw));
 static void cpu_set_dasm(int32 (*routine)(char *S, const uint32 *val, const int32 addr));
 static void cpu_set_is_subroutine_call(t_bool (*routine)(t_addr **ret_addrs));
 
@@ -190,7 +190,7 @@ static void cpu_set_pc_value(t_value (*routine)(void))
     sim_vm_pc_value = routine;
 }
 
-static void cpu_set_parse_sym(t_stat (*routine)(CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw))
+static void cpu_set_parse_sym(t_stat (*routine)(const char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw))
 {
     cpu_parse_sym = routine;
 }
@@ -227,7 +227,7 @@ t_stat fprint_sym(FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw)
     return 1 - r;
 }
 
-t_stat parse_sym(CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
+t_stat parse_sym(const char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
     while (isspace(*cptr)) {
         cptr++; /* absorb spaces */
