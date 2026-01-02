@@ -2703,6 +2703,9 @@ static const char simh_help2[] =
       " Disk Containers that don't have metadata will not be modified\n\n"
       "3Switches\n"
       " Switches can be used to influence the behavior of the ZAPTYPE command\n\n"
+      "4-q\n"
+      " The -q switch suppress all progress and success status reports while\n"
+      " trimming metadata and zero containing sectors is happening.\n\n"
       "4-z\n"
       " The -z switch will cause all zero containing sectors to be trimmed from the\n"
       " end of the container file, even if they were present when the metadata\n"
@@ -7633,9 +7636,11 @@ if (flag == 0)
 #if defined(SIM_GIT_COMMIT_ID)
 if (1) {
     const char *extras = strchr (__STR(SIM_GIT_COMMIT_ID), '+');
+    char buf[64];
 
-    fprintf (st, "%sgit commit id: %8.8s%s", flag ? "\n        " : "        ", __STR(SIM_GIT_COMMIT_ID), extras ? extras : "");
-    setenv ("SIM_GIT_COMMIT_ID", __STR(SIM_GIT_COMMIT_ID), 1);
+    snprintf (buf, sizeof (buf), "%8.8s%s", __STR(SIM_GIT_COMMIT_ID), extras ? extras : "");
+    fprintf (st, "%sgit commit id: %s", flag ? "\n        " : "        ", buf);
+    setenv ("SIM_GIT_COMMIT_ID", buf, 1);
     }
 #if defined(SIM_GIT_COMMIT_TIME)
 setenv ("SIM_GIT_COMMIT_TIME", __STR(SIM_GIT_COMMIT_TIME), 1);
@@ -7646,9 +7651,11 @@ if (flag)
 #if defined(SIM_ARCHIVE_GIT_COMMIT_ID)
 if (NULL == strchr (__STR(SIM_ARCHIVE_GIT_COMMIT_ID), '$')) {
     const char *extras = strchr (__STR(SIM_ARCHIVE_GIT_COMMIT_ID), '+');
+    char buf[64];
 
-    fprintf (st, "%ssimh git commit id: %8.8s%s", flag ? "\n        " : "        ", __STR(SIM_ARCHIVE_GIT_COMMIT_ID), extras ? extras : "");
-    setenv ("SIM_ARCHIVE_GIT_COMMIT_ID", __STR(SIM_ARCHIVE_GIT_COMMIT_ID), 1);
+    snprintf (buf, sizeof (buf), "%8.8s%s", __STR(SIM_ARCHIVE_GIT_COMMIT_ID), extras ? extras : "");
+    fprintf (st, "%ssimh git commit id: %s", flag ? "\n        " : "        ", buf);
+    setenv ("SIM_ARCHIVE_GIT_COMMIT_ID", buf, 1);
     }
 #if defined(SIM_ARCHIVE_GIT_COMMIT_TIME)
 if (NULL == strchr (__STR(SIM_ARCHIVE_GIT_COMMIT_TIME), '$')) {
@@ -12291,6 +12298,7 @@ CONST char *match_ext (CONST char *fnam, const char *ext)
 {
 CONST char *pptr, *fptr;
 const char *eptr;
+char start_quote = ((*fnam == '"') || (*fnam == '\'')) ? *fnam : 0;
 
 if ((fnam == NULL) || (ext == NULL))                    /* bad arguments? */
      return NULL;
@@ -12303,8 +12311,12 @@ if (pptr) {                                             /* any? */
     *fptr != 0;                                         /* others: stop at null */
 #endif
     fptr++, eptr++) {
-        if (sim_toupper (*fptr) != sim_toupper (*eptr))
-            return NULL;
+        if (sim_toupper (*fptr) != sim_toupper (*eptr)) {
+            if ((*eptr == '\0') && (*fptr == start_quote) && (*(fptr + 1) == '\0'))
+                return pptr;
+            else
+                return NULL;
+            }
         }
     if (*eptr != 0)                                     /* ext exhausted? */
         return NULL;
@@ -12689,7 +12701,7 @@ return val * negate;
         stream  =       stream designator
         val     =       value to print
         radix   =       radix to print
-        width   =       width to print
+        width   =       width to print (which is 1 less than the target buffer size)
         format  =       leading zeroes format
    Outputs:
         status  =       error status
@@ -12785,7 +12797,7 @@ if (!buffer)
     return strlen(dbuf+d);
 *buffer = '\0';
 if (width < strlen(dbuf+d))
-return sim_messagef (SCPE_IOERR, "Invalid width (%u) for buffer size (%u)\n", width, (uint32)strlen(dbuf+d));
+    return sim_messagef (SCPE_IOERR, "Invalid width (%u) for buffer size (%u)\n", width, (uint32)strlen(dbuf+d));
 strcpy(buffer, dbuf+d);
 return SCPE_OK;
 }
