@@ -204,6 +204,7 @@ int32 hst_p = 0;                                        /* history pointer */
 int32 hst_lnt = 0;                                      /* history length */
 InstHistory *hst = NULL;                                /* instruction history */
 int32 apr_serial = -1;                                  /* CPU Serial number */
+d10 console_lights = 0;
 
 /* Forward and external declarations */
 
@@ -215,6 +216,8 @@ t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat cpu_set_serial (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat cpu_show_serial (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat cpu_set_lights (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_clr_lights (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 
 d10 adjsp (d10 val, a10 ea);
 void ibp (a10 ea, int32 pflgs);
@@ -241,6 +244,7 @@ d10 calc_jrstfea (d10 inst, int32 pflgs);
 void pi_dismiss (void);
 void set_newflags (d10 fl, t_bool jrst);
 extern t_bool aprid (a10 ea, int32 prv);
+t_bool lights (a10 ea, int32 prv);
 t_bool wrpi (a10 ea, int32 prv);
 t_bool rdpi (a10 ea, int32 prv);
 t_bool czpi (a10 ea, int32 prv);
@@ -387,6 +391,7 @@ REG cpu_reg[] = {
     { ORDATAD (WRU, sim_int_char, 8, "interrupt character") },
     { FLDATA (STOP_ILL, stop_op0, 0) },
     { BRDATAD (REG, acs, 8, 36, AC_NUM * AC_NBLK, "register sets") },
+    { ORDATAD (LIGHTS, console_lights, 36, "console lights") },
     { NULL }
     };
 
@@ -404,6 +409,8 @@ MTAB cpu_mod[] = {
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "HISTORY", "HISTORY",
       &cpu_set_hist, &cpu_show_hist },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "SERIAL", "SERIAL", &cpu_set_serial, &cpu_show_serial },
+    { UNIT_LIGHTS, 0,           "NOLIGHTS", "NOLIGHTS", &cpu_clr_lights },
+    { UNIT_LIGHTS, UNIT_LIGHTS, "LIGHTS",   "LIGHTS",   &cpu_set_lights },
     { 0 }
     };
 
@@ -2249,6 +2256,12 @@ set_dyn_ptrs ();                                        /* set new ptrs */
 return;
 }
 
+t_bool lights (a10 ea, int32 prv)
+{
+console_lights = Read (ea, prv);
+return FALSE;
+}
+
 /* Priority interrupt system (PI)
 
    The priority interrupt system has three sources of requests
@@ -2609,5 +2622,17 @@ if( (apr_serial == -1) || (!Q_ITS && apr_serial < 4096) ) {
     return SCPE_OK;
     }
 fprintf (st, "%d", apr_serial);
+return SCPE_OK;
+}
+
+t_stat cpu_set_lights (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+io700d[11] = lights;
+return SCPE_OK;
+}
+
+t_stat cpu_clr_lights (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+io700d[11] = NULL;
 return SCPE_OK;
 }

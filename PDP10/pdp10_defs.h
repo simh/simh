@@ -136,13 +136,16 @@ typedef t_int64         d10;                            /* PDP-10 data (36b) */
 #define UNIT_V_ITS      (UNIT_V_UF)                     /* ITS */
 #define UNIT_V_T20      (UNIT_V_UF + 1)                 /* TOPS-20 */
 #define UNIT_V_KLAD     (UNIT_V_UF + 2)                 /* diagnostics */
+#define UNIT_V_LIGHTS   (UNIT_V_UF + 3)                 /* console lights */
 #define UNIT_ITS        (1 << UNIT_V_ITS)
 #define UNIT_T20        (1 << UNIT_V_T20)
 #define UNIT_KLAD       (1 << UNIT_V_KLAD)
+#define UNIT_LIGHTS     (1 << UNIT_V_LIGHTS)
 #define Q_T10           ((cpu_unit.flags & (UNIT_ITS|UNIT_T20|UNIT_KLAD)) == 0)
 #define Q_ITS           (cpu_unit.flags & UNIT_ITS)
 #define Q_T20           (cpu_unit.flags & UNIT_T20)
 #define Q_KLAD          (cpu_unit.flags & UNIT_KLAD)
+#define Q_LIGHTS        (cpu_unit.flags & UNIT_LIGHTS)
 
 /* Architectural constants */
 
@@ -792,7 +795,6 @@ t_stat show_addr (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat set_vec (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat show_vec (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat show_vec_mux (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
-t_stat auto_config (const char *name, int32 num);
 
 extern d10 *ac_cur;                                     /* current AC block */
 extern int32 flags;                                     /* flags */
