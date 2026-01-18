@@ -159,6 +159,11 @@ void cpu_set_chiptype(ChipType new_type)
     cpu_reset(&cpu_dev);
 }
 
+ChipType cpu_get_chiptype()
+{
+    return cpu_type;
+}
+
 char * cpu_get_chipname(ChipType type)
 {
     return cpu_chipname[type];

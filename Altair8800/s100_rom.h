@@ -43,7 +43,9 @@
 #define UNIT_ROM_ALTMON         (1 << UNIT_ROM_V_ALTMON )
 #define UNIT_ROM_V_TURMON       (UNIT_V_UF+4)               /* Enable/Disable Turnkey Monitor               */
 #define UNIT_ROM_TURMON         (1 << UNIT_ROM_V_TURMON )
-#define UNIT_ROM_V_AZ80DBL      (UNIT_V_UF+5)               /* Enable/Disable AltairZ80 Disk Boot Loader    */
+#define UNIT_ROM_V_CDBL         (UNIT_V_UF+5)               /* Enable/Disable Combined Disk Boot Loader     */
+#define UNIT_ROM_CDBL           (1 << UNIT_ROM_V_CDBL)
+#define UNIT_ROM_V_AZ80DBL      (UNIT_V_UF+6)               /* Enable/Disable AltairZ80 Disk Boot Loader    */
 #define UNIT_ROM_AZ80DBL        (1 << UNIT_ROM_V_AZ80DBL)
 
 typedef struct {

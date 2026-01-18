@@ -1,6 +1,6 @@
-/* s100_cpu.h
+/* cromemco_dazzler.h
 
-   Copyright (c) 2025 Patrick A. Linstruth
+   Copyright (c) 2026 Patrick A. Linstruth
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,40 +24,33 @@
    in this Software without prior written authorization from Patrick Linstruth.
 
    History:
-   11/07/25 Initial version
+   01/18/26 Initial version
 
 */
 
-#ifndef _S100_CPU_H
-#define _S100_CPU_H
+#ifndef _CROMEMCO_DAZZLER_H
+#define _CROMEMCO_DAZZLER_H
 
-#include "sim_defs.h"
 
-#define UNIT_CPU_V_VERBOSE      (UNIT_V_UF+0)               /* Enable verbose messagesto */
-#define UNIT_CPU_VERBOSE        (1 << UNIT_CPU_V_VERBOSE)
+#define DAZ_PIXELS      (128 * 128)    /* total number of pixels */
 
-/* CPU chip types */
-typedef enum {
-    CHIP_TYPE_8080 = 0,
-    CHIP_TYPE_Z80,
-    NUM_CHIP_TYPE,      /* must be last */
-} ChipType;
+#define DAZ_IO_BASE     0x0e
+#define DAZ_IO_SIZE     2
+#define DAZ_MEM_SIZE    2048
+#define DAZ_MEM_MASK    (2048 - 1)
 
-typedef struct {
-    DEVICE   *dev;
-    REG      **pc_reg;
-    ChipType *chiptype;
-    t_stat   (*instr)(void);
-    t_value  (*pc_val)(void);
-    t_stat   (*parse_sym)(const char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw);
-    int32    (*dasm)(char *S, const uint32 *val, const int32 addr);
-    t_bool   (*isc)(t_addr **ret_addrs);
-    t_stat   (*help)(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
-} CPU;
+#define DAZ_ON          0x80   /* On/Off */
+#define DAZ_RESX4       0x40   /* Resolution X 4 */
+#define DAZ_2K          0x20   /* Picture in 2K bytes of memory */
+#define DAZ_COLOR       0x10   /* Picture in 2K bytes of memory */
+#define DAZ_HIGH        0x08   /* High intensity color */
+#define DAZ_BLUE        0x04   /* Blue */
+#define DAZ_GREEN       0x02   /* Green */
+#define DAZ_RED         0x01   /* Red */
+#define DAZ_EOF         0x40   /* End of Frame */
+#define DAZ_EVEN        0x80   /* Even Line */
 
-extern void cpu_set_chiptype(ChipType type);
-extern ChipType cpu_get_chiptype(void);
-extern char * cpu_get_chipname(ChipType type);
+extern VID_DISPLAY *daz_vptr;
 
 #endif
 

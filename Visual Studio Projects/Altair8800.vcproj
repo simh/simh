@@ -204,6 +204,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\Altair8800\cromemco_dazzler.c"
+				>
+			</File>
+			<File
 				RelativePath="..\Altair8800\mits_2sio.c"
 				>
 			</File>
@@ -213,6 +217,10 @@
 			</File>
 			<File
 				RelativePath="..\Altair8800\mits_dsk.c"
+				>
+			</File>
+			<File
+				RelativePath="..\Altair8800\pmmi_mm103.c"
 				>
 			</File>
 			<File
@@ -337,6 +345,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\Altair8800\cromemco_dazzler.h"
+				>
+			</File>
+			<File
 				RelativePath="..\Altair8800\mits_2sio.h"
 				>
 			</File>
@@ -346,6 +358,10 @@
 			</File>
 			<File
 				RelativePath="..\Altair8800\mits_dsk.h"
+				>
+			</File>
+			<File
+				RelativePath="..\Altair8800\pmmi_mm103.h"
 				>
 			</File>
 			<File

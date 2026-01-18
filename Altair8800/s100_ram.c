@@ -41,6 +41,7 @@ static t_stat ram_default_dis       (UNIT *uptr, int32 value, const char *cptr, 
 static t_stat ram_set_memsize       (int32 value);
 static t_stat ram_clear_command     (UNIT *uptr, int32 value, const char *cptr, void *desc);
 static t_stat ram_enable_command    (UNIT *uptr, int32 value, const char *cptr, void *desc);
+static t_stat ram_prot_command      (UNIT *uptr, int32 value, const char *cptr, void *desc);
 static t_stat ram_randomize_command (UNIT *uptr, int32 value, const char *cptr, void *desc);
 static t_stat ram_size_command      (UNIT *uptr, int32 value, const char *cptr, void *desc);
 static void ram_clear               (void);
@@ -54,7 +55,7 @@ static uint32 GetBYTE(register uint32 Addr);
 static int32 poc = TRUE; /* Power On Clear */
 
 static int32 M[MAXBANKSIZE];                 /* RAM */
-static int32 P[MAXBANKSIZE >> LOG2PAGESIZE]; /* Active pages */
+static int32 P[MAXBANKSIZE >> LOG2PAGESIZE]; /* Protected pages */
 static int32 memsize = MAXBANKSIZE;
 
 static const char* ram_description(DEVICE *dptr) {
@@ -86,6 +87,10 @@ static MTAB ram_mod[] = {
         NULL, NULL, "Enable RAM page(s)" },
     { MTAB_XTD | MTAB_VDV | MTAB_VALR,  0,      NULL, "REMRAM={PAGE | START-END | ALL}", &ram_enable_command,
         NULL, NULL, "Disable RAM page(s)" },
+    { MTAB_XTD | MTAB_VDV | MTAB_VALR,  TRUE,   NULL, "PROT={PAGE | START-END | ALL}",   &ram_prot_command,
+        NULL, NULL, "Protect RAM page(s)" },
+    { MTAB_XTD | MTAB_VDV | MTAB_VALR,  FALSE,  NULL, "UNPROT={PAGE | START-END | ALL}", &ram_prot_command,
+        NULL, NULL, "Unprotect RAM page(s)" },
     { MTAB_VDV,             0,                  NULL, "CLEAR",                           &ram_clear_command,
         NULL, NULL, "Sets RAM to 0x00"  },
     { MTAB_VDV,             0,                  NULL, "RANDOM",                          &ram_randomize_command,
@@ -94,7 +99,11 @@ static MTAB ram_mod[] = {
 };
 
 /* Debug Flags */
+#define VERBOSE_MSG       (1 << 0)
+
+/* Debug Flags */
 static DEBTAB ram_dt[] = {
+    { "VERBOSE",        VERBOSE_MSG,        "Verbose messages"  },
     { NULL, 0 }
 };
 
@@ -116,7 +125,7 @@ DEVICE ram_dev = {
     NULL,                      /* attach routine */
     NULL,                      /* detach routine */
     NULL,                      /* context */
-    (DEV_DISABLE),             /* flags */
+    (DEV_DISABLE | DEV_DEBUG), /* flags */
     0,                         /* debug control */
     ram_dt,                    /* debug flags */
     NULL,                      /* mem size routine */
@@ -129,6 +138,8 @@ DEVICE ram_dev = {
 
 static t_stat ram_reset(DEVICE *dptr)
 {
+    t_addr addr;
+    
     if (dptr->flags & DEV_DIS) {    /* Disable Device */
         s100_bus_remmem(0x0000, MAXBANKSIZE, &ram_memio);
         ram_default_dis(NULL, 0, NULL, NULL);
@@ -141,6 +152,14 @@ static t_stat ram_reset(DEVICE *dptr)
 
             if (ram_unit.flags & UNIT_RAM_DEFAULT) {
                 ram_default_ena(NULL, 0, NULL, NULL);
+            }
+
+            for (addr = 0; addr < MAXADDR; addr++) {
+                M[addr] = 0x00;
+
+                if ((addr & 0xff) == 0x00) {
+                    P[addr >> LOG2PAGESIZE] = FALSE;
+                }
             }
 
             poc = FALSE;
@@ -175,12 +194,17 @@ static int32 ram_memio(const int32 addr, const int32 rw, const int32 data)
     return 0x0ff;
 }
 
-static void PutBYTE(register uint32 Addr, const register uint32 Value)
+static void PutBYTE(uint32 Addr, const register uint32 Value)
 {
-    M[Addr & ADDRMASK] = Value & DATAMASK;
+    if (!P[(Addr & ADDRMASK) >> LOG2PAGESIZE]) {
+        M[Addr & ADDRMASK] = Value & DATAMASK;
+    }
+    else {
+        sim_debug(VERBOSE_MSG, &ram_dev, "RAM: Page %02X is protected\n", Addr >> LOG2PAGESIZE);
+    }
 }
 
-static uint32 GetBYTE(register uint32 Addr)
+static uint32 GetBYTE(uint32 Addr)
 {
     return M[Addr & ADDRMASK] & DATAMASK; /* RAM */
 }
@@ -200,9 +224,8 @@ static t_stat ram_default_dis(UNIT *uptr, int32 value, const char *cptr, void *d
 }
 
 /* set memory to 'size' kilo byte */
-static t_stat ram_set_memsize(int32 size) {
-    int32 page;
-
+static t_stat ram_set_memsize(int32 size)
+{
     size <<= KBLOG2;
 
     if (size < KB) {
@@ -217,11 +240,6 @@ static t_stat ram_set_memsize(int32 size) {
 
     s100_bus_remmem(0x0000, MAXBANKSIZE, &ram_memio);     /* Remove all pages */
     s100_bus_addmem(0x0000, memsize, &ram_memio, "RAM");  /* Add memsize pages */
-
-    /* Keep track of active pages for SHOW */
-    for (page = 0; page < (MAXBANKSIZE >> LOG2PAGESIZE); page++) {
-        P[page] = (page << LOG2PAGESIZE) <= memsize;
-    }
 
     ram_unit.capac = memsize;
 
@@ -246,7 +264,8 @@ static void ram_randomize()
     }
 }
 
-static t_stat ram_size_command(UNIT *uptr, int32 value, const char *cptr, void *desc) {
+static t_stat ram_size_command(UNIT *uptr, int32 value, const char *cptr, void *desc)
+{
     int32 size, result;
 
     if (cptr == NULL) {
@@ -263,12 +282,13 @@ static t_stat ram_size_command(UNIT *uptr, int32 value, const char *cptr, void *
     return SCPE_ARG | SCPE_NOMESSAGE;
 }
 
-static t_stat ram_enable_command(UNIT *uptr, int32 value, const char *cptr, void *desc) {
+static t_stat ram_enable_command(UNIT *uptr, int32 value, const char *cptr, void *desc)
+{
     int32 size;
     t_addr start, end;
 
     if (cptr == NULL) {
-        sim_printf("Memory page(s) must be provided as SET RAM ENABLE=E0-EF\n");
+        sim_printf("Memory page(s) must be provided as SET RAM %s=E0-EF\n", value ? "ADDRAM" : "REMRAM");
         return SCPE_ARG | SCPE_NOMESSAGE;
     }
 
@@ -293,6 +313,35 @@ static t_stat ram_enable_command(UNIT *uptr, int32 value, const char *cptr, void
     }
     else {
         s100_bus_remmem(start, size, &ram_memio);         /* Remove pages */
+    }
+
+    return SCPE_OK;
+}
+
+static t_stat ram_prot_command(UNIT *uptr, int32 value, const char *cptr, void *desc)
+{
+    t_addr start, end;
+    uint16 page;
+
+    if (cptr == NULL) {
+        sim_printf("Memory page(s) must be provided as SET RAM %s=E0-EF\n", value ? "PROT" : "UNPROT");
+        return SCPE_ARG | SCPE_NOMESSAGE;
+    }
+
+    if (get_range(NULL, cptr, &start, &end, 16, PAGEMASK, 0) == NULL) {
+        return SCPE_ARG;
+    }
+
+    if (start > MAXPAGE) {
+        start = start >> LOG2PAGESIZE;
+    }
+    if (end > MAXPAGE) {
+        end = end >> LOG2PAGESIZE;
+    }
+
+    /* Protect or Unprotect Pages */
+    for (page = start; page <= end; page++) {
+        P[page] = value;
     }
 
     return SCPE_OK;

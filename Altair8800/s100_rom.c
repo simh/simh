@@ -55,11 +55,12 @@ static t_stat rom_show_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, cons
 static int32 M[MAXBANKSIZE];
 
 static ROM rom_table[] = {
-    { UNIT_ROM_ALTMON, rom_altmon,   ROM_ALTMON_BASEADDR,    ROM_ALTMON_SIZE,    ROM_ALTMON_NAME,    ROM_ALTMON_DESC },
-    { UNIT_ROM_DBL,    rom_mits_dbl, ROM_MITS_DBL_BASEADDR,  ROM_MITS_DBL_SIZE,  ROM_MITS_DBL_NAME,  ROM_MITS_DBL_DESC },
-    { UNIT_ROM_HDSK,   rom_mits_hdsk, ROM_MITS_HDSK_BASEADDR,  ROM_MITS_HDSK_SIZE,  ROM_MITS_HDSK_NAME,  ROM_MITS_HDSK_DESC },
-    { UNIT_ROM_TURMON, rom_mits_turmon, ROM_MITS_TURMON_BASEADDR, ROM_MITS_TURMON_SIZE, ROM_MITS_TURMON_NAME, ROM_MITS_TURMON_DESC },
-    { UNIT_ROM_AZ80DBL,    rom_az80_dbl, ROM_AZ80_DBL_BASEADDR,  ROM_AZ80_DBL_SIZE,  ROM_AZ80_DBL_NAME,  ROM_AZ80_DBL_DESC },
+    { UNIT_ROM_ALTMON,  rom_altmon,   ROM_ALTMON_BASEADDR,    ROM_ALTMON_SIZE,    ROM_ALTMON_NAME,    ROM_ALTMON_DESC },
+    { UNIT_ROM_DBL,     rom_mits_dbl, ROM_MITS_DBL_BASEADDR,  ROM_MITS_DBL_SIZE,  ROM_MITS_DBL_NAME,  ROM_MITS_DBL_DESC },
+    { UNIT_ROM_HDSK,    rom_mits_hdsk, ROM_MITS_HDSK_BASEADDR,  ROM_MITS_HDSK_SIZE,  ROM_MITS_HDSK_NAME,  ROM_MITS_HDSK_DESC },
+    { UNIT_ROM_TURMON,  rom_mits_turmon, ROM_MITS_TURMON_BASEADDR, ROM_MITS_TURMON_SIZE, ROM_MITS_TURMON_NAME, ROM_MITS_TURMON_DESC },
+    { UNIT_ROM_CDBL,    rom_me_cdbl,  ROM_ME_CDBL_BASEADDR,  ROM_ME_CDBL_SIZE,  ROM_ME_CDBL_NAME,  ROM_ME_CDBL_DESC },
+    { UNIT_ROM_AZ80DBL, rom_az80_dbl, ROM_AZ80_DBL_BASEADDR, ROM_AZ80_DBL_SIZE, ROM_AZ80_DBL_NAME, ROM_AZ80_DBL_DESC },
 
     { 0, NULL, 0x0000, 0, "", "" }
 };
@@ -107,6 +108,11 @@ static MTAB rom_mod[] = {
         NULL, "Enable "  ROM_MITS_TURMON_DESC   },
     { UNIT_ROM_TURMON,      0,                  "NO" ROM_MITS_TURMON_NAME,   "NO" ROM_MITS_TURMON_NAME,   &rom_dis_turmon,  NULL,
         NULL, "Disable " ROM_MITS_TURMON_DESC   },
+
+    { UNIT_ROM_CDBL,        UNIT_ROM_CDBL,      ROM_ME_CDBL_NAME,        ROM_ME_CDBL_NAME,        &rom_ena,  NULL,
+        NULL, "Enable "  ROM_ME_CDBL_DESC   },
+    { UNIT_ROM_CDBL,        0,                  "NO" ROM_ME_CDBL_NAME,   "NO" ROM_ME_CDBL_NAME,   &rom_dis_turmon,  NULL,
+        NULL, "Disable " ROM_ME_CDBL_DESC   },
 
     { MTAB_XTD | MTAB_VDV | MTAB_NMO,  0, "LIST",    NULL, NULL, &rom_show_list,   NULL, "Show available ROMs" },
 

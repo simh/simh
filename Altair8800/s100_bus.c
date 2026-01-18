@@ -45,8 +45,6 @@ static t_stat bus_hexsave_command     (int32 flag, const char *cptr);
 static t_stat hexload                 (const char *filename, t_addr bias);
 static t_stat hexsave                 (FILE *outFile, t_addr start, t_addr end);
 
-static ChipType chiptype = CHIP_TYPE_Z80;
-
 static MDEV mdev_table[MAXPAGE];      /* Active memory table  */
 static MDEV mdev_dflt;                /* Default memory table */
 
@@ -411,18 +409,6 @@ void s100_bus_memw(t_addr addr, int32 data)
     page = (addr & ADDRMASK) >> LOG2PAGESIZE;
 
     mdev_table[page].routine(addr, S100_IO_WRITE, data);
-}
-
-ChipType s100_bus_set_chiptype(ChipType new)
-{
-    chiptype = new;
-
-    return chiptype;
-}
-
-ChipType s100_bus_get_chiptype(void)
-{
-    return chiptype;
 }
 
 uint32 s100_bus_set_addr(uint32 new)
