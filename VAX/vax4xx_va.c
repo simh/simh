@@ -127,7 +127,6 @@
 extern int32 int_req[IPL_HLVL];
 extern int32 tmxr_poll;                                 /* calibrated delay */
 extern int32 fault_PC;
-extern int32 trpirq;
 
 uint16 va_ram[RAM_SIZE];
 

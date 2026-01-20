@@ -135,7 +135,6 @@
 extern int32 int_req[IPL_HLVL];
 extern int32 tmxr_poll;                                 /* calibrated delay */
 extern int32 fault_PC;
-extern int32 trpirq;
 
 uint8 va_red_map[256];                                  /* red colour map */
 uint8 va_blu_map[256];                                  /* blue colour map */

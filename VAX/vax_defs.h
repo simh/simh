@@ -48,7 +48,54 @@
 #define VM_VAX          0
 #endif
 
+/* Code selection switches:
+ *
+ * CC_BRANCHLESS: A hig performance computing hack: compute condition codes
+ *   using "branchless" conditions, which uses the boolean expression's result
+ *   (0/1) multiplied by the cond code's value.  "Branchless" generally produces
+ *   code with fewer conditional jumps, which results in less time being spent
+ *   doing branch prediction (most of which are going to be unpredictable, i.e.
+ *   50/50 branch path odds, so 50/50 odds that prefetch could fetch the wrong
+ *   code path as well.) Fewer conditional jumps also translates to longer basic
+ *   block paths (no. of instructions before a jump.)
+ *
+ *   Setting the integer overflow trap in trpirq also benefits from this approach.
+ * 
+ *   Note: Inline functions used to minimize the preprocessor conditionals.
+ *
+ * SEXT_BYSHIFT: Use signed shifts to sign-extend values, when defined.  The
+ *   compiler optimizer replaces the shift-up, shift-down pattern for sign
+ *   extension with a single sign extending instruction (it's also two
+ *   instructions on x86/x64 vs. the alternative.)
+ */
+#define CC_BRANCHLESS
+#undef SEXT_BYSHIFT
+
+#if 0
+/* Undefine for compilers that don't evaluate booleans to 0/1. */
+#undef CC_BRANCHLESS
+#endif
+
+#if 0
+/* Undefine for processor architectures that don't replicate the sign
+   bit for right shifts. */
+#undef SEXT_BYSHIFT
+#endif
+
 #include "sim_defs.h"
+
+/* Forward declarations: */
+static SIM_INLINE uint32 cc_iizz_b(uint32 r);
+static SIM_INLINE uint32 cc_iizz_w(uint32 r);
+static SIM_INLINE uint32 cc_iizz_b(uint32 r);
+static SIM_INLINE uint32 cc_iizp_o(uint32 rl, uint32 rm2, uint32 rm1, uint32 rh);
+static SIM_INLINE uint32 add_set_carry(uint32 cc, uint32 v1, uint32 v2);
+static SIM_INLINE uint32 sub_set_carry(uint32 cc, uint32 v1, uint32 v2);
+static SIM_INLINE uint32 cc_cmp_b(uint8 v1, uint8 v2);
+static SIM_INLINE uint32 cc_cmp_w(uint16 v1, uint16 v2);
+static SIM_INLINE uint32 cc_cmp_l(uint32 v1, uint32 v2);
+static SIM_INLINE uint32 set_trap_irq(uint32 trpirq, uint32 trp);
+static SIM_INLINE uint32 set_overlflow_trap(uint32 trpirq);
 
 /* Stops and aborts */
 
@@ -71,7 +118,7 @@
 #define ABORT_MCHK      (-SCB_MCHK)                     /* machine check */
 #define ABORT_RESIN     (-SCB_RESIN)                    /* rsvd instruction */
 #define ABORT_RESAD     (-SCB_RESAD)                    /* rsvd addr mode */
-#define ABORT_RESOP     (-SCB_RESOP)                    /* rsvd operand */      
+#define ABORT_RESOP     (-SCB_RESOP)                    /* rsvd operand */
 #define ABORT_CMODE     (-SCB_CMODE)                    /* comp mode fault */
 #define ABORT_ARITH     (-SCB_ARITH)                    /* arithmetic trap */
 #define ABORT_ACV       (-SCB_ACV)                      /* access violation */
@@ -305,7 +352,7 @@ extern jmp_buf save_env;
 #define TRAP_FLTUND     (5 << TIR_V_TRAP)               /* flt underflow */
 #define TRAP_DECOVF     (6 << TIR_V_TRAP)               /* decimal overflow */
 #define TRAP_SUBSCR     (7 << TIR_V_TRAP)               /* subscript range */
-#define SET_TRAP(x)     trpirq = (trpirq & PSL_M_IPL) | (x)
+#define SET_TRAP(x) trpirq = set_trap_irq(trpirq, (x))
 #define CLR_TRAPS       trpirq = trpirq & ~TIR_TRAP
 #define SET_IRQL        trpirq = (trpirq & TIR_TRAP) | eval_int ()
 #define GET_TRAP(x)     (((x) >> TIR_V_TRAP) & TIR_M_TRAP)
@@ -447,7 +494,7 @@ extern jmp_buf save_env;
 #define RB_SP  (14 << DR_V_RESMASK)     /* @SP         */
 #define DR_GETRES(x)    (((x) >> DR_V_RESMASK) & DR_M_RESMASK)
 
-/* Extra bits in the opcode flag word of the Decode ROM array 
+/* Extra bits in the opcode flag word of the Decode ROM array
    to identify instruction group */
 
 #define DR_V_IGMASK     12
@@ -672,7 +719,7 @@ enum opcodes {
 #define SXTW(x)         (((x) & WSIGN)? ((x) | ~WMASK): ((x) & WMASK))
 #define SXTBW(x)        (((x) & BSIGN)? ((x) | (WMASK - BMASK)): ((x) & BMASK))
 #define SXTL(x)         (((x) & LSIGN)? ((x) | ~LMASK): ((x) & LMASK))
-#define INTOV           if (PSL & PSW_IV) SET_TRAP (TRAP_INTOV)
+#define INTOV           trpirq = set_overflow_trap(trpirq)
 #define V_INTOV         cc = cc | CC_V; INTOV
 #define NEG(x)          ((~(x) + 1) & LMASK)
 
@@ -725,45 +772,18 @@ enum opcodes {
 
 #define CC_ZZ1P cc = CC_Z | (cc & CC_C)
 
-#define CC_IIZZ_B(r) \
-            if ((r) & BSIGN) cc = CC_N; \
-            else if ((r) == 0) cc = CC_Z; \
-            else cc = 0
-#define CC_IIZZ_W(r) \
-            if ((r) & WSIGN) cc = CC_N; \
-            else if ((r) == 0) cc = CC_Z; \
-            else cc = 0
-#define CC_IIZZ_L(r) \
-            if ((r) & LSIGN) cc = CC_N; \
-            else if ((r) == 0) cc = CC_Z; \
-            else cc = 0
-#define CC_IIZZ_Q(rl,rh) \
-            if ((rh) & LSIGN) cc = CC_N; \
-            else if (((rl) | (rh)) == 0) cc = CC_Z; \
-            else cc = 0
+#define CC_IIZZ_B(r) cc = cc_iizz_b((r))
+#define CC_IIZZ_W(r) cc = cc_iizz_w((r))
+#define CC_IIZZ_L(r) cc = cc_iizz_l((r))
+#define CC_IIZZ_Q(rl,rh) cc = cc_iizz_q((rl), (rh))
 #define CC_IIZZ_FP      CC_IIZZ_W
 
-#define CC_IIZP_B(r) \
-            if ((r) & BSIGN) cc = CC_N | (cc & CC_C); \
-            else if ((r) == 0) cc = CC_Z | (cc & CC_C); \
-            else cc = cc & CC_C
-#define CC_IIZP_W(r) \
-            if ((r) & WSIGN) cc = CC_N | (cc & CC_C); \
-            else if ((r) == 0) cc = CC_Z | (cc & CC_C); \
-            else cc = cc & CC_C
-#define CC_IIZP_L(r) \
-            if ((r) & LSIGN) cc = CC_N | (cc & CC_C); \
-            else if ((r) == 0) cc = CC_Z | (cc & CC_C); \
-            else cc = cc & CC_C
-#define CC_IIZP_Q(rl,rh) \
-            if ((rh) & LSIGN) cc = CC_N | (cc & CC_C); \
-            else if (((rl) | (rh)) == 0) cc = CC_Z | (cc & CC_C); \
-            else cc = cc & CC_C
-#define CC_IIZP_O(rl,rm2,rm1,rh) \
-            if ((rh) & LSIGN) cc = CC_N | (cc & CC_C); \
-            else if (((rl) | (rm2) | (rm1) | (rh)) == 0) cc = CC_Z | (cc & CC_C); \
-            else cc = cc & CC_C
-#define CC_IIZP_FP      CC_IIZP_W
+#define CC_IIZP_B(r) CC_IIZZ_B(r) | (cc & CC_C);
+#define CC_IIZP_W(r) CC_IIZZ_W(r) | (cc & CC_C);
+#define CC_IIZP_L(r) CC_IIZZ_L(r) | (cc & CC_C);
+#  define CC_IIZP_Q(rl,rh) CC_IIZZ_Q(rl, rh) | (cc & CC_C);
+#define CC_IIZP_O(rl, rm2, rm1, rh) cc = cc_iizp_o((rl), (rm2), (rm1), (rh)) | (cc & CC_C);
+#define CC_IIZP_FP CC_IIZP_W
 
 #define V_ADD_B(r,s1,s2) \
             if (((~(s1) ^ (s2)) & ((s1) ^ (r))) & BSIGN) { V_INTOV; }
@@ -771,8 +791,8 @@ enum opcodes {
             if (((~(s1) ^ (s2)) & ((s1) ^ (r))) & WSIGN) { V_INTOV; }
 #define V_ADD_L(r,s1,s2) \
             if (((~(s1) ^ (s2)) & ((s1) ^ (r))) & LSIGN) { V_INTOV; }
-#define C_ADD(r,s1,s2) \
-            if (((uint32) r) < ((uint32) s2)) cc = cc | CC_C
+#define C_ADD(r,s1,s2)  cc = add_set_carry(cc, (r), (s2))
+
 
 #define CC_ADD_B(r,s1,s2) \
             CC_IIZZ_B (r); \
@@ -793,8 +813,7 @@ enum opcodes {
             if ((((s1) ^ (s2)) & (~(s1) ^ (r))) & WSIGN) { V_INTOV; }
 #define V_SUB_L(r,s1,s2) \
             if ((((s1) ^ (s2)) & (~(s1) ^ (r))) & LSIGN) { V_INTOV; }
-#define C_SUB(r,s1,s2) \
-            if (((uint32) s2) < ((uint32) s1)) cc = cc | CC_C
+#define C_SUB(r,s1,s2)  cc = sub_set_carry(cc, (s2), (s1))
 
 #define CC_SUB_B(r,s1,s2) \
             CC_IIZZ_B (r); \
@@ -809,21 +828,9 @@ enum opcodes {
             V_SUB_L (r, s1, s2); \
             C_SUB (r, s1, s2)
 
-#define CC_CMP_B(s1,s2) \
-            if (SXTB (s1) < SXTB (s2)) cc = CC_N; \
-            else if ((s1) == (s2)) cc = CC_Z; \
-            else cc = 0; \
-            if (((uint32) s1) < ((uint32) s2)) cc = cc | CC_C
-#define CC_CMP_W(s1,s2) \
-            if (SXTW (s1) < SXTW (s2)) cc = CC_N; \
-            else if ((s1) == (s2)) cc = CC_Z; \
-            else cc = 0; \
-            if (((uint32) s1) < ((uint32) s2)) cc = cc | CC_C
-#define CC_CMP_L(s1,s2) \
-            if ((s1) < (s2)) cc = CC_N; \
-            else if ((s1) == (s2)) cc = CC_Z; \
-            else cc = 0; \
-            if (((uint32) s1) < ((uint32) s2)) cc = cc | CC_C
+#define CC_CMP_B(s1,s2) cc = cc_cmp_b((s1),(s2))
+#define CC_CMP_W(s1,s2) cc = cc_cmp_w((s1),(s2))
+#define CC_CMP_L(s1,s2) cc = cc_cmp_l((s1),(s2))
 
 /* Operand Memory vs Register Indicator */
 #define OP_MEM          0xFFFFFFFF
@@ -867,7 +874,7 @@ typedef struct {
 
 extern int32 R[16];                                     /* registers */
 extern int32 STK[5];                                    /* stack pointers */
-extern int32 PSL;                                       /* PSL */
+extern uint32 PSL;                                      /* PSL */
 extern int32 SCBB;                                      /* SCB base */
 extern int32 PCBB;                                      /* PCB base */
 extern int32 SBR, SLR;                                  /* S0 mem mgt */                                          /* S0 mem mgt */
@@ -876,7 +883,7 @@ extern int32 P1BR, P1LR;                                /* P1 mem mgt */
 extern int32 ASTLVL;                                    /* AST Level */
 extern int32 SISR;                                      /* swre int req */
 extern int32 pme;                                       /* perf mon enable */
-extern int32 trpirq;                                    /* trap/intr req */
+extern uint32 trpirq;                                   /* trap/intr req */
 extern int32 fault_PC;                                  /* fault PC */
 extern int32 p1, p2;                                    /* fault parameters */
 extern int32 recq[];                                    /* recovery queue */
@@ -1044,4 +1051,166 @@ extern DEVICE cpu_dev;                                  /* CPU */
 extern UNIT cpu_unit;                                   /* CPU */
 extern const char *boot_code_filename;
 
+/* Inline function hair: */
+
+static SIM_INLINE uint32 cc_iizz_b(uint32 r)
+{
+#if defined(CC_BRANCHLESS)
+  return (((r & BSIGN) != 0) * CC_N) | ((r == 0) * CC_Z);
+#else
+  if (r & BSIGN)
+    return CC_N;
+  else if (r == 0)
+    return CC_Z;
+  else
+    return 0;
+#endif
+}
+
+static SIM_INLINE uint32 cc_iizz_w(uint32 r)
+{
+#if defined(CC_BRANCHLESS)
+  return (((r & WSIGN) != 0) * CC_N) | ((r == 0) * CC_Z);
+#else
+  if (r & WSIGN)
+    return CC_N;
+  else if (r == 0)
+    return CC_Z;
+  else
+    return 0;
+#endif
+}
+
+static SIM_INLINE uint32 cc_iizz_l(uint32 r)
+{
+#if defined(CC_BRANCHLESS)
+  return (((r & LSIGN) != 0) * CC_N) | ((r == 0) * CC_Z);
+#else
+  if (r & LSIGN)
+    return CC_N;
+  else if (r == 0)
+    return CC_Z;
+  else
+    return 0;
+#endif
+}
+
+static SIM_INLINE uint32 cc_iizz_q(uint32 rl, uint32 rh)
+{
+#if defined(CC_BRANCHLESS)
+  return (((rh & LSIGN) != 0) * CC_N) | (((rl | rh) == 0) * CC_Z);
+#else
+  if (rh & LSIGN)
+    return CC_N;
+  else if ((rl | rh) == 0)
+    return CC_Z;
+  else
+    return 0;
+#endif
+}
+
+static SIM_INLINE uint32 cc_iizp_o(uint32 rl, uint32 rm2, uint32 rm1, uint32 rh)
+{
+#if defined(CC_BRANCHLESS)
+  return (((rh & LSIGN) != 0) * CC_N) | (((rl | rm2 | rm1 | rh) == 0) * CC_Z);
+#else
+  if (rh & LSIGN)
+    return CC_N;
+  else if ((rl | rm2 | rm1 | rh) == 0)
+    return CC_Z;
+  else
+    return 0;
+#endif
+}
+
+static SIM_INLINE uint32 add_set_carry(uint32 cc, uint32 v1, uint32 v2)
+{
+#if defined(CC_BRANCHLESS)
+    return cc | (CC_C * (v1 < v2));
+#else
+    return (v1 < v2) ? (cc | CC_C) : cc;
+#endif
+}
+
+static SIM_INLINE uint32 sub_set_carry(uint32 cc, uint32 v1, uint32 v2)
+{
+#if defined(CC_BRANCHLESS)
+    return cc | (CC_C * (v1 < v2));
+#else
+    return (v1 < v2) ? (cc | CC_C) : cc;
+#endif
+}
+
+/* Note: Prefer casting over explicit sign extension. Does exactly the same
+ * thing as explicit sign extension, puts the burden on the compiler to generate
+ * the desired comparison(s) and adds type safety (somewhat clearer in the code's
+ * intent.) */
+
+static SIM_INLINE uint32 cc_cmp_b(uint8 v1, uint8 v2)
+{
+#if defined(CC_BRANCHLESS)
+    return (((int8) v1 < (int8) v2) * CC_N) | ((v1 == v2) * CC_Z) | ((v1 < v2) * CC_C);
+#else
+  uint32 cc;
+  if ((int8) v1 < (int8) v2)
+    cc = CC_N;
+  else if (v1 == v2)
+    cc = CC_Z;
+  else
+    cc = 0;
+  if (v1 < v2)
+    cc = cc | CC_C;
+  return cc;
+#endif
+}
+
+static SIM_INLINE uint32 cc_cmp_w(uint16 v1, uint16 v2)
+{
+#if defined(CC_BRANCHLESS)
+  return (((int16) v1 < (int16) v2) * CC_N) | ((v1 == v2) * CC_Z) | ((v1 < v2) * CC_C);
+#else
+  uint32 cc;
+  if ((int16) v1 < (int16) v2)
+    cc = CC_N;
+  else if (v1 == v2)
+    cc = CC_Z;
+  else
+    cc = 0;
+  if (v1 < v2)
+    cc = cc | CC_C;
+  return cc;
+#endif
+}
+
+static SIM_INLINE uint32 cc_cmp_l(uint32 v1, uint32 v2)
+{
+#if defined(CC_BRANCHLESS)
+    return (((int32) v1 < (int32) v2) * CC_N) | ((v1 == v2) * CC_Z) | ((v1 < v2) * CC_C);
+#else
+  uint32 cc;
+  if ((int32) v1 < (int32) v2)
+    cc = CC_N;
+  else if (v1 == v2)
+    cc = CC_Z;
+  else
+    cc = 0;
+  if (v1 < v2) 
+    cc = cc | CC_C;
+  return cc;
+#endif
+}
+
+static SIM_INLINE uint32 set_trap_irq(uint32 trpirq, uint32 trp)
+{
+  return (trpirq & PSL_M_IPL) | trp;
+}
+
+static SIM_INLINE uint32 set_overflow_trap(uint32 trpirq)
+{
+#if defined(CC_BRANCHLESS)
+  return set_trap_irq(trpirq, ((PSL & PSW_IV) != 0) * TRAP_INTOV);
+#else
+  return ((PSL & PSW_IV) ? SET_TRAP(TRAP_INTOV) : trpirq);
+#endif
+}
 #endif                                                  /* _VAX_DEFS_H */
