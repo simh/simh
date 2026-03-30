@@ -48,11 +48,15 @@ extern DEVICE mdsk_dev;
 extern DEVICE m2sio0_dev;
 extern DEVICE m2sio1_dev;
 extern DEVICE acr_dev;
+extern DEVICE mhdsk_dev;
 extern DEVICE daz_dev;
+extern DEVICE fdcp_dev;
+extern DEVICE icom_dev;
 extern DEVICE pmmi_dev;
 extern DEVICE sio_dev;
 extern DEVICE sbc200_dev;
 extern DEVICE tarbell_dev;
+extern DEVICE vdm1_dev;
 extern DEVICE vfii_dev;
 
 extern char memoryAccessMessage[256];

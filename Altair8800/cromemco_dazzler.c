@@ -25,6 +25,7 @@
 
    History:
    18-Jan-2026 Initial version
+   14-Feb-2026 B Ammerman 0x0E EOF timing fix
 
    ==================================================================
 
@@ -41,11 +42,11 @@
 #include "cromemco_dazzler.h"
 
 /*
-** Public VID_DISPLAY for other devices that may want
+** VID_DISPLAY for other devices that may want
 ** to access the video display directly, such as joystick
 ** events.
 */
-VID_DISPLAY *daz_vptr = NULL;
+static VID_DISPLAY *daz_vptr = NULL;
 
 static t_bool daz_0e = 0x00;
 static t_bool daz_0f = 0x80;
@@ -105,10 +106,10 @@ static t_stat daz_show_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, cons
    daz_reg      DAZ register list
 */
 
-static RES daz_res = { DAZ_IO_BASE, DAZ_IO_SIZE, 0 ,0, NULL };
+static RES daz_res = { DAZ_IO_BASE, DAZ_IO_SIZE, 0 ,0 };
 
 static UNIT daz_unit = {
-    UDATA (&daz_svc, 0, 0), 33000 /* 30 fps */
+    UDATA (&daz_svc, 0, 0), 16666 /* 60 fps */
 };
 
 static REG daz_reg[] = {
@@ -234,7 +235,7 @@ static t_stat daz_boot(int32 unitno, DEVICE *dptr)
         exdep_cmd(EX_D, "-m 11E JP 11EH");
     }
     
-    *((int32 *) sim_PC->loc) = 0x0100;
+    cpu_set_pc_loc(0x0100);
 
     return SCPE_OK;
 }
@@ -242,15 +243,39 @@ static t_stat daz_boot(int32 unitno, DEVICE *dptr)
 static int32 daz_io(const int32 port, const int32 io, const int32 data)
 {
     int32 p = port - daz_res.io_base;
+    uint32 mod50;
 
     if (io == 0) {    /* IN */
         switch (p) {
             case 0x00: /* 0E */
-                daz_frame = 0x7f;
-                if ((sim_os_msec() % 30) > 25) {
+                /*
+                * Fix by BobA: DAZZLER is 60 frames per second. Old code
+                * was effectively about 33 frames per second. Ideally we
+                * we want our modulus to be 16.666 msec, but the precision of
+                * sim_os_msec doesn't allow that. So we do one frame at
+                * 16 milliseocnds and then two at 17 milliseconds.
+                * It takes exactly 50 milliseconds for three frames.
+                */
+                mod50 = sim_os_msec() % 50;
+
+                /*
+                * The first frame is the first 16 milliseconds, we clear the
+                * bit if the value is in the range [12..15]. The second frame is
+                * 17 milliseconds, we clear the bit if the value is in the range
+                * [29..32]. The third frame is 17 milliseocnds, we clear the
+                * bit if the value is in the range [46..49].
+                */
+                daz_frame |= DAZ_EOF;
+
+                if ((mod50 >= 12 && mod50 <= 15) || (mod50 >= 29 && mod50 <= 32) || (mod50 >= 46 && mod50 <= 49)) {
                     daz_frame &= ~DAZ_EOF;
-                } else {
-                    daz_frame |= (sim_os_msec() & 1) ? 0x00 : DAZ_EVEN;
+                }
+
+                /* The even/odd line bit is independent of the EOF bit */
+                daz_frame &= ~DAZ_EVEN;
+
+                if ((mod50 & 1) == 0) {
+                    daz_frame |= DAZ_EVEN;
                 }
 
                 return daz_frame;
@@ -332,7 +357,7 @@ static t_stat daz_open_video(void)
         }
     }
 
-    sim_activate_after_abs(&daz_unit, daz_unit.wait);
+    sim_activate_after_abs(&daz_unit, daz_unit.wait); /* start video refresh event */
 
     return r;
 }
@@ -609,6 +634,12 @@ static t_stat daz_show_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, cons
     fprint_set_help (st, dptr);
     fprint_show_help (st, dptr);
     fprint_reg_help (st, dptr);
+
+    fprintf(st, "\n");
+    fprintf(st, "The %s device does not currently provide timing of the 0Eh\n", dptr->name);
+    fprintf(st, "register Even/Odd bit. This bit is simply toggled during I/O reads.\n");
+    fprintf(st, "\n");
+    fprintf(st, "BOOT %s will display color bars on the Dazzler's video display.\n", dptr->name);
 
     return SCPE_OK;
 }

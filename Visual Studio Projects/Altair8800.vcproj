@@ -208,6 +208,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\Altair8800\farmtek_fdcplus.c"
+				>
+			</File>
+			<File
+				RelativePath="..\Altair8800\icom_fd3x12.c"
+				>
+			</File>
+			<File
 				RelativePath="..\Altair8800\mits_2sio.c"
 				>
 			</File>
@@ -220,7 +228,15 @@
 				>
 			</File>
 			<File
+				RelativePath="..\Altair8800\mits_hdsk.c"
+				>
+			</File>
+			<File
 				RelativePath="..\Altair8800\pmmi_mm103.c"
+				>
+			</File>
+			<File
+				RelativePath="..\Altair8800\pt_vdm1.c"
 				>
 			</File>
 			<File
@@ -346,6 +362,10 @@
 			</File>
 			<File
 				RelativePath="..\Altair8800\cromemco_dazzler.h"
+				>
+			</File>
+			<File
+				RelativePath="..\Altair8800\farmtek_fdcplus.h"
 				>
 			</File>
 			<File

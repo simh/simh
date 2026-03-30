@@ -236,6 +236,8 @@ static MTAB z80_mod[] = {
     NULL, NULL, "Chooses 8080 CPU"},
     { MTAB_XTD | MTAB_VDV,  CHIP_TYPE_Z80,      NULL,           "Z80",          &z80_set_chiptype,
         NULL, NULL, "Chooses Z80 CPU"   },
+    { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE", &sim_set_idle, &sim_show_idle, NULL, "Enable/Display idle detection" },
+    { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL, NULL, "Disable idle detection" },
     { UNIT_Z80_OPSTOP,      UNIT_Z80_OPSTOP,    "ITRAP",        "ITRAP",        NULL, &chip_show,
         NULL, "Stop on illegal instruction"             },
     { UNIT_Z80_OPSTOP,      0,                  "NOITRAP",      "NOITRAP",      NULL, &chip_show,
@@ -2364,7 +2366,7 @@ t_stat z80_instr(void)
                     reason = STOP_HALT;
                     goto end_decode;
                 }
-                sim_interval = 0;
+                cpu_req_idle();
                 break;
 
             case 0x77:          /* LD (HL),A */
@@ -5638,6 +5640,8 @@ t_stat z80_instr(void)
 
         PC &= ADDRMASK; /* reestablish invariant */
         sim_interval--;
+
+        cpu_idle();
     }
 
     end_decode:
@@ -5682,7 +5686,9 @@ static t_stat z80_reset(DEVICE *dptr)
         poc = TRUE;
     }
     else {
-        if (poc) { /* First time reset? */
+        if (poc) { /* Powerup? */
+            sim_set_idle(&z80_unit, 0, "", NULL);
+
             poc = FALSE;
         }
     }

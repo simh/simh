@@ -102,7 +102,7 @@ static int32 po_io(const int32 addr, const int32 rw, const int32 data)
         PO = data & DATAMASK;
 
         if (po_unit.flags & UNIT_PO_VERBOSE) {
-            sim_printf("\n[PO %02X]\n", ~data & DATAMASK);    /* IMSAI FP is Inverted */
+            sim_printf("\n[PO %02X]\n", (~data) & DATAMASK);    /* IMSAI FP is Inverted */
         }
     }
 
@@ -116,6 +116,15 @@ static t_stat po_show_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const
     fprint_set_help (st, dptr);
     fprint_show_help (st, dptr);
     fprint_reg_help (st, dptr);
+
+    fprintf(st, "\n");
+    fprintf(st, "The IMSAI front panel has a Programmed Output port (FFh) with LED indicators.\n");
+    fprintf(st, "The Altair does not have this feature. The %s device adds this feature to the\n", dptr->name);
+    fprintf(st, "simulator. When the device is enabled, any OUT instruction to I/O port FF\n");
+    fprintf(st, "will display '[PO XX]' on the console. Note that the value displayed will be\n");
+    fprintf(st, "inverted to match the functionality of the IMSAI.\n");
+    fprintf(st, "\n");
+    fprintf(st, "SET PO QUIET will suppress the Programmed Output messages.\n");
 
     return SCPE_OK;
 }

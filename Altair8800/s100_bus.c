@@ -33,7 +33,10 @@
 #include "s100_z80.h"
 #include "s100_bus.h"
 
+#define CLK_DELAY       5000          /* 100 Hz */
+
 static t_stat bus_reset               (DEVICE *dptr);
+static t_stat bus_svc                 (UNIT *uptr);
 static t_stat bus_dep                 (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 static t_stat bus_ex                  (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 static t_stat bus_cmd_memory          (int32 flag, const char *cptr);
@@ -44,6 +47,10 @@ static t_stat bus_hexload_command     (int32 flag, const char *cptr);
 static t_stat bus_hexsave_command     (int32 flag, const char *cptr);
 static t_stat hexload                 (const char *filename, t_addr bias);
 static t_stat hexsave                 (FILE *outFile, t_addr start, t_addr end);
+static t_stat bus_ddt_command         (int32 flag, const char *cptr);
+
+static int32 bus_clk_tps = 100;       /* ticks/second */
+static int32 bus_tmr_poll = 0;        /* pgm timer poll */
 
 static MDEV mdev_table[MAXPAGE];      /* Active memory table  */
 static MDEV mdev_dflt;                /* Default memory table */
@@ -74,7 +81,7 @@ static const char* bus_description(DEVICE *dptr) {
 }
 
 static UNIT bus_unit = {
-    UDATA (NULL, 0, 0)
+    UDATA (&bus_svc, UNIT_IDLE, 0)
 };
 
 static REG bus_reg[] = {
@@ -117,17 +124,20 @@ static CTAB bus_cmd_tbl[] = {
     { "MEM",     &bus_cmd_memory,      0, "MEM <address>                  Dump a block of memory\n" },
     { "HEXLOAD", &bus_hexload_command, 0, "HEXLOAD [fname] <bias>         Load Intel hex file\n" },
     { "HEXSAVE", &bus_hexsave_command, 0, "HEXSAVE [fname] [start-end]    Save Intel hex file\n" },
+    { "DDT",     &bus_ddt_command,     0, "DDT <enable | disable>         Control DDT-style output\n" },
     { NULL, NULL, 0, NULL }
 };
 
-/* bus reset */
-static t_stat bus_reset(DEVICE *dptr) {
+/* BUS reset */
+static t_stat bus_reset(DEVICE *dptr)
+{
     int i;
+    int32 actual_tps;
 
-    if (poc) {
+    if (poc) { /* Powerup? */
         sim_vm_cmd = bus_cmd_tbl;
 
-    /* Clear MEM and IO table */
+        /* Clear MEM and IO table */
         for (i = 0; i < MAXPAGE; i++) {
             mdev_table[i].routine = &nulldev;
             mdev_table[i].name = "nulldev";
@@ -141,8 +151,25 @@ static t_stat bus_reset(DEVICE *dptr) {
             idev_out[i].name = "nulldev";
         }
 
+        /* Enable DDT-style output */
+        bus_ddt_command(0, "ENABLE");
+
         poc = FALSE;
     }
+
+    actual_tps = sim_rtcn_init_unit(&bus_unit, CLK_DELAY, S100_CLK_TIMER);
+
+    sim_activate(&bus_unit, actual_tps ? actual_tps : CLK_DELAY);
+
+    return SCPE_OK;
+}
+
+/* Altair8800 100Hz timer */
+static t_stat bus_svc(UNIT *uptr)
+{
+    bus_tmr_poll = sim_rtcn_calb(bus_clk_tps, S100_CLK_TIMER);  /* calibrate 100Hz clock */
+
+    sim_activate_after(uptr, 1000000 / bus_clk_tps);            /* reactivate unit */
 
     return SCPE_OK;
 }
@@ -486,12 +513,7 @@ static t_stat bus_cmd_memory(int32 flag, const char *cptr)
     while (disp_addr <= last && disp_addr <= ADDRMASK) {
 
         if (!(disp_addr & 0x0f)) {
-            if (ADDRMASK+1 <= 0x10000) {
-                sim_printf("%04X ", disp_addr);
-            }
-            else {
-                sim_printf("%02X:%04X ", disp_addr >> 16, disp_addr & 0xffff);
-            }
+            sim_printf("%04X: ", disp_addr);
         }
 
         if (disp_addr < lo || disp_addr > hi) {
@@ -502,6 +524,10 @@ static t_stat bus_cmd_memory(int32 flag, const char *cptr)
             byte = s100_bus_memr(disp_addr);
             sim_printf("%02X ", byte);
             abuf[disp_addr & 0x0f] = sim_isprint(byte) ? byte : '.';
+        }
+
+        if ((disp_addr & 0x0007) == 0x0007) {
+            sim_printf(" ");
         }
 
         if ((disp_addr & 0x000f) == 0x000f) {
@@ -979,6 +1005,63 @@ t_stat s100_bus_poll_kbd(UNIT *uptr)
     if (bus_console == uptr) {
         return sim_poll_kbd();
     }
+
+    return SCPE_OK;
+}
+
+static t_stat bus_ddt_command(int32 flag, const char *cptr)
+{
+    char arg[4*CBUFSIZE];
+    int saved_sim_switches = sim_switches;
+
+    sim_switches = 0;
+
+    GET_SWITCHES(cptr);        /* get switches */
+
+    if (*cptr == 0) {          /* must be more */
+        sim_switches = saved_sim_switches;
+        return SCPE_2FARG;
+    }
+
+    cptr = get_glyph_quoted(cptr, arg, 0);    /* get argument */
+    sim_trim_endspc(arg);
+
+    if (toupper(*arg) == 'D') { /* disable DDT-style output */
+        set_cmd(0, "NOON");
+        on_cmd(0, "1");
+        on_cmd(0, "2");
+        on_cmd(0, "3");
+        on_cmd(0, "4");
+        on_cmd(0, "5");
+        on_cmd(0, "STEP");
+        on_cmd(0, "STOP");
+        set_cmd(0, "ON NOINHERIT");
+        set_cmd(0, "ENV S=S");
+        set_cmd(0, "ENV G=G");
+        set_cmd(0, "ENV C=C");
+        set_cmd(0, "ENV N=N");
+        set_cmd(0, "ENV BOOT=BOOT");
+    } else {                      /* enable DDT-style output */
+        set_cmd(0, "ON");
+        on_cmd(0, "1     ECHOF -n \"%TSTATUS% \";REG");
+        on_cmd(0, "2     ECHOF -n \"%TSTATUS% \";REG");
+        on_cmd(0, "3     ECHOF -n \"%TSTATUS% \";REG");
+        on_cmd(0, "4     ECHOF -n \"%TSTATUS% \";REG");
+        on_cmd(0, "5     ECHOF -n \"%TSTATUS% \";REG");
+        on_cmd(0, "STEP  ECHOF -n \"%TSTATUS% \";REG");
+        on_cmd(0, "STOP  ECHOF -n \"\\n%TSTATUS% \";REG");
+        set_cmd(0, "ON INHERIT");
+        set_cmd(0, "ENV S=S -q");
+        set_cmd(0, "ENV G=G -q");
+        set_cmd(0, "ENV C=C -q");
+        set_cmd(0, "ENV N=N -q");
+        set_cmd(0, "ENV BOOT=BOOT -q");
+    }
+
+    /* Make "D" execute "DEPOSIT", not "DDT" */
+    set_cmd(0, "ENV D=DEP");
+
+    sim_switches = saved_sim_switches;
 
     return SCPE_OK;
 }

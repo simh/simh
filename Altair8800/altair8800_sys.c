@@ -57,7 +57,7 @@ static t_bool fprint_stopped(FILE *st, t_stat reason);
    sim_load             binary loader
 */
 
-char sim_name[] = "Altair 8800 (BUS)";
+char sim_name[] = "Altair 8800 (GEN2)";
 
 int32 sim_emax = SIM_EMAX;
 
@@ -74,11 +74,15 @@ DEVICE *sim_devices[] = {
     &m2sio0_dev,
     &m2sio1_dev,
     &acr_dev,
+    &mhdsk_dev,
     &daz_dev,
+    &fdcp_dev,
+    &icom_dev,
     &pmmi_dev,
     &sio_dev,
     &sbc200_dev,
     &tarbell_dev,
+    &vdm1_dev,
     &vfii_dev,
     NULL
 };

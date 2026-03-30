@@ -50,7 +50,5 @@
 #define DAZ_EOF         0x40   /* End of Frame */
 #define DAZ_EVEN        0x80   /* Even Line */
 
-extern VID_DISPLAY *daz_vptr;
-
 #endif
 

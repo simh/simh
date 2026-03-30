@@ -63,6 +63,9 @@
 
 #define ADDRESS_FORMAT      "[0x%08x]"
 
+/* Altair8800 calibrated timer */
+#define S100_CLK_TIMER      0
+
 /* This is the I/O configuration table.  There are 255 possible
 device addresses, if a device is plugged to a port it's routine
 address is here, 'nulldev' means no device is available

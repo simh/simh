@@ -32,6 +32,7 @@
 #include "altair8800_sys.h"
 #include "altair8800_dsk.h"
 #include "s100_bus.h"
+#include "s100_cpu.h"
 #include "sds_vfii.h"
 #include "wd_17xx.h"
 
@@ -41,8 +42,7 @@ static WD17XX_INFO *wd17xx = NULL;
 
 #define VFII_WD17XX_OFFSET   1
 
-static int32 poc = TRUE; /* Power On Clear */
-
+static int32 poc = TRUE;
 static uint8 drv_sel = 0;
 static uint8 vfii_creg = 0;
 
@@ -67,7 +67,6 @@ static UNIT vfii_unit[VFII_NUM_DRIVES] = {
 };
 
 static REG vfii_reg[] = {
-    { FLDATAD (POC,     poc,       0x01,      "Power on Clear flag"), },
     { DRDATAD (DRVSEL,  drv_sel,   8,         "Drive select"), },
     { NULL }
 };
@@ -139,7 +138,7 @@ static t_stat vfii_reset(DEVICE *dptr)
 
         poc = TRUE;
     } else {
-        if (poc) {
+        if (poc) { /* Powerup? */
             for (i = 0; i < VFII_NUM_DRIVES; i++) {
                 vfii_unit[i].dptr = dptr;
                 dsk_init(&dsk_info[i], &vfii_unit[i], 77, 1, 0);
@@ -182,7 +181,7 @@ static t_stat vfii_boot(int32 unitno, DEVICE *dptr)
 
     sim_debug(STATUS_MSG, &vfii_dev, DEV_NAME ": Booting Controller at 0x%04x\n", 0xE000);
 
-    s100_bus_set_addr(0xE000);
+    cpu_set_pc_loc(0xE000);
 
     return SCPE_OK;
 }

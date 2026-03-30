@@ -58,6 +58,11 @@ typedef struct {
 extern void cpu_set_chiptype(ChipType type);
 extern ChipType cpu_get_chiptype(void);
 extern char * cpu_get_chipname(ChipType type);
+extern t_addr cpu_set_pc_loc(t_addr loc);
+extern void cpu_idle();
+extern void cpu_req_idle();
+extern void cpu_clr_idle();
+extern int cpu_get_idle();
 
 #endif
 

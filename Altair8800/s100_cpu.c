@@ -37,6 +37,7 @@
 REG *sim_PC;
 
 static int32 poc = TRUE; /* Power On Clear */
+static int32 idle = FALSE; /* Idle has been requested */
 
 static ChipType cpu_type = CHIP_TYPE_8080;
 
@@ -169,6 +170,30 @@ char * cpu_get_chipname(ChipType type)
     return cpu_chipname[type];
 }
 
+void cpu_idle()
+{
+    if (sim_idle_enab && idle) {
+        sim_idle(S100_CLK_TIMER, FALSE);
+
+        idle = FALSE;
+    }
+}
+
+void cpu_req_idle()
+{
+    idle = TRUE;
+}
+
+void cpu_clr_idle()
+{
+    idle = FALSE;
+}
+
+int cpu_get_idle()
+{
+    return idle;
+}
+
 t_stat sim_instr()
 {
     t_stat reason = SCPE_NXDEV;
@@ -188,6 +213,18 @@ static void cpu_set_instr(t_stat (*routine)(void))
 static void cpu_set_pc(REG *reg)
 {
     sim_PC = reg;
+}
+
+t_addr cpu_set_pc_loc(t_addr loc)
+{
+    t_addr old = 0x0000;
+
+    if (sim_PC != NULL) {
+        old = *((int32 *) sim_PC->loc);
+        *((int32 *) sim_PC->loc) = loc & ADDRMASK;
+    }
+
+    return old;
 }
 
 static void cpu_set_pc_value(t_value (*routine)(void))
