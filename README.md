@@ -49,7 +49,7 @@
 
 All Simulator updates on Open SIMH will be present in this repository, and any changes to the master branch code in this repository authored by anyone except Mark Pizzolato may be posted as pull requests on the Open simh repo.
 
-Simulator binaries for x86 Linus, x86 macOS, and Windows for all recent changes are available at https://github.com/simh/Development-Binaries
+Simulator binaries for x86 Linux, x86 macOS, and Windows for all recent changes are available at https://github.com/simh/Development-Binaries
 
 ### Mark Pizzolato's changes only present in the simh/simh repo and not present in the Open SIMH repo:
 
