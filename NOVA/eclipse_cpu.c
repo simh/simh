@@ -338,6 +338,8 @@
 
 #include "nova_defs.h"
 
+
+
 #define UNIT_V_MICRO    (UNIT_V_UF)                     /* Microeclipse? */
 #define UNIT_V_17B      (UNIT_V_UF)                     /* 17 bit MAP */
 #define UNIT_V_UP       (UNIT_V_UF)                     /* FPU Enabled */
@@ -364,7 +366,6 @@ int32 stop_dev = 0;                                     /* stop on ill dev */
 int32 old_PC = 0;                                       /* previous PC */
 int32 model = 140;                                      /* Model of Eclipse */
 int32 speed = 0;                                        /* Delay for each instruction */
-
 int32 XCT_mode = 0;                                     /* 1 if XCT mode */
 int32 XCT_inst = 0;                                     /* XCT instruction */
 int32 PrevPC = -1;
@@ -514,6 +515,8 @@ int32 PutMap(int32 addr, int32 data);
 int32 Debug_Entry(int32 PC, int32 inst, int32 inst2, int32 AC0, int32 AC1, int32 AC2, int32 AC3, int32 flags);
 t_stat build_devtab (void);
 
+extern t_stat sim_process_event(void);
+
 /* CPU data structures
 
    cpu_dev      CPU device descriptor
@@ -522,7 +525,7 @@ t_stat build_devtab (void);
    cpu_mod      CPU modifiers list
 */
 
-UNIT cpu_unit = { UDATA (NULL, UNIT_FIX + UNIT_BINK, MAXMEMSIZE) };
+UNIT cpu_unite = { UDATA (NULL, UNIT_FIX + UNIT_BINK, MAXMEMSIZE) };
 
 REG cpu_reg[] = {
     { ORDATA (PC, saved_PC, 15) },
@@ -573,7 +576,7 @@ MTAB cpu_mod[] = {
 };
 
 DEVICE cpu_dev = {
-    "CPU", &cpu_unit, cpu_reg, cpu_mod,
+    "CPU", &cpu_unite, cpu_reg, cpu_mod,
     1, 8, 17, 1, 8, 16,
     &cpu_ex, &cpu_dep, &cpu_reset,
     &cpu_boot, NULL, NULL
@@ -4804,9 +4807,9 @@ if (t < 014) {                                          /* mem ref? */
     }
     if (IR & 002000) {                                  /* indirect? */
         for (i = 0; i < (ind_max * 2); i++) {           /* count indirects */
-            if ((MA & 077770) == 020 && !(cpu_unit.flags & UNIT_MICRO))
+            if ((MA & 077770) == 020 && !(cpu_unite.flags & UNIT_MICRO))
                 MA = (PutMap(MA & AMASK, (GetMap(MA & AMASK) + 1) & 0177777));
-            else if ((MA & 077770) == 030 && !(cpu_unit.flags & UNIT_MICRO))
+            else if ((MA & 077770) == 030 && !(cpu_unite.flags & UNIT_MICRO))
                 MA = (PutMap(MA & AMASK, (GetMap(MA & AMASK) - 1) & 0177777));
             else MA = GetMap(MA & AMASK);
             if (MapStat & 1) {                          /* Start MAP */
@@ -4837,12 +4840,12 @@ if (t < 014) {                                          /* mem ref? */
         break;
     case 002:                                           /* ISZ */
         src = (GetMap(MA) + 1) & 0177777;
-        if (MEM_ADDR_OK (MA)) PutMap(MA, src);
+        if (MEM_ADDR_OK2 (MA)) PutMap(MA, src);
         if (src == 0) PC = (PC + 1) & AMASK;
         break;
     case 003:                                           /* DSZ */
         src = (GetMap(MA) - 1) & 0177777;
-        if (MEM_ADDR_OK (MA)) PutMap(MA, src);
+        if (MEM_ADDR_OK2 (MA)) PutMap(MA, src);
         if (src == 0) PC = (PC + 1) & AMASK;
         break;
     case 004:                                           /* LDA 0 */
@@ -4888,7 +4891,7 @@ if (t < 014) {                                          /* mem ref? */
     case 010:                                           /* STA 0 */
         if (SingleCycle) 
             Usermap = SingleCycle;
-        if (MEM_ADDR_OK (MA)) PutMap(MA, AC[0]);
+        if (MEM_ADDR_OK2 (MA)) PutMap(MA, AC[0]);
         if (SingleCycle) {
             Usermap = SingleCycle = 0;
             if (Inhibit == 1) Inhibit = 3;
@@ -4899,7 +4902,7 @@ if (t < 014) {                                          /* mem ref? */
     case 011:                                           /* STA 1 */
         if (SingleCycle) 
             Usermap = SingleCycle;
-        if (MEM_ADDR_OK (MA)) PutMap(MA, AC[1]);
+        if (MEM_ADDR_OK2 (MA)) PutMap(MA, AC[1]);
         if (SingleCycle) {
             Usermap = SingleCycle = 0;
             if (Inhibit == 1) Inhibit = 3;
@@ -4910,7 +4913,7 @@ if (t < 014) {                                          /* mem ref? */
     case 012:                                          /* STA 2 */
         if (SingleCycle) 
             Usermap = SingleCycle;
-        if (MEM_ADDR_OK (MA)) PutMap(MA, AC[2]);
+        if (MEM_ADDR_OK2 (MA)) PutMap(MA, AC[2]);
         if (SingleCycle) {
             Usermap = SingleCycle = 0;
             if (Inhibit == 1) Inhibit = 3;
@@ -4921,7 +4924,7 @@ if (t < 014) {                                          /* mem ref? */
     case 013:                                           /* STA 3 */
         if (SingleCycle) 
             Usermap = SingleCycle;
-        if (MEM_ADDR_OK (MA)) PutMap(MA, AC[3]);
+        if (MEM_ADDR_OK2 (MA)) PutMap(MA, AC[3]);
         if (SingleCycle) {
             Usermap = SingleCycle = 0;
             if (Inhibit == 1) Inhibit = 3;
@@ -5403,9 +5406,9 @@ int32 LEFmode(int32 PC, int32 index, int32 disp, int32 indirect)
 
     if (indirect) {                                     /* indirect? */
         for (i = 0; i < (ind_max * 2); i++) {           /* count indirects */
-            if ((MA & 077770) == 020 && !(cpu_unit.flags & UNIT_MICRO))
+            if ((MA & 077770) == 020 && !(cpu_unite.flags & UNIT_MICRO))
                 MA = (PutMap(MA & AMASK, (GetMap(MA & AMASK) + 1) & 0177777));
-            else if ((MA & 077770) == 030 && !(cpu_unit.flags & UNIT_MICRO))
+            else if ((MA & 077770) == 030 && !(cpu_unite.flags & UNIT_MICRO))
                 MA = (PutMap(MA & AMASK, (GetMap(MA & AMASK) - 1) & 0177777));
             else MA = GetMap(MA & AMASK);
             if (SingleCycle) Usermap = 0;
@@ -5462,9 +5465,9 @@ int32 indirect(int32 d)
        
     if (d & 0100000) {                                  /* indirect? */
         for (i = 0; i < ind_max * 2; i++) {             /* count indirects */
-            if ((d & 077770) == 020 && !(cpu_unit.flags & UNIT_MICRO)) 
+            if ((d & 077770) == 020 && !(cpu_unite.flags & UNIT_MICRO)) 
                 d = (PutMap(d & AMASK, ((GetMap(d & AMASK) + 1) & 0177777)));
-            else if ((d & 077770) == 030 && !(cpu_unit.flags & UNIT_MICRO)) 
+            else if ((d & 077770) == 030 && !(cpu_unite.flags & UNIT_MICRO)) 
                 d = (PutMap(d & AMASK, ((GetMap(d & AMASK) - 1) & 0177777)));
             else d = GetMap(d & AMASK);
             if (MapStat & 1) {                          /* Start MAP */
@@ -5517,7 +5520,7 @@ int32 GetMap(int32 addr)
             if (addr < 076000)
                 return M[addr];
             paddr = ((Map31 & PAGEMASK) << 10) | (addr & 001777);
-            if (paddr < MEMSIZE)
+            if (paddr < MEMSIZE2)
                  return M[paddr];
                 else
                  return (0); 
@@ -5527,7 +5530,7 @@ int32 GetMap(int32 addr)
             paddr = ((Map[1][page] & 01777) << 10) | (addr & 001777);
             if (Map[1][page] == INVALID && !SingleCycle) 
                 Fault = 0100000/*!!!*/;                 /* Validity */
-            if (paddr < MEMSIZE)
+            if (paddr < MEMSIZE2)
                  return M[paddr];
                 else
                  return (0); 
@@ -5537,7 +5540,7 @@ int32 GetMap(int32 addr)
             paddr = ((Map[2][page] & PAGEMASK) << 10) | (addr & 001777);
             if (Map[2][page] == INVALID && !SingleCycle) 
                 Fault = 0100000/*!!!*/;                /* Validity */
-            if (paddr < MEMSIZE)
+            if (paddr < MEMSIZE2)
                  return M[paddr];
                 else
                  return (0); 
@@ -5547,7 +5550,7 @@ int32 GetMap(int32 addr)
             paddr = ((Map[6][page] & PAGEMASK) << 10) | (addr & 001777);
             if (Map[6][page] == INVALID && !SingleCycle) 
                 Fault = 0100000/*!!!*/;                /* Validity */
-            if (paddr < MEMSIZE)
+            if (paddr < MEMSIZE2)
                  return M[paddr];
                 else
                  return (0); 
@@ -5557,7 +5560,7 @@ int32 GetMap(int32 addr)
             paddr = ((Map[7][page] & PAGEMASK) << 10) | (addr & 001777);
             if (Map[7][page] == INVALID && !SingleCycle) 
                 Fault = 0100000/*!!!*/;                /* Validity */
-            if (paddr < MEMSIZE)
+            if (paddr < MEMSIZE2)
                  return M[paddr];
                 else
                  return (0); 
@@ -5581,35 +5584,35 @@ int32 PutMap(int32 addr, int32 data)
                 return (data);
             }
             paddr = ((Map31 & PAGEMASK) << 10) | (addr & 001777);
-            if (paddr < MEMSIZE) M[paddr] = data;    
+            if (paddr < MEMSIZE2) M[paddr] = data;    
             break;
         case 1:
             page = (addr >> 10) & 037;
             paddr = ((Map[1][page] & PAGEMASK) << 10) | (addr & 001777);
             if (((Map[1][page] & 0100000) && (MapStat & 020)) || Map[1][page] == INVALID) 
                 Fault = 010000;                         /* Write Protect Fault */
-            else if (paddr < MEMSIZE) M[paddr] = data; 
+            else if (paddr < MEMSIZE2) M[paddr] = data; 
             break;
         case 2:
             page = (addr >> 10) & 037;
             paddr = ((Map[2][page] & PAGEMASK) << 10) | (addr & 001777);
             if (((Map[2][page] & 0100000) && (MapStat & 020)) || Map[2][page] == INVALID) 
                 Fault = 010000;                         /* Write Protect Fault */
-            else if (paddr < MEMSIZE) M[paddr] = data;
+            else if (paddr < MEMSIZE2) M[paddr] = data;
             break;    
         case 6:
             page = (addr >> 10) & 037;
             paddr = ((Map[2][page] & PAGEMASK) << 10) | (addr & 001777);
             if (((Map[6][page] & 0100000) && (MapStat & 020)) || Map[6][page] == INVALID)
                 Fault = 010000;                         /* Write Protect Fault */
-            else if (paddr < MEMSIZE) M[paddr] = data;
+            else if (paddr < MEMSIZE2) M[paddr] = data;
             break;    
         case 7:
             page = (addr >> 10) & 037;
             paddr = ((Map[2][page] & PAGEMASK) << 10) | (addr & 001777);
             if (((Map[7][page] & 0100000) && (MapStat & 020)) || Map[7][page] == INVALID) 
                 Fault = 010000;                         /* Write Protect Fault */
-            else if (paddr < MEMSIZE) M[paddr] = data;
+            else if (paddr < MEMSIZE2) M[paddr] = data;
             break;    
         default:
             M[addr] = data;
@@ -5624,7 +5627,7 @@ int16 GetDCHMap(int32 map, int32 addr)
      t_addr paddr;
      if (!(MapStat & 02)) return M[addr];
      paddr = ((Map[map][(addr >> 10) & 037] & PAGEMASK) << 10) | (addr & 001777);
-     if (paddr < MEMSIZE)
+     if (paddr < MEMSIZE2)
          return M[paddr]; 
      return (0);       
 }
@@ -5637,7 +5640,7 @@ int16 PutDCHMap(int32 map, int32 addr, int16 data)
          return (data);
      }    
      paddr = ((Map[map][(addr >> 10) & 037] & PAGEMASK) << 10) | (addr & 001777);
-     if (paddr < MEMSIZE)
+     if (paddr < MEMSIZE2)
         M[paddr] = data;
      return (data);    
 }
@@ -5740,7 +5743,7 @@ if (sw & SWMASK ('V')) {
     if (vptr != NULL) *vptr = GetMap (addr);
 }
 else {
-    if (addr >= MEMSIZE) return SCPE_NXM;
+    if (addr >= MEMSIZE2) return SCPE_NXM;
     if (vptr != NULL) *vptr = M[addr] & 0177777;
 }
 return SCPE_OK;
@@ -5755,7 +5758,7 @@ if (sw & SWMASK ('V')) {
     PutMap (addr, (int32) val);
 }
 else {
-    if (addr >= MEMSIZE) return SCPE_NXM;
+    if (addr >= MEMSIZE2) return SCPE_NXM;
     M[addr] = (int32) val & 0177777;
 }
 return SCPE_OK;
@@ -5770,11 +5773,11 @@ t_addr i;
 
 if ((val <= 0) || (val > MAXMEMSIZE) || ((val & 07777) != 0))
     return SCPE_ARG;
-for (i = val; i < MEMSIZE; i++) mc = mc | M[i];
+for (i = val; i < MEMSIZE2; i++) mc = mc | M[i];
 if ((mc != 0) && (!get_yn ("Really truncate memory [N]?", FALSE)))
     return SCPE_OK;
-MEMSIZE = val;
-for (i = MEMSIZE; i < MAXMEMSIZE; i++) M[i] = 0;
+MEMSIZE2 = val;
+for (i = MEMSIZE2; i < MAXMEMSIZE; i++) M[i] = 0;
 return SCPE_OK;
 }
 
