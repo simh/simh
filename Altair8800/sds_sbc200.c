@@ -25,6 +25,7 @@
 
    History:
    07-Nov-2025 Initial version
+   13-May-2026 Fixed sbc200_info initializer error identified by Mark P.
 
 */
 
@@ -707,7 +708,7 @@ static MTAB sbc200_mod[] = {
     { 0 }
 };
 
-static SBC200_INFO sbc200_info = { 0, sbc200_tmln, &sbc200_tmxr, SBC200_BAUD, 1 };
+static SBC200_INFO sbc200_info = { 0, sbc200_tmln, &sbc200_tmxr, TRUE, 0, SBC200_BAUD };
 
 static UNIT sbc200_unit[] = {
         { UDATA (&sbc200_svc, UNIT_ATTABLE | UNIT_DISABLE |
