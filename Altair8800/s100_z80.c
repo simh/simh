@@ -5761,10 +5761,10 @@ static t_stat z80_set_chiptype(UNIT *uptr, int32 value, const char *cptr, void *
 {
     if (z80_chiptype != value) {
         if (z80_unit.flags & UNIT_CPU_VERBOSE) {
-            sim_printf("CPU changed from %s to %s\n", cpu_get_chipname(z80_chiptype), cpu_get_chipname(value));
+            sim_printf("CPU changed from %s to %s\n", cpu_get_chipname(z80_chiptype), cpu_get_chipname((ChipType) value));
         }
 
-        cpu_set_chiptype(value);
+        cpu_set_chiptype((ChipType) value);
     }
 
     return SCPE_OK;

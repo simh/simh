@@ -438,9 +438,9 @@ void s100_bus_memw(t_addr addr, int32 data)
     mdev_table[page].routine(addr, S100_IO_WRITE, data);
 }
 
-uint32 s100_bus_set_addr(uint32 new)
+uint32 s100_bus_set_addr(uint32 addr)
 {
-    bus_addr = new;
+    bus_addr = addr;
 
     return bus_addr;
 }

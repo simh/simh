@@ -370,7 +370,7 @@ static t_stat bram_type_command(UNIT *uptr, int32 value, const char *cptr, void 
 
 static t_stat bram_set_banks(int32 banks) {
     if (banks > 0 && banks <= MAXBANK) {
-        M = realloc(M, banks * MAXBANKSIZE);
+        M = (int32 *) realloc(M, banks * MAXBANKSIZE);
     }
     else if (M != NULL) {
         free(M);

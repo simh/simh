@@ -333,7 +333,7 @@ t_stat dsk_write_track(DSK_INFO *d, int32 track, int32 head, uint8 fill)
     ssize = dsk_sector_size(d, track, head);
     start = dsk_start_sector(d, track, head);
 
-    if ((b = malloc(ssize)) == NULL) {
+    if ((b = (unsigned char *) malloc(ssize)) == NULL) {
         return 0;
     }
 

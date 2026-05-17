@@ -120,7 +120,7 @@ extern void s100_bus_get_idev(int32 port, IDEV *idev_in, IDEV *idev_out);
 extern void s100_bus_get_mdev(int32 addr, MDEV *mdev);
 extern int32 nulldev(const int32 addr, const int32 io, const int32 data);
 
-extern uint32 s100_bus_set_addr(uint32 pc);
+extern uint32 s100_bus_set_addr(uint32 addr);
 extern uint32 s100_bus_get_addr(void);
 
 extern t_stat s100_bus_console(UNIT *uptr);

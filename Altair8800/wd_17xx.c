@@ -51,7 +51,7 @@ WD17XX_INFO * wd17xx_init(DEVICE *dptr)
 {
     WD17XX_INFO *wd;
 
-    if ((dptr == NULL) || (wd = malloc(sizeof(WD17XX_INFO))) == NULL) {
+    if ((dptr == NULL) || (wd = (WD17XX_INFO *) malloc(sizeof(WD17XX_INFO))) == NULL) {
         return NULL;
     }
 
