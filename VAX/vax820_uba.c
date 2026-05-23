@@ -142,6 +142,9 @@ int32 uba_get_ubvector (int32 lvl);
 void uba_ub_nxm (int32 ua);
 void uba_bi_nxm (int32 ba);
 void uba_inv_map (int32 ublk);
+t_bool uba_adap_int_source (void);
+t_bool uba_biic_error_int_en (void);
+t_bool uba_adap_int_req (void);
 void uba_eval_int (void);
 void uba_adap_set_int ();
 void uba_adap_clr_int ();
@@ -394,11 +397,16 @@ switch (ofs) {                                          /* case on offset */
 
     case BI_BER:
         uba_biic.ber = uba_biic.ber & ~(val & BIBER_W1C);
+        uba_adap_clr_int ();                            /* possible clr int */
         break;
 
     case BI_EICR:
         uba_biic.eicr = (uba_biic.eicr & ~BIECR_RW) | (val & BIECR_RW);
         uba_biic.eicr = uba_biic.eicr & ~(val & BIECR_W1C);
+        if (!(uba_biic.eicr & BIECR_FRC)) {
+            uba_int = 0;
+            uba_biic.eicr &= ~BIECR_COM;
+            }
         break;
 
     case BI_IDEST:
@@ -425,6 +433,7 @@ switch (ofs) {                                          /* case on offset */
             }
         uba_csr = (uba_csr & ~UBACSR_WR) | (val & UBACSR_WR);
         uba_csr = uba_csr & ~(val & UBACSR_W1C);
+        uba_adap_clr_int ();                            /* possible clr int */
         break;
 
     case UBAVO_OF:                                      /* VO */
@@ -485,7 +494,9 @@ uba_ub_nxm (pa);                                        /* UB nxm */
 return;
 }
 
-/* ReadIO - read from IO - UBA only responds to byte, aligned word
+/* ReadIO - read from IO - UBA responds to byte, aligned word, and
+   aligned longword reads. Longword reads perform two Unibus word reads,
+   matching the two 16b Unibus cycles behind a 32b VAXBI transaction.
 
    Inputs:
         pa      =       physical address
@@ -505,10 +516,19 @@ if ((lnt == L_BYTE) ||                                  /* byte? */
         iod = iod << 16;
     }
 else {
-    printf (">>UBA: invalid read mask, pa = %x, lnt = %d\n", pa, lnt);
-    //TODO: Set error bit?
-    iod = 0;
+    if ((lnt == L_LONG) && ((pa & 1) == 0)) {          /* aligned lw? */
+        uint32 high;
+
+        iod = ReadUb (pa);                                  /* low word */
+        high = ReadUb (pa + 2);                             /* high word */
+        iod = (iod & 0xffff) | ((high & 0xffff) << 16);
+        }
+    else {
+        printf (">>UBA: invalid read mask, pa = %x, lnt = %d\n", pa, lnt);
+        //TODO: Set error bit?
+        iod = 0;
     }
+}
 SET_IRQL;
 return iod;
 }
@@ -543,25 +563,20 @@ void uba_eval_int (void)
 {
 int32 i, lvl;
 
-// TODO: Check BIIC register?
-if (uba_int) {
+for (i = 0; i < NEXUS_HLVL; i++)                       /* clear all UBA req */
+    nexus_req[i] &= ~(1 << TR_UBA);
+if (uba_adap_int_req ()) {
     lvl = (uba_biic.eicr >> BIECR_V_LVL) & BIECR_M_LVL;
-    for (i = 0; i < (IPL_HMAX - IPL_HMIN); i++) {
+    for (i = 0; i < NEXUS_HLVL; i++) {
         if (lvl & (1u << i)) {
             nexus_req[i] |= (1 << TR_UBA);
             }
         }
     }
-else {
-    for (i = 0; i < (IPL_HMAX - IPL_HMIN); i++)             /* clear all UBA req */
-        nexus_req[i] &= ~(1 << TR_UBA);
-    for (i = 0; i < (IPL_HMAX - IPL_HMIN); i++) {
-        if (int_req[i])
-            nexus_req[i] |= (1 << TR_UBA);
-        }
+for (i = 0; i < NEXUS_HLVL; i++) {
+    if (int_req[i])
+        nexus_req[i] |= (1 << TR_UBA);
     }
-//if (uba_int)                                            /* adapter int? */
-//    SET_NEXUS_INT (UBA);
 return;
 }
 
@@ -571,10 +586,11 @@ int32 uba_get_ubvector (int32 lvl)
 {
 int32 i, vec;
 
-if ((uba_biic.eicr & (1u << (lvl + BIECR_V_LVL))) && uba_int) {         /* UBA err lvl, int? */
-//if ((lvl == (IPL_UBA - IPL_HMIN)) && uba_int) {         /* UBA lvl, int? */
+if ((uba_biic.eicr & (1u << (lvl + BIECR_V_LVL))) &&
+    uba_adap_int_req ()) {                              /* UBA err lvl, int? */
     vec = uba_biic.eicr & BIECR_VEC;
-    uba_int = 0;                                        /* clear int */
+    /* INTR transmission is not modeled separately, so IDENT only sets COM. */
+    uba_biic.eicr |= BIECR_COM;                         /* vector transmitted */
     }
 else {
     vec = uba_vo & UBAVO_VEC;
@@ -814,8 +830,8 @@ return;
 
 void uba_bi_nxm (int32 ba)
 {
-if ((uba_biic.ber & BIBER_BTO) == 0) {
-    uba_biic.ber |= BIBER_BTO;
+if ((uba_csr & UBACSR_BIF) == 0) {
+    uba_csr |= UBACSR_BIF;
     uba_bifa = ba;
     uba_adap_set_int ();
     }
@@ -871,10 +887,27 @@ return SCPE_OK;
 
 /* Interrupt routines */
 
-void uba_adap_set_int ()
+t_bool uba_adap_int_source (void)
+{
+return uba_int || (uba_biic.eicr & BIECR_FRC);
+}
+
+t_bool uba_biic_error_int_en (void)
+{
+return (uba_biic.csr & (BICSR_HIE | BICSR_SIE)) != 0;
+}
+
+t_bool uba_adap_int_req (void)
+{
+return uba_adap_int_source () && uba_biic_error_int_en () &&
+    !(uba_biic.eicr & BIECR_COM);
+}
+
+void uba_adap_set_int (void)
 {
 if (uba_csr & UBACSR_EIE) {
     uba_int = 1;
+    uba_biic.eicr |= BIECR_FRC;
     sim_debug (UBA_DEB_ERR, &uba_dev,
         "adapter int req, csr = %X\n", uba_csr);
     }
@@ -883,8 +916,11 @@ return;
 
 void uba_adap_clr_int ()
 {
-if (!(uba_csr & UBACSR_EIE))
+if (!(uba_csr & UBACSR_EIE)) {
     uba_int = 0;
+    }
+if (!uba_adap_int_source ())
+    uba_biic.eicr &= ~BIECR_COM;
 return;
 }
 
