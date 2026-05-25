@@ -1590,10 +1590,16 @@ FILE *fIn = NULL, *fOut = NULL;
 t_stat st = SCPE_OK;
 char *buf = NULL;
 size_t bytes;
+struct stat statb;
 
 fIn = sim_fopen (source_file, "rb");
 if (!fIn) {
     st = sim_messagef (SCPE_ARG, "Can't open '%s' for input: %s\n", source_file, strerror (errno));
+    goto Cleanup_Return;
+    }
+if (!overwrite_existing && (sim_stat (dest_file, &statb) == 0)) {
+    st = sim_messagef (SCPE_ARG, "Can't open '%s' for output: %s\n",
+                       dest_file, strerror (EEXIST));
     goto Cleanup_Return;
     }
 fOut = sim_fopen (dest_file, "wb");
