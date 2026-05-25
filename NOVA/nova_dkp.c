@@ -328,8 +328,8 @@ struct drvtyp drv_tab[] = {
  */
 
 extern uint16 M[];
-extern UNIT cpu_unit;
-extern int32 int_req, dev_busy, dev_done, dev_disable;
+extern UNIT cpu_unitn;
+extern int32 int_reqn, dev_busy, dev_donen, dev_disablen;
 extern int32 saved_PC, SR, AMASK;
 
 int32 dkp_ma = 0;                                       /* memory address */
@@ -377,10 +377,10 @@ REG dkp_reg[] = {
     { ORDATA (USSC, dkp_ussc, 16) },
     { ORDATA (STA, dkp_sta, 16) },
     { ORDATA (MA, dkp_ma, 16) },
-    { FLDATA (INT, int_req, INT_V_DKP) },
+    { FLDATA (INT, int_reqn, INT_V_DKP) },
     { FLDATA (BUSY, dev_busy, INT_V_DKP) },
-    { FLDATA (DONE, dev_done, INT_V_DKP) },
-    { FLDATA (DISABLE, dev_disable, INT_V_DKP) },
+    { FLDATA (DONE, dev_donen, INT_V_DKP) },
+    { FLDATA (DISABLE, dev_disablen, INT_V_DKP) },
     { FLDATA (DIAG,  dkp_diagmode, 0) },
     { DRDATA (TRACE, dkp_trace,   32) },
     { ORDATA (MAP, dkp_map, 2) },
