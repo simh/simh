@@ -116,6 +116,8 @@ t_stat tto_reset (DEVICE *dptr);
 t_stat clk_reset (DEVICE *dptr);
 t_stat clk_attach (UNIT *uptr, CONST char *cptr);
 t_stat clk_detach (UNIT *uptr);
+t_stat clk_show_mode (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat clk_show_time (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat todr_resync (void);
 const char *tti_description (DEVICE *dptr);
 const char *tto_description (DEVICE *dptr);
@@ -215,7 +217,7 @@ DEVICE tto_dev = {
 
 DIB clk_dib = { 0, 0, NULL, NULL, 1, IVCL (CLK), SCB_INTTIM, { NULL } };
 
-UNIT clk_unit = { UDATA (&clk_svc, UNIT_IDLE+UNIT_FIX, sizeof(TOY)), CLK_DELAY };/* 100Hz */
+UNIT clk_unit = { UDATA (&clk_svc, UNIT_IDLE, sizeof(TOY)), CLK_DELAY };/* 100Hz */
 
 REG clk_reg[] = {
     { HRDATAD (CSR,                          clk_csr,        16, "control/status register") },
@@ -235,7 +237,9 @@ REG clk_reg[] = {
     };
 
 MTAB clk_mod[] = {
-    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,     NULL, &show_vec, NULL, "Display interrupt vector" },
+    { MTAB_XTD|MTAB_VDV,            0, "VECTOR", NULL,     NULL, &show_vec,      NULL, "Display interrupt vector" },
+    { MTAB_XTD|MTAB_VUN,            0, "MODE",   NULL,     NULL, &clk_show_mode, NULL, "Display TODR clock mode" },
+    { MTAB_XTD|MTAB_VUN|MTAB_SH_NL, 0, "TIME",   NULL,     NULL, &clk_show_time, NULL, "Display TODR clock time" },
     { 0 }
     };
 
@@ -456,8 +460,13 @@ t_stat clk_svc (UNIT *uptr)
 {
 if (clk_csr & CSR_IE)
     SET_INT (CLK);
-tmr_poll = sim_rtcn_calb (clk_tps, TMR_CLK);            /* calibrate clock */
-sim_activate_after (&clk_unit, 1000000/clk_tps);        /* reactivate unit */
+if (ADDR_IS_ROM(fault_PC)) {
+    sim_activate (&clk_unit, 10000);                    /* reactivate unit */
+    }
+else {
+    tmr_poll = sim_rtcn_calb (clk_tps, TMR_CLK);        /* calibrate clock */
+    sim_activate_after (&clk_unit, 1000000/clk_tps);    /* reactivate unit */
+    }
 tmxr_poll = tmr_poll * TMXR_MULT;                       /* set mux poll */
 if (!todr_blow && todr_reg)                             /* if running? */
     todr_reg = todr_reg + 1;                            /* incr TODR */
@@ -681,3 +690,30 @@ if ((uptr->flags & UNIT_ATT) == 0)
 return r;
 }
 
+/* CLK show time */
+
+t_stat clk_show_mode (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+fprintf (st, "%s", (uptr->flags & UNIT_ATT) ? "OS Agnostic TODR Mode" : "Automatic VMS TODR Mode");
+return SCPE_OK;
+}
+
+/* CLK show time */
+
+t_stat clk_show_time (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+TOY *toy = (TOY *)uptr->filebuf;
+time_t ttime = (time_t)toy->toy_gmtbase;
+struct tm *ttm = localtime (&ttime);
+struct timespec now;
+int32 todr_now = todr_rd ();
+
+fprintf (st, "VMS Time Base: %d-%02d-%02d %02d:%02d:%02d.%03d", 1900 + ttm->tm_year, 1 + ttm->tm_mon, ttm->tm_mday, ttm->tm_hour, ttm->tm_min, ttm->tm_sec, (int)(toy->toy_gmtbasemsec));
+now.tv_nsec = (toy->toy_gmtbasemsec + (10 * (todr_now % 100)));
+now.tv_sec = (time_t)toy->toy_gmtbase + (todr_now / 100) + (now.tv_nsec / 1000000000);
+now.tv_nsec = now.tv_nsec % 1000000000;
+ttime = (time_t)now.tv_sec;
+ttm = localtime (&ttime);
+fprintf (st, ", Now: %d-%02d-%02d %02d:%02d:%02d.%03d", 1900 + ttm->tm_year, 1 + ttm->tm_mon, ttm->tm_mday, ttm->tm_hour, ttm->tm_min, ttm->tm_sec, (int)(now.tv_nsec / 1000000));
+return SCPE_OK;
+}

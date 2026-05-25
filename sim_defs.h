@@ -776,6 +776,7 @@ struct MTAB {
 #define MTAB_NC         (0040 | MTAB_XTD)               /* no UC conversion */
 #define MTAB_QUOTE      (0100 | MTAB_XTD)               /* quoted string */
 #define MTAB_SHP        (0200 | MTAB_XTD)               /* show takes parameter */
+#define MTAB_SH_NL      (0400 | MTAB_XTD)               /* show on a new line */
 #define MODMASK(mptr,flag) (((mptr)->mask & (uint32)(flag)) == (uint32)(flag))/* flag mask test */
 
 /* Search table */

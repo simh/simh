@@ -8025,7 +8025,8 @@ for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
         ((mptr->mask & MTAB_XTD)?
             (MODMASK(mptr,flag) && !MODMASK(mptr,MTAB_NMO)):
             ((MTAB_VUN == (uint32)flag) && ((uptr->flags & mptr->mask) == mptr->match)))) {
-        if ((*toks > 2) && (r == SCPE_OK)) {/* something emitted already? */
+        if (((*toks > 2) && (r == SCPE_OK)) ||           /* something emitted already? */
+            ((mptr->mask & MTAB_SH_NL) == MTAB_SH_NL)) { /* or force to a new line request? */
             fprintf (st, "\n");
             *toks = 0;                      /* force device/unit name indent on next output */
             }

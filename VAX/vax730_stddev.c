@@ -205,6 +205,8 @@ t_stat tto_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cpt
 t_stat clk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 t_stat clk_attach (UNIT *uptr, CONST char *cptr);
 t_stat clk_detach (UNIT *uptr);
+t_stat clk_show_mode (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat clk_show_time (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat tmr_reset (DEVICE *dptr);
 t_stat td_reset (DEVICE *dptr);
 int32 icr_rd (void);
@@ -298,6 +300,12 @@ REG clk_reg[] = {
     { NULL }
     };
 
+MTAB clk_mod[] = {
+    { MTAB_XTD|MTAB_VUN,            0, "MODE",   NULL,     NULL, &clk_show_mode, NULL, "Display TODR clock mode" },
+    { MTAB_XTD|MTAB_VUN|MTAB_SH_NL, 0, "TIME",   NULL,     NULL, &clk_show_time, NULL, "Display TODR clock time" },
+    { 0 }
+    };
+
 #define TMR_DB_TODR     0x10    /* TODR */
 
 DEBTAB todr_deb[] = {
@@ -306,7 +314,7 @@ DEBTAB todr_deb[] = {
     };
 
 DEVICE clk_dev = {
-    "TODR", &clk_unit, clk_reg, NULL,
+    "TODR", &clk_unit, clk_reg, clk_mod,
     1, 0, 8, 4, 0, 32,
     NULL, NULL, &clk_reset,
     NULL, &clk_attach, &clk_detach,
@@ -881,6 +889,34 @@ r = detach_unit (uptr);
 if ((uptr->flags & UNIT_ATT) == 0)
     uptr->flags = uptr->flags & ~(UNIT_ATTABLE | UNIT_BUFABLE);
 return r;
+}
+
+/* CLK show time */
+
+t_stat clk_show_mode (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+fprintf (st, "%s", (uptr->flags & UNIT_ATT) ? "OS Agnostic TODR Mode" : "Automatic VMS TODR Mode");
+return SCPE_OK;
+}
+
+/* CLK show time */
+
+t_stat clk_show_time (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+TOY *toy = (TOY *)uptr->filebuf;
+time_t ttime = (time_t)toy->toy_gmtbase;
+struct tm *ttm = localtime (&ttime);
+struct timespec now;
+int32 todr_now = todr_rd ();
+
+fprintf (st, "VMS Time Base: %d-%02d-%02d %02d:%02d:%02d.%03d", 1900 + ttm->tm_year, 1 + ttm->tm_mon, ttm->tm_mday, ttm->tm_hour, ttm->tm_min, ttm->tm_sec, (int)(toy->toy_gmtbasemsec));
+now.tv_nsec = (toy->toy_gmtbasemsec + (10 * (todr_now % 100)));
+now.tv_sec = (time_t)toy->toy_gmtbase + (todr_now / 100) + (now.tv_nsec / 1000000000);
+now.tv_nsec = now.tv_nsec % 1000000000;
+ttime = (time_t)now.tv_sec;
+ttm = localtime (&ttime);
+fprintf (st, ", Now: %d-%02d-%02d %02d:%02d:%02d.%03d", 1900 + ttm->tm_year, 1 + ttm->tm_mon, ttm->tm_mday, ttm->tm_hour, ttm->tm_min, ttm->tm_sec, (int)(now.tv_nsec / 1000000));
+return SCPE_OK;
 }
 
 /* Interval timer reset */

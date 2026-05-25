@@ -973,6 +973,10 @@ extern t_stat build_dib_tab (void);
 extern void rom_wr_B (int32 pa, int32 val);
 extern int32 cpu_instruction_set;
 
+/* vax*_stddev dependent definitions */
+extern int32 todr_rd (void);
+extern void todr_wr (int32 dat);
+
 #if defined (VAX_780)
 #include "vax780_defs.h"
 #elif defined (VAX_750)

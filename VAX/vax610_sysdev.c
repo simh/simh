@@ -62,12 +62,10 @@ t_stat vax610_boot (int32 flag, CONST char *ptr);
 t_stat vax610_boot_parse (int32 flag, const char *ptr);
 
 extern int32 iccs_rd (void);
-extern int32 todr_rd (void);
 extern int32 rxcs_rd (void);
 extern int32 rxdb_rd (void);
 extern int32 txcs_rd (void);
 extern void iccs_wr (int32 dat);
-extern void todr_wr (int32 dat);
 extern void rxcs_wr (int32 dat);
 extern void txcs_wr (int32 dat);
 extern void txdb_wr (int32 dat);
