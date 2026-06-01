@@ -77,6 +77,7 @@
 #define MAXMEMSIZE      1048576                         /* max memory size in 16-bit words */
 #define PAMASK          (MAXMEMSIZE - 1)                /* physical addr mask */
 #define MEM_ADDR_OK(x)  (((uint32) (x)) < (uint32) MEMSIZE)
+#define MEM_ADDR_OK2(x)  (((uint32) (x)) < (uint32) MEMSIZE2)
 
 #else
                                 /*----------------------*/
@@ -87,11 +88,13 @@
                                                         /* 64 KW = 3rd-party extended memory feature  */
 #define DFTMEMSIZE      32768                           /* default/initial mem size  */
 #define MEM_ADDR_OK(x)  (((uint32) (x)) < (uint32) MEMSIZE)
+#define MEM_ADDR_OK2(x)  (((uint32) (x)) < (uint32) MEMSIZE2)
 
 #endif
 
 
-#define MEMSIZE         (cpu_unit.capac)                /* actual memory size */
+#define MEMSIZE         (cpu_unitn.capac)                /* actual memory size */
+#define MEMSIZE2         (cpu_unite.capac)                /* actual memory size */
 #define A_V_IND         15                              /* ind: indirect */
 #define A_IND           (1 << A_V_IND)
 
@@ -316,12 +319,12 @@ typedef struct {
 
 #define DEV_SET_BUSY( x )    dev_busy = dev_busy |   (x)
 #define DEV_CLR_BUSY( x )    dev_busy = dev_busy & (~(x))
-#define DEV_SET_DONE( x )    dev_done = dev_done |   (x)
-#define DEV_CLR_DONE( x )    dev_done = dev_done & (~(x))
-#define DEV_UPDATE_INTR      int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable)
+#define DEV_SET_DONE( x )    dev_donen = dev_donen |   (x)
+#define DEV_CLR_DONE( x )    dev_donen = dev_donen & (~(x))
+#define DEV_UPDATE_INTR      int_reqn = (int_reqn & ~INT_DEV) | (dev_donen & ~dev_disablen)
 
 #define DEV_IS_BUSY( x )    (dev_busy & (x))
-#define DEV_IS_DONE( x )    (dev_done & (x))
+#define DEV_IS_DONE( x )    (dev_donen & (x))
 
 /* Function prototypes */
 

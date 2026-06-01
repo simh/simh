@@ -44,7 +44,7 @@ Notes:
 
 #include "nova_defs.h"
 
-extern int32 int_req, dev_busy, dev_done, dev_disable;
+extern int32 int_reqn, dev_busy, dev_donen, dev_disablen;
 
 int32 plt_stopioe = 0;                                  /* stop on error */
 
@@ -74,9 +74,9 @@ UNIT plt_unit = {   /* 2007-May-30, bkr */
 REG plt_reg[] = {
     { ORDATA (BUF, plt_unit.buf, 8) },
     { FLDATA (BUSY, dev_busy, INT_V_PLT) },
-    { FLDATA (DONE, dev_done, INT_V_PLT) },
-    { FLDATA (DISABLE, dev_disable, INT_V_PLT) },
-    { FLDATA (INT, int_req, INT_V_PLT) },
+    { FLDATA (DONE, dev_donen, INT_V_PLT) },
+    { FLDATA (DISABLE, dev_disablen, INT_V_PLT) },
+    { FLDATA (INT, int_reqn, INT_V_PLT) },
     { DRDATA (POS, plt_unit.pos, T_ADDR_W), PV_LEFT },
     { DRDATA (TIME, plt_unit.wait, 24), PV_LEFT },
     { FLDATA (STOP_IOE, plt_stopioe, 0) },
