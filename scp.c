@@ -12936,7 +12936,8 @@ uint32 c;
 char *p;
 
 if (0 == (number - ((int)(number / 1000000.0)) * 1000000.0)) {
-    factor = "M";
+    if (number != 0.0)
+        factor = "M";
     number /= 1000000.0;
     }
 else {
