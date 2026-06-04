@@ -142,6 +142,7 @@ int32 _sim_timer_activate_time (UNIT *uptr);
 double sim_timer_activate_time_usecs (UNIT *uptr);
 t_bool sim_timer_is_active (UNIT *uptr);
 t_stat sim_timer_cancel (UNIT *uptr);
+t_bool sim_timer_idle (int sin_cyc);
 t_stat sim_register_clock_unit (UNIT *uptr);
 t_stat sim_register_clock_unit_tmr (UNIT *uptr, int32 tmr);
 t_stat sim_clock_coschedule (UNIT *uptr, int32 interval);
@@ -152,6 +153,7 @@ double sim_timer_inst_per_sec (void);
 void sim_timer_precalibrate_execution_rate (void);
 int32 sim_rtcn_tick_size (int32 tmr);
 int32 sim_rtcn_calibrated_tmr (void);
+int32 sim_rtcn_calibrated_tick_size (void);
 t_bool sim_timer_idle_capable (uint32 *host_ms_sleep_1, uint32 *host_tick_ms);
 #define PRIORITY_BELOW_NORMAL  -1
 #define PRIORITY_NORMAL         0

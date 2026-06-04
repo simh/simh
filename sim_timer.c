@@ -171,9 +171,9 @@ static uint32 sim_os_clock_resoluton_ms = 0;
 static uint32 sim_os_tick_hz = 0;
 static uint32 sim_idle_stable = SIM_IDLE_STDFLT;
 static uint32 sim_idle_calib_pct = 100;
-static int32  sim_idle_backward_jumps = 0;
+static uint32  sim_idle_backward_jumps = 0;
 static double sim_idle_backward_total = 0.0; 
-static int32  sim_idle_forward_jumps = 0;
+static uint32  sim_idle_forward_jumps = 0;
 static double sim_idle_forward_total = 0.0; 
 static double sim_timer_stop_time = 0;
 static uint32 sim_rom_delay = 0;
@@ -601,8 +601,11 @@ int clock_gettime(int clk_id, struct timespec *tp)
 {
 t_uint64 now, unixbase;
 
-if (clk_id != CLOCK_REALTIME)
+if (clk_id != CLOCK_REALTIME) {
+    tp->tv_sec = 0;
+    tp->tv_nsec = 0;
     return -1;
+    }
 unixbase = 116444736;
 unixbase *= 1000000000;
 GetSystemTimeAsFileTime((FILETIME*)&now);
@@ -678,8 +681,11 @@ int clock_gettime(clockid_t clk_id, struct timespec *tp)
 struct timeval cur;
 struct timezone foo;
 
-if (clk_id != CLOCK_REALTIME)
-  return -1;
+if (clk_id != CLOCK_REALTIME) {
+    tp->tv_sec = 0;
+    tp->tv_nsec = 0;
+    return -1;
+    }
 gettimeofday (&cur, &foo);
 tp->tv_sec = cur.tv_sec;
 tp->tv_nsec = cur.tv_usec*1000;
@@ -893,6 +899,8 @@ rtc = &rtcs[tmr];
  */
 if (rtc->currd)
     time = rtc->currd;
+if ((ticksper != 0) && (sim_precalibrate_ips != 0))
+    time = sim_precalibrate_ips / ticksper;
 if (!uptr)
     uptr = rtc->clock_unit;
 if (ticksper)
@@ -911,8 +919,8 @@ rtc->ticks = 0;
 rtc->last_hz = rtc->hz;
 rtc->hz = ticksper;
 rtc->based = time;
-rtc->currd = time;
-rtc->initd = time;
+rtc->currd = rtc->based ;
+rtc->initd = rtc->based ;
 rtc->elapsed = 0;
 rtc->calibrations = 0;
 rtc->clock_ticks_tot += rtc->clock_ticks;
@@ -1238,11 +1246,11 @@ if (sim_idle_enab) {
     fprintf (st, "Idling:                         Enabled\n");
     fprintf (st, "Time before Idling starts:      %d seconds\n", sim_idle_stable);
     if (sim_idle_backward_jumps) {
-        fprintf (st, "Backward Time Jumps while Idle: %d\n", sim_idle_backward_jumps);
+        fprintf (st, "Backward Time Jumps while Idle: %u\n", sim_idle_backward_jumps);
         fprintf (st, "Total Backward Adjustments:     %s milliseconds\n", sim_fmt_numeric (-sim_idle_backward_total));
         }
     if (sim_idle_forward_jumps) {
-        fprintf (st, "Forward Time Jumps while Idle:  %d\n", sim_idle_forward_jumps);
+        fprintf (st, "Forward Time Jumps while Idle:  %u\n", sim_idle_forward_jumps);
         fprintf (st, "Total Forward Adjustments:      %s milliseconds\n", sim_fmt_numeric (sim_idle_forward_total));
         }
     }
@@ -1894,10 +1902,15 @@ if ((!sim_idle_enab)                             ||     /* idling disabled */
     ((sim_clock_queue != QUEUE_LIST_END) &&             /* or clock queue not empty */
      ((sim_clock_queue->flags & UNIT_IDLE) == 0))||     /*   and event not idle-able? */
     (rtc->elapsed < sim_idle_stable)) {             /* or calibrated timer not stable? */
-    sim_debug (DBG_IDL, &sim_timer_dev, "Can't idle: %s - elapsed: %d and %d/%d\n", !sim_idle_enab ? "idle disabled" :
+    sim_debug (DBG_IDL, &sim_timer_dev, "Can not idle: %s - %d seconds since init, %d/%d ticks\n", !sim_idle_enab ? "idle disabled" :
                                                                              ((rtc->elapsed < sim_idle_stable) ? "not stable" :
                                                                                                                      ((sim_clock_queue != QUEUE_LIST_END) ? sim_uname (sim_clock_queue) :
                                                                                                                                                             "")), rtc->elapsed, rtc->ticks, rtc->hz);
+    sim_interval -= sin_cyc;
+    return FALSE;
+    }
+if (sim_interval < 0) {
+    sim_debug (DBG_IDL, &sim_timer_dev, "Can not idle: while recovering from prior idle oversleep: sim_interval=%d\n", sim_interval);
     sim_interval -= sin_cyc;
     return FALSE;
     }
@@ -1978,6 +1991,12 @@ else
     sim_debug (DBG_IDL, &sim_timer_dev, "slept for %d ms - pending event on %s in %d %s\n", act_ms, sim_uname(sim_clock_queue), sim_interval, sim_vm_interval_units);
 return TRUE;
 }
+
+t_bool sim_timer_idle (int sin_cyc)
+{
+return sim_idle (sim_calb_tmr, sin_cyc);
+}
+
 
 /* Set idling - implicitly disables throttling */
 
@@ -3353,6 +3372,8 @@ if (NULL == uptr) {                         /* deregistering? */
 if (rtc->clock_unit == NULL)
     rtc->clock_cosched_queue = QUEUE_LIST_END;
 rtc->clock_unit = uptr;
+if (uptr != NULL)
+    uptr->flags |= UNIT_IDLE;       /* All clock devices are idle eligible for scheduling purposes */
 uptr->dynflags |= UNIT_TMR_UNIT;
 rtc->timer_unit->flags = ((tmr == SIM_NTIMERS) ? 0 : UNIT_DIS) |
                           (rtc->clock_unit ? UNIT_IDLE : 0);
@@ -3368,6 +3389,13 @@ return ((rtcs[0].currd && rtcs[0].hz) ? 0 : ((sim_calb_tmr != -1) ? sim_calb_tmr
 int32 sim_rtcn_tick_size (int32 tmr)
 {
 RTC *rtc = &rtcs[tmr];
+
+return (rtc->currd) ? rtc->currd : 10000;
+}
+
+int32 sim_rtcn_calibrated_tick_size (void)
+{
+RTC *rtc = &rtcs[sim_rtcn_calibrated_tmr ()];
 
 return (rtc->currd) ? rtc->currd : 10000;
 }
