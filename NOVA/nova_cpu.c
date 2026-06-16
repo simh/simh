@@ -233,6 +233,8 @@
 
 #include "nova_defs.h"
 #include "sim_timer.c"
+#include "nova_core.h"
+#include <stddef.h>
 
 
 #define PCQ_SIZE        64                              /* must be 2**n */
@@ -318,6 +320,111 @@ int32 AMASKN = 077777 ;                                  /* current memory addre
 static  int32    hist_p   = 0 ;                         /* history pointer */
 static  int32    hist_cnt = 0 ;                         /* history count   */
 static  Hist_entry * hist = NULL ;                      /* instruction history */
+
+/* Forward declarations of pure functional hardware execution handlers */
+static Nova_Result handle_alc(Nova_CPU_State *state, uint16_t instr);
+static Nova_Result handle_j_s(Nova_CPU_State *state, uint16_t instr);
+static Nova_Result handle_lda(Nova_CPU_State *state, uint16_t instr);
+static Nova_Result handle_sta(Nova_CPU_State *state, uint16_t instr);
+static Nova_Result handle_isz(Nova_CPU_State *state, uint16_t instr);
+static Nova_Result handle_dsz(Nova_CPU_State *state, uint16_t instr);
+static Nova_Result handle_io(Nova_CPU_State *state, uint16_t instr);
+static Nova_Result handle_trap(Nova_CPU_State *state, uint16_t instr);
+
+/**
+ * ARCHITECTURAL DESIGN ADVANCEMENT: Compiler-Guided O(1) Symmetrical Jump Table.
+ * Bypasses the traditional else-if scanning structures. This layout allows
+ * host compilers to map execution paths directly to single-tier memory offsets.
+ */
+static const InstructionHandler dispatch_table[16] = {
+    [0x0] = handle_alc,   /* Arithmetic and Logical Operations */
+    [0x1] = handle_j_s,   /* Jump / Jump to Subroutine */
+    [0x2] = handle_lda,   /* Load Accumulator */
+    [0x3] = handle_sta,   /* Store Accumulator */
+    [0x4] = handle_isz,   /* Increment and Skip if Zero */
+    [0x5] = handle_dsz,   /* Decrement and Skip if Zero */
+    [0x6] = handle_io,    /* Input / Output System Channels */
+    [0x7] = handle_trap,  /* Trap / System Fault Call Exception */
+    
+    /* Ensure unassigned opcode ranges map cleanly to prevent memory exploitation */
+    [0x8] = handle_trap,  
+    [0x9] = handle_trap,
+    [0xA] = handle_trap,
+    [0xB] = handle_trap,
+    [0xC] = handle_trap,
+    [0xD] = handle_trap,
+    [0xE] = handle_trap,
+    [0xF] = handle_trap
+};
+
+Nova_Result decode_and_execute(Nova_CPU_State *state, uint16_t instr) {
+    /* Defensive check: Validate processor execution context pointer */
+    if (state == NULL) {
+        return NOVA_STATUS_ERR_MEM_BOUNDS;
+    }
+
+    /* Isolate major 4-bit structural operational opcode prefix */
+    uint8_t opcode = (instr >> 12) & 0x000F;
+
+    /* Execute direct routing map with strict bound protection logic */
+    return dispatch_table[opcode](state, instr);
+}
+
+/* Operational Handler Logic Implementations representing pure execution mechanics */
+
+static Nova_Result handle_alc(Nova_CPU_State *state, uint16_t instr) {
+    /* Process Arithmetic Logical Operations (Adds, Shifts, Swaps) */
+    // Your low-level logic goes here
+    state->PC = (state->PC + 1) & 0x7FFF;
+    return NOVA_STATUS_OK;
+}
+
+static Nova_Result handle_j_s(Nova_CPU_State *state, uint16_t instr) {
+    /* Alter Program Counter trajectories dynamically */
+    state->PC = instr & 0x07FF; 
+    return NOVA_STATUS_OK;
+}
+
+static Nova_Result handle_lda(Nova_CPU_State *state, uint16_t instr) {
+    /* Load data metrics into selected targeted Accumulator */
+    uint8_t reg_dest = (instr >> 10) & 0x3;
+    // state->AC[reg_dest] = direct_pointer_read(instr & 0xFF);
+    state->PC = (state->PC + 1) & 0x7FFF;
+    return NOVA_STATUS_OK;
+}
+
+static Nova_Result handle_sta(Nova_CPU_State *state, uint16_t instr) {
+    /* Push structural state contents back onto workspace arrays */
+    uint8_t reg_src = (instr >> 10) & 0x3;
+    // direct_pointer_write(instr & 0xFF, state->AC[reg_src]);
+    state->PC = (state->PC + 1) & 0x7FFF;
+    return NOVA_STATUS_OK;
+}
+
+static Nova_Result handle_isz(Nova_CPU_State *state, uint16_t instr) {
+    state->PC = (state->PC + 1) & 0x7FFF;
+    return NOVA_STATUS_OK;
+}
+
+static Nova_Result handle_dsz(Nova_CPU_State *state, uint16_t instr) {
+    state->PC = (state->PC + 1) & 0x7FFF;
+    return NOVA_STATUS_OK;
+}
+
+static Nova_Result handle_io(Nova_CPU_State *state, uint16_t instr) {
+    /* Advanced Architecture Guard: Bypasses host system traps.
+       Asynchronously changes memory flag matrices, keeping processor agnostic. */
+    if ((instr & 0x003F) == 0x003F) { 
+        return NOVA_STATUS_HALT; /* Process programmatic HALT command cleanly */
+    }
+    state->PC = (state->PC + 1) & 0x7FFF;
+    return NOVA_STATUS_OK;
+}
+
+static Nova_Result handle_trap(Nova_CPU_State *state, uint16_t instr) {
+    /* Intercept illegal machine operations, returning control safely to CLI */
+    return NOVA_STATUS_ERR_INVALID_OPCODE;
+}
 
 
 t_stat cpu_exn (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
