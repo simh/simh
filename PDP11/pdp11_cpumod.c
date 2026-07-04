@@ -1284,18 +1284,28 @@ t_stat cpu_set_bus (int32 opt)
 {
 DEVICE *dptr;
 uint32 i, mask;
+const char *busname = "";
 
-if (opt & BUS_U)                                        /* Unibus variant? */
+if (opt & BUS_U) {                                      /* Unibus variant? */
     mask = DEV_UBUS;
-else if (MEMSIZE <= UNIMEMSIZE)                         /* 18b Qbus devices? */
-    mask = DEV_QBUS | DEV_Q18;
-else mask = DEV_QBUS;                                   /* must be 22b */
+    busname = "Unibus system";
+    }
+else {
+    if (MEMSIZE <= UNIMEMSIZE) {                        /* 18b Qbus devices? */
+        mask = DEV_QBUS | DEV_Q18;
+        busname = "18bit Qbus system";
+        }
+    else {
+        mask = DEV_QBUS;                                 /* must be 22b */
+        busname = "Qbus system";
+        }
+    }
 mask |= DEV_MBUS;                                       /* leave Massbus devices */
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
     if ((dptr->flags & DEV_DISABLE) &&                  /* disable-able? */
         !(dptr->flags & DEV_DIS) &&                     /* enabled? */
         ((dptr->flags & mask) == 0)) {                  /* not allowed? */
-        sim_printf ("Disabling %s\n", sim_dname (dptr));
+        sim_messagef (SCPE_OK, "Disabling %s which never existed on a %s\n", sim_dname (dptr), busname);
         dptr->flags = dptr->flags | DEV_DIS;
         }
     }
