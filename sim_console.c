@@ -2339,7 +2339,7 @@ t_stat sim_show_log (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char 
 if (cptr && (*cptr != 0))
     return SCPE_2MARG;
 if (sim_log)
-    fprintf (st, "Logging enabled to \"%s\"\n",
+    fprintf (st, "Logging enabled to %s\n",
                  sim_relative_path (sim_logfile_name (sim_log, sim_log_ref)));
 else
     fprintf (st, "Logging disabled\n");
@@ -2484,7 +2484,7 @@ int32 i;
 if (cptr && (*cptr != 0))
     return SCPE_2MARG;
 if (sim_deb) {
-    fprintf (st, "Debug output enabled to \"%s\"\n",
+    fprintf (st, "Debug output enabled to %s\n",
                  sim_relative_path (sim_logfile_name (sim_deb, sim_deb_ref)));
     if (sim_deb_switches & SWMASK ('P'))
         fprintf (st, "   Debug messages contain current PC value\n");

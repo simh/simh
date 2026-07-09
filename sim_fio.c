@@ -371,8 +371,7 @@ static char *_sim_expand_homedir (const char *file, char *dest, size_t dest_size
 char *without_quotes = NULL;
 
 errno = 0;
-if (((*file == '"') && (file[strlen (file) - 1] == '"')) ||
-    ((*file == '\'') && (file[strlen (file) - 1] == '\''))) {
+if ((*file == '"') || (*file == '\'')) {    /* Start with a quote? */
     size_t offset = 1;
     const char *end = &file[strlen (file) - 1];
     char quote = *file;
@@ -381,7 +380,9 @@ if (((*file == '"') && (file[strlen (file) - 1] == '"')) ||
     if (without_quotes == NULL)
         return NULL;
     strcpy (without_quotes, file + 1);
-    without_quotes[strlen (without_quotes) - 1] = '\0';
+    if (((*file == '"') && (file[strlen (file) - 1] == '"')) ||
+        ((*file == '\'') && (file[strlen (file) - 1] == '\'')))
+        without_quotes[strlen (without_quotes) - 1] = '\0'; /* drop trailing quote */
     file = (const char*)without_quotes;
 }
 
@@ -2104,6 +2105,12 @@ if (dsep != '/')
     while ((cp = strchr (buf, dsep)) != NULL)
         *cp = '/';                      /* Always return with / as the directory separator */
 free (filepath);
+/* Put quotes around paths containing space */
+if ((NULL != strchr (buf, ' ')) && (strlen (buf) < sizeof (buf) - 3)) {
+    memmove (buf + 1, buf, strlen (buf) + 1);
+    buf[0] = '"';
+    strlcat (buf, "\"", sizeof (buf));
+    }
 return buf;
 }
 

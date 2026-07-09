@@ -1577,7 +1577,7 @@ if ((Scb.scb_w_cluster != Home.hm2_w_cluster) ||
     (Scb.scb_b_strucver != Home.hm2_b_strucver) ||
     (Scb.scb_b_struclev != Home.hm2_b_struclev))
     goto Return_Cleanup;
-sim_messagef (SCPE_OK, "%s: '%s' Contains ODS%d File system\n", sim_uname (uptr), sim_relative_path (uptr->filename), Home.hm2_b_struclev);
+sim_messagef (SCPE_OK, "%s: %s Contains ODS%d File system\n", sim_uname (uptr), sim_relative_path (uptr->filename), Home.hm2_b_struclev);
 sim_messagef (SCPE_OK, "%s: Volume Name: %12.12s Format: %12.12s Sectors In Volume: %u\n",
                                    sim_uname (uptr), Home.hm2_t_volname, Home.hm2_t_format, Scb.scb_l_volsize);
 ret_val = ((t_offset)Scb.scb_l_volsize) * 512;
@@ -1637,7 +1637,7 @@ if (Scb->scb_b_bitmapblks < 127)
     ret_val = (((t_offset)Scb->scb_r_blocks[Scb->scb_b_bitmapblks].scb_w_freeblks << 16) + Scb->scb_r_blocks[Scb->scb_b_bitmapblks].scb_w_freeptr) * 512;
 else
     ret_val = (((t_offset)Scb->scb_r_blocks[0].scb_w_freeblks << 16) + Scb->scb_r_blocks[0].scb_w_freeptr) * 512;
-sim_messagef (SCPE_OK, "%s: '%s' Contains an ODS1 File system\n", sim_uname (uptr), sim_relative_path (uptr->filename));
+sim_messagef (SCPE_OK, "%s: %s Contains an ODS1 File system\n", sim_uname (uptr), sim_relative_path (uptr->filename));
 sim_messagef (SCPE_OK, "%s: Volume Name: %12.12s Format: %12.12s Sectors In Volume: %u\n",
                                 sim_uname (uptr), Home.hm1_t_volname, Home.hm1_t_format, (uint32)(ret_val / 512));
 Return_Cleanup:
@@ -1688,7 +1688,7 @@ for (i = 0; i < 8; i++) {
         max_lbn_partnum = i;
         }
     }
-sim_messagef (SCPE_OK, "%s: '%s' Contains Ultrix partitions\n", sim_uname (uptr), sim_relative_path (uptr->filename));
+sim_messagef (SCPE_OK, "%s: %s Contains Ultrix partitions\n", sim_uname (uptr), sim_relative_path (uptr->filename));
 sim_messagef (SCPE_OK, "Partition with highest sector: %c, Sectors On Disk: %u\n", 'a' + max_lbn_partnum, max_lbn);
 ret_val = ((t_offset)max_lbn) * 512;
 
@@ -1777,7 +1777,7 @@ while (sim_disk_rdsect(uptr, (t_lba)(sectfactor * cur_pos / sizeof (*Desc)), (ui
     if ((Desc->Type == 255) ||
         (read_count >= 32)) {
         ret_val = ctx->container_size;
-        sim_messagef (SCPE_OK, "%s: '%s' Contains an ISO 9660 filesystem\n", sim_uname (uptr), sim_relative_path (uptr->filename));
+        sim_messagef (SCPE_OK, "%s: %s Contains an ISO 9660 filesystem\n", sim_uname (uptr), sim_relative_path (uptr->filename));
         if (Primary) {
             char VolId[sizeof (Primary->VolumeIdentifier) + 1];
 
@@ -1923,7 +1923,7 @@ for (i = 0; i < Label->d_npartitions; i++) {
         max_lbn_partnum = i;
         }
     }
-sim_messagef (SCPE_OK, "%s: '%s' Contains BSD 2.11 partitions\n", sim_uname (uptr), sim_relative_path (uptr->filename));
+sim_messagef (SCPE_OK, "%s: %s Contains BSD 2.11 partitions\n", sim_uname (uptr), sim_relative_path (uptr->filename));
 sim_messagef (SCPE_OK, "Partition with highest sector: %c, Sectors On Disk: %u\n", 'a' + max_lbn_partnum, max_lbn);
 ret_val = ((t_offset)max_lbn) * 512;
 
@@ -2067,7 +2067,7 @@ for (i = 0; i < Label->d_npartitions; i++) {
         max_lbn_partnum = i;
         }
     }
-sim_messagef (SCPE_OK, "%s: '%s' Contains NET/Open BSD partitions\n", sim_uname (uptr), sim_relative_path (uptr->filename));
+sim_messagef (SCPE_OK, "%s: %s Contains NET/Open BSD partitions\n", sim_uname (uptr), sim_relative_path (uptr->filename));
 sim_messagef (SCPE_OK, "Partition with highest sector: %c, Sectors On Disk: %u\n", 'a' + max_lbn_partnum, max_lbn);
 ret_val = ((t_offset)max_lbn) * 512;
 
@@ -2547,7 +2547,7 @@ for (context.dcshift = 0; context.dcshift < 8; context.dcshift++) {
                                     break;
                                 }
 
-                            sim_messagef(SCPE_OK, "%s: '%s' Contains a RSTS File system\n", sim_uname (uptr), sim_relative_path (uptr->filename));
+                            sim_messagef(SCPE_OK, "%s: %s Contains a RSTS File system\n", sim_uname (uptr), sim_relative_path (uptr->filename));
                             sim_messagef(SCPE_OK, "%s: Pack ID: %6.6s Revision Level: %3s Pack Clustersize: %d\n",
                                                                   sim_uname (uptr), context.packid, fmt, context.pcs);
                             sim_messagef(SCPE_OK, "%s: Last Unallocated Sector In File System: %u\n", sim_uname (uptr), (uint32)((ret_val / 512) - 1));
@@ -2769,7 +2769,7 @@ if (partitions) {
             parttype = "???";
             break;
         }
-    sim_messagef (SCPE_OK, "%s: '%s' Contains RT11 partitions\n", sim_uname (uptr), sim_relative_path (uptr->filename));
+    sim_messagef (SCPE_OK, "%s: %s Contains RT11 partitions\n", sim_uname (uptr), sim_relative_path (uptr->filename));
     sim_messagef (SCPE_OK, "%d valid partition%s, Type: %s, Sectors On Disk: %u\n", partitions, partitions == 1 ? "" : "s", parttype, (uint32)(ret_val / 512));
     }
 uptr->capac = saved_capac;
@@ -7861,11 +7861,11 @@ if (info->flag) {        /* zap disk type */
                 (void)sim_set_fsize (container, (t_addr)container_size);
                 fclose (container);
                 sim_set_file_times (FullPath, statb.st_atime, statb.st_mtime);
-                info->stat = sim_messagef (SCPE_OK, "Disk Type Info Removed from container: '%s'\n", sim_relative_path (FullPath));
+                info->stat = sim_messagef (SCPE_OK, "Disk Type Info Removed from container: %s\n", sim_relative_path (FullPath));
                 }
             else {
                 fclose (container);
-                info->stat = sim_messagef (SCPE_ARG, "Canceled Disk Type Info Removal from container: '%s'\n", sim_relative_path (FullPath));
+                info->stat = sim_messagef (SCPE_ARG, "Canceled Disk Type Info Removal from container: %s\n", sim_relative_path (FullPath));
                 }
             stop_cpu = FALSE;
             return;
@@ -7958,7 +7958,7 @@ if (info->flag == 0) {  /* DISKINFO */
                 ctx->xfer_encode_size = NtoHl (f->ElementEncodingSize);
                 }
             else {
-                sim_printf ("%sContainer Info metadata for '%s' unavailable\n", indent, sim_relative_path (uptr->filename));
+                sim_printf ("%sContainer Info metadata for %s unavailable\n", indent, sim_relative_path (uptr->filename));
                 sim_printf ("%sContainer Size: %s bytes\n", indent, sim_fmt_numeric ((double)container_size));
                 info->stat = SCPE_ARG|SCPE_NOMESSAGE;
                 ctx->sector_size = 512;
