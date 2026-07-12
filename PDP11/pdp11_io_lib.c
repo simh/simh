@@ -997,7 +997,15 @@ for (autp = auto_tab; autp->valid >= 0; autp++) {       /* loop thru table */
             dptr->flags |= DEV_DIS;
             if (sim_switches & SWMASK ('P'))
                 continue;
-            return sim_messagef (SCPE_NOFNC, "%s device not compatible with system bus\n", sim_dname(dptr));
+            if ((!UNIBUS) && (dptr->flags & DEV_Q18) && (MEMSIZE > UNIMEMSIZE)) {
+                int32 saved_switches = sim_switches;
+
+                sim_switches |= SWMASK ('B');
+                sim_messagef (SCPE_OK, "%s device might need special OS support with %s memory\n", sim_dname(dptr), sprint_capac (sim_dflt_dev, sim_dflt_dev->units));
+                sim_switches = saved_switches;
+                }
+            else
+                return sim_messagef (SCPE_NOFNC, "%s device not compatible with system bus\n", sim_dname(dptr));
             }
         dibp = (DIB *) dptr->ctxt;                      /* get DIB */
         if (dibp == NULL)                               /* not there??? */
