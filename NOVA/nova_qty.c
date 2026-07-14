@@ -106,7 +106,7 @@
 
 
 
-extern int32    int_req, dev_busy, dev_done, dev_disable ;
+extern int32    int_reqn, dev_busy, dev_donen, dev_disablen ;
 extern int32    tmxr_poll ;                             /* calibrated delay */
 
 t_stat  qty_setnl   ( UNIT * uptr, int32 val, CONST char * cptr, void * desc ) ;
@@ -160,9 +160,9 @@ REG qty_reg[] =  /*  ('alm_reg' should be similar to this except for device code
         {
         { ORDATA (BUF, qty_unit.buf, 8) },
         { FLDATA (BUSY, dev_busy, INT_V_QTY) },
-        { FLDATA (DONE, dev_done, INT_V_QTY) },
-        { FLDATA (DISABLE, dev_disable, INT_V_QTY) },
-        { FLDATA (INT, int_req, INT_V_QTY) },
+        { FLDATA (DONE, dev_donen, INT_V_QTY) },
+        { FLDATA (DISABLE, dev_disablen, INT_V_QTY) },
+        { FLDATA (INT, int_reqn, INT_V_QTY) },
 
         { FLDATA (MDMCTL, qty_mdm,  0) },
         { FLDATA (AUTODS, qty_auto, 0) },
@@ -845,9 +845,9 @@ REG alm_reg[] =  /*  ('qty_reg' should be similar to this except for device code
         {
         { ORDATA (BUF, alm_unit.buf, 8) },
         { FLDATA (BUSY, dev_busy, INT_V_ALM) },
-        { FLDATA (DONE, dev_done, INT_V_ALM) },
-        { FLDATA (DISABLE, dev_disable, INT_V_ALM) },
-        { FLDATA (INT, int_req, INT_V_ALM) },
+        { FLDATA (DONE, dev_donen, INT_V_ALM) },
+        { FLDATA (DISABLE, dev_disablen, INT_V_ALM) },
+        { FLDATA (INT, int_reqn, INT_V_ALM) },
 
         { FLDATA (MDMCTL, qty_mdm,  0) },
         { FLDATA (AUTODS, qty_auto, 0) },

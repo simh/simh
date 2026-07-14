@@ -51,7 +51,7 @@
 #include <ctype.h>
 
 extern DEVICE cpu_dev;
-extern UNIT cpu_unit;
+extern UNIT cpu_unitn;
 extern DEVICE ptr_dev;
 extern DEVICE ptp_dev;
 extern DEVICE plt_dev;
@@ -705,7 +705,7 @@ int32 cflag, i, j, c1, c2, inst, inst1, dv, src, dst, skp;
 int32 ind, mode, disp, dev;
 int32 byac, extind, extdisp, xop;
 
-cflag = (uptr == NULL) || (uptr == &cpu_unit);
+cflag = (uptr == NULL) || (uptr == &cpu_unitn);
 c1 =  ((int32) val[0] >> 8) & 0177;
 c2 = (int32) val[0] & 0177;
 if (sw & SWMASK ('A')) {                                /* ASCII? */
@@ -996,7 +996,7 @@ int32 cflag, d, i, j, amd[3];
 t_stat r, rtn;
 char gbuf[CBUFSIZE];
 
-cflag = (uptr == NULL) || (uptr == &cpu_unit);
+cflag = (uptr == NULL) || (uptr == &cpu_unitn);
 while (isspace (*cptr)) cptr++;                         /* absorb spaces */
 if ((sw & SWMASK ('A')) || ((*cptr == '\'') && cptr++)) { /* ASCII char? */
     if (cptr[0] == 0)                                   /* must have 1 char */
