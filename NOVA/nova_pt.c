@@ -47,7 +47,7 @@ Notes:
 
 #include "nova_defs.h"
 
-extern int32 int_req, dev_busy, dev_done, dev_disable ;
+extern int32 int_reqn, dev_busy, dev_donen, dev_disablen ;
 extern int32 SR ;
 
 extern t_stat cpu_boot(int32 unitno, DEVICE * dptr ) ;
@@ -86,9 +86,9 @@ UNIT ptr_unit = {   /* 2007-May-30, bkr */
 REG ptr_reg[] = {
     { ORDATA (BUF, ptr_unit.buf, 8) },
     { FLDATA (BUSY, dev_busy, INT_V_PTR) },
-    { FLDATA (DONE, dev_done, INT_V_PTR) },
-    { FLDATA (DISABLE, dev_disable, INT_V_PTR) },
-    { FLDATA (INT, int_req, INT_V_PTR) },
+    { FLDATA (DONE, dev_donen, INT_V_PTR) },
+    { FLDATA (DISABLE, dev_disablen, INT_V_PTR) },
+    { FLDATA (INT, int_reqn, INT_V_PTR) },
     { DRDATA (POS, ptr_unit.pos, T_ADDR_W), PV_LEFT },
     { DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
     { FLDATA (STOP_IOE, ptr_stopioe, 0) },
@@ -127,9 +127,9 @@ UNIT ptp_unit =
 REG ptp_reg[] = {
     { ORDATA (BUF, ptp_unit.buf, 8) },
     { FLDATA (BUSY, dev_busy, INT_V_PTP) },
-    { FLDATA (DONE, dev_done, INT_V_PTP) },
-    { FLDATA (DISABLE, dev_disable, INT_V_PTP) },
-    { FLDATA (INT, int_req, INT_V_PTP) },
+    { FLDATA (DONE, dev_donen, INT_V_PTP) },
+    { FLDATA (DISABLE, dev_disablen, INT_V_PTP) },
+    { FLDATA (INT, int_reqn, INT_V_PTP) },
     { DRDATA (POS, ptp_unit.pos, T_ADDR_W), PV_LEFT },
     { DRDATA (TIME, ptp_unit.wait, 24), PV_LEFT },
     { FLDATA (STOP_IOE, ptp_stopioe, 0) },
