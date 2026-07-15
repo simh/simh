@@ -1707,10 +1707,10 @@ int     n;                              /* Significant digit counter */
 }   /* end function load_decimal */
 
 /*-------------------------------------------------------------------*/
-/* Store decimal byte string into packed decimal storage operand     */
+/* Store decimal byte string into zoned decimal storage operand      */
 /*                                                                   */
 /* Input:                                                            */
-/*      addr    Logical address of packed decimal storage operand    */
+/*      addr    Logical address of zoned decimal storage operand     */
 /*      len     Length minus one of storage operand (range 0-15)     */
 /*      dec     A 31-byte area containing the decimal digits to be   */
 /*              stored.  Each byte contains one decimal digit in     */
@@ -1736,9 +1736,9 @@ int     i, j, a;                        /* Array subscripts          */
             break;
         }       
     }
-    if (sign == -1) {
-        PutMem(addr, (GetMem(addr) & 0x0f));
-        PutMem(addr, (GetMem(addr) | 0xf0)); 
+    if (sign == -1) {                       /* if number is negative */
+        PutMem(addr, (GetMem(addr) & 0x0f));    /* clear zone bits */
+        PutMem(addr, (GetMem(addr) | 0xd0));    /* set ZD negative */
     }
     
 }   /* end function store_decimal */
