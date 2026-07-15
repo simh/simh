@@ -994,15 +994,19 @@ for (autp = auto_tab; autp->valid >= 0; autp++) {       /* loop thru table */
         if (!((UNIBUS && (dptr->flags & (DEV_UBUS | DEV_Q18))) ||
              ((!UNIBUS) && ((dptr->flags & DEV_QBUS) || 
                             ((dptr->flags & DEV_Q18) && (MEMSIZE <= UNIMEMSIZE)))))) {
+            uint32 prior_dev_flags = dptr->flags;
+
             dptr->flags |= DEV_DIS;
             if (sim_switches & SWMASK ('P'))
                 continue;
-            if ((!UNIBUS) && (dptr->flags & DEV_Q18) && (MEMSIZE > UNIMEMSIZE)) {
+            if ((!UNIBUS) && (dptr->flags & DEV_Q18) && 
+                ((prior_dev_flags & DEV_DIS) == 0) && (MEMSIZE > UNIMEMSIZE)) {
                 int32 saved_switches = sim_switches;
 
                 sim_switches |= SWMASK ('B');
                 sim_messagef (SCPE_OK, "%s device might need special OS support with %s memory\n", sim_dname(dptr), sprint_capac (sim_dflt_dev, sim_dflt_dev->units));
                 sim_switches = saved_switches;
+                dptr->flags = prior_dev_flags;
                 }
             else
                 return sim_messagef (SCPE_NOFNC, "%s device not compatible with system bus\n", sim_dname(dptr));

@@ -1284,22 +1284,25 @@ t_stat cpu_set_bus (int32 opt)
 {
 DEVICE *dptr;
 uint32 i, mask;
-const char *busname = "";
+char busname[64] = "";
+int32 saved_switches = sim_switches;
 
+sim_switches |= SWMASK ('B');
 if (opt & BUS_U) {                                      /* Unibus variant? */
     mask = DEV_UBUS;
-    busname = "Unibus system";
+    strlcpy (busname, "Unibus system", sizeof (busname));
     }
 else {
     if (MEMSIZE <= UNIMEMSIZE) {                        /* 18b Qbus devices? */
         mask = DEV_QBUS | DEV_Q18;
-        busname = "18bit Qbus system";
+        strlcpy (busname, "18bit Qbus system", sizeof (busname));
         }
     else {
         mask = DEV_QBUS;                                 /* must be 22b */
-        busname = "Qbus system";
+        snprintf (busname, sizeof (busname), "Qbus system with %s memory", sprint_capac (sim_dflt_dev, sim_dflt_dev->units));
         }
     }
+sim_switches = saved_switches;
 mask |= DEV_MBUS;                                       /* leave Massbus devices */
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
     if ((dptr->flags & DEV_DISABLE) &&                  /* disable-able? */
