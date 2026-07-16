@@ -857,18 +857,6 @@ extern DEVICE sim_throttle_dev;
 extern DEVICE sim_stop_dev;
 
 
-void sim_rtcn_init_all (void)
-{
-int32 tmr;
-RTC *rtc;
-
-for (tmr = 0; tmr <= SIM_NTIMERS; tmr++) {
-    rtc = &rtcs[tmr];
-    if (rtc->initd != 0)
-        sim_rtcn_init (rtc->initd, tmr);
-    }
-}
-
 int32 sim_rtcn_init (int32 time, int32 tmr)
 {
 return sim_rtcn_init_unit (NULL, time, tmr);
@@ -2495,7 +2483,8 @@ if ((stat == SCPE_OK)                           &&
         if (fabs(skew) > fabs(rtc->clock_skew_max))
             rtc->clock_skew_max = skew;
         }
-    /* Gather any queued events which are scheduled for right now */
+    /* We are here since the top of the queue is ready to fire now */
+    /* Gather all queued events which are scheduled for right now */
     do {
         cptr = rtc->clock_cosched_queue;
         rtc->clock_cosched_queue = cptr->next;
@@ -3159,8 +3148,20 @@ AIO_VALIDATE(uptr);
 /* Any clock with a very short delay (not a tick duration) will be put 
    directly on the event queue */
 if (usecs <= (1000.0 * sim_os_clock_resoluton_ms)) {
+    int tmr;
+
     if (!sim_is_active(uptr))
         uptr->usecs_remaining = 0.0;
+    AIO_VALIDATE(uptr);
+    /* This is a clock unit, so we need to schedule the related timer unit instead */
+    for (tmr=0; tmr<=SIM_NTIMERS; tmr++) {
+        RTC *rtc = &rtcs[tmr];
+
+        if (rtc->clock_unit == uptr) {
+            uptr = rtc->timer_unit;
+            break;
+            }
+        }
     return _sim_activate (uptr, interval);
     }
 else
