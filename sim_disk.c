@@ -2802,6 +2802,7 @@ static FILESYSTEM_CHECK checks[] = {
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 uint32 saved_sector_size = ctx->sector_size;
 t_offset ret_val = (t_offset)-1;
+uint32 saved_flags = uptr->flags;
 int i;
 
 if (isreadonly != NULL)
@@ -2812,7 +2813,8 @@ if (pseudo_filesystem_size != 0) {      /* Dummy file system size mechanism? */
     return pseudo_filesystem_size;
     }
 
-for (i = 0; checks[i] != NULL; i++)
+uptr->flags &= ~DKUF_WRP;
+for (i = 0; checks[i] != NULL; i++) {
     if ((ret_val = checks[i] (uptr, 0, isreadonly)) != (t_offset)-1) {
         /* ISO files that haven't already been determined to be ISO 9660
          * which contain a known file system are also marked read-only
@@ -2823,8 +2825,11 @@ for (i = 0; checks[i] != NULL; i++)
             (*isreadonly == FALSE)        &&
             (NULL != match_ext (uptr->filename, "ISO")))
             *isreadonly = TRUE;
+        uptr->flags = saved_flags;
         return ret_val;
         }
+    }
+uptr->flags = saved_flags;
 /*
  * The only known interleaved disk devices have either 256 byte
  * or 128 byte sector sizes.  If additional interleaved file
@@ -4087,12 +4092,16 @@ if ((uptr->flags & UNIT_RO) == 0) {     /* Opened Read/Write? */
 
     sim_quiet = 1;
     get_filesystem_size (uptr, &isreadonly);
-    if (isreadonly) {                     /* ReadOny File System? */
+    if (isreadonly) {                     /* ReadOnly File System? */
+        t_stat r;
+
         sim_disk_detach (uptr);
         sim_switches |= SWMASK ('R');
-        sim_disk_attach_ex2 (uptr, cptr, sector_size, xfer_encode_size, dontchangecapac,
-                            dbit, dtype, pdp11tracksize, completion_delay, drivetypes,
-                            reserved_sectors);
+        r = sim_disk_attach_ex2 (uptr, cptr, sector_size, xfer_encode_size, dontchangecapac,
+                                 dbit, dtype, pdp11tracksize, completion_delay, drivetypes,
+                                 reserved_sectors);
+        if (r != SCPE_OK)
+            return r;
         }
     sim_quiet = saved_quiet;
     }

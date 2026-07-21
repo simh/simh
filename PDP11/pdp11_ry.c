@@ -67,8 +67,6 @@
 #define RX02_NUMBY      256                             /* bytes/sector */
 #define RX_NUMDR        2                               /* drives/controller */
 #define RX_M_NUMDR      01
-#define UNIT_V_AUTO     (UNIT_V_UF + 0)                 /* autosize */
-#define UNIT_AUTO       (1u << UNIT_V_AUTO)
 
 #define RY_DRV(d,a)                                     \
   { RX_NUMSC, RX_NUMSF, RX_NUMTR, (RX_NUMSC * RX_NUMTR),\
@@ -218,13 +216,10 @@ REG ry_reg[] = {
     };
 
 MTAB ry_mod[] = {
-    { UNIT_WLK,                             0, "write enabled",     "WRITEENABLED", 
-        NULL, NULL, NULL, "Write enable disk drive" },
-    { UNIT_WLK,                      UNIT_WLK, "write locked",      "LOCKED", 
-        NULL, NULL, NULL, "Write lock disk drive" },
-    { (UNIT_AUTO+UNIT_ATT),          UNIT_AUTO, "autosize",         NULL, NULL },
-    { UNIT_AUTO,                     UNIT_AUTO, NULL,               "AUTOSIZE", 
-        NULL, NULL, NULL, "set density based on file size at ATTACH" },
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable disk drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock disk drive" },
     { MTAB_XTD|MTAB_VUN, 0, "DENSITY", NULL,
       NULL, &ry_show_density, NULL, "Display disk density" },
 #if defined (VM_PDP11)

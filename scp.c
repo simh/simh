@@ -2469,7 +2469,7 @@ static const char simh_help2[] =
       "++{ELSE commandtoprocess{; additionalcommandtoprocess}...}\n\n"
       "5Examples:\n"
       " A command file might be used to bootstrap an operating system that\n"
-      " halts after the initial load from disk.  The ASSERT command is then\n"
+      " halts after the initial load from disk.  The IF command is then\n"
       " used to confirm that the load completed successfully by examining the\n"
       " CPU's \"A\" register for the expected value:\n\n"
       "++; OS bootstrap command file\n"
@@ -6503,8 +6503,12 @@ while (*cptr != 0) {                                    /* do all mods */
         if ((mptr->mstring) &&                          /* match string */
             (MATCH_CMD (gbuf, mptr->mstring) == 0)) {   /* matches option? */
             if (mptr->mask & MTAB_XTD) {                /* extended? */
-                if (((lvl & mptr->mask) & ~MTAB_XTD) == 0)
-                    return SCPE_ARG;
+                if (((lvl & mptr->mask) & ~MTAB_XTD) == 0) {
+                    if (mptr->mask & (MTAB_XTD|MTAB_VUN))
+                        return sim_messagef (SCPE_ARG, "Unit number needed for a SET %s %s command\n", dptr->name, mptr->mstring);
+                    else
+                        return SCPE_ARG;
+                    }
                 if ((lvl == MTAB_VUN) && (uptr->flags & UNIT_DIS))
                     return sim_messagef (SCPE_UDIS, "Unit disabled: %s\n", sim_uname (uptr));
                 if (mptr->valid) {                      /* validation rtn? */
@@ -8886,6 +8890,12 @@ MTAB *mtab;
 for (mtab = dptr->modifiers; (mtab != NULL) && ((mtab->mstring != NULL) || (mtab->pstring != NULL)); ++mtab) {
     if (mtab->disp == &show_writelock)
         mtab->pstring = "WRITEENABLED";
+    if (mtab->valid == &set_writelock) {
+        uint32 i;
+
+        for (i = 0; i < dptr->numunits; i++)
+            dptr->units[i].flags |= UNIT_ROABLE;
+        }
     }
 }
 
