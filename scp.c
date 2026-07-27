@@ -3339,26 +3339,34 @@ if (docmdp) {
         stat = docmdp->action (-1, "/Library/Preferences/simh.ini");/* simh.ini proc cmd file */
     if (SCPE_BARE_STATUS(stat) == SCPE_OPENERR)
         stat = docmdp->action (-1, "/etc/simh.ini");        /* simh.ini proc cmd file */
-    if (*cbuf)                                              /* cmd file arg? */
-        stat = docmdp->action (0, cbuf);                    /* proc cmd file */
+    if ((sim_switches & SWMASK ('C')) && (*cbuf)) {         /* single command from command line */
+        sim_switches &= ~SWMASK ('C');
+        sim_brk_act[sim_do_depth] = (char *)calloc (strlen (cbuf) + 10, sizeof (*cbuf));
+        strcpy (sim_brk_act[sim_do_depth], cbuf);
+        strcat (sim_brk_act[sim_do_depth], ";EXIT -Q");
+        }
     else {
-        if (*argv[0]) {                                    /* sim name arg? */
-            char *np;                                      /* "path.ini" */
-            nbuf[0] = '"';                                 /* starting " */
-            strlcpy (nbuf + 1, argv[0], PATH_MAX + 2);     /* copy sim name */
-            if ((np = (char *)match_ext (nbuf, "EXE")))    /* remove .exe */
-                *np = 0;
-            strlcat (nbuf, ".ini\"", sizeof (nbuf));       /* add .ini" */
-            stat = docmdp->action (-1, nbuf) & ~SCPE_NOMESSAGE; /* proc default cmd file */
-            if (stat == SCPE_OPENERR) {                    /* didn't exist/can't open? */
-                np = strrchr (nbuf, '/');                  /* strip path and try again in cwd */
-                if (np == NULL)
-                    np = strrchr (nbuf, '\\');             /* windows path separator */
-                if (np == NULL)
-                    np = strrchr (nbuf, ']');              /* VMS path separator */
-                if (np != NULL) {
-                    *np = '"';
-                    stat = docmdp->action (-1, np) & ~SCPE_NOMESSAGE;/* proc default cmd file */
+        if (*cbuf)                                          /* cmd file arg? */
+            stat = docmdp->action (0, cbuf);                /* proc cmd file */
+        else {
+            if (*argv[0]) {                                 /* sim name arg? */
+                char *np;                                   /* "path.ini" */
+                nbuf[0] = '"';                              /* starting " */
+                strlcpy (nbuf + 1, argv[0], PATH_MAX + 2);  /* copy sim name */
+                if ((np = (char *)match_ext (nbuf, "EXE"))) /* remove .exe */
+                    *np = 0;
+                strlcat (nbuf, ".ini\"", sizeof (nbuf));    /* add .ini" */
+                stat = docmdp->action (-1, nbuf) & ~SCPE_NOMESSAGE; /* proc default cmd file */
+                if (stat == SCPE_OPENERR) {                 /* didn't exist/can't open? */
+                    np = strrchr (nbuf, '/');               /* strip path and try again in cwd */
+                    if (np == NULL)
+                        np = strrchr (nbuf, '\\');          /* windows path separator */
+                    if (np == NULL)
+                        np = strrchr (nbuf, ']');           /* VMS path separator */
+                    if (np != NULL) {
+                        *np = '"';
+                        stat = docmdp->action (-1, np) & ~SCPE_NOMESSAGE;/* proc default cmd file */
+                        }
                     }
                 }
             }
