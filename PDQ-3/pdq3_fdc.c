@@ -1138,7 +1138,7 @@ t_stat pdq3_diskCreate(FILE *fileref, const char *ctlr_comment) {
     fsize = ftell(fileref);
     sim_set_fsize(fileref, fsize<0 ? 0 : fsize);
 
-    fprintf(fileref, "IMD SIMH %s %s\n", __DATE__, __TIME__);
+    fprintf(fileref, "IMD SIMH %s\n", sim_version_date_stamp);
     fputs(comment, fileref);
     free(comment);
     fprintf(fileref, "%s\n", ctlr_comment);

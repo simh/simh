@@ -411,7 +411,7 @@ t_stat diskCreate(FILE *fileref, const char *ctlr_comment)
         return(SCPE_OPENERR);
     }
 
-    fprintf(fileref, "IMD SIMH %s %s\n", __DATE__, __TIME__);
+    fprintf(fileref, "IMD SIMH %s\n", sim_version_date_stamp);
     fputs(comment, fileref);
     free(comment);
     fprintf(fileref, "\n\n$Id: sim_imd.c 1999 2008-07-22 04:25:28Z hharte $\n");

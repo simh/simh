@@ -1,14 +1,21 @@
-# This script converts Visual Studio 2022 and 2026 upgraded VS2008 projects to produce 
-# VS2022 or VS2026 projects that will build executables that will link against Visual 
-# Studio 2017 libraries which are stable in the windows_build repo.
+# This script converts Visual Studio 2019, 2022 and 2026 upgraded VS2008 projects to 
+# produce VS2019 or VS2022 or VS2026 projects that will build executables that will 
+# leverate the Visual Studio 2017 tool chain which is stable in the windows_build repo.
 #
-#$SDK = $env:WindowsSDKVersion
+# Additionally, it will also convert to projects in an attempt to produce reproducible
+# executables when the same input files are processed by the same tool chain on 
+# potentially different hosts.
+#
 param(
-    [string]$Solution
+    [string]$Solution,
+    [switch]$Convert
     )
 $changedProjects = 0
+$processedProjects = 0
 $changedSolution = 0
-$SDK = "10.0.26100.0\"
+[string]$uncommittedChanges = ''
+$reproduciblePropsFile = 'Directory.Build.props'
+$SDK = $env:WindowsSDKVersion
 $SDK = $SDK.Replace("\","")
 $solutionFile = $Solution
 $solutionPath = Split-Path -Path $solutionFile -Parent
@@ -49,28 +56,58 @@ EndGlobal
 VisualStudioVersion = 17.14.36705.20 d17.14
 MinimumVisualStudioVersion = 10.0.40219.1")
 }
+$reproduciblePropsFile = $solutionPath + $reproduciblePropsFile
+$uncommittedChanges = $(git update-index --refresh --)
+if ($uncommittedChanges -ne '')
+{
+    if (Test-Path -Path $reproduciblePropsFile)
+    {
+        Remove-Item -Path $reproduciblePropsFile
+    }
+}
+else
+{
+    Set-Content -Path $reproduciblePropsFile -Value '<Project>
+  <ItemDefinitionGroup Condition="''$(Configuration)''==''Release''">
+    <ClCompile>
+      <!-- Avoid compile time info in compiled results -->
+      <AdditionalOptions>/experimental:deterministic %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup>
+    <Link>
+      <AdditionalOptions>/fixed:no  /Brepro /PDBALTPATH:%_PDB% /INCREMENTAL:NO</AdditionalOptions>
+    </Link>
+  </ItemDefinitionGroup>
+</Project>
+'
+}
 ForEach ($Project in $Projects)
 {
+    $processedProjects = $processedProjects + 1
     $projFile = $solutionPath + "\" + $($Project.Groups['file'].Value).Replace(".vcproj", ".vcxproj")
     if (-not (Test-Path -Path $ProjFile -PathType Any)) {if (-not (Get-Item -Path $ProjFile -ErrorAction Ignore)) {Write-Host "No such file: $ProjFile"; continue; }}
     $projString  =  Get-Content -Path $projFile -Raw
     $startingProjString = $projString
-    if ($projString.Contains("<WindowsTargetPlatformVersion>")) {Write-Host "$projFile - already converted"; continue; }
-    $projString = $projString.Replace(
+    if ($Convert)
+    {
+        if ($projString.Contains("<WindowsTargetPlatformVersion>")) {Write-Host "$projFile - already converted"; continue; }
+        $projString = $projString.Replace(
 "<Keyword>Win32Proj</Keyword>
 ", 
 "<Keyword>Win32Proj</Keyword> 
     <WindowsTargetPlatformVersion>$SDK</WindowsTargetPlatformVersion>
 ")
-    $projString = $projString.Replace("<PlatformToolset>v143</PlatformToolset>","<PlatformToolset>v141</PlatformToolset>")
-    $projString = $projString.Replace("<PlatformToolset>v144</PlatformToolset>","<PlatformToolset>v141</PlatformToolset>")
-    $projString = $projString.Replace("<PlatformToolset>v145</PlatformToolset>","<PlatformToolset>v141</PlatformToolset>")
-    $projString = $projString.Replace(
+        $projString = $projString.Replace("<PlatformToolset>v143</PlatformToolset>","<PlatformToolset>v141</PlatformToolset>")
+        $projString = $projString.Replace("<PlatformToolset>v144</PlatformToolset>","<PlatformToolset>v141</PlatformToolset>")
+        $projString = $projString.Replace("<PlatformToolset>v145</PlatformToolset>","<PlatformToolset>v141</PlatformToolset>")
+        $projString = $projString.Replace(
 ' Label="LocalAppDataPlatform" />
   ',' Label="LocalAppDataPlatform" />
     <Import Project="simh.props" />
   ')
-    if (-not $projString.Contains($BuildROMsGUID))
+    }
+    if ((-not $projString.Contains($BuildROMsGUID)) -and (-not $projString.Contains($BuildROMsGUID.ToLower())))
     {
         $ProjString = $ProjString.Replace(
 '  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />',
@@ -93,4 +130,12 @@ if (-not ($solution -ceq $startingSolution))
     $solution | Out-File -Force -FilePath "$solutionFile" -Encoding utf8
     $changedSolution = 1
 }
-Write-Host "Projects Changed: $changedProjects  Solution Changed: $changedSolution"
+if ($uncommittedChanges -eq '')
+{
+    Write-Host "Reproducible Builds Enabled"
+}
+else
+{
+    Write-Host "Non Reproducible Builds Enabled"
+}
+Write-Host "Projects Processed: $processedProjects, Projects Changed: $changedProjects,  Solution Changed: $changedSolution"

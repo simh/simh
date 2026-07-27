@@ -343,6 +343,7 @@ extern t_addr sim_brk_match_addr;
 extern BRKTYPTAB *sim_brk_type_desc;                    /* type descriptions */
 extern const char *sim_prog_name;                       /* executable program name */
 extern FILE *stdnul;
+extern const char *sim_version_date_stamp;              /* Source Code base time */
 extern t_bool sim_asynch_enabled;
 extern int32 sim_asynch_latency;
 extern int32 sim_asynch_inst_latency;

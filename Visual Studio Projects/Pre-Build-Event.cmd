@@ -421,6 +421,7 @@ if "%GIT_COMMIT_ID%" equ "%OLD_GIT_COMMIT_ID%" goto _IdGood
 echo Generating updated .git-commit-id.h containing id %GIT_COMMIT_ID%
 echo #define SIM_GIT_COMMIT_ID %GIT_COMMIT_ID% >.git-commit-id.h
 echo #define SIM_GIT_COMMIT_TIME %GIT_COMMIT_TIME% >>.git-commit-id.h
+if "%ACTUAL_GIT_COMMIT_EXTRAS%" neq "" echo #define SIM_GIT_UNCOMMITTED_CHANGES 1 >>.git-commit-id.h
 if errorlevel 1 echo Retrying...
 if errorlevel 1 goto _SetId
 :_IdGood

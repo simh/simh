@@ -136,7 +136,7 @@ extern int sim_vax_snprintf(char *buf, size_t buf_size, const char *fmt, ...);
 #endif
 
 #if defined(__DECC)
-#define __FUNCTION__ __FILE__
+#define __FUNCTION__ " a function in " __FILE__ " at line " __LINE__
 #endif
 
 #ifdef  __cplusplus

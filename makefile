@@ -551,10 +551,14 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
     endif
     ifneq (,$(or $(NEED_COMMIT_ID),$(GIT_EXTRA_FILES)))
       isodate=$(shell git $(REPO_PATH) log -1 --pretty="%ai"|sed -e 's/ /T/'|sed -e 's/ //')
-      $(shell git $(REPO_PATH) log -1 --pretty="SIM_GIT_COMMIT_ID %H$(GIT_EXTRA_FILES)%nSIM_GIT_COMMIT_TIME $(isodate)" >.git-commit-id)
+      ifneq (,$(GIT_EXTRA_FILES))
+        $(shell git $(REPO_PATH) log -1 --pretty="SIM_GIT_COMMIT_ID %H$(GIT_EXTRA_FILES)%nSIM_GIT_COMMIT_TIME $(isodate)%nSIM_GIT_UNCOMMITTED_CHANGES 1" >.git-commit-id)
+      else
+        $(shell git $(REPO_PATH) log -1 --pretty="SIM_GIT_COMMIT_ID %H$(GIT_EXTRA_FILES)%nSIM_GIT_COMMIT_TIME $(isodate)" >.git-commit-id)
+      endif
     endif
   endif
-  SIM_BUILD_OS_VERSION= -DSIM_BUILD_OS_VERSION="$(shell uname -a|sed 's/,//g')"
+  SIM_BUILD_OS_VERSION= -DSIM_BUILD_OS_VERSION="$(shell uname -srvmo|sed 's/,//g')"
   LTO_EXCLUDE_VERSIONS =
   PCAPLIB = pcap
   ifeq (agcc,$(findstring agcc,${GCC})) # Android target build?
@@ -1440,11 +1444,15 @@ else
       isodate=$(word 1,$(isodatetime))T$(word 2,$(isodatetime))$(word 3,$(isodatetime))
       $(shell echo SIM_GIT_COMMIT_ID $(ACTUAL_GIT_COMMIT_ID)$(GIT_EXTRA_FILES)>.git-commit-id)
       $(shell echo SIM_GIT_COMMIT_TIME $(isodate)>>.git-commit-id)
+      ifneq (,$(GIT_EXTRA_FILES))
+        $(shell echo SIM_GIT_UNCOMMITTED_CHANGES 1>>.git-commit-id)
+      endif
     endif
   endif
   ifneq (,$(shell if exist .git-commit-id echo git-commit-id))
     GIT_COMMIT_ID=$(shell for /F "tokens=2" %%i in ("$(shell findstr /C:"SIM_GIT_COMMIT_ID" .git-commit-id)") do echo %%i)
     GIT_COMMIT_TIME=$(shell for /F "tokens=2" %%i in ("$(shell findstr /C:"SIM_GIT_COMMIT_TIME" .git-commit-id)") do echo %%i)
+    GIT_EXTRA_FILES=$(shell for /F "tokens=2" %%i in ("$(shell findstr /C:"SIM_GIT_UNCOMMITTED_CHANGES" .git-commit-id)") do echo %%i)
   else
     ifeq (,$(shell findstr /C:"define SIM_GIT_COMMIT_ID" sim_rev.h | findstr Format))
       GIT_COMMIT_ID=$(shell for /F "tokens=3" %%i in ("$(shell findstr /C:"define SIM_GIT_COMMIT_ID" sim_rev.h)") do echo %%i)
@@ -1615,12 +1623,15 @@ ifeq (,$(MAKE_RESULT))
   ifneq (,$(GIT_COMMIT_TIME))
     CFLAGS_GIT += -DSIM_GIT_COMMIT_TIME=$(GIT_COMMIT_TIME)
   endif
+  ifneq (,$(GIT_EXTRA_FILES))
+    CFLAGS_GIT += -DSIM_GIT_UNCOMMITTED_CHANGES
+  endif
   ifneq (,$(UNSUPPORTED_BUILD))
     CFLAGS_GIT += -DSIM_BUILD=Unsupported=$(UNSUPPORTED_BUILD)
   endif
   OPTIMIZE ?= -O2
   ifneq ($(DEBUG),)
-    CFLAGS_G = -g -ggdb -g3
+    CFLAGS_G = -g -ggdb -g3 -D_DEBUG
     CFLAGS_O = -O0
     BUILD_FEATURES = - debugging support
     LTO =

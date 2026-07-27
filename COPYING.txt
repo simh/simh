@@ -12,7 +12,7 @@ can easily determine what simh version they are working with.
 The best way to do this leverages git's archive feature which in 
 the simh case has simh git commit information embedded in the archive.
 Alternatively, some live git operations could be done to fetch and
-extrace the current commit/version information from that archive 
+extract the current commit/version information from that archive 
 and then pass it around and through the derivative project's build 
 mechanism.
 
@@ -27,7 +27,7 @@ storage is so cheap that this generally shouldn't be a concern, but
 some folks really like to keep things to a minimal footprint.
 
 A git archive containing all of the simh components can be acquired
-from the simh gitub repository for the latest simh code from:
+from the simh github repository for the latest simh code from:
         https://github.com/simh/simh/archive/master.zip
 or for a specific simh commit:
         https://github.com/simh/simh/archive/<commit-hash>.zip

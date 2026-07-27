@@ -318,20 +318,17 @@ if "%_X_SLN_VERSION%" == "10.00" copy /y "%_SLN_FILE%" "%_NEW_SLN_FILE%" >NUL & 
 if not "%_NEW_SLN_FILE%" == "" echo Project conversion completed at %TIME%
 set _NEW_SLN_FILE=
 if not "%_X_SLN_VERSION%" == "10.00" echo _SLN_FILE=%_SLN_FILE%
-if not "%_VC_VER%" == "2022" if not "%_VC_VER%" == "2026" goto _RunBuild
-if exist "%_VC_DIR%\MSBuild\Microsoft\VC\v150\Platforms\Win32\PlatformToolsets\v141" goto _DoV141Convert
-for /F "usebackq tokens=8" %%a in (`findstr /C:"Microsoft Visual Studio Solution File, Format Version" "%_SLN_FILE%"`) do SET _X_SLN_VERSION=%%a
-if "%_X_SLN_VERSION%" == "10.00" goto _DoV141Convert
-goto _RunBuild
+if not "%_VC_VER%" == "2019" if not "%_VC_VER%" == "2022" if not "%_VC_VER%" == "2026" goto _RunBuild
 
 :_DoV141Convert
 set _X_PROJS_CONVERTED=
 for /F "usebackq tokens=1" %%a in (`findstr /C:"<WindowsTargetPlatformVersion>10." "%_BUILD_PROJECT_DIR%BuildROMs.vcxproj"`) do set _X_PROJS_CONVERTED=%%a
-if not "%_X_PROJS_CONVERTED%" == "" goto _RunBuild
-echo v141 Convert starting at %TIME%
-echo Converting the VS2022 or VS2026 projects to used the 2017 support libraries
-Powershell -NoLogo -File "%~dp0\Visual Studio Projects\ConvertToV141Project.ps1" "%_SLN_FILE%"
-echo v141 Convert completed at %TIME%
+for /F "usebackq tokens=1" %%a in (`findstr /C:"deterministic" "%_BUILD_PROJECT_DIR%BuildROMs.vcxproj"`) do set _X_PROJS_CONVERTED=%%a
+set _SETUP_V141=
+if exist "%_VC_DIR%\MSBuild\Microsoft\VC\v150\Platforms\Win32\PlatformToolsets\v141" set _SETUP_V141=-Convert
+if not "%_SETUP_V141%" == "" echo v141 Convert starting at %TIME% & echo Converting the VS2022 or VS2026 projects to used the 2017 support libraries
+Powershell -NoLogo -File "%~dp0\Visual Studio Projects\FixupProjects.ps1" "%_SLN_FILE%" %_SETUP_V141%
+if not "%_SETUP_V141%" == "" echo v141 Convert completed at %TIME%
 set _X_PROJS_CONVERTED=
 
 :_RunBuild
