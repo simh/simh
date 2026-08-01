@@ -284,7 +284,7 @@ int32 i, cc;
 
 if ((lpt_unit.flags & UNIT_ATT) == 0) {                 /* not attached? */
     ind[IN_PRCHK] = 1;                                  /* pri check */
-    return SCPE_UNATT;
+    return sim_messagef (SCPE_UNATT, "LPT Device is not attached\n");
     }
 
 for (i = LPT_WIDTH; i <= LPT_BSIZE; i++)                /* clear unprintable */
@@ -341,6 +341,11 @@ return STOP_CCT;                                        /* runaway channel */
 t_stat lpt_space (int32 count, int32 sflag)
 {
 int32 i, cc;
+
+if ((lpt_unit.flags & UNIT_ATT) == 0) {                 /* not attached? */
+    ind[IN_PRCHK] = 1;                                  /* pri check */
+    return sim_messagef (SCPE_UNATT, "LPT Device is not attached\n");
+    }
 
 cct_ptr = (cct_ptr + count) % cct_lnt;                  /* adv cct, mod lnt */
 if (sflag && CHP (0, cct[cct_ptr]) &&                   /* skip, top of form, */
