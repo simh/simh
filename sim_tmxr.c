@@ -2106,8 +2106,13 @@ if (((lp->conn || lp->txbfd) && lp->rcve) &&            /* (conn or buffered) & 
 if (lp->rxbpi == lp->rxbpr)                             /* empty? zero ptrs */
     lp->rxbpi = lp->rxbpr = 0;
 if (val) {                                              /* Got something? */
-    if (lp->rxbps)
-        lp->rxnexttime = floor (sim_gtime_now + ((lp->rxdeltausecs * sim_timer_inst_per_sec ()) / USECS_PER_SECOND));
+    if (lp->rxbps) {
+        if (((lp->rxbpi != 0) || (lp->rxbpr != 0)) &&   /* something still pending */
+            (lp->rxnexttime != 0.0))                    /* && not the first tmxr_getc_ln() call */
+            lp->rxnexttime += floor (((lp->rxdeltausecs * sim_timer_inst_per_sec ()) / USECS_PER_SECOND));
+        else                                            /* next check when quiet */
+            lp->rxnexttime = floor (sim_gtime_now + ((lp->rxdeltausecs * sim_timer_inst_per_sec ()) / USECS_PER_SECOND));
+        }
     else
         lp->rxnexttime = floor (sim_gtime_now + ((lp->mp->uptr->wait * sim_timer_inst_per_sec ()) / USECS_PER_SECOND));
     }

@@ -495,7 +495,8 @@ if (dz_csr & CSR_MSE) {                                 /* enabled? */
     dz_update_rcvi ();                                  /* upd rcv intr */
     tmxr_poll_tx (&dz_desc);                            /* poll output */
     dz_update_xmti ();                                  /* upd xmt intr */
-    if ((dz_csr & CSR_RDONE) == 0)
+    if (((dz_csr & CSR_RDONE) == 0) ||
+        ((dz_csr & CSR_SAE) != 0))
         sim_clock_coschedule (uptr, tmxr_poll);         /* reactivate */
     }
 return SCPE_OK;

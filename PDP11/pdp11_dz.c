@@ -461,8 +461,8 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
                     (dz_csr[dz] & ~0377) | data;
         if (data & CSR_CLR)                             /* clr? reset */
             dz_clear (dz, FALSE);
-        if (data & CSR_MSE)                             /* MSE? start poll */
-            sim_clock_coschedule (dz_unit, tmxr_poll);
+        if (data & CSR_MSE)                             /* MSE? start next poll */
+            sim_clock_coschedule_abs (dz_unit, tmxr_poll);
         else
             dz_csr[dz] &= ~(CSR_SA | CSR_RDONE | CSR_TRDY);
         if ((data & CSR_RIE) == 0)                      /* RIE = 0? */
@@ -577,11 +577,13 @@ if (t) {                                                /* any enabled? */
     tmxr_poll_tx (&dz_desc);                            /* poll output */
     dz_update_xmti ();                                  /* upd xmt intr */
     for (dz = 0; dz < dz_desc.lines/DZ_LINES; dz++) {
-        if (dz_csr[dz] & CSR_RDONE)
+        if ((dz_csr[dz] & CSR_RDONE) || (dz_csr[dz] & CSR_SAE))
             break;
         }
-    if (dz == dz_desc.lines/DZ_LINES)                   /* All idle? */
+    if ((dz == dz_desc.lines/DZ_LINES) ||               /* All idle? */
+        (dz_csr[dz] & CSR_SAE)){                        /* or a controller in drain Silo mode? */
         sim_clock_coschedule (uptr, tmxr_poll);         /* reactivate */
+        }
     }
 return SCPE_OK;
 }
