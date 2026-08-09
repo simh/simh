@@ -250,8 +250,8 @@ endif
 ifneq (,$(or $(findstring pdp8,${MAKECMDGOALS}),$(findstring sds,${MAKECMDGOALS})))
   VIDEO_USEFUL = true
 endif
-# building the PDP11 on certain platforms (Raspberry Pi) could use gpio support
-ifneq (,$(findstring pdp11,${MAKECMDGOALS}))
+# building the PiDP11 front panel on certain platforms (Raspberry Pi) could use gpio support
+ifneq (,$(findstring pidp11-frontpanel,${MAKECMDGOALS}))
   GPIO_USEFUL = true
 endif
 # building the pdp11, any pdp10, any 3b2, or any vax simulator could use networking support
@@ -2643,7 +2643,7 @@ ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	swtp6800mp-a swtp6800mp-a2 tx-0 ssem b5500 intel-mds \
 	scelbi 3b2 3b2-700 i701 i704 i7010 i7070 i7080 i7090 \
 	sigma uc15 pdp10-ka pdp10-ki pdp10-kl pdp10-ks pdp6 i650 \
-	imlac linc tt2500 sel32
+	imlac linc tt2500 sel32 $(if $(GPIO_AVAILABLE),pidp11-frontpanel)
 
 all : ${ALL}
 
@@ -2733,19 +2733,23 @@ $(BIN)tt2500$(EXE) : ${TT2500} ${SIM}
 	$(MAKEIT) OPTS="$(TT2500_OPT)"
 
 
-pdp11 : $(BIN)pdp11$(EXE) $(if $(GPIO_AVAILABLE),pidp11-frontpanel)
+pdp11 : $(BIN)pdp11$(EXE)
 
 $(BIN)pdp11$(EXE) : ${PDP11} ${SIM} ${BUILD_ROMS}
 	$(MAKEIT) OPTS="$(PDP11_OPT)"
 
-pidp11-frontpanel : $(BIN)pidp11-frontpanel$(EXE)
+pidp11-frontpanel : pdp11 $(BIN)pidp11-frontpanel$(EXE)
 
 $(BIN)pidp11-frontpanel$(EXE) : 
+ifneq (,$(GPIO_AVAILABLE))
 	mkdir -p $(BIN)frontpanels/ && test ! -d $(BIN)frontpanels/pidp11-frontpanel && git clone https://github.com/hammurabi-mendes/pidp-frontpanel $(BIN)frontpanels/pidp11-frontpanel
 	cp $(BIN)../sim_frontpanel.* $(BIN)frontpanels/pidp11-frontpanel/
 	cp $(BIN)../sim_sock.* $(BIN)frontpanels/pidp11-frontpanel/
 	sed -i 's/sim_panel_destroy.simh_panel/sim_panel_destroy\(\&simh_panel/g' $(BIN)frontpanels/pidp11-frontpanel/frontpanel.cpp
 	cd $(BIN)frontpanels/pidp11-frontpanel/ && make && cp frontpanel ../../pidp11-frontpanel
+else
+	$(error pidp11-frontpanel only builds on Raspberry Pi)
+endif
 
 uc15 : $(BIN)uc15$(EXE)
 
