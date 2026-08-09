@@ -9610,11 +9610,18 @@ for (i = 0; i < (device_count + sim_internal_device_count); i++) {/* loop thru d
             if ((uptr->flags & UNIT_BUF) &&             /* writable buffered */
                 uptr->hwmark &&                         /* files need to be */
                 ((uptr->flags & UNIT_RO) == 0)) {       /* written on save */
-                uint32 cap = (uptr->hwmark + dptr->aincr - 1) / dptr->aincr;
-                rewind (uptr->fileref);
-                sim_fwrite (uptr->filebuf, SZ_D (dptr), cap, uptr->fileref);
-                fclose (uptr->fileref);                 /* flush data and state */
-                uptr->fileref = sim_fopen (uptr->filename, "rb+");/* reopen r/w */
+                int32 saved_switches = sim_switches;
+                t_stat r;
+                char *saved_filename = strdup (uptr->filename);
+
+                sim_switches |= SWMASK ('Q');
+                r = scp_detach_unit (dptr, uptr);       /* detach to flush any changed buffered state */
+                if (r == SCPE_OK)
+                    r = attach_unit (uptr, saved_filename);/* reattach */
+                free (saved_filename);
+                sim_switches = saved_switches;
+                if (r != SCPE_OK)
+                    sim_messagef (r, "%s: Problem flushing buffered data\n", sim_uname (uptr));
                 }
             }
         fputc ('\n', sfile);
