@@ -1285,6 +1285,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
   ifneq (,$(GPIO_USEFUL))
     ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(findstring APT,$(PKG_MGR)),$(wildcard /sys/firmware/devicetree/base/model),$(shell cat /sys/firmware/devicetree/base/model | awk '{ if ($$1 = "Raspberry") {print $$1} }')))
       ifneq (,$(and $(wildcard /etc/debian_version),$(shell cat /etc/debian_version | awk '{ if ($$1 >= "13.2") {print "good"} }')))
+        RASPBERRY_PI_SYSTEM = true
         $(info Building on a Raspberry Pi)
         ifeq (,$(call find_include,gpiod))
           NEEDED_PKGS += DPKG_GPIO
@@ -2741,11 +2742,15 @@ $(BIN)pdp11$(EXE) : ${PDP11} ${SIM} ${BUILD_ROMS}
 pidp11-frontpanel : $(BIN)pidp11-frontpanel$(EXE)
 
 $(BIN)pidp11-frontpanel$(EXE) : 
-	mkdir -p $(BIN)frontpanels/ && test ! -d $(BIN)frontpanels/pidp11-frontpanel && git clone https://github.com/hammurabi-mendes/pidp-frontpanel $(BIN)frontpanels/pidp11-frontpanel
-	cp $(BIN)../sim_frontpanel.* $(BIN)frontpanels/pidp11-frontpanel/
-	cp $(BIN)../sim_sock.* $(BIN)frontpanels/pidp11-frontpanel/
-	sed -i 's/sim_panel_destroy.simh_panel/sim_panel_destroy\(\&simh_panel/g' $(BIN)frontpanels/pidp11-frontpanel/frontpanel.cpp
-	cd $(BIN)frontpanels/pidp11-frontpanel/ && make && cp frontpanel ../../pidp11-frontpanel
+  ifneq (,$(RASPBERRY_PI_SYSTEM))
+		mkdir -p $(BIN)frontpanels/ && test ! -d $(BIN)frontpanels/pidp11-frontpanel && git clone https://github.com/hammurabi-mendes/pidp-frontpanel $(BIN)frontpanels/pidp11-frontpanel
+		cp $(BIN)../sim_frontpanel.* $(BIN)frontpanels/pidp11-frontpanel/
+		cp $(BIN)../sim_sock.* $(BIN)frontpanels/pidp11-frontpanel/
+		sed -i 's/sim_panel_destroy.simh_panel/sim_panel_destroy\(\&simh_panel/g' $(BIN)frontpanels/pidp11-frontpanel/frontpanel.cpp
+		cd $(BIN)frontpanels/pidp11-frontpanel/ && make && cp frontpanel ../../pidp11-frontpanel
+  else
+		$(error The pidp11-frontpanel is only available on Raspberry Pi systems)
+  endif
 
 uc15 : $(BIN)uc15$(EXE)
 
