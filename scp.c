@@ -9723,6 +9723,7 @@ char **attnames = NULL;
 UNIT **attunits = NULL;
 int32 *attswitches = NULL;
 int32 attcnt = 0;
+t_stat att_r = SCPE_OK;
 void *mbuf = NULL;
 int32 j, blkcnt, limit, unitno, time, flg;
 uint32 us, depth;
@@ -9922,7 +9923,7 @@ for ( ;; ) {                                            /* device loop */
         if (high > 0) {                                 /* [V2.5+] any memory? */
             if (((uptr->flags & (UNIT_FIX + UNIT_ATTABLE)) != UNIT_FIX) ||
                  (dptr->deposit == NULL)) {
-                sim_printf ("Can't restore memory: %s%d\n", sim_dname (dptr), unitno);
+                sim_printf ("Can't restore memory: %s\n", sim_uname (uptr));
                 r = SCPE_INCOMP;
                 goto Cleanup_Return;
                 }
@@ -9931,13 +9932,13 @@ for ( ;; ) {                                            /* device loop */
                 if ((dptr->flags & DEV_DYNM) &&
                     ((dptr->msize == NULL) ||
                      (dptr->msize (uptr, (int32) high, NULL, NULL) != SCPE_OK))) {
-                    sim_printf ("Can't change memory size: %s%d\n",
-                                sim_dname (dptr), unitno);
+                    sim_printf ("Can't change memory size: %s\n",
+                                sim_uname (uptr));
                     r = SCPE_INCOMP;
                     goto Cleanup_Return;
                     }
                 uptr->capac = high;                     /* new memory size */
-                sim_printf ("Memory size changed: %s%d = ", sim_dname (dptr), unitno);
+                sim_printf ("Memory size changed: %s = ", sim_uname (uptr));
                 fprint_capac (stdout, dptr, uptr);
                 if (sim_log)
                     fprint_capac (sim_log, dptr, uptr);
@@ -10018,7 +10019,7 @@ for ( ;; ) {                                            /* device loop */
    units which were originally attached.  Some of these attach operations
    may depend on the state of the device (in registers) to work correctly */
 for (j=0, r = SCPE_OK; j<attcnt; j++) {
-    if ((r == SCPE_OK) && (!dont_detach_attach)) {
+    if (!dont_detach_attach) {
         struct stat fstat;
         t_addr saved_pos;
         char drivetype[CBUFSIZE], filename[CBUFSIZE], cmd[CBUFSIZE * 2];
@@ -10040,7 +10041,7 @@ for (j=0, r = SCPE_OK; j<attcnt; j++) {
         if ((!force_restore) &&
             (!stat(filename, &fstat)))
             if (fstat.st_mtime > rstat.st_mtime + 30) {
-                r = SCPE_INCOMP;
+                att_r = SCPE_INCOMP;
                 sim_printf ("Error Attaching %s to %s - the restore state is %d seconds older than the attach file\n", sim_dname (dptr), attnames[j], (int)(fstat.st_mtime - rstat.st_mtime));
                 sim_printf ("restore with the -F switch to override this sanity check\n");
                 continue;
@@ -10049,8 +10050,10 @@ for (j=0, r = SCPE_OK; j<attcnt; j++) {
         sim_switches = attswitches[j];
         r = scp_attach_unit (dptr, attunits[j], filename);/* reattach unit */
         attunits[j]->pos = saved_pos;
-        if (r != SCPE_OK)
+        if (r != SCPE_OK) {
             sim_printf ("Error Attaching %s to %s%s%s\n", sim_uname (attunits[j]), filename, drivetype[0] ? " as " : "", drivetype);
+            att_r = SCPE_INCOMP;
+            }
         }
     else {
         if ((r == SCPE_OK) && (dont_detach_attach)) {
@@ -10068,6 +10071,7 @@ for (j=0, r = SCPE_OK; j<attcnt; j++) {
     free (attnames[j]);
     attnames[j] = NULL;
     }
+r = att_r;          /* Complete ATTACH activity with the worst error (if any) while attaching */
 Cleanup_Return:
 free (mbuf);
 for (j=0; j < attcnt; j++)
@@ -10077,7 +10081,9 @@ free (attunits);
 free (attswitches);
 if (warned)
     sim_printf ("restore with the -Q switch to suppress warning messages\n");
-return r;
+if (r != SCPE_OK)
+    return sim_messagef (r, "%s\n", sim_error_text (r));
+return SCPE_OK;
 }
 
 void sim_flush_buffered_files (t_bool debug_flush)
