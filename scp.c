@@ -7755,6 +7755,41 @@ fprintf (st, "%sBuild: %s", flag ? "\n        " : "        ", __STR(SIM_BUILD));
 fprintf (st, "\n");
 if (sim_vm_release_message != NULL)                    /* if a release message string is defined */
     fprintf (st, "\n%s", sim_vm_release_message);      /*   then display it */
+if (only_reproducible_factors && (sim_switches & SWMASK ('S'))) {
+    FILE *f;
+    const char *sha256sum;
+    const char *arg1 = "";
+    const char *arg3 = "";
+    char cmd[256];
+
+    sha256sum = sim_get_tool_path ("sha256sum");
+    if (sha256sum[0] == '\0') {
+        sha256sum = sim_get_tool_path ("certutil");
+        arg1 = "-hashfile";
+        arg3 = "SHA256";
+        }
+    snprintf (cmd, sizeof (cmd), "%s %s %s %s", sha256sum, arg1, sim_prog_name, arg3);
+    if (sha256sum[0]) {
+        if ((f = popen (cmd, "r"))) {
+            char line[256];
+            char *c;
+
+            do {
+                if (NULL == fgets (line, sizeof (line), f))
+                    break;
+                sim_trim_endspc (line);
+                if (((memcmp (line, "SHA256",    6) == 0)) ||
+                     (memcmp (line, "CertUtil:", 9) == 0))
+                    continue;
+                if ((c = strchr (line, ' ')) || (c = strchr (line, '\t')))
+                    *c = '\0';
+                fprintf (st, "\n        Checksum: %s\n", line);
+                break;
+                } while (1);
+            pclose (f);
+            }
+        }
+    }
 return SCPE_OK;
 }
 

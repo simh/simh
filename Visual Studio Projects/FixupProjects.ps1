@@ -56,7 +56,7 @@ EndGlobal
 VisualStudioVersion = 17.14.36705.20 d17.14
 MinimumVisualStudioVersion = 10.0.40219.1")
 }
-$reproduciblePropsFile = $solutionPath + $reproduciblePropsFile
+$reproduciblePropsFile = $solutionPath + '\' + $reproduciblePropsFile
 $uncommittedChanges = $(git update-index --refresh --)
 if ($uncommittedChanges -ne '')
 {
@@ -85,7 +85,7 @@ else
 ForEach ($Project in $Projects)
 {
     $processedProjects = $processedProjects + 1
-    $projFile = $solutionPath + "\" + $($Project.Groups['file'].Value).Replace(".vcproj", ".vcxproj")
+    $projFile = $solutionPath + '\' + $($Project.Groups['file'].Value).Replace(".vcproj", ".vcxproj")
     if (-not (Test-Path -Path $ProjFile -PathType Any)) {if (-not (Get-Item -Path $ProjFile -ErrorAction Ignore)) {Write-Host "No such file: $ProjFile"; continue; }}
     $projString  =  Get-Content -Path $projFile -Raw
     $startingProjString = $projString
