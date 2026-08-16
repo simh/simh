@@ -43,7 +43,7 @@ Notes:
 
 #include "nova_defs.h"
 
-extern int32 int_req, dev_busy, dev_done, dev_disable;
+extern int32 int_reqn, dev_busy, dev_donen, dev_disablen;
 
 
 int32 lpt_stopioe = 0;                                  /* stop on error flag */
@@ -69,9 +69,9 @@ UNIT lpt_unit = {    /* 2007-May-30, bkr */
 REG lpt_reg[] = {
     { ORDATA (BUF, lpt_unit.buf, 8) },
     { FLDATA (BUSY, dev_busy, INT_V_LPT) },
-    { FLDATA (DONE, dev_done, INT_V_LPT) },
-    { FLDATA (DISABLE, dev_disable, INT_V_LPT) },
-    { FLDATA (INT, int_req, INT_V_LPT) },
+    { FLDATA (DONE, dev_donen, INT_V_LPT) },
+    { FLDATA (DISABLE, dev_disablen, INT_V_LPT) },
+    { FLDATA (INT, int_reqn, INT_V_LPT) },
     { DRDATA (POS, lpt_unit.pos, T_ADDR_W), PV_LEFT },
     { DRDATA (TIME, lpt_unit.wait, 24), PV_LEFT },
     { FLDATA (STOP_IOE, lpt_stopioe, 0) },

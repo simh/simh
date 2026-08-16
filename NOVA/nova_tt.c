@@ -53,7 +53,7 @@
 #define UNIT_V_DASHER   (TTUF_V_UF)                 /* Dasher mode */
 #define UNIT_DASHER     (1 << UNIT_V_DASHER)
 
-extern int32 int_req, dev_busy, dev_done, dev_disable;
+extern int32 int_reqn, dev_busy, dev_donen, dev_disablen;
 
 int32 tti (int32 pulse, int32 code, int32 AC);
 int32 tto (int32 pulse, int32 code, int32 AC);
@@ -79,9 +79,9 @@ UNIT tti_unit = { UDATA (&tti_svc, 0, 0), KBD_POLL_WAIT };
 REG tti_reg[] = {
     { ORDATA (BUF, tti_unit.buf, 8) },
     { FLDATA (BUSY, dev_busy, INT_V_TTI) },
-    { FLDATA (DONE, dev_done, INT_V_TTI) },
-    { FLDATA (DISABLE, dev_disable, INT_V_TTI) },
-    { FLDATA (INT, int_req, INT_V_TTI) },
+    { FLDATA (DONE, dev_donen, INT_V_TTI) },
+    { FLDATA (DISABLE, dev_disablen, INT_V_TTI) },
+    { FLDATA (INT, int_reqn, INT_V_TTI) },
     { DRDATA (POS, tti_unit.pos, T_ADDR_W), PV_LEFT },
     { DRDATA (TIME, tti_unit.wait, 24), REG_NZ + PV_LEFT },
     { NULL }
@@ -119,9 +119,9 @@ UNIT tto_unit = { UDATA (&tto_svc, 0, 0), SERIAL_OUT_WAIT };
 REG tto_reg[] = {
     { ORDATA (BUF, tto_unit.buf, 8) },
     { FLDATA (BUSY, dev_busy, INT_V_TTO) },
-    { FLDATA (DONE, dev_done, INT_V_TTO) },
-    { FLDATA (DISABLE, dev_disable, INT_V_TTO) },
-    { FLDATA (INT, int_req, INT_V_TTO) },
+    { FLDATA (DONE, dev_donen, INT_V_TTO) },
+    { FLDATA (DISABLE, dev_disablen, INT_V_TTO) },
+    { FLDATA (INT, int_reqn, INT_V_TTO) },
     { DRDATA (POS, tto_unit.pos, T_ADDR_W), PV_LEFT },
     { DRDATA (TIME, tto_unit.wait, 24), PV_LEFT },
     { NULL }

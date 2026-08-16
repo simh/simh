@@ -15,6 +15,9 @@ and then give this command:
 
 	% cc -DECLIPSE eclipse_cpu.c nova_*.c -o eclipse
 
+For NOVA emulator you must give this command:
+        % cc -DECLIPSE eclipse_cpu.c nova_*.c scp.c sim_console.c sim_fio.c sim_tape.c sim_tmxr.c sim_sock.c sim_disk.c sim_video.c sim_ether.c sim_serial.c -o eclipse -lm
+
 2. Alternate terminal emulator
 
 The module eclipse_tt.c can be used with either an Eclipse or Nova CPU simulator
