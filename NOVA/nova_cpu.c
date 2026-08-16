@@ -232,6 +232,7 @@
 */
 
 #include "nova_defs.h"
+#include "sim_timer.c"
 
 
 #define PCQ_SIZE        64                              /* must be 2**n */
@@ -239,21 +240,21 @@
 #define PCQ_ENTRY       pcq[pcq_p = (pcq_p - 1) & PCQ_MASK] = PC
 
 
-#define INCA(x)         (((x) + 1) & AMASK)
-#define DECA(x)         (((x) - 1) & AMASK)
+#define INCA(x)         (((x) + 1) & AMASKN)
+#define DECA(x)         (((x) - 1) & AMASKN)
 #define SEXT(x)         (((x) & SIGN)? ((x) | ~DMASK): (x))
 #define STK_CHECK(x,y)  if (((x) & 0377) < (y)) \
-                            int_req = int_req | INT_STK
-#define IND_STEP(x)     M[x] & A_IND;  /* return next level indicator */ \
+                            int_reqn = int_reqn | INT_STK
+#define IND_STEP(x)     MN[x] & A_IND;  /* return next level indicator */ \
                         if ( ((x) <= AUTO_TOP) && ((x) >= AUTO_INC) ) {  \
                             if ( (x) < AUTO_DEC )                        \
-                                M[x] = (M[x] + 1) & DMASK;               \
+                                MN[x] = (MN[x] + 1) & DMASK;               \
                             else                                         \
-                                M[x] = (M[x] - 1) & DMASK;               \
+                                MN[x] = (MN[x] - 1) & DMASK;               \
                             }                                            \
-                        x = M[x] & AMASK
+                        x = MN[x] & AMASKN
 
-#define INCREMENT_PC    PC = (PC + 1) & AMASK           /* increment PC */
+#define INCREMENT_PC    PC = (PC + 1) & AMASKN           /* increment PC */
 
 #define UNIT_V_MDV      (UNIT_V_UF + 0)                 /* MDV present */
 #define UNIT_V_STK      (UNIT_V_UF + 1)                 /* stack instr */
@@ -270,9 +271,10 @@
 #define UNIT_NOVA4      (UNIT_MDV | UNIT_STK | UNIT_BYT)
 #define UNIT_KERONIX    (UNIT_MDV | UNIT_64KW)
 
-#define MODE_64K        (cpu_unit.flags & UNIT_64KW)
-#define MODE_64K_ACTIVE ((cpu_unit.flags & UNIT_64KW) && (0xFFFF == AMASK))
+#define MODE_64K        (cpu_unitn.flags & UNIT_64KW)
+#define MODE_64K_ACTIVE ((cpu_unitn.flags & UNIT_64KW) && (0xFFFF == AMASKN))
 
+#define DFTMEMSIZE      32768  
 
 typedef struct
     {
@@ -292,45 +294,45 @@ typedef struct
     }   Hist_entry ;
 
 
-uint16 M[MAXMEMSIZE] = { 0 };                           /* memory */
-int32 AC[4] = { 0 };                                    /* accumulators */
-int32 C = 0;                                            /* carry flag */
-int32 saved_PC = 0;                                     /* program counter */
+uint16 MN[MAXMEMSIZE] = { 0 };                           /* memory */
+int32 ACN[4] = { 0 };                                    /* accumulators */
+int32 CN = 0;                                            /* carry flag */
+int32 saved_PCN = 0;                                     /* program counter */
 int32 SP = 0;                                           /* stack pointer */
 int32 FP = 0;                                           /* frame pointer */
-int32 SR = 0;                                           /* switch register */
-int32 dev_done = 0;                                     /* device done flags */
-int32 dev_busy = 0;                                     /* device busy flags */
-int32 dev_disable = 0;                                  /* int disable flags */
-int32 int_req = 0;                                      /* interrupt requests */
-int32 pimask = 0;                                       /* priority int mask */
-int32 pwr_low = 0;                                      /* power fail flag */
-int32 ind_max = 65536;                                  /* iadr nest limit */
-int32 stop_dev = 0;                                     /* stop on ill dev */
+int32 SRN = 0;                                           /* switch register */
+int32 dev_donen = 0;                                     /* device done flags */
+int32 dev_busyn = 0;                                     /* device busy flags */
+int32 dev_disablen = 0;                                  /* int disable flags */
+int32 int_reqn = 0;                                      /* interrupt requests */
+int32 pimaskn = 0;                                       /* priority int mask */
+int32 pwr_lown = 0;                                      /* power fail flag */
+int32 ind_maxn = 65536;                                  /* iadr nest limit */
+int32 stop_devn = 0;                                     /* stop on ill dev */
 uint16 pcq[PCQ_SIZE] = { 0 };                           /* PC queue */
 int32 pcq_p = 0;                                        /* PC queue ptr */
 REG *pcq_r = NULL;                                      /* PC queue reg ptr */
-struct ndev dev_table[64];                              /* dispatch table */
-int32 AMASK = 077777 ;                                  /* current memory address mask  */
+struct ndev dev_tablen[64];                              /* dispatch table */
+int32 AMASKN = 077777 ;                                  /* current memory address mask  */
                                                         /* (default to 32KW)  */
 static  int32    hist_p   = 0 ;                         /* history pointer */
 static  int32    hist_cnt = 0 ;                         /* history count   */
 static  Hist_entry * hist = NULL ;                      /* instruction history */
 
 
-t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
-t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
-t_stat cpu_reset (DEVICE *dptr);
-t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
-t_stat cpu_boot (int32 unitno, DEVICE *dptr);
-t_stat build_devtab (void);
+t_stat cpu_exn (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
+t_stat cpu_depn (t_value val, t_addr addr, UNIT *uptr, int32 sw);
+t_stat cpu_resetn (DEVICE *dptr);
+t_stat cpu_set_sizen (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_bootn (int32 unitno, DEVICE *dptr);
+t_stat build_devtabn (void);
 
 t_stat hist_set( UNIT * uptr, int32 val, CONST char * cptr, void * desc ) ;
 t_stat hist_show( FILE * st, UNIT * uptr, int32 val, CONST void * desc ) ;
 static int hist_save( int32 pc, int32 our_ir ) ;
 char * devBitNames( int32 flags, char * ptr, char * sepStr ) ;
 
-void mask_out (int32 mask);
+void mask_outn (int32 mask);
 
 
 /* CPU data structures
@@ -341,87 +343,87 @@ void mask_out (int32 mask);
    cpu_mod      CPU modifiers list
 */
 
-UNIT cpu_unit = {
+UNIT cpu_unitn = {
     UDATA (NULL, UNIT_FIX+UNIT_BINK+UNIT_MDV,  DFTMEMSIZE /* MAXMEMSIZE */ )
     };
 
-REG cpu_reg[] = {
-    { ORDATA (PC, saved_PC, 15) },
-    { ORDATA (AC0, AC[0], 16) },
-    { ORDATA (AC1, AC[1], 16) },
-    { ORDATA (AC2, AC[2], 16) },
-    { ORDATA (AC3, AC[3], 16) },
-    { FLDATA (C, C, 16) },
+REG cpu_regn[] = {
+    { ORDATA (PC, saved_PCN, 15) },
+    { ORDATA (AC0, ACN[0], 16) },
+    { ORDATA (AC1, ACN[1], 16) },
+    { ORDATA (AC2, ACN[2], 16) },
+    { ORDATA (AC3, ACN[3], 16) },
+    { FLDATA (CN, CN, 16) },
     { ORDATA (SP, SP, 16) },
     { ORDATA (FP, FP, 16) },
-    { ORDATA (SR, SR, 16) },
-    { ORDATA (PI, pimask, 16) },
-    { FLDATA (ION, int_req, INT_V_ION) },
-    { FLDATA (ION_DELAY, int_req, INT_V_NO_ION_PENDING) },
-    { FLDATA (STKOVF, int_req, INT_V_STK) },
-    { FLDATA (PWR, pwr_low, 0) },
-    { ORDATA (INT, int_req, INT_V_ION+1), REG_RO },
-    { ORDATA (BUSY, dev_busy, INT_V_ION+1), REG_RO },
-    { ORDATA (DONE, dev_done, INT_V_ION+1), REG_RO },
-    { ORDATA (DISABLE, dev_disable, INT_V_ION+1), REG_RO },
-    { FLDATA (STOP_DEV, stop_dev, 0) },
-    { DRDATA (INDMAX, ind_max, 32), REG_NZ + PV_LEFT },
-    { ORDATA (AMASK, AMASK, 16) },
-    { DRDATA (MEMSIZE, cpu_unit.capac, 32), REG_NZ + PV_LEFT },
+    { ORDATA (SRN, SRN, 16) },
+    { ORDATA (PI, pimaskn, 16) },
+    { FLDATA (ION, int_reqn, INT_V_ION) },
+    { FLDATA (ION_DELAY, int_reqn, INT_V_NO_ION_PENDING) },
+    { FLDATA (STKOVF, int_reqn, INT_V_STK) },
+    { FLDATA (PWR, pwr_lown, 0) },
+    { ORDATA (INT, int_reqn, INT_V_ION+1), REG_RO },
+    { ORDATA (BUSY, dev_busyn, INT_V_ION+1), REG_RO },
+    { ORDATA (DONE, dev_donen, INT_V_ION+1), REG_RO },
+    { ORDATA (DISABLE, dev_disablen, INT_V_ION+1), REG_RO },
+    { FLDATA (STOP_DEV, stop_devn, 0) },
+    { DRDATA (INDMAX, ind_maxn, 32), REG_NZ + PV_LEFT },
+    { ORDATA (AMASKN, AMASKN, 16) },
+    { DRDATA (MEMSIZE, cpu_unitn.capac, 32), REG_NZ + PV_LEFT },
     { BRDATA (PCQ, pcq, 8, 16, PCQ_SIZE), REG_RO+REG_CIRC },
     { ORDATA (PCQP, pcq_p, 6), REG_HRO },
     { ORDATA (WRU, sim_int_char, 8) },
     { NULL }
     };
 
-MTAB cpu_mod[] = {
+MTAB cpu_modn[] = {
     { UNIT_IOPT, UNIT_NOVA3, "NOVA3", "NOVA3", NULL },
     { UNIT_IOPT, UNIT_NOVA4, "NOVA4", "NOVA4", NULL },
     { UNIT_IOPT, UNIT_KERONIX, "KERONIX", "KERONIX", NULL },
     { UNIT_IOPT, UNIT_MDV,   "MDV",   "MDV",   NULL },
     { UNIT_IOPT, UNIT_64KW,  "EXT64KW", "EXT64KW",  NULL },
     { UNIT_IOPT,        0,   "none",  "NONE",  NULL },
-    { UNIT_MSIZE, ( 4 * 1024), NULL,  "4K", &cpu_set_size },
-    { UNIT_MSIZE, ( 8 * 1024), NULL,  "8K", &cpu_set_size },
-    { UNIT_MSIZE, (12 * 1024), NULL, "12K", &cpu_set_size },
-    { UNIT_MSIZE, (16 * 1024), NULL, "16K", &cpu_set_size },
-    { UNIT_MSIZE, (20 * 1024), NULL, "20K", &cpu_set_size },
-    { UNIT_MSIZE, (24 * 1024), NULL, "24K", &cpu_set_size },
-    { UNIT_MSIZE, (28 * 1024), NULL, "28K", &cpu_set_size },
-    { UNIT_MSIZE, (32 * 1024), NULL, "32K", &cpu_set_size },
-    { UNIT_MSIZE, (36 * 1024), NULL, "36K", &cpu_set_size },
-    { UNIT_MSIZE, (40 * 1024), NULL, "40K", &cpu_set_size },
-    { UNIT_MSIZE, (44 * 1024), NULL, "44K", &cpu_set_size },
-    { UNIT_MSIZE, (48 * 1024), NULL, "48K", &cpu_set_size },
-    { UNIT_MSIZE, (52 * 1024), NULL, "52K", &cpu_set_size },
-    { UNIT_MSIZE, (56 * 1024), NULL, "56K", &cpu_set_size },
-    { UNIT_MSIZE, (60 * 1024), NULL, "60K", &cpu_set_size },
-    { UNIT_MSIZE, (64 * 1024), NULL, "64K", &cpu_set_size },
+    { UNIT_MSIZE, ( 4 * 1024), NULL,  "4K", &cpu_set_sizen },
+    { UNIT_MSIZE, ( 8 * 1024), NULL,  "8K", &cpu_set_sizen },
+    { UNIT_MSIZE, (12 * 1024), NULL, "12K", &cpu_set_sizen },
+    { UNIT_MSIZE, (16 * 1024), NULL, "16K", &cpu_set_sizen },
+    { UNIT_MSIZE, (20 * 1024), NULL, "20K", &cpu_set_sizen },
+    { UNIT_MSIZE, (24 * 1024), NULL, "24K", &cpu_set_sizen },
+    { UNIT_MSIZE, (28 * 1024), NULL, "28K", &cpu_set_sizen },
+    { UNIT_MSIZE, (32 * 1024), NULL, "32K", &cpu_set_sizen },
+    { UNIT_MSIZE, (36 * 1024), NULL, "36K", &cpu_set_sizen },
+    { UNIT_MSIZE, (40 * 1024), NULL, "40K", &cpu_set_sizen },
+    { UNIT_MSIZE, (44 * 1024), NULL, "44K", &cpu_set_sizen },
+    { UNIT_MSIZE, (48 * 1024), NULL, "48K", &cpu_set_sizen },
+    { UNIT_MSIZE, (52 * 1024), NULL, "52K", &cpu_set_sizen },
+    { UNIT_MSIZE, (56 * 1024), NULL, "56K", &cpu_set_sizen },
+    { UNIT_MSIZE, (60 * 1024), NULL, "60K", &cpu_set_sizen },
+    { UNIT_MSIZE, (64 * 1024), NULL, "64K", &cpu_set_sizen },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "HISTORY", "HISTORY",
       &hist_set, &hist_show },
 
     { 0 }
     };
 
-DEVICE cpu_dev = {
-    "CPU", &cpu_unit, cpu_reg, cpu_mod,
+DEVICE cpu_devn = {
+    "CPU", &cpu_unitn, cpu_regn, cpu_modn,
     1, 8, 16 /* = 64 KW, 15 = 32KW */, 1, 8, 16,
-    &cpu_ex, &cpu_dep, &cpu_reset,
+    &cpu_exn, &cpu_depn, &cpu_resetn,
     NULL, NULL, NULL
     };
 
-t_stat sim_instr (void)
+t_stat sim_instrn (void)
 {
 int32 PC, IR, i;
 t_stat reason;
 
 /* Restore register state */
 
-if (build_devtab () != SCPE_OK)                         /* build dispatch */
+if (build_devtabn () != SCPE_OK)                         /* build dispatch */
     return SCPE_IERR;
-PC = saved_PC & AMASK;                                  /* load local PC */
-C = C & CBIT;
-mask_out (pimask);                                      /* reset int system */
+PC = saved_PCN & AMASKN;                                  /* load local PC */
+CN = CN & CBIT;
+mask_outn (pimaskn);                                      /* reset int system */
 reason = 0;
 
 /* Main instruction fetch/decode loop */
@@ -433,21 +435,21 @@ while (reason == 0) {                                   /* loop until halted */
             break;
         }
 
-    if (int_req > INT_PENDING) {                        /* interrupt or exception? */
+    if (int_reqn > INT_PENDING) {                        /* interrupt or exception? */
         int32 MA, indf;
 
-        if (int_req & INT_TRAP) {                       /* trap instruction? */
-            int_req = int_req & ~INT_TRAP ;             /* clear */
+        if (int_reqn & INT_TRAP) {                       /* trap instruction? */
+            int_reqn = int_reqn & ~INT_TRAP ;             /* clear */
             PCQ_ENTRY;                                  /* save old PC */
-            M[TRP_SAV] = (PC - 1) & AMASK;
+            MN[TRP_SAV] = (PC - 1) & AMASKN;
             MA = TRP_JMP;                               /* jmp @47 */
             }
         else {
-            int_req = int_req & ~INT_ION;               /* intr off */
+            int_reqn = int_reqn & ~INT_ION;               /* intr off */
             PCQ_ENTRY;                                  /* save old PC */
-            M[INT_SAV] = PC;
-            if (int_req & INT_STK) {                    /* stack overflow? */
-                int_req = int_req & ~INT_STK;           /* clear */
+            MN[INT_SAV] = PC;
+            if (int_reqn & INT_STK) {                    /* stack overflow? */
+                int_reqn = int_reqn & ~INT_STK;           /* clear */
                 MA = STK_JMP;                           /* jmp @3 */
         }
         else
@@ -458,10 +460,10 @@ while (reason == 0) {                                   /* loop until halted */
         }
     else
         {
-        for (i = 0, indf = 1; indf && (i < ind_max); i++) {
+        for (i = 0, indf = 1; indf && (i < ind_maxn); i++) {
             indf = IND_STEP (MA);                       /* indirect loop */
             }
-        if (i >= ind_max) {
+        if (i >= ind_maxn) {
             reason = STOP_IND_INT;
             break;
             }
@@ -474,14 +476,14 @@ while (reason == 0) {                                   /* loop until halted */
         break;
         }
 
-    IR = M[PC];                                         /* fetch instr */
+    IR = MN[PC];                                         /* fetch instr */
     if ( hist_cnt )
         {
         hist_save( PC, IR ) ;                           /*  PC, int_req unchanged */
         }
 
     INCREMENT_PC ;
-    int_req = int_req | INT_NO_ION_PENDING;             /* clear ION delay */
+    int_reqn = int_reqn | INT_NO_ION_PENDING;             /* clear ION delay */
     sim_interval = sim_interval - 1;
 
 /* Operate instruction */
@@ -493,16 +495,16 @@ while (reason == 0) {                                   /* loop until halted */
         dstAC = I_GETDST (IR);
         switch (I_GETCRY (IR)) {                        /* decode carry */
         case 0:                                         /* load */
-            src = AC[srcAC] | C;
+            src = ACN[srcAC] | CN;
             break;
         case 1:                                         /* clear */
-            src = AC[srcAC];
+            src = ACN[srcAC];
             break;
         case 2:                                         /* set */
-            src = AC[srcAC] | CBIT;
+            src = ACN[srcAC] | CBIT;
             break;
         case 3:                                         /* complement */
-            src = AC[srcAC] | (C ^ CBIT);
+            src = ACN[srcAC] | (CN ^ CBIT);
             break;
             }                                           /* end switch carry */
 
@@ -519,16 +521,16 @@ while (reason == 0) {                                   /* loop until halted */
             src = (src + 1) & CDMASK;
             break;
         case 4:                                         /* ADC */
-            src = ((src ^ DMASK) + AC[dstAC]) & CDMASK;
+            src = ((src ^ DMASK) + ACN[dstAC]) & CDMASK;
             break;
         case 5:                                         /* SUB */
-            src = ((src ^ DMASK) + AC[dstAC] + 1) & CDMASK;
+            src = ((src ^ DMASK) + ACN[dstAC] + 1) & CDMASK;
             break;
         case 6:                                         /* ADD */
-            src = (src + AC[dstAC]) & CDMASK;
+            src = (src + ACN[dstAC]) & CDMASK;
             break;
         case 7:                                         /* AND */
-            src = src & (AC[dstAC] | CBIT);
+            src = src & (ACN[dstAC] | CBIT);
             break;
             }                                           /* end switch oper */
 
@@ -549,8 +551,8 @@ while (reason == 0) {                                   /* loop until halted */
 
         switch (I_GETSKP (IR)) {                        /* decode skip */
         case 0:                                         /* nop */
-            if ((IR & I_NLD) && (cpu_unit.flags & UNIT_STK)) {
-                int_req = int_req | INT_TRAP ;           /* Nova 3 or 4 trap */
+            if ((IR & I_NLD) && (cpu_unitn.flags & UNIT_STK)) {
+                int_reqn = int_reqn | INT_TRAP ;           /* Nova 3 or 4 trap */
                 continue ;
                 }
             break;
@@ -583,8 +585,8 @@ while (reason == 0) {                                   /* loop until halted */
             break;
             }                                           /* end switch skip */
         if ((IR & I_NLD) == 0) {                        /* load? */
-            AC[dstAC] = src & DMASK;
-            C = src & CBIT;
+            ACN[dstAC] = src & DMASK;
+            CN = src & CBIT;
             }                                           /* end if load */
         }                                               /* end if operate */
 
@@ -600,17 +602,17 @@ while (reason == 0) {                                   /* loop until halted */
         case 1:                                         /* PC relative */
             if (MA & DISPSIGN)
                 MA = 0177400 | MA;
-            MA = (MA + PC - 1) & AMASK;
+            MA = (MA + PC - 1) & AMASKN;
             break;
         case 2:                                         /* AC2 relative */
             if (MA & DISPSIGN)
                 MA = 0177400 | MA;
-            MA = (MA + AC[2]) & AMASK;
+            MA = (MA + ACN[2]) & AMASKN;
             break;
         case 3:                                         /* AC3 relative */
             if (MA & DISPSIGN)
                 MA = 0177400 | MA;
-            MA = (MA + AC[3]) & AMASK;
+            MA = (MA + ACN[3]) & AMASKN;
             break;
             }                                           /* end switch mode */
 
@@ -620,10 +622,10 @@ while (reason == 0) {                                   /* loop until halted */
                 }
             else                                        /* compat mode */
                 {
-                 for (i = 0; indf && (i < ind_max); i++) {   /* count */
+                 for (i = 0; indf && (i < ind_maxn); i++) {   /* count */
                     indf = IND_STEP (MA);               /* resolve indirect */
                 }
-                if (i >= ind_max) {                     /* too many? */
+                if (i >= ind_maxn) {                     /* too many? */
                     reason = STOP_IND;
                     break;
                 }
@@ -632,52 +634,52 @@ while (reason == 0) {                                   /* loop until halted */
 
         switch (I_GETOPAC (IR)) {                       /* decode op + AC */
         case 001:                                       /* JSR */
-            AC[3] = PC;
+            ACN[3] = PC;
         case 000:                                       /* JMP */
             PCQ_ENTRY;
             PC = MA;
             break;
         case 002:                                       /* ISZ */
-            src = (M[MA] + 1) & DMASK;
+            src = (MN[MA] + 1) & DMASK;
             if (MEM_ADDR_OK(MA))
-                M[MA] = src;
+                MN[MA] = src;
             if (src == 0)
                 INCREMENT_PC ;
             break;
         case 003:                                       /* DSZ */
-            src = (M[MA] - 1) & DMASK;
+            src = (MN[MA] - 1) & DMASK;
             if (MEM_ADDR_OK(MA))
-                M[MA] = src;
+                MN[MA] = src;
             if (src == 0)
                 INCREMENT_PC ;
             break;
         case 004:                                       /* LDA 0 */
-            AC[0] = M[MA];
+            ACN[0] = MN[MA];
             break;
         case 005:                                       /* LDA 1 */
-            AC[1] = M[MA];
+            ACN[1] = MN[MA];
             break;
         case 006:                                       /* LDA 2 */
-            AC[2] = M[MA];
+            ACN[2] = MN[MA];
             break;
         case 007:                                       /* LDA 3 */
-            AC[3] = M[MA];
+            ACN[3] = MN[MA];
             break;
         case 010:                                       /* STA 0 */
             if (MEM_ADDR_OK(MA))
-                M[MA] = AC[0];
+                MN[MA] = ACN[0];
             break;
         case 011:                                       /* STA 1 */
             if (MEM_ADDR_OK(MA))
-                M[MA] = AC[1];
+                MN[MA] = ACN[1];
             break;
         case 012:                                       /* STA 2 */
             if (MEM_ADDR_OK(MA))
-                M[MA] = AC[2];
+                MN[MA] = ACN[2];
             break;
         case 013:                                       /* STA 3 */
             if (MEM_ADDR_OK(MA))
-                M[MA] = AC[3];
+                MN[MA] = ACN[3];
             break;
             }                                           /* end switch */
         }                                               /* end mem ref */
@@ -695,26 +697,26 @@ while (reason == 0) {                                   /* loop until halted */
             switch (pulse) {                            /* decode IR<8:9> */
 
             case 0:                                     /* skip if busy */
-                if ((device == DEV_CPU)? (int_req & INT_ION) != 0:
-                    (dev_busy & dev_table[device].mask) != 0)
+                if ((device == DEV_CPU)? (int_reqn & INT_ION) != 0:
+                    (dev_busyn & dev_tablen[device].mask) != 0)
                     INCREMENT_PC ;
                 break;
 
             case 1:                                     /* skip if not busy */
-                if ((device == DEV_CPU)? (int_req & INT_ION) == 0:
-                    (dev_busy & dev_table[device].mask) == 0)
+                if ((device == DEV_CPU)? (int_reqn & INT_ION) == 0:
+                    (dev_busyn & dev_tablen[device].mask) == 0)
                     INCREMENT_PC ;
                 break;
 
             case 2:                                     /* skip if done */
-                if ((device == DEV_CPU)? pwr_low != 0:
-                    (dev_done & dev_table[device].mask) != 0)
+                if ((device == DEV_CPU)? pwr_lown != 0:
+                    (dev_donen & dev_tablen[device].mask) != 0)
                     INCREMENT_PC ;
                 break;
 
             case 3:                                     /* skip if not done */
-                if ((device == DEV_CPU)? pwr_low == 0:
-                    (dev_done & dev_table[device].mask) == 0)
+                if ((device == DEV_CPU)? pwr_lown == 0:
+                    (dev_donen & dev_tablen[device].mask) == 0)
                     INCREMENT_PC ;
                 break;
                 }                                       /* end switch */
@@ -726,244 +728,244 @@ while (reason == 0) {                                   /* loop until halted */
             switch (code) {                             /* case on opcode */
 
             case ioNIO:                                 /* frame ptr */
-                if (cpu_unit.flags & UNIT_STK) {
+                if (cpu_unitn.flags & UNIT_STK) {
                     if (pulse == iopN)
-                        FP = AC[dstAC] & AMASK ;
+                        FP = ACN[dstAC] & AMASKN ;
                     if (pulse == iopC)
-                        AC[dstAC] = FP & AMASK ;
+                        ACN[dstAC] = FP & AMASKN ;
                     }
                 break;
 
             case ioDIA:                                 /* load byte */
-                if (cpu_unit.flags & UNIT_BYT)
+                if (cpu_unitn.flags & UNIT_BYT)
                     {
-                    AC[dstAC] = (M[AC[pulse] >> 1] >> ((AC[pulse] & 1)? 0: 8)) & 0377 ;
+                    ACN[dstAC] = (MN[ACN[pulse] >> 1] >> ((ACN[pulse] & 1)? 0: 8)) & 0377 ;
                     }
-                else if (cpu_unit.flags & UNIT_STK)  /*  if Nova 3 this is really a SAV... 2007-Jun-01, BKR  */
+                else if (cpu_unitn.flags & UNIT_STK)  /*  if Nova 3 this is really a SAV... 2007-Jun-01, BKR  */
                     {
                     SP = INCA (SP);
                     if (MEM_ADDR_OK (SP))
-                        M[SP] = AC[0];
+                        MN[SP] = ACN[0];
                     SP = INCA (SP);
                     if (MEM_ADDR_OK (SP))
-                        M[SP] = AC[1];
+                        MN[SP] = ACN[1];
                     SP = INCA (SP);
                     if (MEM_ADDR_OK (SP))
-                        M[SP] = AC[2];
+                        MN[SP] = ACN[2];
                     SP = INCA (SP);
                     if (MEM_ADDR_OK (SP))
-                        M[SP] = FP;
+                        MN[SP] = FP;
                     SP = INCA (SP);
                     if (MEM_ADDR_OK (SP))
-                        M[SP] = (C >> 1) | (AC[3] & AMASK);
-                    AC[3] = FP = SP & AMASK;  
+                        MN[SP] = (CN >> 1) | (ACN[3] & AMASKN);
+                    ACN[3] = FP = SP & AMASKN;  
                     STK_CHECK (SP, 5);
                     }
                 else
                     {
-                    AC[dstAC] = 0;
+                    ACN[dstAC] = 0;
                     }
                 break;
 
             case ioDOA:                                 /* stack ptr */
-                if (cpu_unit.flags & UNIT_STK) {
+                if (cpu_unitn.flags & UNIT_STK) {
                     if (pulse == iopN)
-                        SP = AC[dstAC] & AMASK;
+                        SP = ACN[dstAC] & AMASKN;
                     if (pulse == iopC)
-                        AC[dstAC] = SP & AMASK;
+                        ACN[dstAC] = SP & AMASKN;
                     }
                 break;
 
             case ioDIB:                                 /* push, pop */
-                if (cpu_unit.flags & UNIT_STK) {
+                if (cpu_unitn.flags & UNIT_STK) {
                     if (pulse == iopN) {                /* push (PSHA) */
                         SP = INCA (SP);
                         if (MEM_ADDR_OK (SP))
-                            M[SP] = AC[dstAC];
+                            MN[SP] = ACN[dstAC];
                         STK_CHECK (SP, 1);
                         }
                     if ((pulse == iopS) &&              /* Nova 4 pshn (PSHN) */
-                        (cpu_unit.flags & UNIT_BYT)) {
+                        (cpu_unitn.flags & UNIT_BYT)) {
                         SP = INCA (SP);
                         if (MEM_ADDR_OK (SP))
-                            M[SP] = AC[dstAC];
-                        if ( (SP & 0xFFFF) > (M[042] & 0xFFFF) )
+                            MN[SP] = ACN[dstAC];
+                        if ( (SP & 0xFFFF) > (MN[042] & 0xFFFF) )
                             {
-                            int_req = int_req | INT_STK ;
+                            int_reqn = int_reqn | INT_STK ;
                             }
                         }
                     if (pulse == iopC) {                /* pop (POPA) */
-                        AC[dstAC] = M[SP];
+                        ACN[dstAC] = MN[SP];
                         SP = DECA (SP);
                         }
                     }
                 break;
 
             case ioDOB:                                 /* store byte */
-                if (cpu_unit.flags & UNIT_BYT)
+                if (cpu_unitn.flags & UNIT_BYT)
                   {
                     int32 MA, val;
-                   MA = AC[pulse] >> 1;
-                    val = AC[dstAC] & 0377;
-                    if (MEM_ADDR_OK (MA)) M[MA] = (AC[pulse] & 1)?
-                      ((M[MA] & ~0377) | val)
-                    : ((M[MA] & 0377) | (val << 8));
+                   MA = ACN[pulse] >> 1;
+                    val = ACN[dstAC] & 0377;
+                    if (MEM_ADDR_OK (MA)) MN[MA] = (ACN[pulse] & 1)?
+                      ((MN[MA] & ~0377) | val)
+                    : ((MN[MA] & 0377) | (val << 8));
                     }
-                else if (cpu_unit.flags & UNIT_STK)  /*  if Nova 3 this is really a SAV... 2007-Jun-01, BKR  */
+                else if (cpu_unitn.flags & UNIT_STK)  /*  if Nova 3 this is really a SAV... 2007-Jun-01, BKR  */
                     {
                     SP = INCA (SP);
                     if (MEM_ADDR_OK (SP))
-                        M[SP] = AC[0];
+                        MN[SP] = ACN[0];
                     SP = INCA (SP);
                     if (MEM_ADDR_OK (SP))
-                        M[SP] = AC[1];
+                        MN[SP] = ACN[1];
                     SP = INCA (SP);
                     if (MEM_ADDR_OK (SP))
-                        M[SP] = AC[2];
+                        MN[SP] = ACN[2];
                     SP = INCA (SP);
                     if (MEM_ADDR_OK (SP))
-                        M[SP] = FP;
+                        MN[SP] = FP;
                     SP = INCA (SP);
                     if (MEM_ADDR_OK (SP))
-                        M[SP] = (C >> 1) | (AC[3] & AMASK);
-                    AC[3] = FP = SP & AMASK;  
+                        MN[SP] = (CN >> 1) | (ACN[3] & AMASKN);
+                    ACN[3] = FP = SP & AMASKN;  
                     STK_CHECK (SP, 5);
                     }
                 break;
 
             case ioDIC:                                 /* save, return */
-                if (cpu_unit.flags & UNIT_STK) {
+                if (cpu_unitn.flags & UNIT_STK) {
                     if (pulse == iopN) {                /* save */
                         SP = INCA (SP);
                         if (MEM_ADDR_OK (SP))
-                            M[SP] = AC[0];
+                            MN[SP] = ACN[0];
                         SP = INCA (SP);
                         if (MEM_ADDR_OK (SP))
-                            M[SP] = AC[1];
+                            MN[SP] = ACN[1];
                         SP = INCA (SP);
                         if (MEM_ADDR_OK (SP))
-                            M[SP] = AC[2];
+                            MN[SP] = ACN[2];
                         SP = INCA (SP);
                         if (MEM_ADDR_OK (SP))
-                            M[SP] = FP;
+                            MN[SP] = FP;
                         SP = INCA (SP);
                         if (MEM_ADDR_OK (SP))
-                            M[SP] = (C >> 1) | (AC[3] & AMASK);
-                        AC[3] = FP = SP & AMASK;  
+                            MN[SP] = (CN >> 1) | (ACN[3] & AMASKN);
+                        ACN[3] = FP = SP & AMASKN;  
                         STK_CHECK (SP, 5);
                         }
                     else if (pulse == iopC) {                /* retn */
                         PCQ_ENTRY;
-                        SP = FP & AMASK;
-                        C = (M[SP] << 1) & CBIT;
-                        PC = M[SP] & AMASK;
+                        SP = FP & AMASKN;
+                        CN = (MN[SP] << 1) & CBIT;
+                        PC = MN[SP] & AMASKN;
                         SP = DECA (SP);
-                        AC[3] = M[SP];
+                        ACN[3] = MN[SP];
                         SP = DECA (SP);
-                        AC[2] = M[SP];
+                        ACN[2] = MN[SP];
                         SP = DECA (SP);
-                        AC[1] = M[SP];
+                        ACN[1] = MN[SP];
                         SP = DECA (SP);
-                        AC[0] = M[SP];
+                        ACN[0] = MN[SP];
                         SP = DECA (SP);
-                        FP = AC[3] & AMASK;
+                        FP = ACN[3] & AMASKN;
                         }
                     else if ((pulse == iopS) &&              /* Nova 4 SAVN */
-                        (cpu_unit.flags & UNIT_BYT)) {
-                        int32 frameSz = M[PC] ;
+                        (cpu_unitn.flags & UNIT_BYT)) {
+                        int32 frameSz = MN[PC] ;
                         PC = INCA (PC) ;
                         SP = INCA (SP);
                         if (MEM_ADDR_OK (SP))
-                            M[SP] = AC[0];
+                            MN[SP] = ACN[0];
                         SP = INCA (SP);
                         if (MEM_ADDR_OK (SP))
-                            M[SP] = AC[1];
+                            MN[SP] = ACN[1];
                         SP = INCA (SP);
                         if (MEM_ADDR_OK (SP))
-                            M[SP] = AC[2];
+                            MN[SP] = ACN[2];
                         SP = INCA (SP);
                         if (MEM_ADDR_OK (SP))
-                            M[SP] = FP;
+                            MN[SP] = FP;
                         SP = INCA (SP);
                         if (MEM_ADDR_OK (SP))
-                            M[SP] = (C >> 1) | (AC[3] & AMASK);
-                        AC[3] = FP = SP & AMASK ;
-                        SP = (SP + frameSz) & AMASK ;
-                        if (SP > M[042])
+                            MN[SP] = (CN >> 1) | (ACN[3] & AMASKN);
+                        ACN[3] = FP = SP & AMASKN ;
+                        SP = (SP + frameSz) & AMASKN ;
+                        if (SP > MN[042])
                             {
-                            int_req = int_req | INT_STK;
+                            int_reqn = int_reqn | INT_STK;
                             }
                         }
                     }
                 break;
 
             case ioDOC:
-                if ((dstAC == 2) && (cpu_unit.flags & UNIT_MDV))
+                if ((dstAC == 2) && (cpu_unitn.flags & UNIT_MDV))
                     {  /*  Nova, Nova3 or Nova 4  */
                     uint32 mddata, uAC0, uAC1, uAC2;
 
-                    uAC0 = (uint32) AC[0];
-                    uAC1 = (uint32) AC[1];
-                    uAC2 = (uint32) AC[2];
+                    uAC0 = (uint32) ACN[0];
+                    uAC1 = (uint32) ACN[1];
+                    uAC2 = (uint32) ACN[2];
                     if (pulse == iopP)
                         {                /* mul */
                         mddata = (uAC1 * uAC2) + uAC0;
-                        AC[0]  = (mddata >> 16) & DMASK;
-                        AC[1]  = mddata & DMASK;
+                        ACN[0]  = (mddata >> 16) & DMASK;
+                        ACN[1]  = mddata & DMASK;
                         }
                     if (pulse == iopS)
                         {                /* div */
                         if ((uAC0 >= uAC2) || (uAC2 == 0))
                             {
-                            C = CBIT;
+                            CN = CBIT;
                             }
                         else
                             {
-                            C = 0;
+                            CN = 0;
                             mddata = (uAC0 << 16) | uAC1;
-                            AC[1]  = mddata / uAC2;
-                            AC[0]  = mddata % uAC2;
+                            ACN[1]  = mddata / uAC2;
+                            ACN[0]  = mddata % uAC2;
                             }
                         }
                     }
-                else if ((dstAC == 3) && (cpu_unit.flags & UNIT_BYT) /* assuming UNIT_BYT = Nova 4 */)
+                else if ((dstAC == 3) && (cpu_unitn.flags & UNIT_BYT) /* assuming UNIT_BYT = Nova 4 */)
                     {
                     int32 mddata;
                     if (pulse == iopC)
                         {                /* muls */
-                        mddata = (SEXT (AC[1]) * SEXT (AC[2])) + SEXT (AC[0]);
-                        AC[0]  = (mddata >> 16) & DMASK;
-                        AC[1]  = mddata & DMASK;
+                        mddata = (SEXT (ACN[1]) * SEXT (ACN[2])) + SEXT (ACN[0]);
+                        ACN[0]  = (mddata >> 16) & DMASK;
+                        ACN[1]  = mddata & DMASK;
                         }
                     else if (pulse == iopN)
                         {                /* divs */
-                        if ((AC[2] == 0) ||             /* overflow? */
-                            ((AC[0] == 0100000) && (AC[1] == 0) && (AC[2] == 0177777)))
+                        if ((ACN[2] == 0) ||             /* overflow? */
+                            ((ACN[0] == 0100000) && (ACN[1] == 0) && (ACN[2] == 0177777)))
                             {
-                            C = CBIT;
+                            CN = CBIT;
                             }
                         else
                             {
-                            mddata = (SEXT (AC[0]) << 16) | AC[1];
-                            AC[1]  = mddata / SEXT (AC[2]);
-                            AC[0]  = mddata % SEXT (AC[2]);
-                            if ((AC[1] > 077777) || (AC[1] < -0100000))
+                            mddata = (SEXT (ACN[0]) << 16) | ACN[1];
+                            ACN[1]  = mddata / SEXT (ACN[2]);
+                            ACN[0]  = mddata % SEXT (ACN[2]);
+                            if ((ACN[1] > 077777) || (ACN[1] < -0100000))
                                 {
-                                C = CBIT;
+                                CN = CBIT;
                                 }
                             else
                                 {
-                                C = 0;
+                                CN = 0;
                                 }
-                            AC[0] = AC[0] & DMASK;
+                            ACN[0] = ACN[0] & DMASK;
                             }
                         }
                     }
-                else if ((dstAC == 3) && (cpu_unit.flags & UNIT_STK))  /*  if Nova 3 this is really a PSHA... 2007-Jun-01, BKR  */
+                else if ((dstAC == 3) && (cpu_unitn.flags & UNIT_STK))  /*  if Nova 3 this is really a PSHA... 2007-Jun-01, BKR  */
                     {
                     SP = INCA (SP);
                     if (MEM_ADDR_OK (SP))
-                        M[SP] = AC[dstAC];
+                        MN[SP] = ACN[dstAC];
                     STK_CHECK (SP, 1);
                     }
                 break;
@@ -981,34 +983,34 @@ while (reason == 0) {                                   /* loop until halted */
                     /*  64 KW memory extension:                    */
                     /*  NIOP - set memory mode (32/64 KW) per AC:  */
                     /*  B15: 0 = 32 KW, 1 = 64 KW mode             */
-                    AMASK = (AC[dstAC] & 0x0001) ? 0177777 : 077777 ;
+                    AMASKN = (ACN[dstAC] & 0x0001) ? 0177777 : 077777 ;
                     }
                 break ;
 
             case ioDIA:                                 /* read switches */
-                AC[dstAC] = SR;
+                ACN[dstAC] = SRN;
                 break;
 
             case ioDIB:                                 /* int ack */
-                AC[dstAC] = 0;
+                ACN[dstAC] = 0;
                 DEV_UPDATE_INTR ;
-                iodata = int_req & (-int_req);
+                iodata = int_reqn & (-int_reqn);
                 for (i = DEV_LOW; i <= DEV_HIGH; i++)  {
-                    if (iodata & dev_table[i].mask) {
-                        AC[dstAC] = i;
+                    if (iodata & dev_tablen[i].mask) {
+                        ACN[dstAC] = i;
                         break;
                         }
                     }
                 break;
 
             case ioDOB:                                 /* mask out */
-                mask_out (pimask = AC[dstAC]);
+                mask_outn (pimaskn = ACN[dstAC]);
                 break;
 
             case ioDIC:                                 /* io reset */
                 reset_all (0);                          /* reset devices */
-                mask_out( 0 ) ;                         /* clear all device masks  */
-                AMASK = 077777 ;                        /* reset memory mode */
+                mask_outn( 0 ) ;                         /* clear all device masks  */
+                AMASKN= 077777 ;                        /* reset memory mode */
                 break;
 
             case ioDOC:                                 /* halt */
@@ -1019,20 +1021,20 @@ while (reason == 0) {                                   /* loop until halted */
             switch (pulse) {                            /* decode IR<8:9> */
 
             case iopS:                                  /* ion */
-                int_req = (int_req | INT_ION) & ~INT_NO_ION_PENDING;
+                int_reqn = (int_reqn | INT_ION) & ~INT_NO_ION_PENDING;
                 break;
 
             case iopC:                                  /* iof */
-                int_req = int_req & ~INT_ION;
+                int_reqn = int_reqn & ~INT_ION;
                 break;
                 }                                       /* end switch pulse */
             }                                           /* end CPU control */
 
-        else if (dev_table[device].routine) {           /* normal device */
-            iodata = dev_table[device].routine (pulse, code, AC[dstAC]);
+        else if (dev_tablen[device].routine) {           /* normal device */
+            iodata = dev_tablen[device].routine (pulse, code, ACN[dstAC]);
             reason = iodata >> IOT_V_REASON;
             if (code & 1)
-                AC[dstAC] = iodata & 0177777;
+                ACN[dstAC] = iodata & 0177777;
             }
 
 /* bkr, 2007-May-30
@@ -1043,14 +1045,14 @@ while (reason == 0) {                                   /* loop until halted */
  *    Perform these non-supported device functions only if 'stop_dev'
  *    is zero (i.e. I/O access trap is not in effect).
  */
-    else if ( stop_dev == 0 )
+    else if ( stop_devn == 0 )
         {
         switch (code)                                   /* decode IR<5:7> */
             {
         case ioDIA:
         case ioDIB:
         case ioDIC:
-            AC[dstAC] = 0 ;  /*  idle I/O bus data  */
+            ACN[dstAC] = 0 ;  /*  idle I/O bus data  */
             break;
 
         case ioSKP:
@@ -1061,27 +1063,27 @@ while (reason == 0) {                                   /* loop until halted */
                 }
             }    /*  end of 'switch'  */
         }    /*  end of handling non-existant device  */
-      else reason = stop_dev;
+      else reason = stop_devn;
       }                                                 /* end if IOT */
     }                                                   /* end while */
 
 /* Simulation halted */
 
-saved_PC = PC;
+saved_PCN = PC;
 pcq_r->qptr = pcq_p;                                    /* update pc q ptr */
 return ( reason ) ;
 }
 
 /* New priority mask out */
 
-void mask_out (int32 newmask)
+void mask_outn (int32 newmask)
 {
 int32 i;
 
-dev_disable = 0;
+dev_disablen = 0;
 for (i = DEV_LOW; i <= DEV_HIGH; i++)  {
-    if (newmask & dev_table[i].pi)
-        dev_disable = dev_disable | dev_table[i].mask;
+    if (newmask & dev_tablen[i].pi)
+        dev_disablen = dev_disablen | dev_tablen[i].mask;
     }
 DEV_UPDATE_INTR ;
 return;
@@ -1089,13 +1091,13 @@ return;
 
 /* Reset routine */
 
-t_stat cpu_reset (DEVICE *dptr)
+t_stat cpu_resetn (DEVICE *dptr)
 {
-int_req = int_req & ~(INT_ION | INT_STK | INT_TRAP);
-pimask = 0;
-dev_disable = 0;
-pwr_low = 0;
-AMASK = 077777 ;                                        /* 32KW mode */
+int_reqn = int_reqn & ~(INT_ION | INT_STK | INT_TRAP);
+pimaskn = 0;
+dev_disablen = 0;
+pwr_lown = 0;
+AMASKN = 077777 ;                                        /* 32KW mode */
 pcq_r = find_reg ("PCQ", NULL, dptr);
 if (pcq_r)
     pcq_r->qptr = 0;
@@ -1106,28 +1108,28 @@ return SCPE_OK;
 
 /* Memory examine */
 
-t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
+t_stat cpu_exn (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 {
 if (addr >= MEMSIZE)
     return SCPE_NXM;
 if (vptr != NULL)
-    *vptr = M[addr] & DMASK;
+    *vptr = MN[addr] & DMASK;
 return SCPE_OK;
 }
 
 /* Memory deposit */
 
-t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
+t_stat cpu_depn (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 {
 if (addr >= MEMSIZE)
     return SCPE_NXM;
-M[addr] = val & DMASK;
+MN[addr] = val & DMASK;
 return SCPE_OK;
 }
 
 /* Alter memory size */
 
-t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+t_stat cpu_set_sizen (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 mc = 0;
 t_addr i;
@@ -1135,35 +1137,35 @@ t_addr i;
 if ((val <= 0) || (val > MAXMEMSIZE) || ((val & 07777) != 0))
     return SCPE_ARG;
 for (i = val; i < MEMSIZE; i++)
-    mc = mc | M[i];
+    mc = mc | MN[i];
 if ((mc != 0) && (!get_yn ("Really truncate memory [N]?", FALSE)))
     return SCPE_OK;
 MEMSIZE = val;
 for (i = MEMSIZE; i < MAXMEMSIZE; i++)
-    M[i] = 0;
+    MN[i] = 0;
 return SCPE_OK;
 }
 
 /* Build dispatch table */
 
-t_stat build_devtab (void)
+t_stat build_devtabn (void)
 {
 DEVICE *dptr;
 DIB *dibp;
 int32 i, dn;
 
 for (i = 0; i < 64; i++) {                              /* clr dev_table */
-    dev_table[i].mask = 0;
-    dev_table[i].pi = 0;
-    dev_table[i].routine = NULL;
+    dev_tablen[i].mask = 0;
+    dev_tablen[i].pi = 0;
+    dev_tablen[i].routine = NULL;
     }
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru dev */
     if (!(dptr->flags & DEV_DIS) &&                     /* enabled and */
         ( (dibp = (DIB *) dptr->ctxt)) ) {              /* defined DIB? */
         dn = dibp->dnum;                                /* get dev num */
-        dev_table[dn].mask = dibp->mask;                /* copy entries */
-        dev_table[dn].pi = dibp->pi;
-        dev_table[dn].routine = dibp->routine;
+        dev_tablen[dn].mask = dibp->mask;                /* copy entries */
+        dev_tablen[dn].pi = dibp->pi;
+        dev_tablen[dn].routine = dibp->routine;
         }
     }
 return SCPE_OK;
@@ -1244,18 +1246,18 @@ static const int32 boot_rom[] = {
     0000000                     /*      0               ;padding */
     };
 
-t_stat cpu_boot (int32 unitno, DEVICE *dptr)
+t_stat cpu_bootn (int32 unitno, DEVICE *dptr)
 {
 size_t i;
 
-for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = boot_rom[i];
-saved_PC = BOOT_START;
+for (i = 0; i < BOOT_LEN; i++) MN[BOOT_START + i] = boot_rom[i];
+saved_PCN = BOOT_START;
 return SCPE_OK;
 }
 
 /* 1-to-1 map for I/O devices */
 
-int32 MapAddr (int32 map, int32 addr)
+int32 MapAddrN (int32 map, int32 addr)
 {
 return addr;
 }
@@ -1312,17 +1314,17 @@ if ( hist )
 
     hist_ptr->pc    = pc ;
     hist_ptr->ir    = our_ir ;
-    hist_ptr->ac0   = AC[ 0 ] ;
-    hist_ptr->ac1   = AC[ 1 ] ;
-    hist_ptr->ac2   = AC[ 2 ] ;
-    hist_ptr->ac3   = AC[ 3 ] ;
-    hist_ptr->carry = C >> 16 ;
+    hist_ptr->ac0   = ACN[ 0 ] ;
+    hist_ptr->ac1   = ACN[ 1 ] ;
+    hist_ptr->ac2   = ACN[ 2 ] ;
+    hist_ptr->ac3   = ACN[ 3 ] ;
+    hist_ptr->carry = CN >> 16 ;
     hist_ptr->fp    = FP ;
     hist_ptr->sp    = SP ;
-    hist_ptr->devBusy    = dev_busy ;
-    hist_ptr->devDone    = dev_done ;
-    hist_ptr->devDisable = dev_disable ;
-    hist_ptr->devIntr    = int_req ;
+    hist_ptr->devBusy    = dev_busyn ;
+    hist_ptr->devDone    = dev_donen ;
+    hist_ptr->devDisable = dev_disablen ;
+    hist_ptr->devIntr    = int_reqn ;
     /*  how 'bout state and AMASK?  */
     return ( hist_p ) ;
     }
@@ -1388,13 +1390,13 @@ if ( hptr )
         (hptr->ac3 & 0xFFFF),
         (hptr->carry & 1)
         ) ;
-    if ( cpu_unit.flags & UNIT_STK  /* Nova 3 or Nova 4 */ ) 
+    if ( cpu_unitn.flags & UNIT_STK  /* Nova 3 or Nova 4 */ ) 
         {
         fprintf( fp, "%06o  %06o   ", SP, FP ) ;
         }
 
     sim_eval[0] = (hptr->ir & 0xFFFF) ;
-    if ( (fprint_sym(fp, (hptr->pc & AMASK), sim_eval, &cpu_unit, SWMASK ('M'))) > 0 )
+    if ( (fprint_sym(fp, (hptr->pc & AMASKN), sim_eval, &cpu_unitn, SWMASK ('M'))) > 0 )
         {
         fprintf( fp, "(undefined) %04o", (hptr->ir & 0xFFFF) ) ;
     }
