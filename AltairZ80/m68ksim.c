@@ -160,6 +160,57 @@ extern uint32 in(const uint32 Port);
 
 static uint32 m68k_fc;                              /* Current function code from CPU */
 
+/* CompuPro CPU-68K support.
+ *
+ * The CPU-68K maps the whole S-100 I/O space into extended page FF0000 of
+ * data space (CPU 68K Technical Manual A196, "I/O") and has no console or
+ * disk of its own: everything lives on S-100 boards which AltairZ80 already
+ * models (DISK1A, SS1, DISK2, DISK3, MDRIVEH, SELCHAN, IF3).  In this mode
+ * the built in MC6850 console and the simulated CP/M-68K disk of the generic
+ * machine are switched off so that the entire window reaches in()/out().
+ */
+uint32 m68k_compupro = FALSE;
+
+extern uint32 mmiobase;
+extern uint32 mmiosize;
+
+extern uint32 disk1a_rom_is_visible(void);
+extern uint32 disk1a_rom_base(void);
+extern uint32 disk1a_rom_size(void);
+extern uint32 disk1a_rom_read(uint32 offset);
+
+t_stat m68k_set_compupro(UNIT *uptr, int32 value, CONST char *cptr, void *desc) {
+    m68k_compupro = (value != 0);
+    return SCPE_OK;
+}
+
+/* Returns the byte the DISK 1A boot ROM answers with, or -1 when the ROM is
+   not visible at this address. */
+static int32 m68k_compupro_rom(uint32 address) {
+    uint32 base;
+    if (!m68k_compupro || !disk1a_rom_is_visible())
+        return -1;
+    base = disk1a_rom_base();
+    if ((address < base) || (address >= base + disk1a_rom_size()))
+        return -1;
+    return (int32)disk1a_rom_read(address - base);
+}
+
+static t_bool m68k_is_mmio(uint32 address) {
+    return (address >= mmiobase) && (address < mmiobase + mmiosize);
+}
+
+/* TRUE when a byte at this address is not plain RAM. */
+static t_bool m68k_compupro_special(uint32 address) {
+    return m68k_compupro && (m68k_is_mmio(address) || (m68k_compupro_rom(address) >= 0));
+}
+
+t_stat m68k_compupro_boot(void) {
+    m68k_pulse_reset();
+    m68k_CPUToView();
+    return SCPE_OK;
+}
+
 extern uint32 m68k_registers[M68K_REG_CPU_TYPE + 1];
 extern UNIT cpu_unit;
 extern uint32 mmiobase;                             /* M68K MMIO base address            */
@@ -251,8 +302,10 @@ void m68k_clear_memory(void ) {
 
 void m68k_cpu_reset(void) {
 
-    WRITE_LONG(m68k_ram, 0, 0x00006000);    // SP
-    WRITE_LONG(m68k_ram, 4, 0x00000200);    // PC
+    if (!m68k_compupro) {
+        WRITE_LONG(m68k_ram, 0, 0x00006000);    // SP
+        WRITE_LONG(m68k_ram, 4, 0x00000200);    // PC
+    }
     m68k_init();
 
     if ((m68kvariant == M68K_CPU_TYPE_INVALID) || (m68kvariant > M68K_CPU_TYPE_SCC68070)) {
@@ -357,6 +410,13 @@ unsigned int m68k_cpu_read_byte_raw(unsigned int address) {
 }
 
 unsigned int m68k_cpu_read_byte(unsigned int address) {
+    if (m68k_compupro) {
+        const int32 rom = m68k_compupro_rom(address);
+        if (rom >= 0)
+            return (unsigned int)rom;
+        if (m68k_is_mmio(address))
+            return (in(address & 0xff) & 0xff);
+    } else
     switch(address) {
         case MC6850_DATA:
             return MC6850_data_read();
@@ -379,6 +439,10 @@ unsigned int m68k_cpu_read_byte(unsigned int address) {
 }
 
 unsigned int m68k_cpu_read_word(unsigned int address) {
+    if (m68k_compupro) {
+        if (m68k_compupro_special(address) || m68k_compupro_special(address + 1))
+            return (m68k_cpu_read_byte(address) << 8) | m68k_cpu_read_byte(address + 1);
+    } else
     switch(address) {
         case DISK_STATUS:
             return hdsk_getStatus();
@@ -395,6 +459,14 @@ unsigned int m68k_cpu_read_word(unsigned int address) {
 }
 
 unsigned int m68k_cpu_read_long(unsigned int address) {
+    if (m68k_compupro) {
+        if (m68k_compupro_special(address)     || m68k_compupro_special(address + 1) ||
+            m68k_compupro_special(address + 2) || m68k_compupro_special(address + 3))
+            return (m68k_cpu_read_byte(address)          << 24) |
+                   (m68k_cpu_read_byte(address + 1)      << 16) |
+                   (m68k_cpu_read_byte(address + 2)      <<  8) |
+                    m68k_cpu_read_byte(address + 3);
+    } else
     switch(address) {
         case DISK_STATUS:
             return hdsk_getStatus();
@@ -425,6 +497,12 @@ void m68k_cpu_write_byte_raw(unsigned int address, unsigned int value) {
 }
 
 void m68k_cpu_write_byte(unsigned int address, unsigned int value) {
+    if (m68k_compupro) {
+        if (m68k_is_mmio(address)) {
+            out(address & 0xff, value & 0xff);
+            return;
+        }
+    } else
     switch(address) {
         case MC6850_DATA:
             MC6850_data_write(value & 0xff);
@@ -449,6 +527,12 @@ void m68k_cpu_write_byte(unsigned int address, unsigned int value) {
 }
 
 void m68k_cpu_write_word(unsigned int address, unsigned int value) {
+    if (m68k_compupro &&
+        (m68k_compupro_special(address) || m68k_compupro_special(address + 1))) {
+        m68k_cpu_write_byte(address,     (value >> 8) & 0xff);
+        m68k_cpu_write_byte(address + 1,  value       & 0xff);
+        return;
+    }
     if (address > M68K_MAX_RAM-1) {
         if (cpu_unit.flags & UNIT_CPU_VERBOSE)
             sim_printf("M68K: 0x%08x Attempt to write word 0x%04x to non existing memory 0x%08x.\n",
@@ -459,6 +543,20 @@ void m68k_cpu_write_word(unsigned int address, unsigned int value) {
 }
 
 void m68k_cpu_write_long(unsigned int address, unsigned int value) {
+    if (m68k_compupro) {
+        if (m68k_compupro_special(address)     || m68k_compupro_special(address + 1) ||
+            m68k_compupro_special(address + 2) || m68k_compupro_special(address + 3)) {
+            m68k_cpu_write_byte(address,     (value >> 24) & 0xff);
+            m68k_cpu_write_byte(address + 1, (value >> 16) & 0xff);
+            m68k_cpu_write_byte(address + 2, (value >>  8) & 0xff);
+            m68k_cpu_write_byte(address + 3,  value        & 0xff);
+            return;
+        }
+        if (address > M68K_MAX_RAM-3)
+            return;
+        WRITE_LONG(m68k_ram, address, value);
+        return;
+    }
     switch(address) {
         case DISK_SET_DRIVE:
             hdsk_setSelectedDisk(value);
