@@ -901,7 +901,8 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
   # Find available ncurses library.
   ifneq (,$(call find_include,ncurses))
     ifneq (,$(call find_lib,ncurses))
-      OS_CURSES_DEFS += -DHAVE_NCURSES -lncurses
+      OS_CURSES_DEFS += -DHAVE_NCURSES
+      OS_CURSES_LDFLAGS += -lncurses
     endif
   endif
   ifeq (,$(findstring Android,$(shell uname -a)))
@@ -3204,11 +3205,19 @@ $(BIN)pdp10-ks$(EXE) : ${KS10} ${SIM}
 
 # Front Panel API Demo/Test program
 
-frontpaneltest : ${BIN}frontpaneltest${EXE} ${BIN}vax${EXE} 
+frontpaneltest : ${BIN}frontpaneltest${EXE} ${BIN}vax${EXE}
 
 ${BIN}frontpaneltest${EXE} : frontpanel/FrontPanelTest.c sim_sock.c sim_frontpanel.c
 	#cmake:ignore-target
-	$(MAKEIT) OPTS="$(OS_CURSES_DEFS)" TESTS=0
+	$(MAKEIT) OPTS="$(OS_CURSES_DEFS)" LNK_OPTS="$(OS_CURSES_LDFLAGS)" TESTS=0
+
+# Front Panel for the local PDP-11/70 RT-11 setup
+
+pdp11panel : ${BIN}pdp11panel${EXE} ${BIN}pdp11${EXE}
+
+${BIN}pdp11panel${EXE} : frontpanel/PDP11Panel.c sim_sock.c sim_frontpanel.c
+	#cmake:ignore-target
+	$(MAKEIT) OPTS="$(OS_CCDEFS)" TESTS=0
 
 else # end of primary make recipies
 
