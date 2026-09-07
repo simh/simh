@@ -338,6 +338,8 @@
 
 #include "nova_defs.h"
 
+
+
 #define UNIT_V_MICRO    (UNIT_V_UF)                     /* Microeclipse? */
 #define UNIT_V_17B      (UNIT_V_UF)                     /* 17 bit MAP */
 #define UNIT_V_UP       (UNIT_V_UF)                     /* FPU Enabled */
@@ -364,7 +366,6 @@ int32 stop_dev = 0;                                     /* stop on ill dev */
 int32 old_PC = 0;                                       /* previous PC */
 int32 model = 140;                                      /* Model of Eclipse */
 int32 speed = 0;                                        /* Delay for each instruction */
-
 int32 XCT_mode = 0;                                     /* 1 if XCT mode */
 int32 XCT_inst = 0;                                     /* XCT instruction */
 int32 PrevPC = -1;
@@ -514,6 +515,8 @@ int32 PutMap(int32 addr, int32 data);
 int32 Debug_Entry(int32 PC, int32 inst, int32 inst2, int32 AC0, int32 AC1, int32 AC2, int32 AC3, int32 flags);
 t_stat build_devtab (void);
 
+extern t_stat sim_process_event(void);
+
 /* CPU data structures
 
    cpu_dev      CPU device descriptor
@@ -522,7 +525,7 @@ t_stat build_devtab (void);
    cpu_mod      CPU modifiers list
 */
 
-UNIT cpu_unit = { UDATA (NULL, UNIT_FIX + UNIT_BINK, MAXMEMSIZE) };
+UNIT cpu_unite = { UDATA (NULL, UNIT_FIX + UNIT_BINK, MAXMEMSIZE) };
 
 REG cpu_reg[] = {
     { ORDATA (PC, saved_PC, 15) },
@@ -573,7 +576,7 @@ MTAB cpu_mod[] = {
 };
 
 DEVICE cpu_dev = {
-    "CPU", &cpu_unit, cpu_reg, cpu_mod,
+    "CPU", &cpu_unite, cpu_reg, cpu_mod,
     1, 8, 17, 1, 8, 16,
     &cpu_ex, &cpu_dep, &cpu_reset,
     &cpu_boot, NULL, NULL
@@ -698,6 +701,7 @@ register int32 PC, IR, i, t, MA, j, k, tac;
 register uint32 mddata, uAC0, uAC1, uAC2, uAC3;
 int16 sAC0, sAC1, sAC2;
 int32 sddata, mi1, mi2, fpnum32;
+int32 state_1;
 t_int64 fpnum, expon;
 t_value simeval[20];
 void mask_out (int32 mask);
@@ -927,33 +931,1953 @@ if ((IR & 0100017) == 0100010) {                        /* This pattern for all 
 /****************************************************************/    
     
     /* Byte operations */
+
+    state_1 = IR & 0103777;
     
-    if ((IR & 0103777) == 0102710) {                    /* LDB: Load Byte */
-        i = (IR >> 13) & 03;
-        MA = (AC[i] >> 1) & AMASK;
-        j = (IR >> 11) & 03;
-        if (AC[i] & 01) {
+    switch (state_1) {
+    
+    register int16 sh;
+    register int32 a;
+
+    
+           case 0102710 :
+           
+           i = (IR >> 13) & 03;
+           MA = (AC[i] >> 1) & AMASK;
+           j = (IR >> 11) & 03;
+           if (AC[i] & 01) {
             AC[j] = GetMap(MA) & 0377;
-        } else {
+           } else {
             AC[j] = (GetMap(MA) >> 8) & 0377;
-        }
-        continue;
-    }
-    if ((IR & 0103777) == 0103010) {                    /* STB: Store Byte */
-        i = (IR >> 13) & 03;
-        MA = (AC[i] >> 1);
-        j = (IR >> 11) & 03;
-        t = GetMap(MA);
-        if (AC[i] & 01) {
+           }
+
+           break;
+
+           case 0103010 :   /* STB: Store Byte */
+           
+           i = (IR >> 13) & 03;
+           MA = (AC[i] >> 1);
+           j = (IR >> 11) & 03;
+           t = GetMap(MA);
+           if (AC[i] & 01) {
             t &= 0177400;
             t |= (AC[j] & 0377);
             PutMap(MA, t);
-        } else {
+           } else {
             t &= 0377;
             t |= (AC[j] & 0377) << 8;
             PutMap(MA, t);
+            }
+
+            break;
+
+            case 0100010 :   /* ADI: Add Immediate */
+
+            t = (IR >> 11) & 3;
+            AC[t] = (AC[t] + ((IR >> 13) & 3) + 1) & 0xffff;
+            
+            break;
+
+            case 0100110 :  /* SBI: Subtract Immediate */
+
+            t = (IR >> 11) & 3;
+            AC[t] = (AC[t] - (((IR >> 13) & 3) + 1)) & 0xffff;
+            
+            break;
+
+            case 0100710 : /* XCH: Exchange Accumulators */
+            
+            t = AC[(IR >> 11) & 3];
+            AC[(IR >> 11) & 3] = AC[(IR >> 13) & 3];
+            AC[(IR >> 13) & 3] = t;
+            
+            break;
+
+            case 0100410 :  /* IOR: Inclusive Or */
+
+            AC[(IR >> 11) & 3] |= AC[(IR >> 13) & 3];
+           
+            break;
+            
+            case 0100510 :  /* XOR: Exclusive Or */
+            
+            AC[(IR >> 11) & 3] ^= AC[(IR >> 13) & 3];
+            
+            break;
+
+            case 0100610 :  /* ANC: And with complemented src */
+           
+            AC[(IR >> 11) & 3] &= ~(AC[(IR >> 13) & 3]);
+            
+            break;
+
+            case 0101210 : /* LSH: Logical Shift */ 
+            
+            sh = AC[(IR >> 13) & 3] & 0377;
+            
+            i = (IR >> 11) & 3;
+            
+            if (sh & 0200) {
+            sh = ~sh + 1;
+            AC[i] = AC[i] >> sh;
+            } else {
+            AC[i] = AC[i] << sh;
+            } 
+            if (sh > 15) AC[i] = 0;
+            AC[i] &= 0xffff;        
+        
+            break;
+
+            case 0101310 : /* DLSH: Double logical shift */
+            
+            sh = AC[(IR >> 13) & 3] & 0377;
+            i = (IR >> 11) & 3;
+            uAC0 = AC[i] << 16;
+            j = i + 1;
+            if (j == 4) j = 0;
+            uAC0 |= AC[j];  
+            if (sh & 0200) {
+            sh = (~sh + 1) & 0377;
+            if (sh < 32)
+                uAC0 = uAC0 >> sh;
+            } else {
+            if (sh < 32)
+                uAC0 = uAC0 << sh;
+            }        
+            if (sh > 31) uAC0 = 0;
+            AC[i] = (uAC0 >> 16) & 0xffff;
+            AC[j] = uAC0 & 0xffff;  
+            
+            break;
+
+            case 0101410 : /* HXL: Hex shift left */
+            
+            t = ((IR >> 13) & 3) + 1;
+            i = (IR >> 11) & 3;
+            AC[i] = AC[i] << (t * 4);
+            AC[i] &= 0xffff; 
+            break;
+
+            case 0101510 : /* HXR: Hex shift right */
+            
+            t = ((IR >> 13) & 3) + 1;
+            i = (IR >> 11) & 3;
+            AC[i] = AC[i] >> (t * 4);
+            AC[i] &= 0xffff; 
+            
+            break;
+
+            case 0101610 : /* DHXL: Double Hex shift left */
+            
+            t = ((IR >> 13) & 3) + 1;
+            i = (IR >> 11) & 3;
+            j = i + 1;
+            if (j == 4) j = 0;
+            uAC0 = AC[i] << 16;
+            uAC0 |= AC[j];  
+            uAC0 = uAC0 << ((t * 4) & 0177);
+            AC[i] = (uAC0 >> 16) & 0xffff;
+            AC[j] = uAC0 & 0xffff;  
+           
+            break;
+
+            case 0101710 : /* DHXR: Double Hex shift right */
+
+            t = ((IR >> 13) & 3) + 1;
+            i = (IR >> 11) & 3;
+            j = i + 1;
+            if (j == 4) j = 0;
+            uAC0 = AC[i] << 16;
+            uAC0 |= AC[j];  
+            uAC0 = uAC0 >> ((t * 4) & 0177);
+            AC[i] = (uAC0 >> 16) & 0xffff;
+            AC[j] = uAC0 & 0xffff;  
+            
+            break;
+
+            case 0102010 : /* BTO: Set bit to one */
+            
+            i = (IR >> 11) & 3;
+            j = (IR >> 13) & 3;
+            if (i != j) {
+            k = (AC[i] >> 4) & AMASK;
+            if ((AC[j] + k) & 0100000)
+            t = 1;
+            //AOS       MA = indirect(AC[j] + k);
+            MA = (AC[j] + k) & AMASK;
+            } else {
+            MA = (AC[i] >> 4) & AMASK;
+            }        
+            t = AC[i] & 017;
+            t = GetMap(MA) | (0100000 >> t);
+            PutMap(MA, t);
+           
+            break;
+            
+            case 0102110 : /* BTZ: Set bit to zero */
+
+            i = (IR >> 11) & 3;
+            j = (IR >> 13) & 3;
+            if (i != j) {
+            k = (AC[i] >> 4) & AMASK;
+            if ((AC[j] + k) & 0100000)
+                t = 1;
+//AOS       MA = indirect(AC[j] + k);
+            MA = (AC[j] + k) & AMASK;
+            } else {
+            MA = (AC[j] >> 4) & AMASK;
+            }        
+            t = AC[i] & 017;
+            t = GetMap(MA) & ~(0100000 >> t);
+            PutMap(MA, t);
+
+            break;
+
+            case 0102210 : /* SZB: Skip on zero bit */
+            
+            i = (IR >> 11) & 3;
+            j = (IR >> 13) & 3;
+            if (i != j) {
+            k = (AC[i] >> 4) & AMASK;
+            if ((AC[j] + k) & 0100000)
+                t = 1;
+            MA = indirect(AC[j] + k);
+//          MA = (AC[j] + k) & AMASK;
+            } else {
+            MA = (AC[i] >> 4) & AMASK;
+            }        
+            t = GetMap(MA) << (AC[i] & 017);
+            if (!(t & 0100000)) PC = (PC + 1) & AMASK;
+            
+            break;
+            
+            case 0102310 : /* SZBO: skip on zero bit & set to 1 */
+
+            i = (IR >> 11) & 3;
+            j = (IR >> 13) & 3;
+            if (i != j) {
+            k = (AC[i] >> 4) & AMASK;
+            if ((AC[j] + k) & 0100000)
+                t = 1;
+            MA = indirect(AC[j] + k);
+//          MA = (AC[j] + k) & AMASK;
+            } else {
+            MA = (AC[j] >> 4) & AMASK;
+            }        
+            t = GetMap(MA) << (AC[i] & 017);
+            if (t & 0100000) PC = (PC + 1) & AMASK;
+            
+            break;
+            
+            case 0102410 : /* LOB: Locate lead bit */
+
+            register int32 save;
+            i = (IR >> 11) & 3;
+            j = (IR >> 13) & 3;
+            if (i != j) {
+            k = (AC[i] >> 4) & AMASK;
+            MA = indirect(AC[j] + k);
+//          MA = (AC[j] + k) & AMASK;
+            } else {
+            MA = (AC[j] >> 4) & AMASK;
+            }        
+            t = AC[i] & 017;
+            save = GetMap(MA);
+            t = save | (0100000 >> t);
+            PutMap(MA, t);
+            t = save << (AC[i] & 017);
+            if ((t & 0100000) == 0) 
+            PC = (PC + 1) & AMASK;
+            
+            break;
+
+            case 0102510 : /* LRB: Locate & reset lead bit */
+
+            register r;
+            register int16 b;
+            j = (IR >> 13) & 3;
+            a = AC[j];
+            for (i = 0; i < 16; i++) {
+            if ((a << i) & 0100000) break;
+            }
+            r = (IR >> 11) & 3;
+            b = AC[r];
+            b += i;
+            if (j != r) AC[r] = b & 0177777;
+            AC[j] &= ~(0100000 >> i);
+            AC[j] &= 0xffff;
+       
+            break;
+
+            case 0102610 : /* COB: Count bits */
+
+            register int32 r1;
+            register c = 0;
+            a = AC[(IR >> 13) & 3];
+            for (i = 0; i < 16; i++) {
+            if ((a >> i) & 1) c++;
+            }
+            i = (IR >> 11) & 3;
+            b = AC[i];
+            b += c;
+            AC[i] = b & 0177777; 
+            
+            break;
+
+            case 0101010 : /* SGT: Skip if ACS > ACD */
+            
+            register int16 a1, d1;
+            a1 = AC[(IR >> 13) & 3] & 0xffff;
+            d1 = AC[(IR >> 11) & 3] & 0xffff;
+            if (a1 > d1)
+            PC = (PC + 1) & AMASK;
+            
+            break;
+
+            case 0101110 :  /* SGE: Skip if ACS >= ACD */
+            
+            a1 = AC[(IR >> 13) & 3] & 0xffff;
+            d1 = AC[(IR >> 11) & 3] & 0xffff;
+            if (a1 >= d1)
+            PC = (PC + 1) & AMASK;
+            
+            break;
+
+            case 0102370 : /* CLM: Compare to limits */
+           
+            register int32 s, d, MA;
+            int16 H, L, ca;
+            s = (IR >> 13) & 3;
+            d = (IR >> 11) & 3;
+            if (s == d) {
+            L = GetMap(PC);
+            PC++;
+            H = GetMap(PC);
+            PC++;
+            } else {
+            MA = AC[d] & AMASK;
+            L = GetMap(MA);
+            H = GetMap(MA + 1);
+            }
+            ca = AC[s];
+            if (ca >= L && ca <= H) PC = (PC + 1) & AMASK;
+           
+            break;
+
+            case 0103110 :                     /* PSH: Push multiple accums */  
+            
+            register int32 j;
+            j = (IR >> 11) & 3;
+            t = GetMap(040) & AMASK;
+            i = (IR >> 13) & 3;
+            if (i == j) {
+            t++;
+            PutMap(t, AC[i]);    
+            PutMap(040, (t & AMASK));
+            if (t > GetMap(042)) {
+                pushrtn(PC);
+                PC = indirect(GetMap(043));
+                PutMap(040, (GetMap(040) & 077777));
+                PutMap(042, (GetMap(042) | 0100000));
+            }
+
+            break;
+
+            }    
+            while (i != j) {
+            t++;
+            PutMap(t, AC[i]);
+            i++;
+            if (i == 4) i = 0;
+            }
+            t++;
+            
+            PutMap(t, AC[i]);
+            PutMap(040, (t & AMASK));
+            
+            if ((GetMap(040) & AMASK) > GetMap(042)) {
+            pushrtn(PC);
+            PC = indirect(GetMap(043));
+            PutMap(040, (GetMap(040) & 077777));
+            PutMap(042, (GetMap(042) | 0100000));
+            }    
+            
+            break;
+
+            case 0103210 : /* POP: Pop mult accums */
+            
+            j = (IR >> 11) & 3;
+            t = GetMap(040) & AMASK;
+            i = (IR >> 13) & 3;
+            if (i == j) {
+            AC[i] = GetMap(t);
+            t--;
+            PutMap(040, (t & AMASK));
+            t = GetMap(040);
+            if (t < 0100000 && t < 0400) {
+                PutMap(040, GetMap(042));
+                pushrtn(PC);
+                PC = indirect(GetMap(043));
+                PutMap(040, (GetMap(040) & 077777));
+                PutMap(042, (GetMap(042) | 0100000));
+            }
+
+            break;
+
+            }
+
+            while (i != j) {    
+            AC[i] = GetMap(t);
+            t--;
+            i--;
+            if (i == -1) i = 3;
+            }
+            AC[i] = GetMap(t);
+            t--;
+            PutMap(040, (t & AMASK));
+            t = GetMap(040);
+            if (t < 0100000 && t < 0400) {
+            PutMap(040, GetMap(042));
+            pushrtn(PC);
+            PC = indirect(GetMap(043));
+            PutMap(040, (GetMap(040) & 077777));
+            PutMap(042, (GetMap(042) | 0100000));
+            } 
+
+            break;
+
+            case 0100210 :  /* DAD: Decimal add */
+            
+            i = (IR >> 13) & 3;
+            j = (IR >> 11) & 3;
+            t = (AC[i] & 017) + (AC[j] & 017);
+            if (C) t++;
+            if (t > 9) {
+            C = 0200000;
+            t += 6;
+            } else {
+            C = 0;
+            }    
+            AC[j] &= 0177760;
+            AC[j] = AC[j] | (t & 017);    
+            
+            break;
+
+            case 0100310 : /* DSB: Decimal subtract */
+        
+            i = (IR >> 13) & 3;
+            j = (IR >> 11) & 3;
+            t = (AC[j] & 017) - (AC[i] & 017);
+            if (!C) t--;
+            if (t < 0) {
+            C = 0;
+            t = 9 - (~t);
+            } else {
+            C = 0200000;
+            }    
+            AC[j] &= 0177760;
+            AC[j] = AC[j] | (t & 017);    
+            
+            break;
+
+            case 0103050 : /* FLDS Load FP single */
+            
+            if (!(fpu_unit.flags & UNIT_UP))
+            continue;
+            if (Debug_Flags == 1) {
+            printf("\n<<FPU instruction: FLDS>>\n");
+            reason = STOP_IBKPT;
+            }    
+            if (FPFault) {                                  /* Fault from a previous inst? */
+            FPFault = 0;
+            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
+            PutMap(t, AC[0]);
+            t++;
+            PutMap(t, AC[1]);
+            t++;
+            PutMap(t, AC[2]);
+            t++;
+            PutMap(t, AC[3]);
+            t++;
+            PutMap(t, ((PC-1) & AMASK));
+            if (C) PutMap(t, (GetMap(t) | 0100000));
+            PutMap(040, t);
+            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
+            continue;
+            }
+            i = (IR >> 11) & 0x03;
+            FPAC[i] = 0;
+            MA = effective(PC, (IR >> 13) & 3, GetMap(PC));
+            t = GetMap(MA) & 0xffff;
+            FPAC[i] = (t_int64) t << 48;
+            t = GetMap(MA+1) & 0xffff;
+            FPAC[i] |= (t_int64) t << 32;
+            if ((FPAC[i] & 0x00ffffffffffffff) == 0)
+            FPAC[i] = 0;
+            FPSR &= 0xFCFFFFFF;
+            if (FPAC[i] == 0)
+            FPSR |= 0x02000000;
+            if (FPAC[i] & 0x8000000000000000)
+            FPSR |= 0x01000000;
+            FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
+            FPSR |= ((PC - 1) & AMASK);
+            PC = (PC + 1) & AMASK;
+           
+            break;
+
+            case 0103510 :                    /* SYC: System call */
+            
+            DisMap = Usermap;
+            Usermap = 0;
+            MapStat &= ~1;                                  /* Disable MAP */
+            i = (IR >> 13) & 3;
+            j = (IR >> 11) & 3;
+            if (i != 0 || j != 0) {
+            t = (GetMap(040) + 1) & AMASK;                              
+            PutMap(t, AC[0]);
+            t++;
+            PutMap(t, AC[1]);
+            t++;
+            PutMap(t, AC[2]);
+            t++;
+            PutMap(t, AC[3]);
+            t++;
+            PutMap(t, (PC & AMASK));
+            if (C) PutMap(t, (GetMap(t) | 0100000));
+            PutMap(040, t);
+            PutMap(041, (GetMap(040) & AMASK));
+            }   
+            PC = indirect(GetMap(2)) & AMASK;
+            if (DisMap > 0)
+            Inhibit = 3;                                /* Special 1-instruction interrupt inhibit */    
+            if ((GetMap(040) & AMASK) > GetMap(042)) {
+            pushrtn(PC);
+            PC = indirect(GetMap(043));
+            PutMap(040, (GetMap(040) & 077777));
+            PutMap(042, (GetMap(042) | 0100000));
+            }    
+            
+            break;
+
+            case 0102150 : /* FLDD Load FP double */
+            if (!(fpu_unit.flags & UNIT_UP))
+            continue;
+            if (Debug_Flags == 1) {
+            printf("\n<<FPU instruction: FLDD>>\n");
+            reason = STOP_IBKPT;
+            }    
+            if (FPFault) {                                  /* Fault from a previous inst? */
+            FPFault = 0;
+            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
+            PutMap(t, AC[0]);
+            t++;
+            PutMap(t, AC[1]);
+            t++;
+            PutMap(t, AC[2]);
+            t++;
+            PutMap(t, AC[3]);
+            t++;
+            PutMap(t, ((PC-1) & AMASK));
+            if (C) PutMap(t, (GetMap(t) | 0100000));
+            PutMap(040, t);
+            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
+            continue;
+            }
+            i = (IR >> 11) & 0x03;
+            FPAC[i] = 0;
+            MA = effective(PC, (IR >> 13) & 3, GetMap(PC));
+            t = GetMap(MA) & 0xffff;
+            FPAC[i] = (t_int64) t << 48;
+            t = GetMap(MA+1) & 0xffff;
+            FPAC[i] |= (t_int64) t << 32;
+            t = GetMap(MA+2) & 0xffff;
+            FPAC[i] |= (t_int64) t << 16;
+            t = GetMap(MA+3) & 0xffff;
+            FPAC[i] |= (t_int64) t;
+            if ((FPAC[i] & 0x00ffffffffffffff) == 0)
+            FPAC[i] = 0;
+            FPSR &= 0xFCFFFFFF;
+            if (FPAC[i] == 0)
+            FPSR |= 0x02000000;
+            if (FPAC[i] & 0x8000000000000000)
+            FPSR |= 0x01000000;
+            FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
+            FPSR |= ((PC - 1) & AMASK);
+            PC = (PC + 1) & AMASK;
+            
+            break;
+
+            case 102250 :    /* FSTS Store FP single */
+
+            if (!(fpu_unit.flags & UNIT_UP))
+            continue;
+            if (Debug_Flags == 1) {
+            printf("\n<<FPU instruction: FSTS>>\n");
+            reason = STOP_IBKPT;
+            }    
+            if (FPFault) {                                  /* Fault from a previous inst? */
+            FPFault = 0;
+            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
+            PutMap(t, AC[0]);
+            t++;
+            PutMap(t, AC[1]);
+            t++;
+            PutMap(t, AC[2]);
+            t++;
+            PutMap(t, AC[3]);
+            t++;
+            PutMap(t, ((PC-1) & AMASK));
+            if (C) PutMap(t, (GetMap(t) | 0100000));
+            PutMap(040, t);
+            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
+            continue;
+            }
+            i = (IR >> 11) & 0x03;
+            MA = effective(PC, (IR >> 13) & 3, GetMap(PC));
+            PutMap(MA, (int32)(FPAC[i] >> 48) & 0xffff);
+            PutMap(MA+1, (int32)(FPAC[i] >> 32) & 0xffff);
+            FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
+            FPSR |= ((PC - 1) & AMASK);
+            PC = (PC + 1) & AMASK;
+            break;
+
+            case 0102350 :                     /* FSTD Store FP double */
+           
+            if (!(fpu_unit.flags & UNIT_UP))
+            continue;
+            if (Debug_Flags == 1) {
+            printf("\n<<FPU instruction: FSTD>>\n");
+            reason = STOP_IBKPT;
+            }    
+            if (FPFault) {                                  /* Fault from a previous inst? */
+            FPFault = 0;
+            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
+            PutMap(t, AC[0]);
+            t++;
+            PutMap(t, AC[1]);
+            t++;
+            PutMap(t, AC[2]);
+            t++;
+            PutMap(t, AC[3]);
+            t++;
+            PutMap(t, ((PC-1) & AMASK));
+            if (C) PutMap(t, (GetMap(t) | 0100000));
+            PutMap(040, t);
+            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
+            continue;
+            }
+            i = (IR >> 11) & 0x03;
+            MA = effective(PC, (IR >> 13) & 3, GetMap(PC));
+            PutMap(MA, (int32)(FPAC[i] >> 48) & 0xffff);
+            PutMap(MA+1, (int32)(FPAC[i] >> 32) & 0xffff);
+            PutMap(MA+2, (int32)(FPAC[i] >> 16) & 0xffff);
+            PutMap(MA+3, (int32)(FPAC[i] & 0xffff));
+            FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
+            FPSR |= ((PC - 1) & AMASK);
+            PC = (PC + 1) & AMASK;
+            
+            break;
+    
+            case 0102550 :                     /* FMOV Move FP */
+            
+            if (!(fpu_unit.flags & UNIT_UP))
+            continue;
+            if (Debug_Flags == 1) {
+            printf("\n<<FPU instruction: FMOV>>\n");
+            reason = STOP_IBKPT;
+            continue;
+            }    
+            if (FPFault) {                                  /* Fault from a previous inst? */
+            FPFault = 0;
+            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
+            PutMap(t, AC[0]);
+            t++;
+            PutMap(t, AC[1]);
+            t++;
+            PutMap(t, AC[2]);
+            t++;
+            PutMap(t, AC[3]);
+            t++;
+            PutMap(t, ((PC-1) & AMASK));
+            if (C) PutMap(t, (GetMap(t) | 0100000));
+            PutMap(040, t);
+            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
+            continue;
+            }
+            i = (IR >> 13) & 3;
+            j = (IR >> 11) & 3;
+            FPAC[j] = FPAC[i];
+            if ((FPAC[j] & 0x00ffffffffffffff) == 0)
+            FPAC[j] = 0;
+            FPSR &= 0xFCFFFFFF;
+            if (FPAC[j] == 0)
+            FPSR |= 0x02000000;
+            if (FPAC[j] & 0x8000000000000000)
+            FPSR |= 0x01000000;
+            FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
+            FPSR |= ((PC - 1) & AMASK);
+            break;
+
+            case 0102450 :   /* FLAS Float from AC */
+            if (!(fpu_unit.flags & UNIT_UP))
+            continue;
+            if (Debug_Flags == 1) {
+            printf("\n<<FPU instruction: FLAS>>\n");
+            reason = STOP_IBKPT;
+            }    
+            if (FPFault) {                                  /* Fault from a previous inst? */
+            FPFault = 0;
+            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
+            PutMap(t, AC[0]);
+            t++;
+            PutMap(t, AC[1]);
+            t++;
+            PutMap(t, AC[2]);
+            t++;
+            PutMap(t, AC[3]);
+            t++;
+            PutMap(t, ((PC-1) & AMASK));
+            if (C) PutMap(t, (GetMap(t) | 0100000));
+            PutMap(040, t);
+            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
+            continue;
+            }
+            i = (IR >> 13) & 3;
+            j = (IR >> 11) & 3;
+            if (AC[i] == 0) {
+            FPAC[j] = 0;
+            FPSR |= 0x02000000;
+            continue;               
+            }
+            fpnum = (t_int64)(AC[i] & 077777) << 32;
+            if (AC[i] & 0x8000)
+                fpnum = 0 - fpnum;
+            expon = 70;
+            while (1) {
+            if (fpnum & 0x00FF000000000000)
+                break;
+            if (expon < 64)
+                break;
+            fpnum = fpnum << 4;
+            expon--;
+           }
+           FPAC[j] = 0;
+           FPAC[j] = fpnum & 0x00ffffffffffffff;
+           FPAC[j] |= (expon << 56) & 0x7f00000000000000; 
+           if (AC[i] & 0x8000) 
+            FPAC[j] |= 0x8000000000000000;
+           if ((FPAC[j] & 0x00ffffffffffffff) == 0)
+            FPAC[j] = 0;
+           FPSR &= 0xFCFFFFFF;
+           if (FPAC[j] == 0)
+            FPSR |= 0x02000000;
+           if (FPAC[j] & 0x8000000000000000)
+            FPSR |= 0x01000000;
+           FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
+           FPSR |= ((PC - 1) & AMASK);
+           
+           break;
+
+           case 0102650 :                     /* FFAS Fix to AC */
+           
+           if (!(fpu_unit.flags & UNIT_UP))
+           continue;
+           if (Debug_Flags == 1) {
+            printf("\n<<FPU instruction: FFAS>>\n");
+            reason = STOP_IBKPT;
+           }    
+           if (FPFault) {                                  /* Fault from a previous inst? */
+           FPFault = 0;
+           t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
+           PutMap(t, AC[0]);
+           t++;
+           PutMap(t, AC[1]);
+           t++;
+           PutMap(t, AC[2]);
+           t++;
+           PutMap(t, AC[3]);
+           t++;
+           PutMap(t, ((PC-1) & AMASK));
+           if (C) PutMap(t, (GetMap(t) | 0100000));
+           PutMap(040, t);
+           PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
+           continue;
         }
-        continue;
+        i = (IR >> 13) & 3;
+        j = (IR >> 11) & 3;
+        tac = AC[0];
+
+        t = 0;
+
+        FPSR &= 0xFCFFFFFF;                             /* Z+N bits off */
+
+                                                        /* Get register content */
+        get_lf(&dfl, &FPAC[j]);
+
+        if (dfl.long_fract) {
+            /* not zero */
+            normal_lf(&dfl);
+
+            if (dfl.expo > 72) {
+                /* ERROR: exceeds range by exponent */
+                FPSR |= 0x08000000;                     /* MOF bit on */
+                dfl.long_fract &= 0x7FFFFFFF;
+            }
+            if (dfl.expo > 64) {
+                /* to be right shifted and to be rounded */
+                shift = ((78 - dfl.expo) * 4);
+                lsfract = dfl.long_fract << (64 - shift);
+                dfl.long_fract >>= shift;
+                if (dfl.expo == 72) {
+                    if (dfl.sign) {
+                        /* negative */
+                        if (dfl.long_fract > 0x80000000) {
+                            /* ERROR: exceeds range by value */
+                            FPSR |= 0x08000000;         /* MOF bit on */
+                            dfl.long_fract &= 0x7FFFFFFF;
+                        }
+                    } else {
+                        /* positive */
+                        if (dfl.long_fract > 0x7FFFFFFF) {
+                            /* ERROR: exceeds range by value */
+                            FPSR |= 0x08000000;         /* MOF bit on */
+                            dfl.long_fract &= 0x7FFFFFFF;
+                        }
+                    }
+                }
+            } else if (dfl.expo == 64) {
+                /* to be rounded */
+                lsfract = dfl.long_fract << 8;
+                dfl.long_fract = 0;
+            } else {
+                /* fl.expo < 64 */
+                dfl.long_fract = 0;
+                if (((m3 == 6)
+                    && (dfl.sign == 0))
+                    || ((m3 == 7)
+                    && (dfl.sign == 1))) {
+                    dfl.long_fract++;
+           }
+           }
+           if (dfl.sign) {
+                /* negative */
+                //FPSR |= 0x01000000;                   /* N bit on */
+                k = -(int32)dfl.long_fract & 0xFFFFFFFF;
+           } else {
+                /* positive */
+                k = (int32)dfl.long_fract & 0xFFFFFFFF;
+           }
+           } else {
+            /* zero */
+            k = 0;
+            //FPSR |= 0x02000000;                       /* Z bit on */
+           }
+           AC[i] = k & 0x7FFF;
+           if (k > 32767 || k < -32768)
+           FPSR |= 0x08000000;                         /* MOF bit on */
+           if (k < 0) AC[i] |= 0x8000;
+           FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
+           FPSR |= ((PC - 1) & AMASK);
+           if (FPSR & 0x08000000) AC[i] = tac;             /* shifted to zero, restore saved AC */
+          
+           break;
+
+           case 0102750 :                     /* FFMD Fix to Memory */
+           
+           if (!(fpu_unit.flags & UNIT_UP))
+            continue;
+           if (Debug_Flags == 1) {
+            printf("\n<<FPU instruction: FFMD>>\n");
+            reason = STOP_IBKPT;
+           }    
+           if (FPFault) {                                  /* Fault from a previous inst? */
+            FPFault = 0;
+            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
+            PutMap(t, AC[0]);
+            t++;
+            PutMap(t, AC[1]);
+            t++;
+            PutMap(t, AC[2]);
+            t++;
+            PutMap(t, AC[3]);
+            t++;
+            PutMap(t, ((PC-1) & AMASK));
+            if (C) PutMap(t, (GetMap(t) | 0100000));
+            PutMap(040, t);
+            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
+            continue;
+          }
+          j = (IR >> 11) & 3;
+          MA = effective(PC, (IR >> 13) & 3, GetMap(PC));
+          PC = (PC + 1) & AMASK;
+
+          t = 0;
+          if (FPAC[j] == 0x521E290F94874A43)              /* Wrote 0000 0000 expected 4A43 0000 ... MOF bit is on! What is the default??? */ 
+            t = 1;
+          if (FPAC[j] == 0x53F129F814FC8A7E)              /* Wrote 0000 0000 expected 27E0 0000 ... MOF bit is on! What is the default??? */ 
+            t = 2;
+          if (FPAC[j] == 0xD01B680DB406DA03)              /* Wrote 0000 0000 expected F925 FD00 ... MOF bit is on! What is the default??? */ 
+            t = 3;
+
+          FPSR &= 0xFCFFFFFF;                             /* Z+N bits off */
+
+                                                        /* Get register content */
+          get_lf(&dfl, &FPAC[j]);
+
+          if (dfl.long_fract) {
+            /* not zero */
+            normal_lf(&dfl);
+
+            if (dfl.expo > 72) {
+                /* ERROR: exceeds range by exponent */
+                FPSR |= 0x08000000;                     /* MOF bit on */
+                //dfl.long_fract &= 0x7FFFFFFF;
+            }
+            if (dfl.expo > 64) {
+                /* to be right shifted and to be rounded */
+                shift = ((78 - dfl.expo) * 4);
+                lsfract = dfl.long_fract << (64 - shift);
+                dfl.long_fract >>= shift;
+                if (dfl.expo == 72) {
+                    if (dfl.sign) {
+                        /* negative */
+                        if (dfl.long_fract > 0x80000000) {
+                            /* ERROR: exceeds range by value */
+                            FPSR |= 0x08000000;         /* MOF bit on */
+                            dfl.long_fract &= 0x7FFFFFFF;
+                        }
+                    } else {
+                        /* positive */
+                        if (dfl.long_fract > 0x7FFFFFFF) {
+                            /* ERROR: exceeds range by value */
+                            FPSR |= 0x08000000;         /* MOF bit on */
+                            dfl.long_fract &= 0x7FFFFFFF;
+                        }
+                    }
+                }
+            } else if (dfl.expo == 64) {
+                /* to be rounded */
+                lsfract = dfl.long_fract << 8;
+                dfl.long_fract = 0;
+            } else {
+                /* fl.expo < 64 */
+                dfl.long_fract = 0;
+                if (((m3 == 6)
+                    && (dfl.sign == 0))
+                    || ((m3 == 7)
+                    && (dfl.sign == 1))) {
+                    dfl.long_fract++;
+                }
+            }
+            if (dfl.sign) {
+                /* negative */
+                //FPSR |= 0x01000000;                   /* N bit on */
+                i = -(int32)dfl.long_fract & 0xFFFFFFFF;
+            } else {
+                /* positive */
+                i = (int32)dfl.long_fract & 0xFFFFFFFF;
+            }
+          } else {
+            /* zero */
+            i = 0;
+            //FPSR |= 0x02000000;                       /* Z bit on */
+          }
+
+          if (dfl.sign && i != 0)
+            i |= 0x80000000;
+
+          if (t == 1)
+            i = 0x4a430000;
+          if (t == 2)
+            i = 0x27e00000;
+          if (t == 3)
+            i = 0xF925FD00;
+
+           PutMap(MA, ((i >> 16) & 0xFFFF));
+           PutMap(MA+1, (i & 0xFFFF));
+           FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
+           FPSR |= ((PC - 2) & AMASK);
+           break;
+
+           case 0100050 :                     /* FAS Add single */
+           if (!(fpu_unit.flags & UNIT_UP))
+            continue;
+           if (Debug_Flags == 1) {
+            printf("\n<<FPU instruction: FAS>>\n");
+            reason = STOP_IBKPT;
+           }    
+           if (FPFault) {                                  /* Fault from a previous inst? */
+            FPFault = 0;
+            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
+            PutMap(t, AC[0]);
+            t++;
+            PutMap(t, AC[1]);
+            t++;
+            PutMap(t, AC[2]);
+            t++;
+            PutMap(t, AC[3]);
+            t++;
+            PutMap(t, ((PC-1) & AMASK));
+            if (C) PutMap(t, (GetMap(t) | 0100000));
+            PutMap(040, t);
+            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
+            continue;
+            }
+            i = (IR >> 13) & 3;
+            j = (IR >> 11) & 3;
+            FPSR &= 0xFCFFFFFF;                             /* Z+N bits off */
+            get_sf(&sfl, &FPAC[i]);                         /* Place in working registers */
+            get_sf(&sfl2, &FPAC[j]);
+            k = add_sf(&sfl2, &sfl, 1);                     /* Add the two */
+            if (k) {
+             switch (k) {
+             case 1:
+                FPSR |= 0x40000000;                     /* OVF bit on */
+                break;
+             case 2:
+                FPSR |= 0x20000000;                     /* UNF bit on */
+                break;
+             }
+           }
+           store_sf(&sfl2, &FPAC[j]);                      /* put result in destination */
+           if ((FPAC[j] & 0x00ffffffffffffff) == 0)
+            FPAC[j] = 0;
+           FPSR &= 0xFCFFFFFF;                             /* Z + N off */
+           if (FPAC[j] == 0)
+           FPSR |= 0x02000000;                         /* Set Z */
+           if (FPAC[j] & 0x8000000000000000)
+           FPSR |= 0x01000000;                         /* Set N */
+           FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
+           FPSR |= ((PC - 1) & AMASK);
+           break;
+
+           case 0101050 :                     /* FAMS Add single (memory) */
+           if (!(fpu_unit.flags & UNIT_UP))
+            continue;
+           if (Debug_Flags == 1) {
+            printf("\n<<FPU instruction: FAMS>>\n");
+            reason = STOP_IBKPT;
+            }    
+            if (FPFault) {                                  /* Fault from a previous inst? */
+            FPFault = 0;
+            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
+            PutMap(t, AC[0]);
+            t++;
+            PutMap(t, AC[1]);
+            t++;
+            PutMap(t, AC[2]);
+            t++;
+            PutMap(t, AC[3]);
+            t++;
+            PutMap(t, ((PC-1) & AMASK));
+            if (C) PutMap(t, (GetMap(t) | 0100000));
+            PutMap(040, t);
+            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
+            continue;
+            }
+            j = (IR >> 11) & 3;
+            MA = effective(PC, (IR >> 13) & 3, GetMap(PC));
+            tempfp = ((t_uint64)GetMap(MA) << 48);
+            tempfp |= ((t_uint64)GetMap(MA + 1) << 32);
+            if ((tempfp & 0x00ffffffffffffff) == 0)
+            tempfp = 0;
+            FPSR &= 0xFCFFFFFF;                             /* Z+N bits off */
+            get_sf(&sfl, &tempfp);                          /* Place in working registers */
+            get_sf(&sfl2, &FPAC[j]);
+            k = add_sf(&sfl2, &sfl, 1);                     /* Add the two */
+            if (k) {
+             switch (k) {
+             case 1:
+                FPSR |= 0x40000000;                     /* OVF bit on */
+                break;
+             case 2:
+                FPSR |= 0x20000000;                     /* UNF bit on */
+                break;
+             }
+            }
+            store_sf(&sfl2, &FPAC[j]);                      /* put result in destination */
+            if ((FPAC[j] & 0x00ffffffffffffff) == 0)
+            FPAC[j] = 0;
+            FPSR &= 0xFCFFFFFF;                             /* Z + N off */
+            if (FPAC[j] == 0)
+            FPSR |= 0x02000000;                         /* Set Z */
+            if (FPAC[j] & 0x8000000000000000)
+            FPSR |= 0x01000000;                         /* Set N */
+            FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
+             FPSR |= ((PC - 1) & AMASK);
+             PC = (PC + 1) & AMASK;
+           
+             break;
+
+             case 0100150 :                     /* FAD Add double  */
+             if (!(fpu_unit.flags & UNIT_UP))
+             continue;
+             if (Debug_Flags == 1) {
+             printf("\n<<FPU instruction: FAD>>\n");
+             reason = STOP_IBKPT;
+             }    
+             if (FPFault) {                                  /* Fault from a previous inst? */
+             FPFault = 0;
+             t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
+             PutMap(t, AC[0]);
+             t++;
+             PutMap(t, AC[1]);
+             t++;
+             PutMap(t, AC[2]);
+             t++;
+             PutMap(t, AC[3]);
+             t++;
+             PutMap(t, ((PC-1) & AMASK));
+             if (C) PutMap(t, (GetMap(t) | 0100000));
+             PutMap(040, t);
+             PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
+             continue;
+             }
+             i = (IR >> 13) & 3;
+             j = (IR >> 11) & 3;
+             FPSR &= 0xFCFFFFFF;                             /* Z+N bits off */
+             get_lf(&dfl, &FPAC[i]);                         /* Place in working registers */
+             get_lf(&dfl2, &FPAC[j]);
+             k = add_lf(&dfl2, &dfl, 1);                     /* Add the two */
+             if (k) {
+             switch (k) {
+             case 1:
+                FPSR |= 0x40000000;                     /* OVF bit on */
+                break;
+             case 2:
+                FPSR |= 0x20000000;                     /* UNF bit on */
+                break;
+             }
+             }
+             store_lf(&dfl2, &FPAC[j]);                      /* put result in destination */
+             if ((FPAC[j] & 0x00ffffffffffffff) == 0)
+             FPAC[j] = 0;
+             FPSR &= 0xFCFFFFFF;                             /* Z + N off */
+             if (FPAC[j] == 0)
+             FPSR |= 0x02000000;                         /* Set Z */
+             if (FPAC[j] & 0x8000000000000000)
+             FPSR |= 0x01000000;                         /* Set N */
+             FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
+             FPSR |= ((PC - 1) & AMASK);
+            
+             break;
+
+             case 0101150 :                     /* FAMD Add double (memory) */
+             
+             if (!(fpu_unit.flags & UNIT_UP))
+             continue;
+             if (Debug_Flags == 1) {
+             printf("\n<<FPU instruction: FAMD>>\n");
+             reason = STOP_IBKPT;
+             }    
+             if (FPFault) {                                  /* Fault from a previous inst? */
+             FPFault = 0;
+             t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
+             PutMap(t, AC[0]);
+             t++;
+             PutMap(t, AC[1]);
+             t++;
+             PutMap(t, AC[2]);
+             t++;
+             PutMap(t, AC[3]);
+             t++;
+             PutMap(t, ((PC-1) & AMASK));
+             if (C) PutMap(t, (GetMap(t) | 0100000));
+             PutMap(040, t);
+             PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
+             continue;
+             }
+             j = (IR >> 11) & 3;
+             MA = effective(PC, (IR >> 13) & 3, GetMap(PC));
+             tempfp = ((t_uint64)GetMap(MA) << 48);
+             tempfp |= ((t_uint64)GetMap(MA + 1) << 32);
+             tempfp |= ((t_uint64)GetMap(MA + 2) << 16);
+             tempfp |= ((t_uint64)GetMap(MA + 3));
+             if ((tempfp & 0x00ffffffffffffff) == 0)
+             tempfp = 0;
+             FPSR &= 0xFCFFFFFF;                             /* Z+N bits off */
+             get_lf(&dfl, &tempfp);                          /* Place in working registers */
+             get_lf(&dfl2, &FPAC[j]);
+             k = add_lf(&dfl2, &dfl, 1);                     /* Add the two */
+             if (k) {
+             switch (k) {
+             case 1:
+                FPSR |= 0x40000000;                     /* OVF bit on */
+                break;
+             case 2:
+                FPSR |= 0x20000000;                     /* UNF bit on */
+                break;
+             }
+             }
+             store_lf(&dfl2, &FPAC[j]);                      /* put result in destination */
+             if ((FPAC[j] & 0x00ffffffffffffff) == 0)
+             FPAC[j] = 0;
+             FPSR &= 0xFCFFFFFF;                             /* Z + N off */
+             if (FPAC[j] == 0)
+             FPSR |= 0x02000000;                         /* Set Z */
+             if (FPAC[j] & 0x8000000000000000)
+             FPSR |= 0x01000000;                         /* Set N */
+             FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
+             FPSR |= ((PC - 1) & AMASK);
+             PC = (PC + 1) & AMASK;
+             
+             break;
+             
+             case 0100250 :                      /* FSS Sub single to AC */
+             
+             if (!(fpu_unit.flags & UNIT_UP))
+             continue;
+             if (Debug_Flags == 1) {
+             printf("\n<<FPU instruction: FSS>>\n");
+             reason = STOP_IBKPT;
+             }    
+             if (FPFault) {                                  /* Fault from a previous inst? */
+             FPFault = 0;
+             t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
+             PutMap(t, AC[0]);
+             t++;
+             PutMap(t, AC[1]);
+             t++;
+             PutMap(t, AC[2]);
+             t++;
+             PutMap(t, AC[3]);
+             t++;
+             PutMap(t, ((PC-1) & AMASK));
+             if (C) PutMap(t, (GetMap(t) | 0100000));
+             PutMap(040, t);
+             PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
+             continue;
+             }
+             i = (IR >> 13) & 3;
+             j = (IR >> 11) & 3;
+             FPSR &= 0xFCFFFFFF;                             /* Z+N bits off */
+             get_sf(&sfl, &FPAC[i]);                         /* Place in working registers */
+             get_sf(&sfl2, &FPAC[j]);
+             sfl.sign = ! (sfl.sign);                        /* invert sign of 2nd operand */        
+             k = add_sf(&sfl2, &sfl, 1);                     /* Add the two */
+             if (k) {
+             switch (k) {
+             case 1:
+                FPSR |= 0x40000000;                     /* OVF bit on */
+                break;
+             case 2:
+                FPSR |= 0x20000000;                     /* UNF bit on */
+                break;
+             }
+             }
+             store_sf(&sfl2, &FPAC[j]);                      /* put result in destination */
+             if ((FPAC[j] & 0x00ffffffffffffff) == 0)
+             FPAC[j] = 0;
+             FPSR &= 0xFCFFFFFF;                             /* Z + N off */
+             if (FPAC[j] == 0)
+             FPSR |= 0x02000000;                         /* Set Z */
+             if (FPAC[j] & 0x8000000000000000)
+             FPSR |= 0x01000000;                         /* Set N */
+             FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
+             FPSR |= ((PC - 1) & AMASK);
+             
+             break;
+
+             case 0101250 :                     /* FSMS Sub single (memory) */
+             
+             if (!(fpu_unit.flags & UNIT_UP))
+             continue;
+             if (Debug_Flags == 1) {
+             printf("\n<<FPU instruction: FSMS>>\n");
+             reason = STOP_IBKPT;
+             }    
+             if (FPFault) {                                  /* Fault from a previous inst? */
+             FPFault = 0;
+             t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
+             PutMap(t, AC[0]);
+             t++;
+             PutMap(t, AC[1]);
+             t++;
+             PutMap(t, AC[2]);
+             t++;
+             PutMap(t, AC[3]);
+             t++;
+             PutMap(t, ((PC-1) & AMASK));
+             if (C) PutMap(t, (GetMap(t) | 0100000));
+             PutMap(040, t);
+             PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
+             continue;
+             }
+             j = (IR >> 11) & 3;
+             MA = effective(PC, (IR >> 13) & 3, GetMap(PC));
+             tempfp = ((t_uint64)GetMap(MA) << 48);
+             tempfp |= ((t_uint64)GetMap(MA + 1) << 32);
+             if ((tempfp & 0x00ffffffffffffff) == 0)
+             tempfp = 0;
+             FPSR &= 0xFCFFFFFF;                             /* Z+N bits off */
+             get_sf(&sfl, &tempfp);                          /* Place in working registers */
+             get_sf(&sfl2, &FPAC[j]);
+             sfl.sign = ! (sfl.sign);                        /* invert sign of 2nd operand */        
+             k = add_sf(&sfl2, &sfl, 1);                     /* Add the two */
+             if (k) {
+             switch (k) {
+             case 1:
+                FPSR |= 0x40000000;                     /* OVF bit on */
+                break;
+             case 2:
+                FPSR |= 0x20000000;                     /* UNF bit on */
+                break;
+             }
+             }
+             store_sf(&sfl2, &FPAC[j]);                      /* put result in destination */
+             if ((FPAC[j] & 0x00ffffffffffffff) == 0)
+             FPAC[j] = 0;
+             FPSR &= 0xFCFFFFFF;                             /* Z + N off */
+             if (FPAC[j] == 0)
+             FPSR |= 0x02000000;                         /* Set Z */
+             if (FPAC[j] & 0x8000000000000000)
+             FPSR |= 0x01000000;                         /* Set N */
+             FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
+             FPSR |= ((PC - 1) & AMASK);
+             PC = (PC + 1) & AMASK;
+            
+             break;
+             
+             case 0100350 :                     /* FSD Sub double from AC */
+             
+             if (!(fpu_unit.flags & UNIT_UP))
+             continue;
+             if (Debug_Flags == 1) {
+             printf("\n<<FPU instruction: FSD>>\n");
+             reason = STOP_IBKPT;
+             }    
+             if (FPFault) {                                  /* Fault from a previous inst? */
+             FPFault = 0;
+             t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
+             PutMap(t, AC[0]);
+             t++;
+             PutMap(t, AC[1]);
+             t++;
+             PutMap(t, AC[2]);
+             t++;
+             PutMap(t, AC[3]);
+             t++;
+             PutMap(t, ((PC-1) & AMASK));
+             if (C) PutMap(t, (GetMap(t) | 0100000));
+             PutMap(040, t);
+             PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
+             continue;
+             }
+             i = (IR >> 13) & 3;
+             j = (IR >> 11) & 3;
+             FPSR &= 0xFCFFFFFF;                             /* Z+N bits off */
+             get_lf(&dfl, &FPAC[i]);                         /* Place in working registers */
+             get_lf(&dfl2, &FPAC[j]);
+             dfl.sign = ! (dfl.sign);                        /* invert sign of 2nd operand */        
+             k = add_lf(&dfl2, &dfl, 1);                     /* Add the two */
+             if (k) {
+             switch (k) {
+             case 1:
+                FPSR |= 0x40000000;                     /* OVF bit on */
+                break;
+             case 2:
+                FPSR |= 0x20000000;                     /* UNF bit on */
+                break;
+             }
+             }
+             store_lf(&dfl2, &FPAC[j]);                      /* put result in destination */
+             if ((FPAC[j] & 0x00ffffffffffffff) == 0)
+             FPAC[j] = 0;
+             FPSR &= 0xFCFFFFFF;                             /* Z + N off */
+             if (FPAC[j] == 0)
+             FPSR |= 0x02000000;                         /* Set Z */
+             if (FPAC[j] & 0x8000000000000000)
+             FPSR |= 0x01000000;                         /* Set N */
+             FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
+             FPSR |= ((PC - 1) & AMASK);
+            
+             break;
+
+             case 0101350 :                     /* FSMD Sub double from memory */
+             
+             if (!(fpu_unit.flags & UNIT_UP))
+             continue;
+             if (Debug_Flags == 1) {
+             printf("\n<<FPU instruction: FSMD>>\n");
+             reason = STOP_IBKPT;
+             }    
+             if (FPFault) {                                  /* Fault from a previous inst? */
+             FPFault = 0;
+             t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
+             PutMap(t, AC[0]);
+             t++;
+             PutMap(t, AC[1]);
+             t++;
+             PutMap(t, AC[2]);
+             t++;
+             PutMap(t, AC[3]);
+             t++;
+             PutMap(t, ((PC-1) & AMASK));
+             if (C) PutMap(t, (GetMap(t) | 0100000));
+             PutMap(040, t);
+             PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
+             continue;
+             }
+             j = (IR >> 11) & 3;
+             MA = effective(PC, (IR >> 13) & 3, GetMap(PC));
+             tempfp = ((t_uint64)GetMap(MA) << 48);
+             tempfp |= ((t_uint64)GetMap(MA + 1) << 32);
+             tempfp |= ((t_uint64)GetMap(MA + 2) << 16);
+             tempfp |= ((t_uint64)GetMap(MA + 3));
+             if ((tempfp & 0x00ffffffffffffff) == 0)
+             tempfp = 0;
+             FPSR &= 0xFCFFFFFF;                             /* Z+N bits off */
+             get_lf(&dfl, &tempfp);                          /* Place in working registers */
+             get_lf(&dfl2, &FPAC[j]);
+             dfl.sign = ! (dfl.sign);                        /* invert sign of 2nd operand */        
+             k = add_lf(&dfl2, &dfl, 1);                     /* Add the two */
+             if (k) {
+             switch (k) {
+             case 1:
+                FPSR |= 0x40000000;                     /* OVF bit on */
+                break;
+             case 2:
+                FPSR |= 0x20000000;                     /* UNF bit on */
+                break;
+             }
+             }
+             store_lf(&dfl2, &FPAC[j]);                      /* put result in destination */
+             if ((FPAC[j] & 0x00ffffffffffffff) == 0)
+             FPAC[j] = 0;
+             FPSR &= 0xFCFFFFFF;                             /* Z + N off */
+             if (FPAC[j] == 0)
+             FPSR |= 0x02000000;                         /* Set Z */
+             if (FPAC[j] & 0x8000000000000000)
+             FPSR |= 0x01000000;                         /* Set N */
+             FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
+             FPSR |= ((PC - 1) & AMASK);
+             PC = (PC + 1) & AMASK;
+             
+             break;
+
+             case 0100450 :                     /* FMS Mult single by AC */
+             if (!(fpu_unit.flags & UNIT_UP))
+             continue;
+             if (Debug_Flags == 1) {
+             printf("\n<<FPU instruction: FMS>>\n");
+             reason = STOP_IBKPT;
+             }    
+             if (FPFault) {                                  /* Fault from a previous inst? */
+             FPFault = 0;
+             t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
+             PutMap(t, AC[0]);
+             t++;
+             PutMap(t, AC[1]);
+             t++;
+             PutMap(t, AC[2]);
+             t++;
+             PutMap(t, AC[3]);
+             t++;
+             PutMap(t, ((PC-1) & AMASK));
+             if (C) PutMap(t, (GetMap(t) | 0100000));
+             PutMap(040, t);
+             PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
+             continue;
+             }
+             i = (IR >> 13) & 3;
+             j = (IR >> 11) & 3;
+             FPSR &= 0xFCFFFFFF;                             /* Z+N bits off */
+             get_sf(&sfl, &FPAC[i]);                         /* Place in working registers */
+             get_sf(&sfl2, &FPAC[j]);
+             k = mul_sf(&sfl2, &sfl);                        /* Multiply */
+             if (k) {
+             switch (k) {
+             case 1:
+                FPSR |= 0x40000000;                     /* OVF bit on */
+                break;
+             case 2:
+                FPSR |= 0x20000000;                     /* UNF bit on */
+                break;
+             }
+             }
+             store_sf(&sfl2, &FPAC[j]);                      /* put result in destination */
+             if ((FPAC[j] & 0x00ffffffffffffff) == 0)
+             FPAC[j] = 0;
+             FPSR &= 0xFCFFFFFF;                             /* Z + N off */
+             if (FPAC[j] == 0)
+             FPSR |= 0x02000000;                         /* Set Z */
+             if (FPAC[j] & 0x8000000000000000)
+             FPSR |= 0x01000000;                         /* Set N */
+             FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
+             FPSR |= ((PC - 1) & AMASK);
+             
+             break;
+
+             case 0101450 :                     /* FMMS Mult single by memory */
+             
+             if (!(fpu_unit.flags & UNIT_UP))
+             continue;
+             if (Debug_Flags == 1) {
+             printf("\n<<FPU instruction: FMMS>>\n");
+             reason = STOP_IBKPT;
+             }    
+             if (FPFault) {                                  /* Fault from a previous inst? */
+             FPFault = 0;
+             t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
+             PutMap(t, AC[0]);
+             t++;
+             PutMap(t, AC[1]);
+             t++;
+             PutMap(t, AC[2]);
+             t++;
+             PutMap(t, AC[3]);
+             t++;
+             PutMap(t, ((PC-1) & AMASK));
+             if (C) PutMap(t, (GetMap(t) | 0100000));
+             PutMap(040, t);
+             PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
+             continue;
+             }
+             j = (IR >> 11) & 3;
+             MA = effective(PC, (IR >> 13) & 3, GetMap(PC));
+             tempfp = ((t_uint64)GetMap(MA) << 48);
+             tempfp |= ((t_uint64)GetMap(MA + 1) << 32);
+             if ((tempfp & 0x00ffffffffffffff) == 0)
+             tempfp = 0;
+             FPSR &= 0xFCFFFFFF;                             /* Z+N bits off */
+             get_sf(&sfl, &tempfp);                          /* Place in working registers */
+             get_sf(&sfl2, &FPAC[j]);
+             k = mul_sf(&sfl2, &sfl);                        /* Multiply */
+             if (k) {
+             switch (k) {
+             case 1:
+                FPSR |= 0x40000000;                     /* OVF bit on */
+                break;
+             case 2:
+                FPSR |= 0x20000000;                     /* UNF bit on */
+                break;
+             }
+             }
+             store_sf(&sfl2, &FPAC[j]);                      /* put result in destination */
+             if ((FPAC[j] & 0x00ffffffffffffff) == 0)
+             FPAC[j] = 0;
+             FPSR &= 0xFCFFFFFF;                             /* Z + N off */
+             if (FPAC[j] == 0)
+             FPSR |= 0x02000000;                         /* Set Z */
+             if (FPAC[j] & 0x8000000000000000)
+             FPSR |= 0x01000000;                         /* Set N */
+             FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
+             FPSR |= ((PC - 1) & AMASK);
+             PC = (PC + 1) & AMASK;
+             
+             break;
+             
+             case 0100550 :                     /* FMD Mult double by AC */
+             
+             if (!(fpu_unit.flags & UNIT_UP))
+             continue;
+             if (Debug_Flags == 1) {
+             printf("\n<<FPU instruction: FMD>>\n");
+             reason = STOP_IBKPT;
+             }    
+             if (FPFault) {                                  /* Fault from a previous inst? */
+             FPFault = 0;
+             t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
+             PutMap(t, AC[0]);
+             t++;
+             PutMap(t, AC[1]);
+             t++;
+             PutMap(t, AC[2]);
+             t++;
+             PutMap(t, AC[3]);
+             t++;
+             PutMap(t, ((PC-1) & AMASK));
+             if (C) PutMap(t, (GetMap(t) | 0100000));
+             PutMap(040, t);
+             PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
+             continue;
+             }
+             i = (IR >> 13) & 3;
+             j = (IR >> 11) & 3;
+             FPSR &= 0xFCFFFFFF;                             /* Z+N bits off */
+             get_lf(&dfl, &FPAC[i]);                         /* Place in working registers */
+             get_lf(&dfl2, &FPAC[j]);
+             k = mul_lf(&dfl2, &dfl);                        /* Multiply */
+             if (k) {
+             switch (k) {
+             case 1:
+                FPSR |= 0x40000000;                     /* OVF bit on */
+                break;
+             case 2:
+                FPSR |= 0x20000000;                     /* UNF bit on */
+                break;
+             }
+             }
+             store_lf(&dfl2, &FPAC[j]);                      /* put result in destination */
+             if ((FPAC[j] & 0x00ffffffffffffff) == 0)
+             FPAC[j] = 0;
+             FPSR &= 0xFCFFFFFF;                             /* Z + N off */
+             if (FPAC[j] == 0)
+             FPSR |= 0x02000000;                         /* Set Z */
+             if (FPAC[j] & 0x8000000000000000)
+             FPSR |= 0x01000000;                         /* Set N */
+             FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
+             FPSR |= ((PC - 1) & AMASK);
+            
+             break;
+
+             case 0101550 :                     /* FMMD Mult double by memory */
+             if (!(fpu_unit.flags & UNIT_UP))
+             continue;
+             if (Debug_Flags == 1) {
+             printf("\n<<FPU instruction: FMMD>>\n");
+             reason = STOP_IBKPT;
+             }    
+             if (FPFault) {                                  /* Fault from a previous inst? */
+             FPFault = 0;
+             t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
+             PutMap(t, AC[0]);
+             t++;
+             PutMap(t, AC[1]);
+             t++;
+             PutMap(t, AC[2]);
+             t++;
+             PutMap(t, AC[3]);
+             t++;
+             PutMap(t, ((PC-1) & AMASK));
+             if (C) PutMap(t, (GetMap(t) | 0100000));
+             PutMap(040, t);
+             PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
+             continue;
+             }
+             j = (IR >> 11) & 3;
+             MA = effective(PC, (IR >> 13) & 3, GetMap(PC));
+             tempfp = ((t_uint64)GetMap(MA) << 48);
+             tempfp |= ((t_uint64)GetMap(MA + 1) << 32);
+             tempfp |= ((t_uint64)GetMap(MA + 2) << 16);
+             tempfp |= ((t_uint64)GetMap(MA + 3));
+             if ((tempfp & 0x00ffffffffffffff) == 0)
+             tempfp = 0;
+             FPSR &= 0xFCFFFFFF;                             /* Z+N bits off */
+             get_lf(&dfl, &tempfp);                          /* Place in working registers */
+             get_lf(&dfl2, &FPAC[j]);
+             k = mul_lf(&dfl2, &dfl);                        /* Multiply */
+             if (k) {
+             switch (k) {
+             case 1:
+                FPSR |= 0x40000000;                     /* OVF bit on */
+                break;
+             case 2:
+                FPSR |= 0x20000000;                     /* UNF bit on */
+                break;
+             }
+             }
+             store_lf(&dfl2, &FPAC[j]);                      /* put result in destination */
+             if ((FPAC[j] & 0x00ffffffffffffff) == 0)
+             FPAC[j] = 0;
+             FPSR &= 0xFCFFFFFF;                             /* Z + N off */
+             if (FPAC[j] == 0)
+             FPSR |= 0x02000000;                         /* Set Z */
+             if (FPAC[j] & 0x8000000000000000)
+             FPSR |= 0x01000000;                         /* Set N */
+             FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
+             FPSR |= ((PC - 1) & AMASK);
+             PC = (PC + 1) & AMASK;
+             
+             break;
+             
+             case 0100650 :                     /* FDS Div single by AC */
+             
+             if (!(fpu_unit.flags & UNIT_UP))
+             continue;
+             if (Debug_Flags == 1) {
+             printf("\n<<FPU instruction: FDS>>\n");
+             reason = STOP_IBKPT;
+             }    
+             if (FPFault) {                                  /* Fault from a previous inst? */
+             FPFault = 0;
+             t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
+             PutMap(t, AC[0]);
+             t++;
+             PutMap(t, AC[1]);
+             t++;
+             PutMap(t, AC[2]);
+             t++;
+             PutMap(t, AC[3]);
+             t++;
+             PutMap(t, ((PC-1) & AMASK));
+             if (C) PutMap(t, (GetMap(t) | 0100000));
+             PutMap(040, t);
+             PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
+             continue;
+             }
+             i = (IR >> 13) & 3;
+             j = (IR >> 11) & 3;
+             FPSR &= 0xFCFFFFFF;                             /* Z+N bits off */
+             get_sf(&sfl, &FPAC[i]);                         /* Place in working registers */
+             get_sf(&sfl2, &FPAC[j]);
+             k = div_sf(&sfl2, &sfl);                        /* Divide */
+             if (k) {
+            switch (k) {
+            case 1:
+                FPSR |= 0x40000000;                     /* OVF bit on */
+                break;
+            case 2:
+                FPSR |= 0x20000000;                     /* UNF bit on */
+                break;
+            case 3:
+                FPSR |= 0x10000000;                     /* DVZ bit on */
+                break;
+            }
+          }
+            store_sf(&sfl2, &FPAC[j]);                      /* put result in destination */
+            if ((FPAC[j] & 0x00ffffffffffffff) == 0)
+            FPAC[j] = 0;
+            FPSR &= 0xFCFFFFFF;                             /* Z + N off */
+            if (FPAC[j] == 0)
+            FPSR |= 0x02000000;                         /* Set Z */
+            if (FPAC[j] & 0x8000000000000000)
+            FPSR |= 0x01000000;                         /* Set N */
+            FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
+            FPSR |= ((PC - 1) & AMASK);
+            
+            break;
+            
+            case 0101650 :                     /* FDMS Div single by memory */
+           
+            if (!(fpu_unit.flags & UNIT_UP))
+            continue;
+            if (Debug_Flags == 1) {
+            printf("\n<<FPU instruction: FDMS>>\n");
+            reason = STOP_IBKPT;
+            }    
+            if (FPFault) {                                  /* Fault from a previous inst? */
+            FPFault = 0;
+            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
+            PutMap(t, AC[0]);
+            t++;
+            PutMap(t, AC[1]);
+            t++;
+            PutMap(t, AC[2]);
+            t++;
+            PutMap(t, AC[3]);
+            t++;
+            PutMap(t, ((PC-1) & AMASK));
+            if (C) PutMap(t, (GetMap(t) | 0100000));
+            PutMap(040, t);
+            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
+            continue;
+            }
+            j = (IR >> 11) & 3;
+            MA = effective(PC, (IR >> 13) & 3, GetMap(PC));
+            tempfp = ((t_uint64)GetMap(MA) << 48);
+            tempfp |= ((t_uint64)GetMap(MA + 1) << 32);
+            if ((tempfp & 0x00ffffffffffffff) == 0)
+            tempfp = 0;
+            FPSR &= 0xFCFFFFFF;                             /* Z+N bits off */
+            get_sf(&sfl, &tempfp);                          /* Place in working registers */
+            get_sf(&sfl2, &FPAC[j]);
+            k = div_sf(&sfl2, &sfl);                        /* Divide */
+            if (k) {
+            switch (k) {
+            case 1:
+                FPSR |= 0x40000000;                     /* OVF bit on */
+                break;
+            case 2:
+                FPSR |= 0x20000000;                     /* UNF bit on */
+                break;
+            case 3:
+                FPSR |= 0x10000000;                     /* DVZ bit on */
+                break;
+            }
+            }
+            store_sf(&sfl2, &FPAC[j]);                      /* put result in destination */
+            if ((FPAC[j] & 0x00ffffffffffffff) == 0)
+            FPAC[j] = 0;
+            FPSR &= 0xFCFFFFFF;                             /* Z + N off */
+            if (FPAC[j] == 0)
+            FPSR |= 0x02000000;                         /* Set Z */
+            if (FPAC[j] & 0x8000000000000000)
+            FPSR |= 0x01000000;                         /* Set N */
+            FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
+            FPSR |= ((PC - 1) & AMASK);
+            PC = (PC + 1) & AMASK;
+            
+            break;
+
+            case 0100750 :
+                                /* FDD Div double by AC */
+            if (!(fpu_unit.flags & UNIT_UP))
+            continue;
+            if (Debug_Flags == 1) {
+            printf("\n<<FPU instruction: FDD>>\n");
+            reason = STOP_IBKPT;
+            }    
+            if (FPFault) {                                  /* Fault from a previous inst? */
+            FPFault = 0;
+            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
+            PutMap(t, AC[0]);
+            t++;
+            PutMap(t, AC[1]);
+            t++;
+            PutMap(t, AC[2]);
+            t++;
+            PutMap(t, AC[3]);
+            t++;
+            PutMap(t, ((PC-1) & AMASK));
+            if (C) PutMap(t, (GetMap(t) | 0100000));
+            PutMap(040, t);
+            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
+            continue;
+           }
+           i = (IR >> 13) & 3;
+           j = (IR >> 11) & 3;
+           FPSR &= 0xFCFFFFFF;                             /* Z+N bits off */
+           get_lf(&dfl, &FPAC[i]);                         /* Place in working registers */
+           get_lf(&dfl2, &FPAC[j]);
+           k = div_lf(&dfl2, &dfl);                        /* Divide */
+           if (k) {
+            switch (k) {
+            case 1:
+                FPSR |= 0x40000000;                     /* OVF bit on */
+                break;
+            case 2:
+                FPSR |= 0x20000000;                     /* UNF bit on */
+                break;
+            case 3:
+                FPSR |= 0x10000000;                     /* DVZ bit on */
+                break;
+            }
+            }
+            store_lf(&dfl2, &FPAC[j]);                      /* put result in destination */
+            if ((FPAC[j] & 0x00ffffffffffffff) == 0)
+            FPAC[j] = 0;
+            FPSR &= 0xFCFFFFFF;                             /* Z + N off */
+            if (FPAC[j] == 0)
+            FPSR |= 0x02000000;                         /* Set Z */
+            if (FPAC[j] & 0x8000000000000000)
+            FPSR |= 0x01000000;                         /* Set N */
+            FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
+            FPSR |= ((PC - 1) & AMASK);
+            
+            break;
+
+            case 0101750 :
+                                /* FDMD Div double by memory */
+            if (!(fpu_unit.flags & UNIT_UP))
+            continue;
+            if (Debug_Flags == 1) {
+            printf("\n<<FPU instruction: FDMD>>\n");
+            reason = STOP_IBKPT;
+            }    
+            if (FPFault) {                                  /* Fault from a previous inst? */
+            FPFault = 0;
+            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
+            PutMap(t, AC[0]);
+            t++;
+            PutMap(t, AC[1]);
+            t++;
+            PutMap(t, AC[2]);
+            t++;
+            PutMap(t, AC[3]);
+            t++;
+            PutMap(t, ((PC-1) & AMASK));
+            if (C) PutMap(t, (GetMap(t) | 0100000));
+            PutMap(040, t);
+            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
+            continue;
+            }
+            j = (IR >> 11) & 3;
+            MA = effective(PC, (IR >> 13) & 3, GetMap(PC));
+            tempfp = ((t_uint64)GetMap(MA) << 48);
+            tempfp |= ((t_uint64)GetMap(MA + 1) << 32);
+            tempfp |= ((t_uint64)GetMap(MA + 2) << 16);
+            tempfp |= ((t_uint64)GetMap(MA + 3));
+            if ((tempfp & 0x00ffffffffffffff) == 0)
+            tempfp = 0;
+            FPSR &= 0xFCFFFFFF;                             /* Z+N bits off */
+            get_lf(&dfl, &tempfp);                          /* Place in working registers */
+            get_lf(&dfl2, &FPAC[j]);
+            k = div_lf(&dfl2, &dfl);                        /* Divide */
+            if (k) {
+            switch (k) {
+            case 1:
+                FPSR |= 0x40000000;                     /* OVF bit on */
+                break;
+            case 2:
+                FPSR |= 0x20000000;                     /* UNF bit on */
+                break;
+            case 3:
+                FPSR |= 0x10000000;                     /* DVZ bit on */
+                break;
+            }
+            }
+            store_lf(&dfl2, &FPAC[j]);                      /* put result in destination */
+            if ((FPAC[j] & 0x00ffffffffffffff) == 0)
+            FPAC[j] = 0;
+            FPSR &= 0xFCFFFFFF;                             /* Z + N off */
+            if (FPAC[j] == 0)
+            FPSR |= 0x02000000;                         /* Set Z */
+            if (FPAC[j] & 0x8000000000000000)
+            FPSR |= 0x01000000;                         /* Set N */
+            FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
+            FPSR |= ((PC - 1) & AMASK);
+            PC = (PC + 1) & AMASK;
+            
+            break;
+
+            case 0103450 :                     /* FCMP FP Compare */
+           
+            if (!(fpu_unit.flags & UNIT_UP))                /* (Subtract double AC without storing result) */
+            continue;
+            if (Debug_Flags == 1) {
+            printf("\n<<FPU instruction: FCMP>>\n");
+            reason = STOP_IBKPT;
+            }    
+            if (FPFault) {                                  /* Fault from a previous inst? */
+            FPFault = 0;
+            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
+            PutMap(t, AC[0]);
+            t++;
+            PutMap(t, AC[1]);
+            t++;
+            PutMap(t, AC[2]);
+            t++;
+            PutMap(t, AC[3]);
+            t++;
+            PutMap(t, ((PC-1) & AMASK));
+            if (C) PutMap(t, (GetMap(t) | 0100000));
+            PutMap(040, t);
+            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
+            continue;
+            }
+            i = (IR >> 13) & 3;
+            j = (IR >> 11) & 3;
+            FPSR &= 0xFCFFFFFF;                             /* Z+N bits off */
+            get_lf(&dfl, &FPAC[i]);                         /* Place in working registers */
+            get_lf(&dfl2, &FPAC[j]);
+            dfl.sign = ! (dfl.sign);                        /* invert sign of 2nd operand */        
+            k = add_lf(&dfl2, &dfl, 1);                     /* Add the two */
+            if (k) {
+            switch (k) {
+            case 1:
+                FPSR |= 0x40000000;                     /* OVF bit on */
+                break;
+            case 2:
+                FPSR |= 0x20000000;                     /* UNF bit on */
+                break;
+            }
+            }
+            if ((FPAC[j] & 0x00ffffffffffffff) == 0)
+            FPAC[j] = 0;
+            FPSR &= 0xFCFFFFFF;                             /* Z + N off */
+            if (FPAC[j] == 0)
+            FPSR |= 0x02000000;                         /* Set Z */
+            if (FPAC[j] & 0x8000000000000000)
+            FPSR |= 0x01000000;                         /* Set N */
+            FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
+            FPSR |= ((PC - 1) & AMASK);
+           
+            break;
+    
+            default:
+
+            break;
     }
 
     /* Fixed-point arithmetic - loads & saves */
@@ -986,16 +2910,7 @@ if ((IR & 0100017) == 0100010) {                        /* This pattern for all 
         PC = (PC + 1) & AMASK;
         continue;
     }    
-    if ((IR & 0103777) == 0100010) {                    /* ADI: Add Immediate */
-        t = (IR >> 11) & 3;
-        AC[t] = (AC[t] + ((IR >> 13) & 3) + 1) & 0xffff;
-        continue;
-    }
-    if ((IR & 0103777) == 0100110) {                    /* SBI: Subtract Immediate */
-        t = (IR >> 11) & 3;
-        AC[t] = (AC[t] - (((IR >> 13) & 3) + 1)) & 0xffff;
-        continue;
-    }
+   
     if ((IR & 0163777) == 0163770) {                    /* ADDI: Extended Add Immed. */
         t = (IR >> 11) & 3;
         i = GetMap(PC);
@@ -1003,12 +2918,7 @@ if ((IR & 0100017) == 0100010) {                        /* This pattern for all 
         AC[t] = (AC[t] + i) & 0xffff;
         continue;
     }
-    if ((IR & 0103777) == 0100710) {                    /* XCH: Exchange Accumulators */
-        t = AC[(IR >> 11) & 3];
-        AC[(IR >> 11) & 3] = AC[(IR >> 13) & 3];
-        AC[(IR >> 13) & 3] = t;
-        continue;
-    }
+
     if ((IR & 0162377) == 0162070) {                    /* ELEF: Load Effective Addr */
         t = GetMap(PC);
         AC[(IR >> 11) & 3] = effective(PC, (IR >> 8) & 3, t);
@@ -1033,225 +2943,7 @@ if ((IR & 0100017) == 0100010) {                        /* This pattern for all 
         PC = (PC + 1) & AMASK;
         continue;
     }
-    if ((IR & 0103777) == 0100410) {                    /* IOR: Inclusive Or */
-        AC[(IR >> 11) & 3] |= AC[(IR >> 13) & 3];
-        continue;
-    }
-    if ((IR & 0103777) == 0100510) {                    /* XOR: Exclusive Or */
-        AC[(IR >> 11) & 3] ^= AC[(IR >> 13) & 3];
-        continue;
-    }
-    if ((IR & 0103777) == 0100610) {                    /* ANC: And with complemented src */
-        AC[(IR >> 11) & 3] &= ~(AC[(IR >> 13) & 3]);
-        continue;
-    }
-    
-    /* Shift operations */
-    
-    if ((IR & 0103777) == 0101210) {                    /* LSH: Logical Shift */
-        register int16 sh;
-        sh = AC[(IR >> 13) & 3] & 0377;
-        i = (IR >> 11) & 3;
-        if (sh & 0200) {
-            sh = ~sh + 1;
-            AC[i] = AC[i] >> sh;
-        } else {
-            AC[i] = AC[i] << sh;
-        }
-        if (sh > 15) AC[i] = 0;
-        AC[i] &= 0xffff;        
-        continue;
-    }
-    if ((IR & 0103777) == 0101310) {                    /* DLSH: Double logical shift */
-        register int16 sh;
-        sh = AC[(IR >> 13) & 3] & 0377;
-        i = (IR >> 11) & 3;
-        uAC0 = AC[i] << 16;
-        j = i + 1;
-        if (j == 4) j = 0;
-        uAC0 |= AC[j];  
-        if (sh & 0200) {
-            sh = (~sh + 1) & 0377;
-            if (sh < 32)
-                uAC0 = uAC0 >> sh;
-        } else {
-            if (sh < 32)
-                uAC0 = uAC0 << sh;
-        }        
-        if (sh > 31) uAC0 = 0;
-        AC[i] = (uAC0 >> 16) & 0xffff;
-        AC[j] = uAC0 & 0xffff;  
-        continue;
-    }
-    if ((IR & 0103777) == 0101410) {                    /* HXL: Hex shift left */
-        t = ((IR >> 13) & 3) + 1;
-        i = (IR >> 11) & 3;
-        AC[i] = AC[i] << (t * 4);
-        AC[i] &= 0xffff; 
-        continue;
-    }
-    if ((IR & 0103777) == 0101510) {                    /* HXR: Hex shift right */
-        t = ((IR >> 13) & 3) + 1;
-        i = (IR >> 11) & 3;
-        AC[i] = AC[i] >> (t * 4);
-        AC[i] &= 0xffff; 
-        continue;
-    }
-    if ((IR & 0103777) == 0101610) {                    /* DHXL: Double Hex shift left */
-        t = ((IR >> 13) & 3) + 1;
-        i = (IR >> 11) & 3;
-        j = i + 1;
-        if (j == 4) j = 0;
-        uAC0 = AC[i] << 16;
-        uAC0 |= AC[j];  
-        uAC0 = uAC0 << ((t * 4) & 0177);
-        AC[i] = (uAC0 >> 16) & 0xffff;
-        AC[j] = uAC0 & 0xffff;  
-        continue;
-    }
-    if ((IR & 0103777) == 0101710) {                    /* DHXR: Double Hex shift right */
-        t = ((IR >> 13) & 3) + 1;
-        i = (IR >> 11) & 3;
-        j = i + 1;
-        if (j == 4) j = 0;
-        uAC0 = AC[i] << 16;
-        uAC0 |= AC[j];  
-        uAC0 = uAC0 >> ((t * 4) & 0177);
-        AC[i] = (uAC0 >> 16) & 0xffff;
-        AC[j] = uAC0 & 0xffff;  
-        continue;
-    }
-
     /* Bit operations */
-
-    if ((IR & 0103777) == 0102010) {                    /* BTO: Set bit to one */
-        i = (IR >> 11) & 3;
-        j = (IR >> 13) & 3;
-        if (i != j) {
-            k = (AC[i] >> 4) & AMASK;
-            if ((AC[j] + k) & 0100000)
-                t = 1;
-//AOS       MA = indirect(AC[j] + k);
-            MA = (AC[j] + k) & AMASK;
-        } else {
-            MA = (AC[i] >> 4) & AMASK;
-        }        
-        t = AC[i] & 017;
-        t = GetMap(MA) | (0100000 >> t);
-        PutMap(MA, t);
-        continue;
-    }
-    if ((IR & 0103777) == 0102110) {                    /* BTZ: Set bit to zero */
-        i = (IR >> 11) & 3;
-        j = (IR >> 13) & 3;
-        if (i != j) {
-            k = (AC[i] >> 4) & AMASK;
-            if ((AC[j] + k) & 0100000)
-                t = 1;
-//AOS       MA = indirect(AC[j] + k);
-            MA = (AC[j] + k) & AMASK;
-        } else {
-            MA = (AC[j] >> 4) & AMASK;
-        }        
-        t = AC[i] & 017;
-        t = GetMap(MA) & ~(0100000 >> t);
-        PutMap(MA, t);
-        continue;
-    }
-    if ((IR & 0103777) == 0102210) {                    /* SZB: Skip on zero bit */
-        i = (IR >> 11) & 3;
-        j = (IR >> 13) & 3;
-        if (i != j) {
-            k = (AC[i] >> 4) & AMASK;
-            if ((AC[j] + k) & 0100000)
-                t = 1;
-            MA = indirect(AC[j] + k);
-//          MA = (AC[j] + k) & AMASK;
-        } else {
-            MA = (AC[i] >> 4) & AMASK;
-        }        
-        t = GetMap(MA) << (AC[i] & 017);
-        if (!(t & 0100000)) PC = (PC + 1) & AMASK;
-        continue;
-    }
-    if ((IR & 0103777) == 0102770) {                    /* SNB: Skip on non-zero bit */
-        i = (IR >> 11) & 3;
-        j = (IR >> 13) & 3;
-        if (i != j) {
-            k = (AC[i] >> 4) & AMASK;
-            if ((AC[j] + k) & 0100000)
-                t = 1;
-            MA = indirect(AC[j] + k);
-//          MA = (AC[j] + k) & AMASK;
-        } else {
-            MA = (AC[j] >> 4) & AMASK;
-        }        
-        t = GetMap(MA) << (AC[i] & 017);
-        if (t & 0100000) PC = (PC + 1) & AMASK;
-        continue;
-    }
-    if ((IR & 0103777) == 0102310) {                    /* SZBO: skip on zero bit & set to 1 */
-        register int32 save;
-        i = (IR >> 11) & 3;
-        j = (IR >> 13) & 3;
-        if (i != j) {
-            k = (AC[i] >> 4) & AMASK;
-            MA = indirect(AC[j] + k);
-//          MA = (AC[j] + k) & AMASK;
-        } else {
-            MA = (AC[j] >> 4) & AMASK;
-        }        
-        t = AC[i] & 017;
-        save = GetMap(MA);
-        t = save | (0100000 >> t);
-        PutMap(MA, t);
-        t = save << (AC[i] & 017);
-        if ((t & 0100000) == 0) 
-            PC = (PC + 1) & AMASK;
-        continue;
-    }
-    if ((IR & 0103777) == 0102410) {                    /* LOB: Locate lead bit */
-        register int32 a, r;
-        register int16 b;
-        a = AC[(IR >> 13) & 3] & 0xffff;
-        for (i = 0; i < 16; i++) {
-            if ((a << i) & 0100000) break;
-        }
-        r = (IR >> 11) & 3;
-        b = AC[r];
-        b += i;
-        AC[r] = b & 0177777; 
-        continue;
-    }
-    if ((IR & 0103777) == 0102510) {                    /* LRB: Locate & reset lead bit */
-        register int32 a, r;
-        register int16 b;
-        j = (IR >> 13) & 3;
-        a = AC[j];
-        for (i = 0; i < 16; i++) {
-            if ((a << i) & 0100000) break;
-        }
-        r = (IR >> 11) & 3;
-        b = AC[r];
-        b += i;
-        if (j != r) AC[r] = b & 0177777;
-        AC[j] &= ~(0100000 >> i);
-        AC[j] &= 0xffff;
-        continue;
-    }
-    if ((IR & 0103777) == 0102610) {                    /* COB: Count bits */
-        register int32 a;
-        register int16 b, c = 0;
-        a = AC[(IR >> 13) & 3];
-        for (i = 0; i < 16; i++) {
-            if ((a >> i) & 1) c++;
-        }
-        i = (IR >> 11) & 3;
-        b = AC[i];
-        b += c;
-        AC[i] = b & 0177777; 
-        continue;
-    }
 
     /*  Jump & similar operations */
 
@@ -1279,41 +2971,7 @@ if ((IR & 0100017) == 0100010) {                        /* This pattern for all 
         PC = (PC + 1) & AMASK;
         continue;
     }
-    if ((IR & 0103777) == 0101010) {                    /* SGT: Skip if ACS > ACD */
-        register int16 a1, d1;
-        a1 = AC[(IR >> 13) & 3] & 0xffff;
-        d1 = AC[(IR >> 11) & 3] & 0xffff;
-        if (a1 > d1)
-            PC = (PC + 1) & AMASK;
-        continue;
-    }
-    if ((IR & 0103777) == 0101110) {                    /* SGE: Skip if ACS >= ACD */
-        register int16 a1, d1;
-        a1 = AC[(IR >> 13) & 3] & 0xffff;
-        d1 = AC[(IR >> 11) & 3] & 0xffff;
-        if (a1 >= d1)
-            PC = (PC + 1) & AMASK;
-        continue;
-    }
-    if ((IR & 0103777) == 0102370) {                    /* CLM: Compare to limits */
-        register int32 s, d, MA;
-        int16 H, L, ca;
-        s = (IR >> 13) & 3;
-        d = (IR >> 11) & 3;
-        if (s == d) {
-            L = GetMap(PC);
-            PC++;
-            H = GetMap(PC);
-            PC++;
-        } else {
-            MA = AC[d] & AMASK;
-            L = GetMap(MA);
-            H = GetMap(MA + 1);
-        }
-        ca = AC[s];
-        if (ca >= L && ca <= H) PC = (PC + 1) & AMASK;
-        continue;
-    }
+
     if ((IR & 0163777) == 0123370) {                    /* XCT: Execute */
         XCT_mode = 1;                                   /* Set up to execute on next loop */
         XCT_inst = AC[(IR >> 11) & 3];          
@@ -1368,77 +3026,6 @@ if ((IR & 0100017) == 0100010) {                        /* This pattern for all 
     
     /* Stack operations */
     
-    if ((IR & 0103777) == 0103110) {                    /* PSH: Push multiple accums */  
-        register int32 j;
-        j = (IR >> 11) & 3;
-        t = GetMap(040) & AMASK;
-        i = (IR >> 13) & 3;
-        if (i == j) {
-            t++;
-            PutMap(t, AC[i]);    
-            PutMap(040, (t & AMASK));
-            if (t > GetMap(042)) {
-                pushrtn(PC);
-                PC = indirect(GetMap(043));
-                PutMap(040, (GetMap(040) & 077777));
-                PutMap(042, (GetMap(042) | 0100000));
-            }    
-            continue;
-        }    
-        while (i != j) {
-            t++;
-            PutMap(t, AC[i]);
-            i++;
-            if (i == 4) i = 0;
-        }
-        t++;
-        PutMap(t, AC[i]);
-        PutMap(040, (t & AMASK));
-        if ((GetMap(040) & AMASK) > GetMap(042)) {
-            pushrtn(PC);
-            PC = indirect(GetMap(043));
-            PutMap(040, (GetMap(040) & 077777));
-            PutMap(042, (GetMap(042) | 0100000));
-        }    
-        continue;
-    }
-    if ((IR & 0103777) == 0103210) {                    /* POP: Pop mult accums */
-        j = (IR >> 11) & 3;
-        t = GetMap(040) & AMASK;
-        i = (IR >> 13) & 3;
-        if (i == j) {
-            AC[i] = GetMap(t);
-            t--;
-            PutMap(040, (t & AMASK));
-            t = GetMap(040);
-            if (t < 0100000 && t < 0400) {
-                PutMap(040, GetMap(042));
-                pushrtn(PC);
-                PC = indirect(GetMap(043));
-                PutMap(040, (GetMap(040) & 077777));
-                PutMap(042, (GetMap(042) | 0100000));
-            }    
-            continue;
-        }
-        while (i != j) {    
-            AC[i] = GetMap(t);
-            t--;
-            i--;
-            if (i == -1) i = 3;
-        }
-        AC[i] = GetMap(t);
-        t--;
-        PutMap(040, (t & AMASK));
-        t = GetMap(040);
-        if (t < 0100000 && t < 0400) {
-            PutMap(040, GetMap(042));
-            pushrtn(PC);
-            PC = indirect(GetMap(043));
-            PutMap(040, (GetMap(040) & 077777));
-            PutMap(042, (GetMap(042) | 0100000));
-        }    
-        continue;
-    }
     if (IR == 0103710) {                                /* PSHR: Push return addr */
         t = (GetMap(040) + 1) & AMASK;
         PutMap(t, (PC + 1));
@@ -1713,37 +3300,7 @@ if ((IR & 0100017) == 0100010) {                        /* This pattern for all 
     }
     
     /* Decimal arithmetic */
-    
-    if ((IR & 0103777) == 0100210) {                    /* DAD: Decimal add */
-        i = (IR >> 13) & 3;
-        j = (IR >> 11) & 3;
-        t = (AC[i] & 017) + (AC[j] & 017);
-        if (C) t++;
-        if (t > 9) {
-            C = 0200000;
-            t += 6;
-        } else {
-            C = 0;
-        }    
-        AC[j] &= 0177760;
-        AC[j] = AC[j] | (t & 017);    
-        continue;
-    }
-    if ((IR & 0103777) == 0100310) {                    /* DSB: Decimal subtract */
-        i = (IR >> 13) & 3;
-        j = (IR >> 11) & 3;
-        t = (AC[j] & 017) - (AC[i] & 017);
-        if (!C) t--;
-        if (t < 0) {
-            C = 0;
-            t = 9 - (~t);
-        } else {
-            C = 0200000;
-        }    
-        AC[j] &= 0177760;
-        AC[j] = AC[j] | (t & 017);    
-        continue;
-    }
+
     
     /* Exotic, complex instructions */
     
@@ -1795,39 +3352,7 @@ if ((IR & 0100017) == 0100010) {                        /* This pattern for all 
         }    
         continue;
     }
-    if ((IR & 0103777) == 0103510) {                    /* SYC: System call */
-        register int32 j;
-        DisMap = Usermap;
-        Usermap = 0;
-        MapStat &= ~1;                                  /* Disable MAP */
-        i = (IR >> 13) & 3;
-        j = (IR >> 11) & 3;
-        if (i != 0 || j != 0) {
-            t = (GetMap(040) + 1) & AMASK;                              
-            PutMap(t, AC[0]);
-            t++;
-            PutMap(t, AC[1]);
-            t++;
-            PutMap(t, AC[2]);
-            t++;
-            PutMap(t, AC[3]);
-            t++;
-            PutMap(t, (PC & AMASK));
-            if (C) PutMap(t, (GetMap(t) | 0100000));
-            PutMap(040, t);
-            PutMap(041, (GetMap(040) & AMASK));
-        }
-        PC = indirect(GetMap(2)) & AMASK;
-        if (DisMap > 0)
-            Inhibit = 3;                                /* Special 1-instruction interrupt inhibit */    
-        if ((GetMap(040) & AMASK) > GetMap(042)) {
-            pushrtn(PC);
-            PC = indirect(GetMap(043));
-            PutMap(040, (GetMap(040) & 077777));
-            PutMap(042, (GetMap(042) | 0100000));
-        }    
-        continue;
-    }
+    
     if (IR == 0113410) {                                /* LMP: Load Map */
         register int32 w, m;
         if ((Debug_Flags & 077) == 03)
@@ -2249,714 +3774,7 @@ if ((IR & 0100017) == 0100010) {                        /* This pattern for all 
         FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
         FPSR |= ((PC - 1) & AMASK);
         PC = (PC + 1) & AMASK;
-        continue;
-    }
-    if ((IR & 0103777) == 0102050) {                    /* FLDS Load FP single */
-        if (!(fpu_unit.flags & UNIT_UP))
-            continue;
-        if (Debug_Flags == 1) {
-            printf("\n<<FPU instruction: FLDS>>\n");
-            reason = STOP_IBKPT;
-        }    
-        if (FPFault) {                                  /* Fault from a previous inst? */
-            FPFault = 0;
-            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
-            PutMap(t, AC[0]);
-            t++;
-            PutMap(t, AC[1]);
-            t++;
-            PutMap(t, AC[2]);
-            t++;
-            PutMap(t, AC[3]);
-            t++;
-            PutMap(t, ((PC-1) & AMASK));
-            if (C) PutMap(t, (GetMap(t) | 0100000));
-            PutMap(040, t);
-            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
-            continue;
-        }
-        i = (IR >> 11) & 0x03;
-        FPAC[i] = 0;
-        MA = effective(PC, (IR >> 13) & 3, GetMap(PC));
-        t = GetMap(MA) & 0xffff;
-        FPAC[i] = (t_int64) t << 48;
-        t = GetMap(MA+1) & 0xffff;
-        FPAC[i] |= (t_int64) t << 32;
-        if ((FPAC[i] & 0x00ffffffffffffff) == 0)
-            FPAC[i] = 0;
-        FPSR &= 0xFCFFFFFF;
-        if (FPAC[i] == 0)
-            FPSR |= 0x02000000;
-        if (FPAC[i] & 0x8000000000000000)
-            FPSR |= 0x01000000;
-        FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
-        FPSR |= ((PC - 1) & AMASK);
-        PC = (PC + 1) & AMASK;
-        continue;
-    }    
-    if ((IR & 0103777) == 0102150) {                    /* FLDD Load FP double */
-        if (!(fpu_unit.flags & UNIT_UP))
-            continue;
-        if (Debug_Flags == 1) {
-            printf("\n<<FPU instruction: FLDD>>\n");
-            reason = STOP_IBKPT;
-        }    
-        if (FPFault) {                                  /* Fault from a previous inst? */
-            FPFault = 0;
-            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
-            PutMap(t, AC[0]);
-            t++;
-            PutMap(t, AC[1]);
-            t++;
-            PutMap(t, AC[2]);
-            t++;
-            PutMap(t, AC[3]);
-            t++;
-            PutMap(t, ((PC-1) & AMASK));
-            if (C) PutMap(t, (GetMap(t) | 0100000));
-            PutMap(040, t);
-            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
-            continue;
-        }
-        i = (IR >> 11) & 0x03;
-        FPAC[i] = 0;
-        MA = effective(PC, (IR >> 13) & 3, GetMap(PC));
-        t = GetMap(MA) & 0xffff;
-        FPAC[i] = (t_int64) t << 48;
-        t = GetMap(MA+1) & 0xffff;
-        FPAC[i] |= (t_int64) t << 32;
-        t = GetMap(MA+2) & 0xffff;
-        FPAC[i] |= (t_int64) t << 16;
-        t = GetMap(MA+3) & 0xffff;
-        FPAC[i] |= (t_int64) t;
-        if ((FPAC[i] & 0x00ffffffffffffff) == 0)
-            FPAC[i] = 0;
-        FPSR &= 0xFCFFFFFF;
-        if (FPAC[i] == 0)
-            FPSR |= 0x02000000;
-        if (FPAC[i] & 0x8000000000000000)
-            FPSR |= 0x01000000;
-        FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
-        FPSR |= ((PC - 1) & AMASK);
-        PC = (PC + 1) & AMASK;
-        continue;
-    }    
-    if ((IR & 0103777) == 0102250) {                    /* FSTS Store FP single */
-        if (!(fpu_unit.flags & UNIT_UP))
-            continue;
-        if (Debug_Flags == 1) {
-            printf("\n<<FPU instruction: FSTS>>\n");
-            reason = STOP_IBKPT;
-        }    
-        if (FPFault) {                                  /* Fault from a previous inst? */
-            FPFault = 0;
-            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
-            PutMap(t, AC[0]);
-            t++;
-            PutMap(t, AC[1]);
-            t++;
-            PutMap(t, AC[2]);
-            t++;
-            PutMap(t, AC[3]);
-            t++;
-            PutMap(t, ((PC-1) & AMASK));
-            if (C) PutMap(t, (GetMap(t) | 0100000));
-            PutMap(040, t);
-            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
-            continue;
-        }
-        i = (IR >> 11) & 0x03;
-        MA = effective(PC, (IR >> 13) & 3, GetMap(PC));
-        PutMap(MA, (int32)(FPAC[i] >> 48) & 0xffff);
-        PutMap(MA+1, (int32)(FPAC[i] >> 32) & 0xffff);
-        FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
-        FPSR |= ((PC - 1) & AMASK);
-        PC = (PC + 1) & AMASK;
-        continue;
-    }    
-    if ((IR & 0103777) == 0102350) {                    /* FSTD Store FP double */
-        if (!(fpu_unit.flags & UNIT_UP))
-            continue;
-        if (Debug_Flags == 1) {
-            printf("\n<<FPU instruction: FSTD>>\n");
-            reason = STOP_IBKPT;
-        }    
-        if (FPFault) {                                  /* Fault from a previous inst? */
-            FPFault = 0;
-            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
-            PutMap(t, AC[0]);
-            t++;
-            PutMap(t, AC[1]);
-            t++;
-            PutMap(t, AC[2]);
-            t++;
-            PutMap(t, AC[3]);
-            t++;
-            PutMap(t, ((PC-1) & AMASK));
-            if (C) PutMap(t, (GetMap(t) | 0100000));
-            PutMap(040, t);
-            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
-            continue;
-        }
-        i = (IR >> 11) & 0x03;
-        MA = effective(PC, (IR >> 13) & 3, GetMap(PC));
-        PutMap(MA, (int32)(FPAC[i] >> 48) & 0xffff);
-        PutMap(MA+1, (int32)(FPAC[i] >> 32) & 0xffff);
-        PutMap(MA+2, (int32)(FPAC[i] >> 16) & 0xffff);
-        PutMap(MA+3, (int32)(FPAC[i] & 0xffff));
-        FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
-        FPSR |= ((PC - 1) & AMASK);
-        PC = (PC + 1) & AMASK;
-        continue;
-    }    
-    if ((IR & 0103777) == 0103550) {                    /* FMOV Move FP */
-        if (!(fpu_unit.flags & UNIT_UP))
-            continue;
-        if (Debug_Flags == 1) {
-            printf("\n<<FPU instruction: FMOV>>\n");
-            reason = STOP_IBKPT;
-            continue;
-        }    
-        if (FPFault) {                                  /* Fault from a previous inst? */
-            FPFault = 0;
-            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
-            PutMap(t, AC[0]);
-            t++;
-            PutMap(t, AC[1]);
-            t++;
-            PutMap(t, AC[2]);
-            t++;
-            PutMap(t, AC[3]);
-            t++;
-            PutMap(t, ((PC-1) & AMASK));
-            if (C) PutMap(t, (GetMap(t) | 0100000));
-            PutMap(040, t);
-            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
-            continue;
-        }
-        i = (IR >> 13) & 3;
-        j = (IR >> 11) & 3;
-        FPAC[j] = FPAC[i];
-        if ((FPAC[j] & 0x00ffffffffffffff) == 0)
-            FPAC[j] = 0;
-        FPSR &= 0xFCFFFFFF;
-        if (FPAC[j] == 0)
-            FPSR |= 0x02000000;
-        if (FPAC[j] & 0x8000000000000000)
-            FPSR |= 0x01000000;
-        FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
-        FPSR |= ((PC - 1) & AMASK);
-        continue;
-    }    
-    if (IR == 0143350) {                                /* FTE Trap Enable */
-        if (!(fpu_unit.flags & UNIT_UP))
-            continue;
-        if (Debug_Flags == 2) {
-            printf("\n<<FPU instruction: FTE>>\n");
-            reason = STOP_IBKPT;
-        }    
-        if (FPFault) {                                  /* Fault from a previous inst? */
-            FPFault = 0;
-            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
-            PutMap(t, AC[0]);
-            t++;
-            PutMap(t, AC[1]);
-            t++;
-            PutMap(t, AC[2]);
-            t++;
-            PutMap(t, AC[3]);
-            t++;
-            PutMap(t, ((PC-1) & AMASK));
-            if (C) PutMap(t, (GetMap(t) | 0100000));
-            PutMap(040, t);
-            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
-            continue;
-        }
-        FPSR |= 0x04000000;
-        FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
-        FPSR |= ((PC - 1) & AMASK);
-        continue;
-    }    
-    if (IR == 0147350) {                                /* FTD Trap Disable */
-        if (!(fpu_unit.flags & UNIT_UP))
-            continue;
-        if (Debug_Flags == 1) {
-            printf("\n<<FPU instruction: FTD>>\n");
-            reason = STOP_IBKPT;
-        }    
-        if (FPFault) {                                  /* Fault from a previous inst? */
-            FPFault = 0;
-            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
-            PutMap(t, AC[0]);
-            t++;
-            PutMap(t, AC[1]);
-            t++;
-            PutMap(t, AC[2]);
-            t++;
-            PutMap(t, AC[3]);
-            t++;
-            PutMap(t, ((PC-1) & AMASK));
-            if (C) PutMap(t, (GetMap(t) | 0100000));
-            PutMap(040, t);
-            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
-            continue;
-        }
-        FPSR &= 0xFBFFFFFF;
-        FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
-        FPSR |= ((PC - 1) & AMASK);
-        continue;
-    }
-    if ((IR & 0103777) == 0102450) {                    /* FLAS Float from AC */
-        if (!(fpu_unit.flags & UNIT_UP))
-            continue;
-        if (Debug_Flags == 1) {
-            printf("\n<<FPU instruction: FLAS>>\n");
-            reason = STOP_IBKPT;
-        }    
-        if (FPFault) {                                  /* Fault from a previous inst? */
-            FPFault = 0;
-            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
-            PutMap(t, AC[0]);
-            t++;
-            PutMap(t, AC[1]);
-            t++;
-            PutMap(t, AC[2]);
-            t++;
-            PutMap(t, AC[3]);
-            t++;
-            PutMap(t, ((PC-1) & AMASK));
-            if (C) PutMap(t, (GetMap(t) | 0100000));
-            PutMap(040, t);
-            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
-            continue;
-        }
-        i = (IR >> 13) & 3;
-        j = (IR >> 11) & 3;
-        if (AC[i] == 0) {
-            FPAC[j] = 0;
-            FPSR |= 0x02000000;
-            continue;               
-        }
-        fpnum = (t_int64)(AC[i] & 077777) << 32;
-        if (AC[i] & 0x8000)
-                fpnum = 0 - fpnum;
-        expon = 70;
-        while (1) {
-            if (fpnum & 0x00FF000000000000)
-                break;
-            if (expon < 64)
-                break;
-            fpnum = fpnum << 4;
-            expon--;
-        }
-        FPAC[j] = 0;
-        FPAC[j] = fpnum & 0x00ffffffffffffff;
-        FPAC[j] |= (expon << 56) & 0x7f00000000000000; 
-        if (AC[i] & 0x8000) 
-            FPAC[j] |= 0x8000000000000000;
-        if ((FPAC[j] & 0x00ffffffffffffff) == 0)
-            FPAC[j] = 0;
-        FPSR &= 0xFCFFFFFF;
-        if (FPAC[j] == 0)
-            FPSR |= 0x02000000;
-        if (FPAC[j] & 0x8000000000000000)
-            FPSR |= 0x01000000;
-        FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
-        FPSR |= ((PC - 1) & AMASK);
-        continue;
-    }    
-    if ((IR & 0103777) == 0102550) {                    /* FLMD Float from memory */
-        if (!(fpu_unit.flags & UNIT_UP))
-            continue;
-        if (Debug_Flags == 1) {
-            printf("\n<<FPU instruction: FLMD>>\n");
-            reason = STOP_IBKPT;
-        }    
-        if (FPFault) {                                  /* Fault from a previous inst? */
-            FPFault = 0;
-            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
-            PutMap(t, AC[0]);
-            t++;
-            PutMap(t, AC[1]);
-            t++;
-            PutMap(t, AC[2]);
-            t++;
-            PutMap(t, AC[3]);
-            t++;
-            PutMap(t, ((PC-1) & AMASK));
-            if (C) PutMap(t, (GetMap(t) | 0100000));
-            PutMap(040, t);
-            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
-            continue;
-        }
-        i = (IR >> 13) & 3;
-        j = (IR >> 11) & 3;
-        MA = effective(PC, (IR >> 13) & 3, GetMap(PC));
-        PC = (PC + 1) & AMASK;
-        fpnum32 = 0;
-        fpnum32 = (GetMap(MA) << 16);
-        fpnum32 |= (GetMap(MA + 1));
-        if (fpnum32 == 0) {
-            FPAC[j] = 0;
-            FPSR |= 0x02000000;
-            continue;               
-        }
-        fpnum = (t_int64)(fpnum32 & 0xffffffff) << 32;
-        if (fpnum32 < 0)
-            fpnum = (0 - fpnum);
-        expon = 70;
-        while (1) {
-            if (fpnum & 0x00F0000000000000)
-                break;
-            if (expon < 64)
-                break;
-            fpnum = fpnum << 4;
-            expon--;
-        }
-        FPAC[j] = 0;
-        FPAC[j] = fpnum & 0x00ffffffffffffff;
-        FPAC[j] |= (expon << 56) & 0x7f00000000000000; 
-        if (fpnum32 < 0) 
-            FPAC[j] |= 0x8000000000000000;
-        if ((FPAC[j] & 0x00ffffffffffffff) == 0)
-            FPAC[j] = 0;
-        FPSR &= 0xFCFFFFFF;
-        if (FPAC[j] == 0)
-            FPSR |= 0x02000000;
-        if (FPAC[j] & 0x8000000000000000)
-            FPSR |= 0x01000000;
-        FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
-        FPSR |= ((PC - 1) & AMASK);
-        continue;
-    }    
-    if ((IR & 0103777) == 0102650) {                    /* FFAS Fix to AC */
-        if (!(fpu_unit.flags & UNIT_UP))
-            continue;
-        if (Debug_Flags == 1) {
-            printf("\n<<FPU instruction: FFAS>>\n");
-            reason = STOP_IBKPT;
-        }    
-        if (FPFault) {                                  /* Fault from a previous inst? */
-            FPFault = 0;
-            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
-            PutMap(t, AC[0]);
-            t++;
-            PutMap(t, AC[1]);
-            t++;
-            PutMap(t, AC[2]);
-            t++;
-            PutMap(t, AC[3]);
-            t++;
-            PutMap(t, ((PC-1) & AMASK));
-            if (C) PutMap(t, (GetMap(t) | 0100000));
-            PutMap(040, t);
-            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
-            continue;
-        }
-        i = (IR >> 13) & 3;
-        j = (IR >> 11) & 3;
-        tac = AC[0];
-
-        t = 0;
-
-        FPSR &= 0xFCFFFFFF;                             /* Z+N bits off */
-
-                                                        /* Get register content */
-        get_lf(&dfl, &FPAC[j]);
-
-        if (dfl.long_fract) {
-            /* not zero */
-            normal_lf(&dfl);
-
-            if (dfl.expo > 72) {
-                /* ERROR: exceeds range by exponent */
-                FPSR |= 0x08000000;                     /* MOF bit on */
-                dfl.long_fract &= 0x7FFFFFFF;
-            }
-            if (dfl.expo > 64) {
-                /* to be right shifted and to be rounded */
-                shift = ((78 - dfl.expo) * 4);
-                lsfract = dfl.long_fract << (64 - shift);
-                dfl.long_fract >>= shift;
-                if (dfl.expo == 72) {
-                    if (dfl.sign) {
-                        /* negative */
-                        if (dfl.long_fract > 0x80000000) {
-                            /* ERROR: exceeds range by value */
-                            FPSR |= 0x08000000;         /* MOF bit on */
-                            dfl.long_fract &= 0x7FFFFFFF;
-                        }
-                    } else {
-                        /* positive */
-                        if (dfl.long_fract > 0x7FFFFFFF) {
-                            /* ERROR: exceeds range by value */
-                            FPSR |= 0x08000000;         /* MOF bit on */
-                            dfl.long_fract &= 0x7FFFFFFF;
-                        }
-                    }
-                }
-            } else if (dfl.expo == 64) {
-                /* to be rounded */
-                lsfract = dfl.long_fract << 8;
-                dfl.long_fract = 0;
-            } else {
-                /* fl.expo < 64 */
-                dfl.long_fract = 0;
-                if (((m3 == 6)
-                    && (dfl.sign == 0))
-                    || ((m3 == 7)
-                    && (dfl.sign == 1))) {
-                    dfl.long_fract++;
-                }
-            }
-            if (dfl.sign) {
-                /* negative */
-                //FPSR |= 0x01000000;                   /* N bit on */
-                k = -(int32)dfl.long_fract & 0xFFFFFFFF;
-            } else {
-                /* positive */
-                k = (int32)dfl.long_fract & 0xFFFFFFFF;
-            }
-        } else {
-            /* zero */
-            k = 0;
-            //FPSR |= 0x02000000;                       /* Z bit on */
-        }
-        AC[i] = k & 0x7FFF;
-        if (k > 32767 || k < -32768)
-            FPSR |= 0x08000000;                         /* MOF bit on */
-        if (k < 0) AC[i] |= 0x8000;
-        FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
-        FPSR |= ((PC - 1) & AMASK);
-        if (FPSR & 0x08000000) AC[i] = tac;             /* shifted to zero, restore saved AC */
-        continue;
-    }    
-    if ((IR & 0103777) == 0102750) {                    /* FFMD Fix to Memory */
-        if (!(fpu_unit.flags & UNIT_UP))
-            continue;
-        if (Debug_Flags == 1) {
-            printf("\n<<FPU instruction: FFMD>>\n");
-            reason = STOP_IBKPT;
-        }    
-        if (FPFault) {                                  /* Fault from a previous inst? */
-            FPFault = 0;
-            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
-            PutMap(t, AC[0]);
-            t++;
-            PutMap(t, AC[1]);
-            t++;
-            PutMap(t, AC[2]);
-            t++;
-            PutMap(t, AC[3]);
-            t++;
-            PutMap(t, ((PC-1) & AMASK));
-            if (C) PutMap(t, (GetMap(t) | 0100000));
-            PutMap(040, t);
-            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
-            continue;
-        }
-        j = (IR >> 11) & 3;
-        MA = effective(PC, (IR >> 13) & 3, GetMap(PC));
-        PC = (PC + 1) & AMASK;
-
-        t = 0;
-        if (FPAC[j] == 0x521E290F94874A43)              /* Wrote 0000 0000 expected 4A43 0000 ... MOF bit is on! What is the default??? */ 
-            t = 1;
-        if (FPAC[j] == 0x53F129F814FC8A7E)              /* Wrote 0000 0000 expected 27E0 0000 ... MOF bit is on! What is the default??? */ 
-            t = 2;
-        if (FPAC[j] == 0xD01B680DB406DA03)              /* Wrote 0000 0000 expected F925 FD00 ... MOF bit is on! What is the default??? */ 
-            t = 3;
-
-        FPSR &= 0xFCFFFFFF;                             /* Z+N bits off */
-
-                                                        /* Get register content */
-        get_lf(&dfl, &FPAC[j]);
-
-        if (dfl.long_fract) {
-            /* not zero */
-            normal_lf(&dfl);
-
-            if (dfl.expo > 72) {
-                /* ERROR: exceeds range by exponent */
-                FPSR |= 0x08000000;                     /* MOF bit on */
-                //dfl.long_fract &= 0x7FFFFFFF;
-            }
-            if (dfl.expo > 64) {
-                /* to be right shifted and to be rounded */
-                shift = ((78 - dfl.expo) * 4);
-                lsfract = dfl.long_fract << (64 - shift);
-                dfl.long_fract >>= shift;
-                if (dfl.expo == 72) {
-                    if (dfl.sign) {
-                        /* negative */
-                        if (dfl.long_fract > 0x80000000) {
-                            /* ERROR: exceeds range by value */
-                            FPSR |= 0x08000000;         /* MOF bit on */
-                            dfl.long_fract &= 0x7FFFFFFF;
-                        }
-                    } else {
-                        /* positive */
-                        if (dfl.long_fract > 0x7FFFFFFF) {
-                            /* ERROR: exceeds range by value */
-                            FPSR |= 0x08000000;         /* MOF bit on */
-                            dfl.long_fract &= 0x7FFFFFFF;
-                        }
-                    }
-                }
-            } else if (dfl.expo == 64) {
-                /* to be rounded */
-                lsfract = dfl.long_fract << 8;
-                dfl.long_fract = 0;
-            } else {
-                /* fl.expo < 64 */
-                dfl.long_fract = 0;
-                if (((m3 == 6)
-                    && (dfl.sign == 0))
-                    || ((m3 == 7)
-                    && (dfl.sign == 1))) {
-                    dfl.long_fract++;
-                }
-            }
-            if (dfl.sign) {
-                /* negative */
-                //FPSR |= 0x01000000;                   /* N bit on */
-                i = -(int32)dfl.long_fract & 0xFFFFFFFF;
-            } else {
-                /* positive */
-                i = (int32)dfl.long_fract & 0xFFFFFFFF;
-            }
-        } else {
-            /* zero */
-            i = 0;
-            //FPSR |= 0x02000000;                       /* Z bit on */
-        }
-
-        if (dfl.sign && i != 0)
-            i |= 0x80000000;
-
-        if (t == 1)
-            i = 0x4a430000;
-        if (t == 2)
-            i = 0x27e00000;
-        if (t == 3)
-            i = 0xF925FD00;
-
-        PutMap(MA, ((i >> 16) & 0xFFFF));
-        PutMap(MA+1, (i & 0xFFFF));
-        FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
-        FPSR |= ((PC - 2) & AMASK);
-        continue;
-    }    
-    if ((IR & 0103777) == 0100050) {                    /* FAS Add single */
-        if (!(fpu_unit.flags & UNIT_UP))
-            continue;
-        if (Debug_Flags == 1) {
-            printf("\n<<FPU instruction: FAS>>\n");
-            reason = STOP_IBKPT;
-        }    
-        if (FPFault) {                                  /* Fault from a previous inst? */
-            FPFault = 0;
-            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
-            PutMap(t, AC[0]);
-            t++;
-            PutMap(t, AC[1]);
-            t++;
-            PutMap(t, AC[2]);
-            t++;
-            PutMap(t, AC[3]);
-            t++;
-            PutMap(t, ((PC-1) & AMASK));
-            if (C) PutMap(t, (GetMap(t) | 0100000));
-            PutMap(040, t);
-            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
-            continue;
-        }
-        i = (IR >> 13) & 3;
-        j = (IR >> 11) & 3;
-        FPSR &= 0xFCFFFFFF;                             /* Z+N bits off */
-        get_sf(&sfl, &FPAC[i]);                         /* Place in working registers */
-        get_sf(&sfl2, &FPAC[j]);
-        k = add_sf(&sfl2, &sfl, 1);                     /* Add the two */
-        if (k) {
-             switch (k) {
-             case 1:
-                FPSR |= 0x40000000;                     /* OVF bit on */
-                break;
-             case 2:
-                FPSR |= 0x20000000;                     /* UNF bit on */
-                break;
-             }
-        }
-        store_sf(&sfl2, &FPAC[j]);                      /* put result in destination */
-        if ((FPAC[j] & 0x00ffffffffffffff) == 0)
-            FPAC[j] = 0;
-        FPSR &= 0xFCFFFFFF;                             /* Z + N off */
-        if (FPAC[j] == 0)
-            FPSR |= 0x02000000;                         /* Set Z */
-        if (FPAC[j] & 0x8000000000000000)
-            FPSR |= 0x01000000;                         /* Set N */
-        FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
-        FPSR |= ((PC - 1) & AMASK);
-        continue;
-    }    
-    if ((IR & 0103777) == 0101050) {                    /* FAMS Add single (memory) */
-        if (!(fpu_unit.flags & UNIT_UP))
-            continue;
-        if (Debug_Flags == 1) {
-            printf("\n<<FPU instruction: FAMS>>\n");
-            reason = STOP_IBKPT;
-        }    
-        if (FPFault) {                                  /* Fault from a previous inst? */
-            FPFault = 0;
-            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
-            PutMap(t, AC[0]);
-            t++;
-            PutMap(t, AC[1]);
-            t++;
-            PutMap(t, AC[2]);
-            t++;
-            PutMap(t, AC[3]);
-            t++;
-            PutMap(t, ((PC-1) & AMASK));
-            if (C) PutMap(t, (GetMap(t) | 0100000));
-            PutMap(040, t);
-            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
-            continue;
-        }
-        j = (IR >> 11) & 3;
-        MA = effective(PC, (IR >> 13) & 3, GetMap(PC));
-        tempfp = ((t_uint64)GetMap(MA) << 48);
-        tempfp |= ((t_uint64)GetMap(MA + 1) << 32);
-        if ((tempfp & 0x00ffffffffffffff) == 0)
-            tempfp = 0;
-        FPSR &= 0xFCFFFFFF;                             /* Z+N bits off */
-        get_sf(&sfl, &tempfp);                          /* Place in working registers */
-        get_sf(&sfl2, &FPAC[j]);
-        k = add_sf(&sfl2, &sfl, 1);                     /* Add the two */
-        if (k) {
-             switch (k) {
-             case 1:
-                FPSR |= 0x40000000;                     /* OVF bit on */
-                break;
-             case 2:
-                FPSR |= 0x20000000;                     /* UNF bit on */
-                break;
-             }
-        }
-        store_sf(&sfl2, &FPAC[j]);                      /* put result in destination */
-        if ((FPAC[j] & 0x00ffffffffffffff) == 0)
-            FPAC[j] = 0;
-        FPSR &= 0xFCFFFFFF;                             /* Z + N off */
-        if (FPAC[j] == 0)
-            FPSR |= 0x02000000;                         /* Set Z */
-        if (FPAC[j] & 0x8000000000000000)
-            FPSR |= 0x01000000;                         /* Set N */
-        FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
-        FPSR |= ((PC - 1) & AMASK);
-        PC = (PC + 1) & AMASK;
-        continue;
-    }    
-    if ((IR & 0103777) == 0100150) {                    /* FAD Add double  */
+        continue;                    /* FAD Add double  */
         if (!(fpu_unit.flags & UNIT_UP))
             continue;
         if (Debug_Flags == 1) {
@@ -2993,134 +3811,7 @@ if ((IR & 0100017) == 0100010) {                        /* This pattern for all 
                 break;
              case 2:
                 FPSR |= 0x20000000;                     /* UNF bit on */
-                break;
-             }
-        }
-        store_lf(&dfl2, &FPAC[j]);                      /* put result in destination */
-        if ((FPAC[j] & 0x00ffffffffffffff) == 0)
-            FPAC[j] = 0;
-        FPSR &= 0xFCFFFFFF;                             /* Z + N off */
-        if (FPAC[j] == 0)
-            FPSR |= 0x02000000;                         /* Set Z */
-        if (FPAC[j] & 0x8000000000000000)
-            FPSR |= 0x01000000;                         /* Set N */
-        FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
-        FPSR |= ((PC - 1) & AMASK);
-        continue;
-    }    
-    if ((IR & 0103777) == 0101150) {                    /* FAMD Add double (memory) */
-        if (!(fpu_unit.flags & UNIT_UP))
-            continue;
-        if (Debug_Flags == 1) {
-            printf("\n<<FPU instruction: FAMD>>\n");
-            reason = STOP_IBKPT;
-        }    
-        if (FPFault) {                                  /* Fault from a previous inst? */
-            FPFault = 0;
-            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
-            PutMap(t, AC[0]);
-            t++;
-            PutMap(t, AC[1]);
-            t++;
-            PutMap(t, AC[2]);
-            t++;
-            PutMap(t, AC[3]);
-            t++;
-            PutMap(t, ((PC-1) & AMASK));
-            if (C) PutMap(t, (GetMap(t) | 0100000));
-            PutMap(040, t);
-            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
-            continue;
-        }
-        j = (IR >> 11) & 3;
-        MA = effective(PC, (IR >> 13) & 3, GetMap(PC));
-        tempfp = ((t_uint64)GetMap(MA) << 48);
-        tempfp |= ((t_uint64)GetMap(MA + 1) << 32);
-        tempfp |= ((t_uint64)GetMap(MA + 2) << 16);
-        tempfp |= ((t_uint64)GetMap(MA + 3));
-        if ((tempfp & 0x00ffffffffffffff) == 0)
-            tempfp = 0;
-        FPSR &= 0xFCFFFFFF;                             /* Z+N bits off */
-        get_lf(&dfl, &tempfp);                          /* Place in working registers */
-        get_lf(&dfl2, &FPAC[j]);
-        k = add_lf(&dfl2, &dfl, 1);                     /* Add the two */
-        if (k) {
-             switch (k) {
-             case 1:
-                FPSR |= 0x40000000;                     /* OVF bit on */
-                break;
-             case 2:
-                FPSR |= 0x20000000;                     /* UNF bit on */
-                break;
-             }
-        }
-        store_lf(&dfl2, &FPAC[j]);                      /* put result in destination */
-        if ((FPAC[j] & 0x00ffffffffffffff) == 0)
-            FPAC[j] = 0;
-        FPSR &= 0xFCFFFFFF;                             /* Z + N off */
-        if (FPAC[j] == 0)
-            FPSR |= 0x02000000;                         /* Set Z */
-        if (FPAC[j] & 0x8000000000000000)
-            FPSR |= 0x01000000;                         /* Set N */
-        FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
-        FPSR |= ((PC - 1) & AMASK);
-        PC = (PC + 1) & AMASK;
-        continue;
-    }    
-    if ((IR & 0103777) == 0100250) {                    /* FSS Sub single to AC */
-        if (!(fpu_unit.flags & UNIT_UP))
-            continue;
-        if (Debug_Flags == 1) {
-            printf("\n<<FPU instruction: FSS>>\n");
-            reason = STOP_IBKPT;
-        }    
-        if (FPFault) {                                  /* Fault from a previous inst? */
-            FPFault = 0;
-            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
-            PutMap(t, AC[0]);
-            t++;
-            PutMap(t, AC[1]);
-            t++;
-            PutMap(t, AC[2]);
-            t++;
-            PutMap(t, AC[3]);
-            t++;
-            PutMap(t, ((PC-1) & AMASK));
-            if (C) PutMap(t, (GetMap(t) | 0100000));
-            PutMap(040, t);
-            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
-            continue;
-        }
-        i = (IR >> 13) & 3;
-        j = (IR >> 11) & 3;
-        FPSR &= 0xFCFFFFFF;                             /* Z+N bits off */
-        get_sf(&sfl, &FPAC[i]);                         /* Place in working registers */
-        get_sf(&sfl2, &FPAC[j]);
-        sfl.sign = ! (sfl.sign);                        /* invert sign of 2nd operand */        
-        k = add_sf(&sfl2, &sfl, 1);                     /* Add the two */
-        if (k) {
-             switch (k) {
-             case 1:
-                FPSR |= 0x40000000;                     /* OVF bit on */
-                break;
-             case 2:
-                FPSR |= 0x20000000;                     /* UNF bit on */
-                break;
-             }
-        }
-        store_sf(&sfl2, &FPAC[j]);                      /* put result in destination */
-        if ((FPAC[j] & 0x00ffffffffffffff) == 0)
-            FPAC[j] = 0;
-        FPSR &= 0xFCFFFFFF;                             /* Z + N off */
-        if (FPAC[j] == 0)
-            FPSR |= 0x02000000;                         /* Set Z */
-        if (FPAC[j] & 0x8000000000000000)
-            FPSR |= 0x01000000;                         /* Set N */
-        FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
-        FPSR |= ((PC - 1) & AMASK);
-        continue;
-    }    
-    if ((IR & 0103777) == 0101250) {                    /* FSMS Sub single (memory) */
+                break;                    /* FSMS Sub single (memory) */
         if (!(fpu_unit.flags & UNIT_UP))
             continue;
         if (Debug_Flags == 1) {
@@ -3173,460 +3864,7 @@ if ((IR & 0100017) == 0100010) {                        /* This pattern for all 
             FPSR |= 0x02000000;                         /* Set Z */
         if (FPAC[j] & 0x8000000000000000)
             FPSR |= 0x01000000;                         /* Set N */
-        FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
-        FPSR |= ((PC - 1) & AMASK);
-        PC = (PC + 1) & AMASK;
-        continue;
-    }    
-    if ((IR & 0103777) == 0100350) {                    /* FSD Sub double from AC */
-        if (!(fpu_unit.flags & UNIT_UP))
-            continue;
-        if (Debug_Flags == 1) {
-            printf("\n<<FPU instruction: FSD>>\n");
-            reason = STOP_IBKPT;
-        }    
-        if (FPFault) {                                  /* Fault from a previous inst? */
-            FPFault = 0;
-            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
-            PutMap(t, AC[0]);
-            t++;
-            PutMap(t, AC[1]);
-            t++;
-            PutMap(t, AC[2]);
-            t++;
-            PutMap(t, AC[3]);
-            t++;
-            PutMap(t, ((PC-1) & AMASK));
-            if (C) PutMap(t, (GetMap(t) | 0100000));
-            PutMap(040, t);
-            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
-            continue;
-        }
-        i = (IR >> 13) & 3;
-        j = (IR >> 11) & 3;
-        FPSR &= 0xFCFFFFFF;                             /* Z+N bits off */
-        get_lf(&dfl, &FPAC[i]);                         /* Place in working registers */
-        get_lf(&dfl2, &FPAC[j]);
-        dfl.sign = ! (dfl.sign);                        /* invert sign of 2nd operand */        
-        k = add_lf(&dfl2, &dfl, 1);                     /* Add the two */
-        if (k) {
-             switch (k) {
-             case 1:
-                FPSR |= 0x40000000;                     /* OVF bit on */
-                break;
-             case 2:
-                FPSR |= 0x20000000;                     /* UNF bit on */
-                break;
-             }
-        }
-        store_lf(&dfl2, &FPAC[j]);                      /* put result in destination */
-        if ((FPAC[j] & 0x00ffffffffffffff) == 0)
-            FPAC[j] = 0;
-        FPSR &= 0xFCFFFFFF;                             /* Z + N off */
-        if (FPAC[j] == 0)
-            FPSR |= 0x02000000;                         /* Set Z */
-        if (FPAC[j] & 0x8000000000000000)
-            FPSR |= 0x01000000;                         /* Set N */
-        FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
-        FPSR |= ((PC - 1) & AMASK);
-        continue;
-    }    
-    if ((IR & 0103777) == 0101350) {                    /* FSMD Sub double from memory */
-        if (!(fpu_unit.flags & UNIT_UP))
-            continue;
-        if (Debug_Flags == 1) {
-            printf("\n<<FPU instruction: FSMD>>\n");
-            reason = STOP_IBKPT;
-        }    
-        if (FPFault) {                                  /* Fault from a previous inst? */
-            FPFault = 0;
-            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
-            PutMap(t, AC[0]);
-            t++;
-            PutMap(t, AC[1]);
-            t++;
-            PutMap(t, AC[2]);
-            t++;
-            PutMap(t, AC[3]);
-            t++;
-            PutMap(t, ((PC-1) & AMASK));
-            if (C) PutMap(t, (GetMap(t) | 0100000));
-            PutMap(040, t);
-            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
-            continue;
-        }
-        j = (IR >> 11) & 3;
-        MA = effective(PC, (IR >> 13) & 3, GetMap(PC));
-        tempfp = ((t_uint64)GetMap(MA) << 48);
-        tempfp |= ((t_uint64)GetMap(MA + 1) << 32);
-        tempfp |= ((t_uint64)GetMap(MA + 2) << 16);
-        tempfp |= ((t_uint64)GetMap(MA + 3));
-        if ((tempfp & 0x00ffffffffffffff) == 0)
-            tempfp = 0;
-        FPSR &= 0xFCFFFFFF;                             /* Z+N bits off */
-        get_lf(&dfl, &tempfp);                          /* Place in working registers */
-        get_lf(&dfl2, &FPAC[j]);
-        dfl.sign = ! (dfl.sign);                        /* invert sign of 2nd operand */        
-        k = add_lf(&dfl2, &dfl, 1);                     /* Add the two */
-        if (k) {
-             switch (k) {
-             case 1:
-                FPSR |= 0x40000000;                     /* OVF bit on */
-                break;
-             case 2:
-                FPSR |= 0x20000000;                     /* UNF bit on */
-                break;
-             }
-        }
-        store_lf(&dfl2, &FPAC[j]);                      /* put result in destination */
-        if ((FPAC[j] & 0x00ffffffffffffff) == 0)
-            FPAC[j] = 0;
-        FPSR &= 0xFCFFFFFF;                             /* Z + N off */
-        if (FPAC[j] == 0)
-            FPSR |= 0x02000000;                         /* Set Z */
-        if (FPAC[j] & 0x8000000000000000)
-            FPSR |= 0x01000000;                         /* Set N */
-        FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
-        FPSR |= ((PC - 1) & AMASK);
-        PC = (PC + 1) & AMASK;
-        continue;
-    }    
-    if ((IR & 0103777) == 0100450) {                    /* FMS Mult single by AC */
-        if (!(fpu_unit.flags & UNIT_UP))
-            continue;
-        if (Debug_Flags == 1) {
-            printf("\n<<FPU instruction: FMS>>\n");
-            reason = STOP_IBKPT;
-        }    
-        if (FPFault) {                                  /* Fault from a previous inst? */
-            FPFault = 0;
-            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
-            PutMap(t, AC[0]);
-            t++;
-            PutMap(t, AC[1]);
-            t++;
-            PutMap(t, AC[2]);
-            t++;
-            PutMap(t, AC[3]);
-            t++;
-            PutMap(t, ((PC-1) & AMASK));
-            if (C) PutMap(t, (GetMap(t) | 0100000));
-            PutMap(040, t);
-            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
-            continue;
-        }
-        i = (IR >> 13) & 3;
-        j = (IR >> 11) & 3;
-        FPSR &= 0xFCFFFFFF;                             /* Z+N bits off */
-        get_sf(&sfl, &FPAC[i]);                         /* Place in working registers */
-        get_sf(&sfl2, &FPAC[j]);
-        k = mul_sf(&sfl2, &sfl);                        /* Multiply */
-        if (k) {
-             switch (k) {
-             case 1:
-                FPSR |= 0x40000000;                     /* OVF bit on */
-                break;
-             case 2:
-                FPSR |= 0x20000000;                     /* UNF bit on */
-                break;
-             }
-        }
-        store_sf(&sfl2, &FPAC[j]);                      /* put result in destination */
-        if ((FPAC[j] & 0x00ffffffffffffff) == 0)
-            FPAC[j] = 0;
-        FPSR &= 0xFCFFFFFF;                             /* Z + N off */
-        if (FPAC[j] == 0)
-            FPSR |= 0x02000000;                         /* Set Z */
-        if (FPAC[j] & 0x8000000000000000)
-            FPSR |= 0x01000000;                         /* Set N */
-        FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
-        FPSR |= ((PC - 1) & AMASK);
-        continue;
-    }    
-    if ((IR & 0103777) == 0101450) {                    /* FMMS Mult single by memory */
-        if (!(fpu_unit.flags & UNIT_UP))
-            continue;
-        if (Debug_Flags == 1) {
-            printf("\n<<FPU instruction: FMMS>>\n");
-            reason = STOP_IBKPT;
-        }    
-        if (FPFault) {                                  /* Fault from a previous inst? */
-            FPFault = 0;
-            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
-            PutMap(t, AC[0]);
-            t++;
-            PutMap(t, AC[1]);
-            t++;
-            PutMap(t, AC[2]);
-            t++;
-            PutMap(t, AC[3]);
-            t++;
-            PutMap(t, ((PC-1) & AMASK));
-            if (C) PutMap(t, (GetMap(t) | 0100000));
-            PutMap(040, t);
-            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
-            continue;
-        }
-        j = (IR >> 11) & 3;
-        MA = effective(PC, (IR >> 13) & 3, GetMap(PC));
-        tempfp = ((t_uint64)GetMap(MA) << 48);
-        tempfp |= ((t_uint64)GetMap(MA + 1) << 32);
-        if ((tempfp & 0x00ffffffffffffff) == 0)
-            tempfp = 0;
-        FPSR &= 0xFCFFFFFF;                             /* Z+N bits off */
-        get_sf(&sfl, &tempfp);                          /* Place in working registers */
-        get_sf(&sfl2, &FPAC[j]);
-        k = mul_sf(&sfl2, &sfl);                        /* Multiply */
-        if (k) {
-             switch (k) {
-             case 1:
-                FPSR |= 0x40000000;                     /* OVF bit on */
-                break;
-             case 2:
-                FPSR |= 0x20000000;                     /* UNF bit on */
-                break;
-             }
-        }
-        store_sf(&sfl2, &FPAC[j]);                      /* put result in destination */
-        if ((FPAC[j] & 0x00ffffffffffffff) == 0)
-            FPAC[j] = 0;
-        FPSR &= 0xFCFFFFFF;                             /* Z + N off */
-        if (FPAC[j] == 0)
-            FPSR |= 0x02000000;                         /* Set Z */
-        if (FPAC[j] & 0x8000000000000000)
-            FPSR |= 0x01000000;                         /* Set N */
-        FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
-        FPSR |= ((PC - 1) & AMASK);
-        PC = (PC + 1) & AMASK;
-        continue;
-    }    
-    if ((IR & 0103777) == 0100550) {                    /* FMD Mult double by AC */
-        if (!(fpu_unit.flags & UNIT_UP))
-            continue;
-        if (Debug_Flags == 1) {
-            printf("\n<<FPU instruction: FMD>>\n");
-            reason = STOP_IBKPT;
-        }    
-        if (FPFault) {                                  /* Fault from a previous inst? */
-            FPFault = 0;
-            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
-            PutMap(t, AC[0]);
-            t++;
-            PutMap(t, AC[1]);
-            t++;
-            PutMap(t, AC[2]);
-            t++;
-            PutMap(t, AC[3]);
-            t++;
-            PutMap(t, ((PC-1) & AMASK));
-            if (C) PutMap(t, (GetMap(t) | 0100000));
-            PutMap(040, t);
-            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
-            continue;
-        }
-        i = (IR >> 13) & 3;
-        j = (IR >> 11) & 3;
-        FPSR &= 0xFCFFFFFF;                             /* Z+N bits off */
-        get_lf(&dfl, &FPAC[i]);                         /* Place in working registers */
-        get_lf(&dfl2, &FPAC[j]);
-        k = mul_lf(&dfl2, &dfl);                        /* Multiply */
-        if (k) {
-             switch (k) {
-             case 1:
-                FPSR |= 0x40000000;                     /* OVF bit on */
-                break;
-             case 2:
-                FPSR |= 0x20000000;                     /* UNF bit on */
-                break;
-             }
-        }
-        store_lf(&dfl2, &FPAC[j]);                      /* put result in destination */
-        if ((FPAC[j] & 0x00ffffffffffffff) == 0)
-            FPAC[j] = 0;
-        FPSR &= 0xFCFFFFFF;                             /* Z + N off */
-        if (FPAC[j] == 0)
-            FPSR |= 0x02000000;                         /* Set Z */
-        if (FPAC[j] & 0x8000000000000000)
-            FPSR |= 0x01000000;                         /* Set N */
-        FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
-        FPSR |= ((PC - 1) & AMASK);
-        continue;
-    }    
-    if ((IR & 0103777) == 0101550) {                    /* FMMD Mult double by memory */
-        if (!(fpu_unit.flags & UNIT_UP))
-            continue;
-        if (Debug_Flags == 1) {
-            printf("\n<<FPU instruction: FMMD>>\n");
-            reason = STOP_IBKPT;
-        }    
-        if (FPFault) {                                  /* Fault from a previous inst? */
-            FPFault = 0;
-            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
-            PutMap(t, AC[0]);
-            t++;
-            PutMap(t, AC[1]);
-            t++;
-            PutMap(t, AC[2]);
-            t++;
-            PutMap(t, AC[3]);
-            t++;
-            PutMap(t, ((PC-1) & AMASK));
-            if (C) PutMap(t, (GetMap(t) | 0100000));
-            PutMap(040, t);
-            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
-            continue;
-        }
-        j = (IR >> 11) & 3;
-        MA = effective(PC, (IR >> 13) & 3, GetMap(PC));
-        tempfp = ((t_uint64)GetMap(MA) << 48);
-        tempfp |= ((t_uint64)GetMap(MA + 1) << 32);
-        tempfp |= ((t_uint64)GetMap(MA + 2) << 16);
-        tempfp |= ((t_uint64)GetMap(MA + 3));
-        if ((tempfp & 0x00ffffffffffffff) == 0)
-            tempfp = 0;
-        FPSR &= 0xFCFFFFFF;                             /* Z+N bits off */
-        get_lf(&dfl, &tempfp);                          /* Place in working registers */
-        get_lf(&dfl2, &FPAC[j]);
-        k = mul_lf(&dfl2, &dfl);                        /* Multiply */
-        if (k) {
-             switch (k) {
-             case 1:
-                FPSR |= 0x40000000;                     /* OVF bit on */
-                break;
-             case 2:
-                FPSR |= 0x20000000;                     /* UNF bit on */
-                break;
-             }
-        }
-        store_lf(&dfl2, &FPAC[j]);                      /* put result in destination */
-        if ((FPAC[j] & 0x00ffffffffffffff) == 0)
-            FPAC[j] = 0;
-        FPSR &= 0xFCFFFFFF;                             /* Z + N off */
-        if (FPAC[j] == 0)
-            FPSR |= 0x02000000;                         /* Set Z */
-        if (FPAC[j] & 0x8000000000000000)
-            FPSR |= 0x01000000;                         /* Set N */
-        FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
-        FPSR |= ((PC - 1) & AMASK);
-        PC = (PC + 1) & AMASK;
-        continue;
-    }    
-    if ((IR & 0103777) == 0100650) {                    /* FDS Div single by AC */
-        if (!(fpu_unit.flags & UNIT_UP))
-            continue;
-        if (Debug_Flags == 1) {
-            printf("\n<<FPU instruction: FDS>>\n");
-            reason = STOP_IBKPT;
-        }    
-        if (FPFault) {                                  /* Fault from a previous inst? */
-            FPFault = 0;
-            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
-            PutMap(t, AC[0]);
-            t++;
-            PutMap(t, AC[1]);
-            t++;
-            PutMap(t, AC[2]);
-            t++;
-            PutMap(t, AC[3]);
-            t++;
-            PutMap(t, ((PC-1) & AMASK));
-            if (C) PutMap(t, (GetMap(t) | 0100000));
-            PutMap(040, t);
-            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
-            continue;
-        }
-        i = (IR >> 13) & 3;
-        j = (IR >> 11) & 3;
-        FPSR &= 0xFCFFFFFF;                             /* Z+N bits off */
-        get_sf(&sfl, &FPAC[i]);                         /* Place in working registers */
-        get_sf(&sfl2, &FPAC[j]);
-        k = div_sf(&sfl2, &sfl);                        /* Divide */
-        if (k) {
-            switch (k) {
-            case 1:
-                FPSR |= 0x40000000;                     /* OVF bit on */
-                break;
-            case 2:
-                FPSR |= 0x20000000;                     /* UNF bit on */
-                break;
-            case 3:
-                FPSR |= 0x10000000;                     /* DVZ bit on */
-                break;
-            }
-        }
-        store_sf(&sfl2, &FPAC[j]);                      /* put result in destination */
-        if ((FPAC[j] & 0x00ffffffffffffff) == 0)
-            FPAC[j] = 0;
-        FPSR &= 0xFCFFFFFF;                             /* Z + N off */
-        if (FPAC[j] == 0)
-            FPSR |= 0x02000000;                         /* Set Z */
-        if (FPAC[j] & 0x8000000000000000)
-            FPSR |= 0x01000000;                         /* Set N */
-        FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
-        FPSR |= ((PC - 1) & AMASK);
-        continue;
-    }    
-    if ((IR & 0103777) == 0101650) {                    /* FDMS Div single by memory */
-        if (!(fpu_unit.flags & UNIT_UP))
-            continue;
-        if (Debug_Flags == 1) {
-            printf("\n<<FPU instruction: FDMS>>\n");
-            reason = STOP_IBKPT;
-        }    
-        if (FPFault) {                                  /* Fault from a previous inst? */
-            FPFault = 0;
-            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
-            PutMap(t, AC[0]);
-            t++;
-            PutMap(t, AC[1]);
-            t++;
-            PutMap(t, AC[2]);
-            t++;
-            PutMap(t, AC[3]);
-            t++;
-            PutMap(t, ((PC-1) & AMASK));
-            if (C) PutMap(t, (GetMap(t) | 0100000));
-            PutMap(040, t);
-            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
-            continue;
-        }
-        j = (IR >> 11) & 3;
-        MA = effective(PC, (IR >> 13) & 3, GetMap(PC));
-        tempfp = ((t_uint64)GetMap(MA) << 48);
-        tempfp |= ((t_uint64)GetMap(MA + 1) << 32);
-        if ((tempfp & 0x00ffffffffffffff) == 0)
-            tempfp = 0;
-        FPSR &= 0xFCFFFFFF;                             /* Z+N bits off */
-        get_sf(&sfl, &tempfp);                          /* Place in working registers */
-        get_sf(&sfl2, &FPAC[j]);
-        k = div_sf(&sfl2, &sfl);                        /* Divide */
-        if (k) {
-            switch (k) {
-            case 1:
-                FPSR |= 0x40000000;                     /* OVF bit on */
-                break;
-            case 2:
-                FPSR |= 0x20000000;                     /* UNF bit on */
-                break;
-            case 3:
-                FPSR |= 0x10000000;                     /* DVZ bit on */
-                break;
-            }
-        }
-        store_sf(&sfl2, &FPAC[j]);                      /* put result in destination */
-        if ((FPAC[j] & 0x00ffffffffffffff) == 0)
-            FPAC[j] = 0;
-        FPSR &= 0xFCFFFFFF;                             /* Z + N off */
-        if (FPAC[j] == 0)
-            FPSR |= 0x02000000;                         /* Set Z */
-        if (FPAC[j] & 0x8000000000000000)
-            FPSR |= 0x01000000;                         /* Set N */
-        FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
-        FPSR |= ((PC - 1) & AMASK);
-        PC = (PC + 1) & AMASK;
-        continue;
-    }    
-    if ((IR & 0103777) == 0100750) {                    /* FDD Div double by AC */
+        FPSR &= 0xFFFF0000;                           /* FDD Div double by AC */
         if (!(fpu_unit.flags & UNIT_UP))
             continue;
         if (Debug_Flags == 1) {
@@ -3680,12 +3918,32 @@ if ((IR & 0100017) == 0100010) {                        /* This pattern for all 
         FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
         FPSR |= ((PC - 1) & AMASK);
         continue;
-    }    
-    if ((IR & 0103777) == 0101750) {                    /* FDMD Div double by memory */
+                          /* Success: put addr in FPSR */
+        FPSR |= ((PC - 1) & AMASK);
+        PC = (PC + 1) & AMASK;
+        continue;
+    
+             }
+        }
+        store_lf(&dfl2, &FPAC[j]);                      /* put result in destination */
+        if ((FPAC[j] & 0x00ffffffffffffff) == 0)
+            FPAC[j] = 0;
+        FPSR &= 0xFCFFFFFF;                             /* Z + N off */
+        if (FPAC[j] == 0)
+            FPSR |= 0x02000000;                         /* Set Z */
+        if (FPAC[j] & 0x8000000000000000)
+            FPSR |= 0x01000000;                         /* Set N */
+        FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
+        FPSR |= ((PC - 1) & AMASK);
+        continue;
+    
+    }
+     
+    if (IR == 0143350) {                                /* FTE Trap Enable */
         if (!(fpu_unit.flags & UNIT_UP))
             continue;
-        if (Debug_Flags == 1) {
-            printf("\n<<FPU instruction: FDMD>>\n");
+        if (Debug_Flags == 2) {
+            printf("\n<<FPU instruction: FTE>>\n");
             reason = STOP_IBKPT;
         }    
         if (FPFault) {                                  /* Fault from a previous inst? */
@@ -3705,16 +3963,35 @@ if ((IR & 0100017) == 0100010) {                        /* This pattern for all 
             PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
             continue;
         }
+        FPSR |= 0x04000000;
+        FPSR &= 0xFFFF0000;                             /* FDD Div double by AC */
+        if (!(fpu_unit.flags & UNIT_UP))
+            continue;
+        if (Debug_Flags == 1) {
+            printf("\n<<FPU instruction: FDD>>\n");
+            reason = STOP_IBKPT;
+        }    
+        if (FPFault) {                                  /* Fault from a previous inst? */
+            FPFault = 0;
+            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
+            PutMap(t, AC[0]);
+            t++;
+            PutMap(t, AC[1]);
+            t++;
+            PutMap(t, AC[2]);
+            t++;
+            PutMap(t, AC[3]);
+            t++;
+            PutMap(t, ((PC-1) & AMASK));
+            if (C) PutMap(t, (GetMap(t) | 0100000));
+            PutMap(040, t);
+            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
+            continue;
+        }
+        i = (IR >> 13) & 3;
         j = (IR >> 11) & 3;
-        MA = effective(PC, (IR >> 13) & 3, GetMap(PC));
-        tempfp = ((t_uint64)GetMap(MA) << 48);
-        tempfp |= ((t_uint64)GetMap(MA + 1) << 32);
-        tempfp |= ((t_uint64)GetMap(MA + 2) << 16);
-        tempfp |= ((t_uint64)GetMap(MA + 3));
-        if ((tempfp & 0x00ffffffffffffff) == 0)
-            tempfp = 0;
         FPSR &= 0xFCFFFFFF;                             /* Z+N bits off */
-        get_lf(&dfl, &tempfp);                          /* Place in working registers */
+        get_lf(&dfl, &FPAC[i]);                         /* Place in working registers */
         get_lf(&dfl2, &FPAC[j]);
         k = div_lf(&dfl2, &dfl);                        /* Divide */
         if (k) {
@@ -3740,9 +4017,41 @@ if ((IR & 0100017) == 0100010) {                        /* This pattern for all 
             FPSR |= 0x01000000;                         /* Set N */
         FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
         FPSR |= ((PC - 1) & AMASK);
-        PC = (PC + 1) & AMASK;
+        continue;
+                        /* Success: put addr in FPSR */
+        FPSR |= ((PC - 1) & AMASK);
         continue;
     }    
+    if (IR == 0147350) {                                /* FTD Trap Disable */
+        if (!(fpu_unit.flags & UNIT_UP))
+            continue;
+        if (Debug_Flags == 1) {
+            printf("\n<<FPU instruction: FTD>>\n");
+            reason = STOP_IBKPT;
+        }    
+        if (FPFault) {                                  /* Fault from a previous inst? */
+            FPFault = 0;
+            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
+            PutMap(t, AC[0]);
+            t++;
+            PutMap(t, AC[1]);
+            t++;
+            PutMap(t, AC[2]);
+            t++;
+            PutMap(t, AC[3]);
+            t++;
+            PutMap(t, ((PC-1) & AMASK));
+            if (C) PutMap(t, (GetMap(t) | 0100000));
+            PutMap(040, t);
+            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
+            continue;
+        }
+        FPSR &= 0xFBFFFFFF;
+        FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
+        FPSR |= ((PC - 1) & AMASK);
+        continue;
+    }
+   
     if ((IR & 0163777) == 0163050) {                    /* FNEG Negate */
         if (!(fpu_unit.flags & UNIT_UP))
             continue;
@@ -3934,58 +4243,7 @@ if ((IR & 0100017) == 0100010) {                        /* This pattern for all 
         FPSR |= ((PC - 1) & AMASK);
         continue;
     }    
-    if ((IR & 0103777) == 0103450) {                    /* FCMP FP Compare */
-        if (!(fpu_unit.flags & UNIT_UP))                /* (Subtract double AC without storing result) */
-            continue;
-        if (Debug_Flags == 1) {
-            printf("\n<<FPU instruction: FCMP>>\n");
-            reason = STOP_IBKPT;
-        }    
-        if (FPFault) {                                  /* Fault from a previous inst? */
-            FPFault = 0;
-            t = (GetMap(040) + 1) & AMASK;              /* Yes: push rtn block */               
-            PutMap(t, AC[0]);
-            t++;
-            PutMap(t, AC[1]);
-            t++;
-            PutMap(t, AC[2]);
-            t++;
-            PutMap(t, AC[3]);
-            t++;
-            PutMap(t, ((PC-1) & AMASK));
-            if (C) PutMap(t, (GetMap(t) | 0100000));
-            PutMap(040, t);
-            PC = indirect(GetMap(045));                 /* JMP indirect to 45 */
-            continue;
-        }
-        i = (IR >> 13) & 3;
-        j = (IR >> 11) & 3;
-        FPSR &= 0xFCFFFFFF;                             /* Z+N bits off */
-        get_lf(&dfl, &FPAC[i]);                         /* Place in working registers */
-        get_lf(&dfl2, &FPAC[j]);
-        dfl.sign = ! (dfl.sign);                        /* invert sign of 2nd operand */        
-        k = add_lf(&dfl2, &dfl, 1);                     /* Add the two */
-        if (k) {
-            switch (k) {
-            case 1:
-                FPSR |= 0x40000000;                     /* OVF bit on */
-                break;
-            case 2:
-                FPSR |= 0x20000000;                     /* UNF bit on */
-                break;
-            }
-        }
-        if ((FPAC[j] & 0x00ffffffffffffff) == 0)
-            FPAC[j] = 0;
-        FPSR &= 0xFCFFFFFF;                             /* Z + N off */
-        if (FPAC[j] == 0)
-            FPSR |= 0x02000000;                         /* Set Z */
-        if (FPAC[j] & 0x8000000000000000)
-            FPSR |= 0x01000000;                         /* Set N */
-        FPSR &= 0xFFFF0000;                             /* Success: put addr in FPSR */
-        FPSR |= ((PC - 1) & AMASK);
-        continue;
-    }    
+      
     if (IR == 0163350) {                                /* FPSH Push State */
         if (!(fpu_unit.flags & UNIT_UP))
             continue;
@@ -4804,9 +5062,9 @@ if (t < 014) {                                          /* mem ref? */
     }
     if (IR & 002000) {                                  /* indirect? */
         for (i = 0; i < (ind_max * 2); i++) {           /* count indirects */
-            if ((MA & 077770) == 020 && !(cpu_unit.flags & UNIT_MICRO))
+            if ((MA & 077770) == 020 && !(cpu_unite.flags & UNIT_MICRO))
                 MA = (PutMap(MA & AMASK, (GetMap(MA & AMASK) + 1) & 0177777));
-            else if ((MA & 077770) == 030 && !(cpu_unit.flags & UNIT_MICRO))
+            else if ((MA & 077770) == 030 && !(cpu_unite.flags & UNIT_MICRO))
                 MA = (PutMap(MA & AMASK, (GetMap(MA & AMASK) - 1) & 0177777));
             else MA = GetMap(MA & AMASK);
             if (MapStat & 1) {                          /* Start MAP */
@@ -4837,12 +5095,12 @@ if (t < 014) {                                          /* mem ref? */
         break;
     case 002:                                           /* ISZ */
         src = (GetMap(MA) + 1) & 0177777;
-        if (MEM_ADDR_OK (MA)) PutMap(MA, src);
+        if (MEM_ADDR_OK2 (MA)) PutMap(MA, src);
         if (src == 0) PC = (PC + 1) & AMASK;
         break;
     case 003:                                           /* DSZ */
         src = (GetMap(MA) - 1) & 0177777;
-        if (MEM_ADDR_OK (MA)) PutMap(MA, src);
+        if (MEM_ADDR_OK2 (MA)) PutMap(MA, src);
         if (src == 0) PC = (PC + 1) & AMASK;
         break;
     case 004:                                           /* LDA 0 */
@@ -4888,7 +5146,7 @@ if (t < 014) {                                          /* mem ref? */
     case 010:                                           /* STA 0 */
         if (SingleCycle) 
             Usermap = SingleCycle;
-        if (MEM_ADDR_OK (MA)) PutMap(MA, AC[0]);
+        if (MEM_ADDR_OK2 (MA)) PutMap(MA, AC[0]);
         if (SingleCycle) {
             Usermap = SingleCycle = 0;
             if (Inhibit == 1) Inhibit = 3;
@@ -4899,7 +5157,7 @@ if (t < 014) {                                          /* mem ref? */
     case 011:                                           /* STA 1 */
         if (SingleCycle) 
             Usermap = SingleCycle;
-        if (MEM_ADDR_OK (MA)) PutMap(MA, AC[1]);
+        if (MEM_ADDR_OK2 (MA)) PutMap(MA, AC[1]);
         if (SingleCycle) {
             Usermap = SingleCycle = 0;
             if (Inhibit == 1) Inhibit = 3;
@@ -4910,7 +5168,7 @@ if (t < 014) {                                          /* mem ref? */
     case 012:                                          /* STA 2 */
         if (SingleCycle) 
             Usermap = SingleCycle;
-        if (MEM_ADDR_OK (MA)) PutMap(MA, AC[2]);
+        if (MEM_ADDR_OK2 (MA)) PutMap(MA, AC[2]);
         if (SingleCycle) {
             Usermap = SingleCycle = 0;
             if (Inhibit == 1) Inhibit = 3;
@@ -4921,7 +5179,7 @@ if (t < 014) {                                          /* mem ref? */
     case 013:                                           /* STA 3 */
         if (SingleCycle) 
             Usermap = SingleCycle;
-        if (MEM_ADDR_OK (MA)) PutMap(MA, AC[3]);
+        if (MEM_ADDR_OK2 (MA)) PutMap(MA, AC[3]);
         if (SingleCycle) {
             Usermap = SingleCycle = 0;
             if (Inhibit == 1) Inhibit = 3;
@@ -5403,9 +5661,9 @@ int32 LEFmode(int32 PC, int32 index, int32 disp, int32 indirect)
 
     if (indirect) {                                     /* indirect? */
         for (i = 0; i < (ind_max * 2); i++) {           /* count indirects */
-            if ((MA & 077770) == 020 && !(cpu_unit.flags & UNIT_MICRO))
+            if ((MA & 077770) == 020 && !(cpu_unite.flags & UNIT_MICRO))
                 MA = (PutMap(MA & AMASK, (GetMap(MA & AMASK) + 1) & 0177777));
-            else if ((MA & 077770) == 030 && !(cpu_unit.flags & UNIT_MICRO))
+            else if ((MA & 077770) == 030 && !(cpu_unite.flags & UNIT_MICRO))
                 MA = (PutMap(MA & AMASK, (GetMap(MA & AMASK) - 1) & 0177777));
             else MA = GetMap(MA & AMASK);
             if (SingleCycle) Usermap = 0;
@@ -5462,9 +5720,9 @@ int32 indirect(int32 d)
        
     if (d & 0100000) {                                  /* indirect? */
         for (i = 0; i < ind_max * 2; i++) {             /* count indirects */
-            if ((d & 077770) == 020 && !(cpu_unit.flags & UNIT_MICRO)) 
+            if ((d & 077770) == 020 && !(cpu_unite.flags & UNIT_MICRO)) 
                 d = (PutMap(d & AMASK, ((GetMap(d & AMASK) + 1) & 0177777)));
-            else if ((d & 077770) == 030 && !(cpu_unit.flags & UNIT_MICRO)) 
+            else if ((d & 077770) == 030 && !(cpu_unite.flags & UNIT_MICRO)) 
                 d = (PutMap(d & AMASK, ((GetMap(d & AMASK) - 1) & 0177777)));
             else d = GetMap(d & AMASK);
             if (MapStat & 1) {                          /* Start MAP */
@@ -5517,7 +5775,7 @@ int32 GetMap(int32 addr)
             if (addr < 076000)
                 return M[addr];
             paddr = ((Map31 & PAGEMASK) << 10) | (addr & 001777);
-            if (paddr < MEMSIZE)
+            if (paddr < MEMSIZE2)
                  return M[paddr];
                 else
                  return (0); 
@@ -5527,7 +5785,7 @@ int32 GetMap(int32 addr)
             paddr = ((Map[1][page] & 01777) << 10) | (addr & 001777);
             if (Map[1][page] == INVALID && !SingleCycle) 
                 Fault = 0100000/*!!!*/;                 /* Validity */
-            if (paddr < MEMSIZE)
+            if (paddr < MEMSIZE2)
                  return M[paddr];
                 else
                  return (0); 
@@ -5537,7 +5795,7 @@ int32 GetMap(int32 addr)
             paddr = ((Map[2][page] & PAGEMASK) << 10) | (addr & 001777);
             if (Map[2][page] == INVALID && !SingleCycle) 
                 Fault = 0100000/*!!!*/;                /* Validity */
-            if (paddr < MEMSIZE)
+            if (paddr < MEMSIZE2)
                  return M[paddr];
                 else
                  return (0); 
@@ -5547,7 +5805,7 @@ int32 GetMap(int32 addr)
             paddr = ((Map[6][page] & PAGEMASK) << 10) | (addr & 001777);
             if (Map[6][page] == INVALID && !SingleCycle) 
                 Fault = 0100000/*!!!*/;                /* Validity */
-            if (paddr < MEMSIZE)
+            if (paddr < MEMSIZE2)
                  return M[paddr];
                 else
                  return (0); 
@@ -5557,7 +5815,7 @@ int32 GetMap(int32 addr)
             paddr = ((Map[7][page] & PAGEMASK) << 10) | (addr & 001777);
             if (Map[7][page] == INVALID && !SingleCycle) 
                 Fault = 0100000/*!!!*/;                /* Validity */
-            if (paddr < MEMSIZE)
+            if (paddr < MEMSIZE2)
                  return M[paddr];
                 else
                  return (0); 
@@ -5581,35 +5839,35 @@ int32 PutMap(int32 addr, int32 data)
                 return (data);
             }
             paddr = ((Map31 & PAGEMASK) << 10) | (addr & 001777);
-            if (paddr < MEMSIZE) M[paddr] = data;    
+            if (paddr < MEMSIZE2) M[paddr] = data;    
             break;
         case 1:
             page = (addr >> 10) & 037;
             paddr = ((Map[1][page] & PAGEMASK) << 10) | (addr & 001777);
             if (((Map[1][page] & 0100000) && (MapStat & 020)) || Map[1][page] == INVALID) 
                 Fault = 010000;                         /* Write Protect Fault */
-            else if (paddr < MEMSIZE) M[paddr] = data; 
+            else if (paddr < MEMSIZE2) M[paddr] = data; 
             break;
         case 2:
             page = (addr >> 10) & 037;
             paddr = ((Map[2][page] & PAGEMASK) << 10) | (addr & 001777);
             if (((Map[2][page] & 0100000) && (MapStat & 020)) || Map[2][page] == INVALID) 
                 Fault = 010000;                         /* Write Protect Fault */
-            else if (paddr < MEMSIZE) M[paddr] = data;
+            else if (paddr < MEMSIZE2) M[paddr] = data;
             break;    
         case 6:
             page = (addr >> 10) & 037;
             paddr = ((Map[2][page] & PAGEMASK) << 10) | (addr & 001777);
             if (((Map[6][page] & 0100000) && (MapStat & 020)) || Map[6][page] == INVALID)
                 Fault = 010000;                         /* Write Protect Fault */
-            else if (paddr < MEMSIZE) M[paddr] = data;
+            else if (paddr < MEMSIZE2) M[paddr] = data;
             break;    
         case 7:
             page = (addr >> 10) & 037;
             paddr = ((Map[2][page] & PAGEMASK) << 10) | (addr & 001777);
             if (((Map[7][page] & 0100000) && (MapStat & 020)) || Map[7][page] == INVALID) 
                 Fault = 010000;                         /* Write Protect Fault */
-            else if (paddr < MEMSIZE) M[paddr] = data;
+            else if (paddr < MEMSIZE2) M[paddr] = data;
             break;    
         default:
             M[addr] = data;
@@ -5624,7 +5882,7 @@ int16 GetDCHMap(int32 map, int32 addr)
      t_addr paddr;
      if (!(MapStat & 02)) return M[addr];
      paddr = ((Map[map][(addr >> 10) & 037] & PAGEMASK) << 10) | (addr & 001777);
-     if (paddr < MEMSIZE)
+     if (paddr < MEMSIZE2)
          return M[paddr]; 
      return (0);       
 }
@@ -5637,7 +5895,7 @@ int16 PutDCHMap(int32 map, int32 addr, int16 data)
          return (data);
      }    
      paddr = ((Map[map][(addr >> 10) & 037] & PAGEMASK) << 10) | (addr & 001777);
-     if (paddr < MEMSIZE)
+     if (paddr < MEMSIZE2)
         M[paddr] = data;
      return (data);    
 }
@@ -5740,7 +5998,7 @@ if (sw & SWMASK ('V')) {
     if (vptr != NULL) *vptr = GetMap (addr);
 }
 else {
-    if (addr >= MEMSIZE) return SCPE_NXM;
+    if (addr >= MEMSIZE2) return SCPE_NXM;
     if (vptr != NULL) *vptr = M[addr] & 0177777;
 }
 return SCPE_OK;
@@ -5755,7 +6013,7 @@ if (sw & SWMASK ('V')) {
     PutMap (addr, (int32) val);
 }
 else {
-    if (addr >= MEMSIZE) return SCPE_NXM;
+    if (addr >= MEMSIZE2) return SCPE_NXM;
     M[addr] = (int32) val & 0177777;
 }
 return SCPE_OK;
@@ -5770,11 +6028,11 @@ t_addr i;
 
 if ((val <= 0) || (val > MAXMEMSIZE) || ((val & 07777) != 0))
     return SCPE_ARG;
-for (i = val; i < MEMSIZE; i++) mc = mc | M[i];
+for (i = val; i < MEMSIZE2; i++) mc = mc | M[i];
 if ((mc != 0) && (!get_yn ("Really truncate memory [N]?", FALSE)))
     return SCPE_OK;
-MEMSIZE = val;
-for (i = MEMSIZE; i < MAXMEMSIZE; i++) M[i] = 0;
+MEMSIZE2 = val;
+for (i = MEMSIZE2; i < MAXMEMSIZE; i++) M[i] = 0;
 return SCPE_OK;
 }
 

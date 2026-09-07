@@ -153,7 +153,7 @@
                          STA_PEM)                       /* set status chg */
 
 extern uint16 M[];
-extern UNIT cpu_unit;
+extern UNIT cpu_unitn;
 extern int32 int_req, dev_busy, dev_done, dev_disable;
 extern int32 SR, AMASK;
 
