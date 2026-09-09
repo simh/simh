@@ -7190,8 +7190,13 @@ static t_stat set_size(uint32 size, t_bool unmap) {
             sim_printf("Setting memory size to %ikB ignored for M68K.\n", size);
         return SCPE_OK;
     }
+    /* A CPU switcher board such as the CompuPro CPU 85/88 shares one S-100
+       memory space between both processors: the 8085 side only reaches 64K
+       of it, but the 8088 side and the DMA controllers use the full
+       megabyte, so the size must not be clamped to one bank here. */
     maxsize = (((chiptype == CHIP_TYPE_8080) || (chiptype == CHIP_TYPE_Z80)) &&
-               ((cpu_unit.flags & UNIT_CPU_BANKED) == 0)) ? MAXBANKSIZE : MAXMEMORY;
+               ((cpu_unit.flags & (UNIT_CPU_BANKED | UNIT_CPU_SWITCHER)) == 0)) ?
+               MAXBANKSIZE : MAXMEMORY;
     size <<= KBLOG2;
     if (cpu_unit.flags & UNIT_CPU_BANKED)
         size &= ~ADDRMASK;
