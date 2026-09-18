@@ -38,7 +38,7 @@
 
 #include "nova_defs.h"
 
-extern int32 int_req, dev_busy, dev_done, dev_disable ;
+extern int32 int_reqn, dev_busy, dev_donen, dev_disablen ;
 
 int32 clk_sel = 0;                                      /* selected freq */
 int32 clk_time[4] = { 16000, 100000, 10000, 1000 };     /* freq table */
@@ -66,9 +66,9 @@ UNIT clk_unit = { UDATA (&clk_svc, 0, 0) };
 REG clk_reg[] = {
     { ORDATA (SELECT, clk_sel, 2) },
     { FLDATA (BUSY, dev_busy, INT_V_CLK) },
-    { FLDATA (DONE, dev_done, INT_V_CLK) },
-    { FLDATA (DISABLE, dev_disable, INT_V_CLK) },
-    { FLDATA (INT, int_req, INT_V_CLK) },
+    { FLDATA (DONE, dev_donen, INT_V_CLK) },
+    { FLDATA (DISABLE, dev_disablen, INT_V_CLK) },
+    { FLDATA (INT, int_reqn, INT_V_CLK) },
     { DRDATA (TIME0, clk_time[0], 24), REG_NZ + PV_LEFT },
     { DRDATA (TIME1, clk_time[1], 24), REG_NZ + PV_LEFT },
     { DRDATA (TIME2, clk_time[2], 24), REG_NZ + PV_LEFT },

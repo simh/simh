@@ -98,8 +98,8 @@ static const int32 sector_map[] = {
                         ((double) DSK_NUMSC)))
 
 extern uint16 M[];
-extern UNIT cpu_unit;
-extern int32 int_req, dev_busy, dev_done, dev_disable;
+extern UNIT cpu_unitn;
+extern int32 int_reqn, dev_busy, dev_donen, dev_disablen;
 extern int32 saved_PC, SR, AMASK;
 
 int32 dsk_stat = 0;                                     /* status register */
@@ -135,9 +135,9 @@ REG dsk_reg[] = {
     { ORDATA (DA, dsk_da, 16) },
     { ORDATA (MA, dsk_ma, 16) },
     { FLDATA (BUSY, dev_busy, INT_V_DSK) },
-    { FLDATA (DONE, dev_done, INT_V_DSK) },
-    { FLDATA (DISABLE, dev_disable, INT_V_DSK) },
-    { FLDATA (INT, int_req, INT_V_DSK) },
+    { FLDATA (DONE, dev_donen, INT_V_DSK) },
+    { FLDATA (DISABLE, dev_disablen, INT_V_DSK) },
+    { FLDATA (INT, int_reqn, INT_V_DSK) },
     { ORDATA (WLK, dsk_wlk, 8) },
     { DRDATA (TIME, dsk_time, 24), REG_NZ + PV_LEFT },
     { FLDATA (STOP_IOE, dsk_stopioe, 0) },
