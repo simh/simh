@@ -42,6 +42,8 @@
 #include "altairz80_defs.h"
 #include "i8272.h"
 
+extern t_stat m68k_compupro_boot(void);
+
 #ifdef DBG_MSG
 #define DBG_PRINT(args) sim_printf args
 #else
@@ -741,6 +743,11 @@ static t_stat disk1a_boot(int32 unitno, DEVICE *dptr)
     /* Re-enable the ROM in case it was disabled */
     disk1a_info->rom_disabled = FALSE;
 
+    /* On a CompuPro CPU-68K the 68000 takes its reset vectors from the boot
+       ROM, so pulse reset instead of forcing the program counter. */
+    if (chiptype == CHIP_TYPE_M68K)
+        return m68k_compupro_boot();
+
     /* Set the PC to 0, and go. */
     *((int32 *) sim_PC->loc) = 0;
     return SCPE_OK;
@@ -871,4 +878,33 @@ void raise_disk1a_interrupt(void)
 
     raise_ss1_interrupt(SS1_VI4_INT);
 
+}
+
+/* Interface to the CompuPro CPU-68K support in m68ksim.c.
+ *
+ * A CompuPro 68K system has no boot ROM on the CPU board: the 68000 fetches
+ * its initial stack pointer and program counter from the DISK 1A boot ROM,
+ * which the board forces onto the bus at address zero after a reset.  The ROM
+ * stays visible until the bootstrap turns it off by writing to the motor
+ * control port, so the M68K memory handlers have to be able to read it.
+ */
+uint32 disk1a_rom_is_visible(void) {
+    if (disk1a_dev.flags & DEV_DIS)
+        return FALSE;
+    if (!disk1a_hasProperty(UNIT_DISK1A_ROM))
+        return FALSE;
+    return disk1a_info->rom_disabled == FALSE;
+}
+
+uint32 disk1a_rom_base(void) {
+    return disk1a_info->pnp.mem_base;
+}
+
+uint32 disk1a_rom_size(void) {
+    return disk1a_info->pnp.mem_size;
+}
+
+uint32 disk1a_rom_read(uint32 offset) {
+    bootstrap &= 0xF;
+    return disk1a_rom[bootstrap][offset & 0x1FF];
 }
