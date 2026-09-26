@@ -2931,7 +2931,7 @@ ETH_DEV *eth;
 SOCKET sock;
 SERHANDLE serport;
 CONST char *tptr = cptr;
-t_bool nolog, notelnet, listennotelnet, nomessage, listennomessage, modem_control, loopback, datagram, packet, disabled, console;
+t_bool nolog, notelnet, listennotelnet, nomessage, listennomessage, modem_control, loopback, datagram, packet, disabled, console, start_window;
 int32 listenbacklog;
 TMLN *lp;
 t_stat r = SCPE_OK;
@@ -2966,7 +2966,7 @@ while (*tptr) {
     memset(option,      '\0', sizeof(option));
     memset(speed,       '\0', sizeof(speed));
     memset(framer,      '\0', sizeof(framer));
-    nolog = loopback = disabled = FALSE;
+    nolog = loopback = disabled = start_window = FALSE;
     datagram = mp->datagram;
     packet = mp->packet;
     if (mp->buffered)
@@ -3092,6 +3092,12 @@ while (*tptr) {
                 }
             if (0 == MATCH_CMD (gbuf, "CONSOLE")) {
                 console = TRUE;
+                continue;
+                }
+             if (0 == MATCH_CMD (gbuf, "WINDOW")) {
+                if ((NULL != cptr) && ('\0' != *cptr))
+                    return sim_messagef (SCPE_2MARG, "Unexpected Window Specifier: %s\n", cptr);
+                start_window = TRUE;
                 continue;
                 }
             cptr = get_glyph (gbuf, port, ';');
@@ -3484,6 +3490,19 @@ while (*tptr) {
                 tmxr_set_line_speed (lp, speed);
                 }
             }
+        if (start_window) {
+            if (mp->lines > 1) {
+                sim_messagef (SCPE_ARG, "Line specifier needed to establish a telnet window to a mult-line mux on the %s device\n", mp->dptr->name);
+                }
+            else {
+                if (disabled || notelnet || loopback || destination[0] || datagram || (listen[0] == '\0')) {
+                    sim_messagef (SCPE_ARG, "Unreasonable state to establish a telnet window to the %s device\n", mp->dptr->name);
+                    }
+                else {
+                    sim_set_cons_connect (0, mp->port);
+                    }
+                }
+            }
         }
     else {                                                  /* line specific attach */
         lp = &mp->ldsc[line];
@@ -3663,6 +3682,14 @@ while (*tptr) {
         lp->modem_control = modem_control;
         if (speed[0] && (!datagram) && (!lp->serport))
             tmxr_set_line_speed (lp, speed);
+        if (start_window) {
+            if (disabled || notelnet || loopback || destination[0] || datagram || (listen[0] == '\0')) {
+                sim_messagef (SCPE_ARG, "Unreasonable line state to establish a telnet window to this line %d\n", (int)(lp - mp->ldsc));
+                }
+            else {
+                sim_set_cons_connect (0, lp->port);
+                }
+            }
         r = SCPE_OK;
         }
     }
@@ -4460,6 +4487,12 @@ else {
     fprintf (st, "The log file name for each line uses the above LogFileName as a template\n");
     fprintf (st, "for the actual file name which will be LogFileName_n where n is the line\n");
     fprintf (st, "number.\n\n");
+    if (single_line) {
+        fprintf (st, "If the simulator is running under a GUI environment, and a telnet\n");
+        fprintf (st, "listening port is configured, a telnet connection to the configured\n");
+        fprintf (st, "listening port can be established in a separate window by:\n\n");
+        fprintf (st, "   sim> ATTACH %s {interface:}port{;nomessage},WINDOW\n\n", dptr->name);
+        }
     fprintf (st, "Multiplexer lines may be connected to serial ports on the host system.\n");
     }
 fprintf (st, "Serial ports may be specified as an operating system specific device names\n");
@@ -4571,8 +4604,9 @@ fprintf (st, "connection message to be output to the connected serial port.\n");
 fprintf (st, "This will help to confirm the correct port has been connected and\n");
 fprintf (st, "that the port settings are reasonable for the connected device.\n");
 fprintf (st, "This would be done as:\n\n");
-if (single_line)            /* Single Line Multiplexer */
+if (single_line) {          /* Single Line Multiplexer */
     fprintf (st, "   sim> ATTACH -V %s Connect=SerN\n", dptr->name);
+    }
 else {
     fprintf (st, "   sim> ATTACH -V %s Line=n,Connect=SerN\n\n", dptr->name);
     fprintf (st, "Line specific tcp listening ports are supported.  These are configured\n");
@@ -4587,6 +4621,10 @@ else {
     fprintf (st, "or network block in CIDR form.  Rules are interpreted in order and if,\n");
     fprintf (st, "while processing the list, the end is reached the connection will be\n");
     fprintf (st, "rejected.\n\n");
+    fprintf (st, "If the simulator is running under a GUI environment, and a telnet\n");
+    fprintf (st, "listening port is configured for a line, a telnet connection to the\n");
+    fprintf (st, "line's listening port can be established in a separate window by:\n\n");
+    fprintf (st, "   sim> ATTACH %s Line=n,{interface:}port{;nomessage},WINDOW\n\n", dptr->name);
     }
 fprintf (st, "Direct computer to computer connections (Virtual Null Modem cables) may\n");
 fprintf (st, "be established using the telnet protocol or via raw tcp sockets.\n\n");
