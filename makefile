@@ -250,6 +250,15 @@ endif
 ifneq (,$(or $(findstring pdp8,${MAKECMDGOALS}),$(findstring sds,${MAKECMDGOALS})))
   VIDEO_USEFUL = true
 endif
+# PIPANEL builds could use video, network, readline, and GPIO support
+ifneq (,$(findstring pipanel,${MAKECMDGOALS}))
+  BUILD_MULTIPLE = s
+  BUILD_MULTIPLE_VERB = are
+  VIDEO_USEFUL = true
+  NETWORK_USEFUL = true
+  READLINE_USEFUL = true
+  GPIO_USEFUL = true
+endif
 # building the PDP11 on certain platforms (Raspberry Pi) could use gpio support
 ifneq (,$(findstring pdp11,${MAKECMDGOALS}))
   GPIO_USEFUL = true
@@ -866,7 +875,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
   ifneq (,$(call find_lib,edit))
     ifneq (,$(call find_include,editline/readline))
       $(info using libedit: $(call find_lib,edit) $(call find_include,editline/readline))
-      ifneq (,$(ALL_DEPENDENCIES))
+      ifneq (,$(or $(ALL_DEPENDENCIES),$(READLINE_USEFUL)))
         OS_CCDEFS += -DHAVE_LIBEDIT
         OS_LDFLAGS += -ledit
         ifneq (,$(call find_lib,termcap))
@@ -2736,6 +2745,16 @@ tt2500 : $(BIN)tt2500$(EXE)
 
 $(BIN)tt2500$(EXE) : ${TT2500} ${SIM}
 	$(MAKEIT) OPTS="$(TT2500_OPT)"
+
+
+pdp11_pipanel : $(BIN)pdp11_pipanel$(EXE)
+
+$(BIN)pdp11_pipanel$(EXE) : ${PDP11D}/pdp11_pipanel.c ${PDP11} ${SIM} ${BUILD_ROMS}
+  ifneq (,$(RASPBERRY_PI_SYSTEM))
+	$(MAKEIT) OPTS="$(PDP11_OPT) -DUSE_PIPANEL -lgpiolib"
+  else
+		$(error The pdp11_pipanel is only available on Raspberry Pi systems)
+  endif
 
 
 pdp11 : $(BIN)pdp11$(EXE) $(if $(GPIO_AVAILABLE),pidp11-frontpanel)

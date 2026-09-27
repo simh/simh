@@ -382,6 +382,7 @@ extern void (*sim_vm_init) (void);
 
  */
 extern char *(*sim_vm_read) (char *ptr, int32 size, FILE *stream);
+extern char *(*sim_vm_readline) (char *prompt, char *ptr, int32 size, FILE *stream);
 extern void (*sim_vm_post) (t_bool from_scp);
 extern CTAB *sim_vm_cmd;
 extern void (*sim_vm_sprint_addr) (char *buf, DEVICE *dptr, t_addr addr);

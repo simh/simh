@@ -245,6 +245,10 @@
 #include "pdp11_defs.h"
 #include "pdp11_cpumod.h"
 
+#if !defined(FRONTPANEL) && defined(USE_PIPANEL)
+#define FRONTPANEL
+#endif
+
 #define PCQ_SIZE        64                              /* must be 2**n */
 #define PCQ_MASK        (PCQ_SIZE - 1)
 #define PCQ_ENTRY       pcq[pcq_p = (pcq_p - 1) & PCQ_MASK] = PC
@@ -330,6 +334,18 @@ int16 reg_mods;                                         /* reg deltas */
 int32 last_pa;                                          /* pa from ReadMW/ReadMB */
 int32 saved_sim_interval;                               /* saved at inst start */
 t_stat reason;                                          /* stop reason */
+
+#ifdef FRONTPANEL
+/* state extension for front panel interfaces */
+t_addr frontpanel_PA;                                   /* most recent pa */
+t_addr frontpanel_VA;                                   /* most recent va */
+t_value frontpanel_DATA;                                /* most recent data */
+int frontpanel_RW;                                      /* read=0, write=1 */
+int frontpanel_HALT;                                    /* CPU halted by front panel */
+int frontpanel_IDMODE;  /* 1 = data space access, 0 = instruction space access */
+t_value frontpanel_DATAPATH;/* value of shifter in PDP-11 processor data paths */
+t_value frontpanel_IR;      /* buffer for instruction register */
+#endif
 
 extern int32 CPUERR, MAINT;
 extern CPUTAB cpu_tab[];
@@ -611,6 +627,15 @@ REG cpu_reg[] = {
     { ORDATAD (WRU, sim_int_char, 8, "interrupt character") },
     { ORDATA (MODEL, cpu_model, 16), REG_HRO },
     { ORDATA (OPTIONS, cpu_opt, 32), REG_HRO },
+#ifdef FRONTPANEL
+    { ORDATAD (BUS_PA, frontpanel_PA, 22, "last physical memory address on the bus") },
+    { ORDATAD (BUS_VA, frontpanel_VA, 22, "last virtual memory address on the bus") },
+    { ORDATAD (BUS_DATA, frontpanel_DATA, 16, "last memory access data on the bus") },
+    { ORDATAD (BUS_RW, frontpanel_RW, 1, "last memory access was R/W (R=0,W=1)") },
+    { ORDATAD (BUS_IDMODE, frontpanel_IDMODE, 1, "last bus access I/D (I=0,D=1") },
+    { ORDATAD (DATAPATH, frontpanel_DATAPATH, 16, "datapath shifter result") },
+    { ORDATAD (IR, frontpanel_IR, 16, "last instruction") },
+#endif
     { NULL}
     };
 
@@ -718,6 +743,45 @@ DEVICE cpu_dev = {
     &cpu_help, NULL, NULL, &cpu_description,
     cpu_breakpoints
     };
+
+#ifdef FRONTPANEL
+/*** observe memory accesses for front panel
+ * SimH emulated opcodes access memory in many code paths.
+ * In order to display these on the front panel interface,
+ * each virtual, physical address, data value etc must be observed.
+ * Because of speed, macros instead of functions are used.
+ * To make code more readable, situation-specific names are used.
+ *
+ * va - virtual address (may be 0xffffffff denoting it is invalid)
+ * pa - physical address
+ * data_expr - data being read or written
+ * write - 1 for write, 0 for read
+ */
+#define FRONTPANEL_OBSERVE_MEMACCESS_INTERN(va,pa,data_expr,write)  do { \
+    frontpanel_IDMODE = ((va) & 0x10000)? 1 : 0 ; \
+    frontpanel_PA = (pa) ; \
+    if ((va) != 0xffffffff) /* only pa given ? */ \
+        frontpanel_VA = (va) & 0xffff ; \
+    frontpanel_DATA = (data_expr) ; \
+    frontpanel_RW = (write) ; \
+  } while(0)
+#else
+#define FRONTPANEL_OBSERVE_MEMACCESS_INTERN(va,pa,data_expr,write)
+#endif
+
+/*** FRONTPANEL_OBSERVE, tailored to situations ***/
+// Read access, only physical address given
+#define FRONTPANEL_OBSERVE_MEMACCESS_PA_READ(pa,data_expr)\
+    FRONTPANEL_OBSERVE_MEMACCESS_INTERN(0xffffffff,(pa),(data_expr),FALSE)
+// READ access virtual and physical
+#define FRONTPANEL_OBSERVE_MEMACCESS_VA_PA_READ(va,pa,data_expr)   \
+    FRONTPANEL_OBSERVE_MEMACCESS_INTERN((va),(pa),(data_expr),FALSE)
+// WRITE access, only physical address given
+#define FRONTPANEL_OBSERVE_MEMACCESS_PA_WRITE(pa,data_expr)\
+    FRONTPANEL_OBSERVE_MEMACCESS_INTERN(0xffffffff,(pa),(data_expr),TRUE)
+// WRITE access virtual and physical
+#define FRONTPANEL_OBSERVE_MEMACCESS_VA_PA_WRITE(va,pa,data_expr)  \
+    FRONTPANEL_OBSERVE_MEMACCESS_INTERN((va),(pa),(data_expr),TRUE)
 
 t_value pdp11_pc_value (void)
 {
@@ -1012,6 +1076,9 @@ while (reason == 0)  {
             hst_p = 0;
         }
     PC = (PC + 2) & 0177777;                            /* incr PC, mod 65k */
+#ifdef FRONTPANEL
+    saved_PC = PC ; // saved_PC used in panel
+#endif
     switch ((IR >> 12) & 017) {                         /* decode IR<15:12> */
 
 /* Opcode 0: no operands, specials, branches, JSR, SOPs */
@@ -2440,6 +2507,39 @@ while (reason == 0)  {
         else setTRAP (TRAP_ILL);
         break;                                          /* end case 017 */
         }                                               /* end switch op */
+#ifdef FRONTPANEL
+    // assume tmp var "dst" is holding the data path shifter output
+    // It is used on PDP-11/70 for DATA PATH knob position.
+    // (Other PDP-11's may show different signals, or implement
+    //  "shifter" in another way.)
+    // The shifter usage on 11/70 is implemented ad hoc, so the
+    //  known "idle patterns" appear right
+    // Tested for RSX11M, 2.11BSD, IAS
+    {
+        unsigned ir15_06 = IR & 0177700; // mask bits 15:6
+        unsigned ir15_09 = IR & 0177000; // mask bits 15:9
+        unsigned ir15_12 = IR & 0170000; // mask bits 15:12
+        if (   ir15_09 == 0072000 // ASH
+            || ir15_09 == 0073000 // ASHC
+            || ir15_06 == 0063000 // ASL
+            || ir15_06 == 0163000 // ASLB
+            || ir15_06 == 0062000 // ASR
+            || ir15_06 == 0162000 // ASRB
+            || ir15_12 == 0010000 // MOV
+            || ir15_12 == 0110000 // MOVB
+            )
+            frontpanel_DATAPATH = dst;
+        else if (IR == 1)       // WAIT
+            frontpanel_DATAPATH = R[0];
+        }
+
+    // fetch CPU state after opcode processing.
+    frontpanel_IR = IR; // copy: IR only local var
+    PSW = get_PSW(); // copy: PSW not atomic
+    // check if the ENABLE/HALT switch was set to HALT
+    if (frontpanel_HALT)
+        reason = SCPE_STOP; // transition is triggered at end of instr loop
+#endif
     }                                                   /* end main loop */
 
 /* Simulation halted */
@@ -2452,6 +2552,14 @@ saved_PC = PC & 0177777;
 MMR1 = clean_MMR1 (MMR1);                               /* clean up MMR1 */
 pcq_r->qptr = pcq_p;                                    /* update pc q ptr */
 set_r_display (rs, cm);
+#ifdef FRONTPANEL
+if ((reason == STOP_HALT) || (reason == STOP_WAIT) || (reason == SCPE_STOP)
+    || (reason == STOP_VECABORT) || (reason == STOP_SPABORT)) {
+    // during HALT, general register R0 contents are displayed.
+    frontpanel_DATAPATH = R[0];
+    frontpanel_PA = frontpanel_VA = saved_PC; // show PC in address LEDs
+    }
+#endif
 return reason;
 }
 
@@ -2646,8 +2754,11 @@ if (BPT_SUMM_RD &&
     (sim_brk_test (va & 0177777, BPT_RDVIR) ||
      sim_brk_test (pa, BPT_RDPHY)))                     /* read breakpoint? */
     ABORT (ABRT_BKPT);                                  /* stop simulation */
-if (ADDR_IS_MEM (pa))                                   /* memory address? */
-    return RdMemW (pa);
+if (ADDR_IS_MEM (pa)) {                                 /* memory address? */
+    data = RdMemW (pa);
+    FRONTPANEL_OBSERVE_MEMACCESS_VA_PA_READ(va, pa, data);
+    return data;
+    }
 if ((pa < IOPAGEBASE) ||                                /* not I/O address */
     (CPUT (CPUT_J) && (pa >= IOBA_CPU))) {              /* or J11 int reg? */
         setCPUERR (CPUE_NXM);
@@ -2657,12 +2768,13 @@ if (iopageR (&data, pa, READ) != SCPE_OK) {             /* invalid I/O addr? */
     setCPUERR (CPUE_TMO);
     ABORT (TRAP_NXM);
     }
+FRONTPANEL_OBSERVE_MEMACCESS_VA_PA_READ(va, pa, data);
 return data;
 }
 
 int32 ReadW (int32 va)
 {
-int32 pa;
+int32 pa, data;
 
 if ((va & 1) && CPUT (HAS_ODD)) {                       /* odd address? */
     setCPUERR (CPUE_ODD);
@@ -2673,19 +2785,23 @@ if (BPT_SUMM_RD &&
     (sim_brk_test (va & 0177777, BPT_RDVIR) ||
      sim_brk_test (pa, BPT_RDPHY)))                     /* read breakpoint? */
     ABORT (ABRT_BKPT);                                  /* stop simulation */
-return PReadW (pa);
+data = PReadW (pa);
+FRONTPANEL_OBSERVE_MEMACCESS_VA_PA_READ(va, pa, data);
+return data;
 }
 
 int32 ReadB (int32 va)
 {
-int32 pa;
+int32 pa, data;
 
 pa = relocR (va);                                       /* relocate */
 if (BPT_SUMM_RD &&
     (sim_brk_test (va & 0177777, BPT_RDVIR) ||
      sim_brk_test (pa, BPT_RDPHY)))                     /* read breakpoint? */
     ABORT (ABRT_BKPT);                                  /* stop simulation */
-return PReadB (pa);
+data = PReadB (pa);
+FRONTPANEL_OBSERVE_MEMACCESS_VA_PA_READ(va, pa, data);
+return data;
 }
 
 /* Read word with breakpoint check: if a data breakpoint is encountered,
@@ -2693,7 +2809,7 @@ return PReadB (pa);
    to break after doing the operation, used for interrupt processing.  */
 int32 ReadCW (int32 va)
 {
-int32 pa;
+int32 pa, data;
 
 if ((va & 1) && CPUT (HAS_ODD)) {                       /* odd address? */
     setCPUERR (CPUE_ODD);
@@ -2704,11 +2820,14 @@ if (BPT_SUMM_RD &&
     (sim_brk_test (va & 0177777, BPT_RDVIR) ||
      sim_brk_test (pa, BPT_RDPHY)))                     /* read breakpoint? */
     reason = STOP_IBKPT;                                /* report that */
-return PReadW (pa);
+data = PReadW (pa);
+FRONTPANEL_OBSERVE_MEMACCESS_VA_PA_READ(va, pa, data);
+return data;
 }
 
 int32 ReadMW (int32 va)
 {
+int32 data;
 if ((va & 1) && CPUT (HAS_ODD)) {                       /* odd address? */
     setCPUERR (CPUE_ODD);
     ABORT (TRAP_ODD);
@@ -2718,25 +2837,33 @@ if (BPT_SUMM_RW &&
     (sim_brk_test (va & 0177777, BPT_RWVIR) ||
      sim_brk_test (last_pa, BPT_RWPHY)))                /* read or write breakpoint? */
     ABORT (ABRT_BKPT);                                  /* stop simulation */
-return PReadW (last_pa);
+data = PReadW (last_pa);
+FRONTPANEL_OBSERVE_MEMACCESS_VA_PA_READ(va, last_pa, data);
+return data;
 }
 
 int32 ReadMB (int32 va)
 {
+int32 data;
 last_pa = relocW (va);                                  /* reloc, wrt chk */
 if (BPT_SUMM_RW &&
     (sim_brk_test (va & 0177777, BPT_RWVIR) ||
      sim_brk_test (last_pa, BPT_RWPHY)))                /* read or write breakpoint? */
     ABORT (ABRT_BKPT);                                  /* stop simulation */
-return PReadB (last_pa);
+data = PReadB (last_pa);
+FRONTPANEL_OBSERVE_MEMACCESS_VA_PA_READ(va, last_pa, data);
+return data;
 }
 
 int32 PReadW (int32 pa)
 {
 int32 data;
 
-if (ADDR_IS_MEM (pa))                                   /* memory address? */
-    return RdMemW (pa);
+if (ADDR_IS_MEM (pa)) {                                 /* memory address? */
+    data = RdMemW (pa);
+    FRONTPANEL_OBSERVE_MEMACCESS_PA_READ(pa, data);
+    return data;
+    }
 if (pa < IOPAGEBASE) {                                  /* not I/O address? */
     setCPUERR (CPUE_NXM);
     ABORT (TRAP_NXM);
@@ -2745,6 +2872,7 @@ if (iopageR (&data, pa, READ) != SCPE_OK) {             /* invalid I/O addr? */
     setCPUERR (CPUE_TMO);
     ABORT (TRAP_NXM);
     }
+FRONTPANEL_OBSERVE_MEMACCESS_PA_READ(pa, data);
 return data;
 }
 
@@ -2752,8 +2880,11 @@ int32 PReadB (int32 pa)
 {
 int32 data;
 
-if (ADDR_IS_MEM (pa))                                   /* memory address? */
-    return RdMemB (pa);
+if (ADDR_IS_MEM (pa)) {                                 /* memory address? */
+    data = RdMemB (pa);
+    FRONTPANEL_OBSERVE_MEMACCESS_PA_READ(pa, data);
+    return data;
+    }
 if (pa < IOPAGEBASE) {                                  /* not I/O address? */
     setCPUERR (CPUE_NXM);
     ABORT (TRAP_NXM);
@@ -2762,7 +2893,9 @@ if (iopageR (&data, pa, READ) != SCPE_OK) {             /* invalid I/O addr? */
     setCPUERR (CPUE_TMO);
     ABORT (TRAP_NXM);
     }
-return ((pa & 1)? data >> 8: data) & 0377;
+data = ((pa & 1)? data >> 8: data) & 0377;
+FRONTPANEL_OBSERVE_MEMACCESS_PA_READ(pa, data);
+return data;
 }
 
 /* Write byte and word routines
@@ -2787,6 +2920,7 @@ if (BPT_SUMM_WR &&
     (sim_brk_test (va & 0177777, BPT_WRVIR) ||
      sim_brk_test (pa, BPT_WRPHY)))                     /* write breakpoint? */
     ABORT (ABRT_BKPT);                                  /* stop simulation */
+FRONTPANEL_OBSERVE_MEMACCESS_VA_PA_WRITE(va, pa, data);
 PWriteW (data, pa);
 }
 
@@ -2799,6 +2933,7 @@ if (BPT_SUMM_WR &&
     (sim_brk_test (va & 0177777, BPT_WRVIR) ||
      sim_brk_test (pa, BPT_WRPHY)))                     /* write breakpoint? */
     ABORT (ABRT_BKPT);                                  /* stop simulation */
+FRONTPANEL_OBSERVE_MEMACCESS_VA_PA_WRITE(va, pa, data);
 PWriteB (data, pa);
 }
 
@@ -2818,12 +2953,14 @@ if (BPT_SUMM_WR &&
     (sim_brk_test (va & 0177777, BPT_WRVIR) ||
      sim_brk_test (pa, BPT_WRPHY)))                     /* write breakpoint? */
     reason = STOP_IBKPT;                                /* report that */
+FRONTPANEL_OBSERVE_MEMACCESS_VA_PA_WRITE(va, pa, data);
 PWriteW (data, pa);
 }
 
 void PWriteW (int32 data, int32 pa)
 {
 if (ADDR_IS_MEM (pa)) {                                 /* memory address? */
+    FRONTPANEL_OBSERVE_MEMACCESS_PA_WRITE(pa, data);
     WrMemW (pa, data);
     return;
     }
@@ -2835,11 +2972,13 @@ if (iopageW (data, pa, WRITE) != SCPE_OK) {             /* invalid I/O addr? */
     setCPUERR (CPUE_TMO);
     ABORT (TRAP_NXM);
     }
+FRONTPANEL_OBSERVE_MEMACCESS_PA_WRITE(pa, data);
 return;
 }
 
 void PWriteB (int32 data, int32 pa)
 {
+FRONTPANEL_OBSERVE_MEMACCESS_PA_WRITE(pa, data);
 if (ADDR_IS_MEM (pa)) {                                 /* memory address? */
     WrMemB (pa, data);
     return;
@@ -2852,6 +2991,7 @@ if (iopageW (data, pa, WRITEB) != SCPE_OK) {            /* invalid I/O addr? */
     setCPUERR (CPUE_TMO);
     ABORT (TRAP_NXM);
     }
+FRONTPANEL_OBSERVE_MEMACCESS_PA_WRITE(pa, data);
 return;
 }
 
@@ -3492,6 +3632,17 @@ if (pcq_r)
     pcq_r->qptr = 0;
 else
     return SCPE_IERR;
+#ifdef FRONTPANEL
+    // initialize front panel cpu state extension here
+    frontpanel_IDMODE = 0;
+    frontpanel_DATAPATH = 0;
+    frontpanel_IR = 0;
+    frontpanel_PA = 0;
+    frontpanel_VA = 0;
+    frontpanel_DATA = 0;
+    frontpanel_RW = 0;
+    frontpanel_HALT = 0;
+#endif
 set_r_display (0, MD_KER);
 sim_vm_cmd = pdp11_cmd;
 return build_dib_tab ();            /* build, chk dib_tab */
