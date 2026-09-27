@@ -412,7 +412,7 @@ blink(void *terminate)
         gpio_set_pull(cols[i], PULL_UP);
     } 
 
-    // for now, just spin until we're told to terminate
+    // main loop: repeat until we're told to terminate
     while (!*(_Atomic int *)terminate) {
         // configure columns as outputs
         for (i = 0; i < _countof(cols); i++)
