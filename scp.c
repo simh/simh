@@ -3017,6 +3017,7 @@ int32 i, sw;
 t_bool lookswitch;
 t_bool register_check = FALSE;
 t_bool device_unit_tests = FALSE;
+t_bool single_command = FALSE;
 t_stat stat = SCPE_OK;
 CTAB *docmdp = NULL;
 
@@ -3092,6 +3093,8 @@ for (i = 1; i < argc; i++) {                            /* loop thru args */
         lookswitch = FALSE;                             /* no more switches */
         }
     }                                                   /* end for */
+single_command = sim_switches & SWMASK ('C');           /* remember if we're doing a single command */
+sim_switches &= ~SWMASK ('C');
 if (*argv[0]) {                                         /* sim name arg? */
     char *np;                                           /* "path.ini" */
 
@@ -3340,8 +3343,7 @@ if (docmdp) {
         stat = docmdp->action (-1, "/Library/Preferences/simh.ini");/* simh.ini proc cmd file */
     if (SCPE_BARE_STATUS(stat) == SCPE_OPENERR)
         stat = docmdp->action (-1, "/etc/simh.ini");        /* simh.ini proc cmd file */
-    if ((sim_switches & SWMASK ('C')) && (*cbuf)) {         /* single command from command line */
-        sim_switches &= ~SWMASK ('C');
+    if (single_command && (*cbuf)) {                        /* single command from command line */
         sim_brk_act[sim_do_depth] = (char *)calloc (strlen (cbuf) + 10, sizeof (*cbuf));
         strcpy (sim_brk_act[sim_do_depth], cbuf);
         strcat (sim_brk_act[sim_do_depth], ";EXIT -Q");
