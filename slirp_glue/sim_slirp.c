@@ -56,6 +56,7 @@
 #define pthread_mutex_t int
 #endif
 
+#define DOORBELL_TRIES 100          /* local ports tried for the doorbell socket */
 #define IS_TCP 0
 #define IS_UDP 1
 static const char *tcpudp[] = {
@@ -194,16 +195,26 @@ if (_do_redirects (slirp->slirp, slirp->nat.rtcp)) {
 else {
     char db_host[32];
     GPollFD pfd;
-    int64_t rnd_val = qemu_clock_get_ns ((QEMUClockType)0) / 1000000;
+    int port = (int)((qemu_clock_get_ns ((QEMUClockType)0) / 1000000) & 0xFFFF);
+    int tries;
 
     slirp->gpollfds = g_array_new(FALSE, FALSE, sizeof(GPollFD));
-    /* setup transmit packet wakeup doorbell */
-    do {
-        if ((rnd_val & 0xFFFF) == 0)
-            ++rnd_val;
-        sprintf (db_host, "localhost:%d", (int)(rnd_val & 0xFFFF));
+    /* setup transmit packet wakeup doorbell on an unprivileged port */
+    for (tries = 0; tries < DOORBELL_TRIES; tries++, port++) {
+        if (port > 65535)
+            port = 1024;
+        if (port < 1024)                        /* privileged port? */
+            port += 1024;
+        sprintf (db_host, "localhost:%d", port);
         slirp->db_chime  = sim_connect_sock_ex (db_host, db_host, NULL, NULL, SIM_SOCK_OPT_DATAGRAM | SIM_SOCK_OPT_BLOCKING);
-        } while (slirp->db_chime == INVALID_SOCKET);
+        if (slirp->db_chime != INVALID_SOCKET)
+            break;
+        }                                       /* bind failed: try the next port */
+    if (slirp->db_chime == INVALID_SOCKET) {
+        snprintf (errbuf, errbuf_size - 1, "Can't open NAT doorbell socket after %d attempts", tries);
+        sim_slirp_close (slirp);
+        return NULL;
+        }
     memset (&pfd, 0, sizeof (pfd));
     pfd.fd = slirp->db_chime;
     pfd.events = G_IO_IN;
