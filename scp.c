@@ -11549,6 +11549,10 @@ if (prompt && (!initialized)) {
     }
 
 if (prompt) {                                           /* interactive? */
+    if (sim_log)                                        /* flush log before waiting */
+        fflush (sim_log);                               /* so it holds the output so far */
+    if (sim_deb && (sim_deb != sim_log) && (sim_deb != stdout))
+        fflush (sim_deb);                               /* likewise the debug file */
     if (p_readline) {
         char *tmpc = p_readline (prompt);               /* get cmd line */
         if (tmpc == NULL)                               /* bad result? */
