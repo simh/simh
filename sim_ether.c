@@ -1218,11 +1218,23 @@ for (i=0; i<used; ++i) {
   int j, datalink = 0;
   pcap_t* conn = NULL;
   char errbuf[PCAP_ERRBUF_SIZE];
+  static const char *pseudo_devs[] = {"dbus-", "usbmon", "bluetooth", "nflog", "nfqueue", "any", NULL};
+  const char **pseudo;
 
-  conn = pcap_open_live(list[i].name, ETH_MAX_PACKET, ETH_PROMISC, PCAP_READ_TIMEOUT, errbuf);
-  if (NULL != conn)
-    datalink = pcap_datalink(conn), pcap_close(conn);
-  list[i].eth_api = ETH_API_PCAP;
+  /* avoid checking pcap's non-network pseudo devices, most or all may have */
+  /* already been removed since the MAC address query likely returned 0's */
+  for (pseudo = pseudo_devs; *pseudo != NULL; ++pseudo) {
+    if (memcmp (list[i].name, *pseudo, strlen (*pseudo)) == 0)
+      break;
+    }
+  if (*pseudo == NULL) {
+    conn = pcap_open_live(list[i].name, ETH_MAX_PACKET, ETH_PROMISC, PCAP_READ_TIMEOUT, errbuf);
+    if (NULL != conn) {
+      datalink = pcap_datalink(conn);
+      pcap_close(conn);
+      }
+    list[i].eth_api = ETH_API_PCAP;
+    }
   if ((NULL == conn) || (datalink != DLT_EN10MB)) {
     for (j=i; j<used-1; ++j)
       list[j] = list[j+1];
@@ -3361,11 +3373,20 @@ if ((strlen(name) == 4 || strlen(name) == 5)
     return SCPE_OPENERR;
   }
 else {
-  /* are they trying to use device description? */
-  savname = _eth_getname_bydesc(name, temp, desc, info);
-  if (savname == NULL) { /* didn't translate */
-    /* probably is not ethX and has no description */
-    savname = _eth_getname_byname(name, temp, desc, info);
+  static const char *transports[] = {"tap:", "nat:", "vde:", "udp:", NULL};
+  const char **trans;
+
+  for (trans = transports; *trans != NULL; ++trans)
+    if (memcmp (*trans, name, strlen (*trans)) == 0)
+      break;
+  /* Only look for name or desc if it doesn't start with a transport specifier */
+  if (*trans == NULL) {
+    /* are they trying to use device description? */
+    savname = _eth_getname_bydesc(name, temp, desc, info);
+    if (savname == NULL) { /* didn't translate */
+      /* probably is not ethX and has no description */
+      savname = _eth_getname_byname(name, temp, desc, info);
+    }
     if (savname == NULL) {/* didn't translate */
       savname = name;
       desc[0] = '\0';   /* no description */
