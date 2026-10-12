@@ -87,6 +87,7 @@ int32 JCSR = 0;                                         /* J11 control */
 int32 JCSR_dflt = 0;                                    /* J11 boot ctl def */
 int32 JPCR = 0;                                         /* J11 page ctrl */
 int32 JASR = 0;                                         /* J11 addtl status */
+int32 JCLK_timebase = 0;                                /* J11 TOY timebase */
 int32 UDCR = 0;                                         /* UBA diag ctrl */
 int32 UDDR = 0;                                         /* UBA diag data */
 int32 UCSR = 0;                                         /* UBA control */
@@ -134,6 +135,8 @@ void toy_write (int32 bit);
 uint8 toy_set (int32 val);
 t_stat sys_set_jclk_dflt (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat sys_show_jclk_dflt (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat sys_set_jclk_timebase (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat sys_show_jclk_timebase (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 static t_stat sys_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 static const char *sys_description (DEVICE *dptr);
 
@@ -267,6 +270,10 @@ static const char *jcsr_val[4] = {
     "LINE", "50HZ", "60HZ", "800HZ"
     };
 
+static const char *jclk_timebase[2] = {
+    "LOCALTIME", "GMTIME"
+    };
+
 /* SYSTEM data structures
 
    sys_dev      SYSTEM device descriptor
@@ -338,12 +345,15 @@ REG sys_reg[] = {
     { BRDATAD (UBMAP, ub_map, 8, 22, UBM_LNT_LW, "UBA map array") },
     { DRDATA (TOY_STATE, toy_state, 6), REG_HRO },
     { BRDATA (TOY_DATA, toy_data, 8, 8, TOY_LNT), REG_HRO },
+    { FLDATA (TOY_TIMEBASE, JCLK_timebase, 0), REG_HRO},
     { NULL}
     };
 
 MTAB sys_mod[] = {
-    { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "JCLK_DFLT", "JCLK_DFLT={LINE|50HZ|60HZ|800HZ}",
+    { MTAB_VDV|MTAB_VALR|MTAB_NMO, 0, "JCLK_DFLT", "JCLK_DFLT={LINE|50HZ|60HZ|800HZ}",
       &sys_set_jclk_dflt, &sys_show_jclk_dflt, NULL, "J11 default clock frequency" },
+    { MTAB_VDV|MTAB_VALR|MTAB_NMO, 0, "TOY_TIMEBASE", "TOY_TIMEBASE={LOCALTIME|GMTIME}",
+      &sys_set_jclk_timebase, &sys_show_jclk_timebase, NULL, "J11 TOY time base (local or GMT)" },
     { 0 }
     };
 
@@ -1121,7 +1131,10 @@ if (toy_state == 0) {
 
     if (curr == (time_t) -1)                            /* error? */
         return 0;
-    ctm = localtime (&curr);                            /* decompose */
+    if (JCLK_timebase)
+        ctm = gmtime (&curr);                           /* decompose to gmtime */
+    else
+        ctm = localtime (&curr);                        /* decompose to localtime */
     if (ctm == NULL)                                    /* error? */
         return 0;
     toy_data[TOY_HSEC] = toy_set ((now.tv_nsec + 5000000) / 10000000);
@@ -1355,20 +1368,50 @@ uint32 i;
 
 if ((CPUT (CPUT_JB|CPUT_JE)) && cptr) {
     for (i = 0; i < 4; i++) {
-        if (strncmp (cptr, jcsr_val[i], strlen (cptr)) == 0) {
+        if (MATCH_CMD (cptr, jcsr_val[i]) == 0) {
             JCSR_dflt = i << CSRJ_V_LTCSEL;
             return SCPE_OK;
             }
         }
     }
-return SCPE_ARG;
+return sim_messagef (SCPE_ARG, "JCLK only implemented on J11 CPUs: 11/73B, 11/83, 11/84, 11/93 and 11/94\n");
 }
 
 t_stat sys_show_jclk_dflt (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 if (CPUT (CPUT_JB|CPUT_JE))
     fprintf (st, "JCLK default=%s\n", jcsr_val[CSRJ_LTCSEL (JCSR_dflt)]);
-else fprintf (st, "Not implemented\n");
+else
+    fprintf (st, "JCLK only implemented on J11 CPUs: 11/73B, 11/83, 11/84, 11/93 and 11/94\n");
+return SCPE_OK;
+}
+
+/* Set/show JCLK timebase value */
+
+t_stat sys_set_jclk_timebase (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+uint32 i;
+
+if ((CPUT (CPUT_JB|CPUT_JE)) && cptr) {
+    for (i = 0; i < 2; i++) {
+        if (MATCH_CMD (cptr, jclk_timebase[i]) == 0) {
+            JCLK_timebase = i;
+            return SCPE_OK;
+            }
+        }
+    }
+return sim_messagef (SCPE_ARG, "JCLK TOY clock only implemented on J11 CPUs: 11/73B, 11/83, 11/84, 11/93 and 11/94\n");
+}
+
+t_stat sys_show_jclk_timebase (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+if (CPUT (CPUT_JB|CPUT_JE))
+    if (JCLK_timebase == 0)
+        fprintf (st, "JCLK TOY_TIMEBASE default=%s\n", jclk_timebase[JCLK_timebase]);
+    else
+        fprintf (st, "JCLK TOY_TIMEBASE %s\n", jclk_timebase[JCLK_timebase]);
+else
+    fprintf (st, "JCLK TOY only implemented on J11 CPUs: 11/73B, 11/83, 11/84, 11/93 and 11/94\n");
 return SCPE_OK;
 }
 
