@@ -996,9 +996,14 @@ preferred = result;
 /*
     When we can create a dual stack socket, be sure to find the IPv6 addrinfo 
     to bind to.
+    That only works for the unspecified (wildcard) address: a socket bound
+    to a specific IPv6 address such as ::1 never accepts IPv4 connections.
+    So for a named host which resolves to both families (localhost) prefer
+    its IPv4 address, which IPv4-only clients need and dual stack clients
+    fall back to.
 */
 for (; preferred != NULL; preferred = preferred->ai_next) {
-    if (preferred->ai_family == AF_INET6)
+    if (preferred->ai_family == (host[0] ? AF_INET : AF_INET6))
         break;
     }
 if (preferred == NULL)
