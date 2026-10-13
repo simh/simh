@@ -154,6 +154,8 @@ extern t_stat sim_instr_8086(void);
 extern void cpu8086reset(void);
 
 extern unsigned int m68k_cpu_read_byte_raw(unsigned int address);
+extern uint32 m68k_compupro;
+extern t_stat m68k_set_compupro(UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 void m68k_cpu_write_byte_raw(unsigned int address, unsigned int value);
 
 /* function prototypes */
@@ -524,6 +526,10 @@ static MTAB cpu_mod[] = {
         NULL, NULL, "Chooses 8086 CPU"   },
     { MTAB_XTD | MTAB_VDV,  CHIP_TYPE_M68K,     NULL,           "M68K",         &cpu_set_chiptype,
         NULL, NULL, "Chooses M68K CPU"                  },
+    { MTAB_XTD | MTAB_VDV,  1,                  NULL,           "COMPUPRO",     &m68k_set_compupro,
+        NULL, NULL, "Chooses the CompuPro CPU-68K machine for the M68K CPU"     },
+    { MTAB_XTD | MTAB_VDV,  0,                  NULL,           "NOCOMPUPRO",   &m68k_set_compupro,
+        NULL, NULL, "Chooses the generic CP/M-68K machine for the M68K CPU"     },
     { UNIT_CPU_OPSTOP,      UNIT_CPU_OPSTOP,    "ITRAP",        "ITRAP",        NULL, &chip_show,
         NULL, "Stop on illegal instruction"             },
     { UNIT_CPU_OPSTOP,      0,                  "NOITRAP",      "NOITRAP",      NULL, &chip_show,
@@ -6836,6 +6842,7 @@ static t_stat cpu_show(FILE *st, UNIT *uptr, int32 val, CONST void *desc) {
     }
     if (chiptype == CHIP_TYPE_M68K) {
         fprintf(st, "\n\tMemory-Mapped I/O: 0x%06x-0x%06x", mmiobase, mmiobase + (mmiosize - 1));
+        fprintf(st, "\n\tMachine: %s", m68k_compupro ? "CompuPro CPU-68K" : "generic CP/M-68K");
     }
 
     return SCPE_OK;
