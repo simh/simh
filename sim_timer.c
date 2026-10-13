@@ -326,6 +326,8 @@ struct timespec end_time, timeout_time;
 double start_time, delta_ms;
 t_bool timedout = FALSE;
 
+if (sim_asynch_enabled == FALSE)
+  return sim_os_ms_sleep (msec);        /* No need to synchronize when asynch is disabled */
 clock_gettime(idle_clock, &timeout_time);
 start_time = _timespec_to_double (&timeout_time);
 timeout_time.tv_nsec += 1000000*msec;
@@ -340,7 +342,7 @@ if (pthread_cond_timedwait (&sim_asynch_wake, &sim_asynch_lock, &timeout_time))
 sim_idle_wait = FALSE;
 pthread_mutex_unlock (&sim_asynch_lock);
 if (!timedout)
-    sim_asynch_check = 0;                 /* force check of asynch queue now */
+    sim_asynch_check = 0;               /* force check of asynch queue now */
 clock_gettime(idle_clock, &end_time);
 if (!timedout) {
     AIO_UPDATE_QUEUE;

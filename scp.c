@@ -7295,6 +7295,8 @@ if (1) {
         fprintf (st, "\n        RAW disk and CD/DVD ROM support");
 #if defined (SIM_ASYNCH_IO)
     fprintf (st, "\n        Asynchronous I/O support (%s)", AIO_QUEUE_MODE);
+    if (sim_asynch_enabled == FALSE)
+        fprintf (st, "\n        Asynchronous I/O is disabled");
 #endif
 #if defined (SIM_ASYNCH_CLOCKS)
     fprintf (st, "\n        Asynchronous Clock support");

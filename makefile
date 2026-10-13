@@ -37,6 +37,10 @@
 # headers and libraries are available.  To force a build without video
 # support, invoke GNU make with NOVIDEO=1 on the command line.
 #
+# By default, when host system support exists, asynchronous I/O support
+# will enabled by default.  To force a build without asynchronous I/O
+# invoke GNU make with NOASYNC=1 on the command line.
+#
 # The default build will build compiler optimized binaries.
 # If debugging is desired, then GNU make can be invoked with
 # DEBUG=1 on the command line.
@@ -796,31 +800,33 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
     OS_LDFLAGS += -lrt
     $(info using librt: $(call find_lib,rt))
   endif
-  ifneq (,$(call find_include,pthread))
-    ifneq (,$(call find_lib,pthread))
-      PTHREAD_CCDEFS += -DSIM_ASYNCH_IO
-      PTHREAD_LDFLAGS += -lpthread
-      $(info using libpthread: $(call find_lib,pthread) $(call find_include,pthread))
-    else
-      LIBEXTSAVE := ${LIBEXT}
-      LIBEXT = a
+  ifeq (,$(NOASYNC))
+    ifneq (,$(call find_include,pthread))
       ifneq (,$(call find_lib,pthread))
         PTHREAD_CCDEFS += -DSIM_ASYNCH_IO
         PTHREAD_LDFLAGS += -lpthread
         $(info using libpthread: $(call find_lib,pthread) $(call find_include,pthread))
       else
-        ifneq (,$(findstring Haiku,$(OSTYPE)))
-          PTHREAD_CCDEFS += -DUSE_READER_THREAD -DSIM_ASYNCH_IO
-          $(info using libpthread: $(call find_include,pthread))
+        LIBEXTSAVE := ${LIBEXT}
+        LIBEXT = a
+        ifneq (,$(call find_lib,pthread))
+          PTHREAD_CCDEFS += -DSIM_ASYNCH_IO
+          PTHREAD_LDFLAGS += -lpthread
+          $(info using libpthread: $(call find_lib,pthread) $(call find_include,pthread))
         else
-          ifeq (Darwin,$(OSTYPE))
+          ifneq (,$(findstring Haiku,$(OSTYPE)))
             PTHREAD_CCDEFS += -DUSE_READER_THREAD -DSIM_ASYNCH_IO
-            PTHREAD_LDFLAGS += -lpthread
-            $(info using macOS libpthread: $(call find_include,pthread))
+            $(info using libpthread: $(call find_include,pthread))
+          else
+            ifeq (Darwin,$(OSTYPE))
+              PTHREAD_CCDEFS += -DUSE_READER_THREAD -DSIM_ASYNCH_IO
+              PTHREAD_LDFLAGS += -lpthread
+              $(info using macOS libpthread: $(call find_include,pthread))
+            endif
           endif
         endif
+        LIBEXT = $(LIBEXTSAVE)
       endif
-      LIBEXT = $(LIBEXTSAVE)
     endif
   endif
   # Find PCRE RegEx library.
@@ -1356,13 +1362,15 @@ else
   $(info lib paths are: ${LIBPATH})
   $(info include paths are: ${INCPATH})
   # Give preference to any MinGW provided threading (if available)
-  ifneq (,$(call find_include,pthread))
-    PTHREADS_CCDEFS = -DUSE_READER_THREAD -DSIM_ASYNCH_IO
-    PTHREADS_LDFLAGS = -lpthread
-  else
-    ifeq (pthreads,$(shell if exist ..\windows-build\pthreads\Pre-built.2\include\pthread.h echo pthreads))
-      PTHREADS_CCDEFS = -DUSE_READER_THREAD -DPTW32_STATIC_LIB -D_POSIX_C_SOURCE -I../windows-build/pthreads/Pre-built.2/include -DSIM_ASYNCH_IO
-      PTHREADS_LDFLAGS = -lpthreadGC2 -L..\windows-build\pthreads\Pre-built.2\lib
+  ifeq (,$(NOASYNC))
+    ifneq (,$(call find_include,pthread))
+      PTHREADS_CCDEFS = -DUSE_READER_THREAD -DSIM_ASYNCH_IO
+      PTHREADS_LDFLAGS = -lpthread
+    else
+      ifeq (pthreads,$(shell if exist ..\windows-build\pthreads\Pre-built.2\include\pthread.h echo pthreads))
+        PTHREADS_CCDEFS = -DUSE_READER_THREAD -DPTW32_STATIC_LIB -D_POSIX_C_SOURCE -I../windows-build/pthreads/Pre-built.2/include -DSIM_ASYNCH_IO
+        PTHREADS_LDFLAGS = -lpthreadGC2 -L..\windows-build\pthreads\Pre-built.2\lib
+      endif
     endif
   endif
   ifeq (pcap,$(shell if exist ..\windows-build\winpcap\Wpdpack\include\pcap.h echo pcap))
@@ -1731,6 +1739,9 @@ ifeq (,$(MAKE_RESULT))
     endif
     ifneq (,$(VIDEO_FEATURES))
       $(info *** $(VIDEO_FEATURES).)
+    endif
+    ifneq (,$(NOASYNC))
+      $(info *** - Asynchronous I/O support is not provided.)
     endif
     ifneq (,$(TESTING_FEATURES))
       $(info *** $(TESTING_FEATURES).)
