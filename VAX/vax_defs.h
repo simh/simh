@@ -1011,6 +1011,16 @@ extern void todr_wr (int32 dat);
 #define CPU_INSTRUCTION_SET VAX_FULL_BASE
 #endif
 #endif
+/* Processor register numbers that MTPR and MFPR accept before they reach
+   the model's WriteIPR and ReadIPR.  Most models implement one contiguous
+   range 0..MT_MAX and need nothing more.  A model whose register numbers do
+   not form one such range defines ML_IPR_VALID(prn) in its _defs.h: the
+   NVAX, for example, decodes blocks of processor register numbers far above
+   0xFF as cache tag and data stores.  The test is made before any condition
+   code changes, exactly where the MT_MAX test it generalizes was made. */
+#ifndef ML_IPR_VALID
+#define ML_IPR_VALID(prn)   (((uint32) (prn)) <= MT_MAX)
+#endif
 #ifndef CPU_MODEL_MODIFIERS
 #define CPU_MODEL_MODIFIERS             /* No model specific CPU modifiers */
 #endif

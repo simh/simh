@@ -1432,7 +1432,7 @@ int32 cc;
 
 if (PSL & PSL_CUR)                                      /* must be kernel */
     RSVD_INST_FAULT(MTPR);
-if (prn > MT_MAX)                                       /* reg# > max? fault */
+if (!ML_IPR_VALID (prn))                                /* reg# invalid? fault */
     RSVD_OPND_FAULT(op_mtpr);
 CC_IIZZ_L (val);                                        /* set cc's */
 switch (prn) {                                          /* case on reg # */
@@ -1563,7 +1563,7 @@ int32 val;
 
 if (PSL & PSL_CUR)                                      /* must be kernel */
     RSVD_INST_FAULT(MFPR);
-if (prn > MT_MAX)                                       /* reg# > max? fault */
+if (!ML_IPR_VALID (prn))                                /* reg# invalid? fault */
     RSVD_OPND_FAULT(op_mtpr);
 switch (prn) {                                          /* case on reg# */
 
