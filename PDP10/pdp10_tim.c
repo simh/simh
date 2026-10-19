@@ -128,6 +128,7 @@ static d10 tim_base[2] = { 0, 0 };                      /* 71b timebase */
 static d10 tim_interval = 0;                            /* value programmed into the clock */
 static d10 tim_period = 0;                              /* period in HW ticks adjusted for non-zero LSBs */
 static d10 tim_new_period = 0;                          /* period for the next interval */
+static int32 tim_active_tick_in_usecs;                  /* duration of the scheduled interval */
 static int32 tim_mult;                                  /* Multiple of interval timer period at which tmxr is polled */
 
 d10 quant = 0;                                          /* ITS quantum */
@@ -231,7 +232,7 @@ tempbase[1] = tim_base[1];
  * incr is approximate number of HW ticks to add to the timebase
  * value returned.  This does NOT update the timebase.
  */
-incr = (d10)((((double)TIM_HW_FREQ) / 1000000.0) * (tick_in_usecs - sim_activate_time_usecs (&tim_unit)));
+incr = (d10)((((double)TIM_HW_FREQ) / 1000000.0) * (tim_active_tick_in_usecs - sim_activate_time_usecs (&tim_unit)));
 tim_incr_base (tempbase, incr);
 
 /* Although the two LSB of the counter contribute carry to the
@@ -382,6 +383,8 @@ return FALSE;
 
 static t_stat tim_svc (UNIT *uptr)
 {
+/* WRINT may change the next interval while the scheduled interval is active. */
+tim_active_tick_in_usecs = tick_in_usecs;
 if (cpu_unit.flags & UNIT_KLAD) {                       /* diags? */
     tmr_poll = uptr->wait;                              /* fixed clock */
     sim_activate (uptr, tmr_poll);                      /* reactivate unit */
@@ -441,6 +444,7 @@ tim_interval = 0;
 clk_tps = 60;
 sim_debug (DEB_TPS, &tim_dev, "tim_reset() - clk_tps set to %d\n", clk_tps);
 update_interval(17*4096);
+tim_active_tick_in_usecs = tick_in_usecs;
 tmr_poll = (int32)(20000 * ((double)sim_rand () / (double)RAND_MAX));
 
 apr_flg = apr_flg & ~APRF_TIM;                          /* clear interrupt */
