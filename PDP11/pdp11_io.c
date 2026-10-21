@@ -68,15 +68,15 @@ t_stat (*iodispR[IOPAGESIZE >> 1])(int32 *dat, int32 ad, int32 md);
 t_stat (*iodispW[IOPAGESIZE >> 1])(int32 dat, int32 ad, int32 md);
 DIB *iodibp[IOPAGESIZE >> 1];
 
-int32 int_vec[IPL_HLVL][32];                            /* int req to vector */
-int32 (*int_ack[IPL_HLVL][32])(void);                   /* int ack routines */
+int32 int_vec[IPL_HLVL][VEC_BIT_SIZE];                  /* int req to vector */
+int32 (*int_ack[IPL_HLVL][VEC_BIT_SIZE])(void);         /* int ack routines */
 
 static const int32 pirq_bit[7] = {
     INT_V_PIR1, INT_V_PIR2, INT_V_PIR3, INT_V_PIR4,
     INT_V_PIR5, INT_V_PIR6, INT_V_PIR7
     };
 
-static const int32 int_internal[IPL_HLVL] = {
+static const t_int_reqs int_internal[IPL_HLVL] = {
     0,             INT_INTERNAL1, INT_INTERNAL2, INT_INTERNAL3,
     INT_INTERNAL4, INT_INTERNAL5, INT_INTERNAL6, INT_INTERNAL7
     };
@@ -142,7 +142,8 @@ return (dibp && (dibp->dptr == &cpu_dev));
 
 int32 calc_ints (int32 nipl, int32 trq)
 {
-int32 i, t;
+int32 i;
+t_int_reqs t;
 t_bool all_int = (UNIBUS || (nipl < IPL_HMIN));
 
 for (i = IPL_HLVL - 1; i > nipl; i--) {
@@ -158,14 +159,15 @@ return (trq & ~TRAP_INT);
 
 int32 get_vector (int32 nipl)
 {
-int32 i, j, t, vec;
+int32 i, j, vec;
+t_int_reqs t;
 t_bool all_int = (UNIBUS || (nipl < IPL_HMIN));
 
 for (i = IPL_HLVL - 1; i > nipl; i--) {                 /* loop thru lvls */
     t = all_int? int_req[i]: (int_req[i] & int_internal[i]);
-    for (j = 0; t && (j < 32); j++) {                   /* srch level */
+    for (j = 0; t && (j < VEC_BIT_SIZE); j++) {         /* srch level */
         if ((t >> j) & 1) {                             /* irq found? */
-            int_req[i] = int_req[i] & ~(1u << j);       /* clr irq */
+            int_req[i] = int_req[i] & ~(VEC_INT_BIT << j);/* clr irq */
             if (int_ack[i][j])
                 vec = int_ack[i][j]();
             else

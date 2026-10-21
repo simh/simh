@@ -765,7 +765,7 @@ DIB *dibp;
 if (mb >= MBA_NUM)
     return;
 dibp = (DIB *) mba_dev[mb].ctxt;
-int_req[dibp->vloc >> 5] |= (1 << (dibp->vloc & 037));
+int_req[dibp->vloc / VEC_BIT_SIZE] |= (VEC_INT_BIT << (dibp->vloc % VEC_BIT_SIZE));
 return;
 }
 
@@ -776,7 +776,7 @@ DIB *dibp;
 if (mb >= MBA_NUM)
     return;
 dibp = (DIB *) mba_dev[mb].ctxt;
-int_req[dibp->vloc >> 5] &= ~(1 << (dibp->vloc & 037));
+int_req[dibp->vloc / VEC_BIT_SIZE] &= ~(VEC_INT_BIT << (dibp->vloc % VEC_BIT_SIZE));
 return;
 }
 

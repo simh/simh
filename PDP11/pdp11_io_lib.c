@@ -41,14 +41,17 @@
 #define DEV_MBUS 0
 #endif
 
-extern int32 int_vec[IPL_HLVL][32];
+#if !defined (VEC_BIT_SIZE)
+#define VEC_BIT_SIZE 32
+#endif
+extern int32 int_vec[IPL_HLVL][VEC_BIT_SIZE];
 #if !defined(VEC_SET)
 #define VEC_SET 0
 #endif
 #if (VEC_SET != 0)
-extern int32 int_vec_set[IPL_HLVL][32];                 /* bits to set in vector */
+extern int32 int_vec_set[IPL_HLVL][VEC_BIT_SIZE];       /* bits to set in vector */
 #endif
-extern int32 (*int_ack[IPL_HLVL][32])(void);
+extern int32 (*int_ack[IPL_HLVL][VEC_BIT_SIZE])(void);
 extern t_stat (*iodispR[IOPAGESIZE >> 1])(int32 *dat, int32 ad, int32 md);
 extern t_stat (*iodispW[IOPAGESIZE >> 1])(int32 dat, int32 ad, int32 md);
 extern DIB *iodibp[IOPAGESIZE >> 1];
@@ -256,8 +259,8 @@ if (vec == 0)
     fprintf (st, "no vector");
 else {
 #if (VEC_SET != 0)
-    vec |= (int_vec_set[dibp->vloc / 32][dibp->vloc % 32] & ~3);
-    vec &= (int_vec_set[dibp->vloc / 32][dibp->vloc % 32] | 0x1FF);
+    vec |= (int_vec_set[dibp->vloc / VEC_BIT_SIZE][dibp->vloc % VEC_BIT_SIZE] & ~3);
+    vec &= (int_vec_set[dibp->vloc / VEC_BIT_SIZE][dibp->vloc % VEC_BIT_SIZE] | 0x1FF);
 #endif
     fprintf (st, "vector=");
     fprint_val (st, (t_value) vec, DEV_RDX, 16, PV_LEFT);
@@ -278,7 +281,7 @@ else {
     }
 if (vec >= ((VEC_SET | AUTO_VECBASE) & ~3))
     fprintf (st, "*");
-br_lvl = dibp->vloc / 32;
+br_lvl = dibp->vloc / VEC_BIT_SIZE;
 if (br_lvl < 4)                                         /* VAXen do 0-3, others 4-7 */
     br_lvl = br_lvl + 4;
 fprintf (st, ", BR%d", br_lvl);
@@ -304,7 +307,7 @@ size_t i, j;
 
 build_vector_tab ();
 for (i = 0; i < IPL_HLVL; i++) {                        /* clear intr tab */
-    for (j = 0; j < 32; j++) {
+    for (j = 0; j < VEC_BIT_SIZE; j++) {
         int_vec[i][j] = 0;
         int_ack[i][j] = NULL;
         }
@@ -334,8 +337,8 @@ if (dibp->vnum > VEC_DEVMAX)
     return SCPE_IERR;
 vec = dibp->vec;
 #if (VEC_SET != 0)
-ilvl = dibp->vloc / 32;
-ibit = dibp->vloc % 32;
+ilvl = dibp->vloc / VEC_BIT_SIZE;
+ibit = dibp->vloc % VEC_BIT_SIZE;
 if (vec)
     vec |= (int_vec_set[ilvl][ibit] & ~3);
 #endif
@@ -356,8 +359,8 @@ if (vec && !(sim_switches & SWMASK ('P'))) {
             }
         cdvec = cdibp->vec;
 #if (VEC_SET != 0)
-        ilvl = cdibp->vloc / 32;
-        ibit = cdibp->vloc % 32;
+        ilvl = cdibp->vloc / VEC_BIT_SIZE;
+        ibit = cdibp->vloc % VEC_BIT_SIZE;
         if (cdvec)
             cdvec |= (int_vec_set[ilvl][ibit] & ~3);
 #endif
@@ -384,8 +387,8 @@ if (vec && !(sim_switches & SWMASK ('P'))) {
 for (i = 0; i < dibp->vnum; i++) {                      /* loop thru vec */
     idx = dibp->vloc + i;                               /* vector index */
     vec = dibp->vec? (dibp->vec + (i * 4)): 0;          /* vector addr */
-    ilvl = idx / 32;
-    ibit = idx % 32;
+    ilvl = idx / VEC_BIT_SIZE;
+    ibit = idx % VEC_BIT_SIZE;
 #if (VEC_SET != 0)
     if (vec)
         vec |= (int_vec_set[ilvl][ibit] & ~3);
@@ -585,7 +588,7 @@ for (i = 0, dibp = NULL; i < (IOPAGESIZE >> 1); i++) {  /* loop thru entries */
             fprintf (st, "%1s", (dibp->vnum >= AUTO_VECBASE)? "*": " ");
             }
         if (dibp->vnum || dibp->vloc)
-            fprintf (st, " %2u", brbase + dibp->vloc/32);
+            fprintf (st, " %2u", (unsigned int)(brbase + dibp->vloc/VEC_BIT_SIZE));
         else
             fprintf (st, "   ");
         fprintf (st, " %*u %s\n", maxdev,  (dibp->ulnt? dibp->lnt/dibp->ulnt:
@@ -938,8 +941,8 @@ for (j = 0; (dptr = sim_devices[j]) != NULL; j++) {
                 DIB *dibp;
 
                 dibp = (DIB *)dptr->ctxt;
-                ilvl = dibp->vloc / 32;
-                ibit = dibp->vloc % 32;
+                ilvl = dibp->vloc / VEC_BIT_SIZE;
+                ibit = dibp->vloc % VEC_BIT_SIZE;
                 if (1) {
                     int v;
                     

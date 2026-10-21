@@ -294,7 +294,7 @@ int32 PSW = 0;                                          /* PSW */
   int32 N = 0, Z = 0, V = 0, C = 0;                     /*   condition codes */
 int32 wait_state = 0;                                   /* wait state */
 int32 trap_req = 0;                                     /* trap requests */
-int32 int_req[IPL_HLVL] = { 0 };                        /* interrupt requests */
+t_int_reqs int_req[IPL_HLVL] = { 0 };                   /* interrupt requests */
 int32 PIRQ = 0;                                         /* programmed int req */
 int32 STKLIM = 0;                                       /* stack limit */
 fpac_t FR[6] = { {0} };                                 /* fp accumulators */
@@ -599,7 +599,7 @@ REG cpu_reg[] = {
     { GRDATA (UDPDR6, APRFILE[076], 8, 16, 0) },
     { GRDATA (UDPAR7, APRFILE[077], 8, 16, 16) },
     { GRDATA (UDPDR7, APRFILE[077], 8, 16, 0) },
-    { BRDATAD (IREQ, int_req, 8, 32, IPL_HLVL, "interrupt pending flags, IPL 0 to 7"), REG_RO },
+    { BRDATAD (IREQ, int_req, 8, VEC_BIT_SIZE, IPL_HLVL, "interrupt pending flags, IPL 0 to 7"), REG_RO|REG_LARGE },
     { ORDATAD (TRAPS, trap_req, TRAP_V_MAX, "trap pending flags") },
     { FLDATAD (WAIT, wait_state, 0,         "wait state enable flag") },
     { ORDATAD (STOP_TRAPS, stop_trap, TRAP_V_MAX, "stop on trap flags") },
