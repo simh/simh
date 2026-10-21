@@ -878,9 +878,7 @@ const struct scp_error {
 
 const size_t size_map[] = { sizeof (int8),
     sizeof (int8), sizeof (int16), sizeof (int32), sizeof (int32)
-#if defined (USE_INT64)
     , sizeof (t_int64), sizeof (t_int64), sizeof (t_int64), sizeof (t_int64)
-#endif
 };
 
 const t_value width_mask[] = { 0,
@@ -17602,7 +17600,7 @@ for (i = 0; (dptr = devices[i]) != NULL; i++) {
                 Mprintf (f, "%s %s:%s unexpected register depth of 0\n", sim_name, dptr->name, rptr->name);
                 }
             }
-        if (rsz > sizeof (t_value)) {
+        if ((rsz > sizeof (t_value)) && (0 == (rptr->flags | REG_LARGE))) {
             Bad = TRUE;
             Mprintf (f, "%u bits at offset %u is wider than the maximum allowed width of %u bits\n", rptr->width, rptr->offset, (uint32)(8 * sizeof(t_value)));
             }
