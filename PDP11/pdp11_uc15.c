@@ -81,7 +81,6 @@
 
 /* Declarations */
 
-extern int32 int_req[IPL_HLVL];
 extern UNIT cpu_unit;
 extern uint16 *M;
 

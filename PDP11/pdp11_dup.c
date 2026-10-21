@@ -61,7 +61,6 @@
 #define DUP_WAIT   50           /* Minimum character time */
 #define DUP_CONNECT_POLL    2   /* Seconds */
 
-extern int32 IREQ (HLVL);
 extern int32 tmxr_poll;                                 /* calibrated delay */
 extern int32 clk_tps;                                   /* clock ticks per second */
 extern int32 tmr_poll;                                  /* instructions per tick */

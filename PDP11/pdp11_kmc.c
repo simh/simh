@@ -498,7 +498,6 @@ static const char *kmc_description (DEVICE *dptr);
 
 /* Global data */
 
-extern int32 IREQ (HLVL);
 extern int32 tmxr_poll;                         /* calibrated delay */
 
 static int32 kmc_AintAck (void);

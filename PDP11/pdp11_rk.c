@@ -301,8 +301,6 @@ BITFIELD *rk_reg_bits[] = {
 #define RK_MIN          10
 #define MAX(x,y)        (((x) > (y))? (x): (y))
 
-extern int32 int_req[IPL_HLVL];
-
 RKCONTR *rkxb = NULL;                                   /* xfer buffer */
 int32 rkcs = 0;                                         /* control/status */
 int32 rkds = 0;                                         /* drive status */
