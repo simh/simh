@@ -13288,6 +13288,7 @@ do {
         (bare_reason != SCPE_REMOTE)  &&
         (bare_reason != SCPE_MTRLNT)  &&
         (bare_reason != SCPE_STOP)    &&
+        (bare_reason != SCPE_LOST)    &&
         (bare_reason != SCPE_STEP)    &&
         (bare_reason != SCPE_RUNTIME) &&
         (bare_reason != SCPE_EXIT)) {
