@@ -687,7 +687,9 @@ for (i = 0; boot_tab[i].name != NULL; i++) {
             R[1] = TR_UBA;
             R[2] = boot_tab[i].let | (ba & UBADDRMASK);
             }
-        R[3] = unitno;
+        if (boot_tab[i].code == BOOT_CS)                /* console floppy is CSA1: */
+            R[3] = 1;                                   /* VMS puts boot unit in TXDB<8> */
+        else R[3] = unitno;
         R[4] = 0;
         R[5] = r5v;
         return SCPE_OK;
