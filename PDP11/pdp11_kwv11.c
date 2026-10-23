@@ -260,7 +260,7 @@ static void kwv11_schedule (void)
     kwv11_run_usec = (double)ticks * kwv11_tick_usec;
     sim_debug (DBG_SCHED, &kwv11_dev, "schedule %u ticks, %.0f usecs\n",
                ticks, kwv11_run_usec);
-    sim_activate_after (&kwv11_unit, (uint32)kwv11_run_usec);
+    sim_activate_after_d (&kwv11_unit, kwv11_run_usec);
 }
 
 static void kwv11_overflow (void)
